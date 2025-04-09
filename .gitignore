@@ -20,6 +20,7 @@ __pycache__/
 *.so
 *.so.*
 *~
+.vscode
 python/flux/version.py
 
 # due to using tox and pytest and clangd

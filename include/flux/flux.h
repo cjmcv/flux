@@ -38,6 +38,7 @@
 #include "cutlass/detail/dependent_false.hpp"
 #include "cutlass/detail/helper_macros.hpp"
 
+// <NT> 表示x大概率为1，方便编译器优化分支预测
 #ifndef FLUX_LIKELY
 #define FLUX_LIKELY(x) (__builtin_expect(!!(x), 1))
 #endif
@@ -471,15 +472,20 @@ enum class CommOpEnum : int8_t {
   AGScatter,                  // MoE tp, ag + scatter + gemm
 };
 
+// <NT> R是行主序，C是列主序，三个分别对应矩阵ABC
 enum class GemmLayoutEnum : int8_t { RRR, RCR, RCC };
+// <NT> 实现类型
 enum class ImplEnum : int8_t { GemmV2, GemmV3, GemmGroupedV2, GemmGroupedV3 };
 
 enum class GemmKindEnum : int8_t { GemmDefault, GemmStreamK };
+// <NT> 通信方式：节点内，跨节点，节点内多卡采用pcie通信
 enum class CommKindEnum : int8_t { IntraNode, AcrossNode, IntraNodePcie };
 
+// <NT> DP:data-parallel, SK: splict-k
 enum class GemmStreamkModeEnum : int8_t { SK, DP };
+// <NT> 启发式，沿M方向，沿N方向
 enum class GemmRasterOrderEnum : int8_t { Heuristic, AlongM, AlongN };
-
+// <NT> 对应dispatch_policy中的 KernelTmaWarpSpecializedCooperative 和 KernelTmaWarpSpecializedPingpong
 enum class GemmKernelScheduleEnum : int8_t { Cooperative, PingPong };
 
 /////////////////////////////////////////////////////
@@ -1079,6 +1085,7 @@ operator==(cute::tuple<Ts...> const &lhs, cute::tuple<Ts...> const &rhs) {
 }
 
 ///////////////////////////////////////////////////////////////
+// <NT> cute::tuple<Ts...>, 实例化时会使用cuta::make_tuple打包参数来创建
 // FluxNamedTuple
 ///////////////////////////////////////////////////////////////
 template <template <class...> class DerivedTpl, class... Ts>
@@ -1198,6 +1205,8 @@ struct FluxNamedTupleBase : cute::tuple<Ts...> {
   }
 };
 
+// <NT> 以FIELD为函数名，定义取其值的函数。
+//      通过“this->”按下标指定来取, 调用的地方都是 FluxNamedTupleBase 的派生类里，其本质就是一个 cute::tuple
 #define FLUX_NAMED_TUPLE_DEFINE_FIELD(FIELD, IDX)                                              \
   constexpr decltype(auto) FIELD() const noexcept { return cute::get<IDX>(this->as_tuple()); } \
   constexpr decltype(auto) FIELD() noexcept { return cute::get<IDX>(this->as_tuple()); }       \

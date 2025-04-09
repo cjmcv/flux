@@ -28,6 +28,12 @@
 
 #include "cutlass/util/command_line.h"
 
+// <NT> Generator 指定的参数和配置是充当搜索空间，自动生成优化过的 CUDA 内核代码
+// 同目录下的几个cc文件都定义了对应kernel的tuning搜索空间，带有main函数进行代码生成操作。
+// 编译时，每个cc都会生成一个可执行文件，如gen_comm_none.cc会编译生成gen_comm_none文件，
+// 并在comm_none的cmakelist中执行，输出到 ./registers 里，都是cu文件，直接参与编译，并做算子注册。
+// 猜测：执行python的tuning脚本时，过程中会对这些kernel都执行一下，找到性能较优者作为tuning结果，
+// 将对应的结果放置到comm_none/tuning_config中注册使用。
 namespace bytedance::flux::generator {
 
 struct Options {
@@ -62,6 +68,7 @@ struct Options {
   }
 };
 
+// <NT> 解析';'号
 inline std::vector<std::string>
 parse_semicolon_seperated(std::string str) {
   std::vector<std::string> str_vec;
@@ -277,6 +284,7 @@ main_template(
   using namespace bytedance::flux;
   std::set<std::string> all_file_paths;
 
+  // <NT> 每个space对应一个配置，一个配置里一组meta和hparams，根据meta和hparams进行代码生成。
   for (auto const &space : spaces) {
     auto [meta_item_list, impl_header, impl_name] = space;
 

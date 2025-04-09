@@ -19,6 +19,10 @@
 #include "ag_gemm/ths_op/all_gather_gemm_op_crossnode.h"
 #include "flux/ths_op/flux_shm.h"
 #include "flux/ths_op/ths_pybind.h"
+
+// <NT> all_gather_gemm_kernel <module name>
+//      AGKernel::forward / gemm_only / profiling
+//      AGKernelCrossNode::reset_signals / copy_local / gemm_only / forward
 namespace bytedance::flux::ths_op {
 
 using AllGatherGemmOpCls = TorchClassWrapper<AllGatherGemmOp>;

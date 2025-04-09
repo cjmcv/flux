@@ -23,6 +23,10 @@
 #include <vector>
 #include "moe_gather_rs/moe_utils.h"
 
+// <NT> gemm_grouped_v2_gather_rs <module name>
+//      calc_moe_triton_blocked_gather_a
+//      GemmGroupedV2GatherRSOp::forward_gather_rs / forward_gather_rs_triton_aot / profiling / forward_gather_rs_multiple
+//      TopkReduceScatterOp::run
 namespace bytedance::flux::ths_op {
 
 namespace py = pybind11;

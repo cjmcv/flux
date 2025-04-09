@@ -21,6 +21,9 @@
 #include "flux/ths_op/ths_pybind.h"
 #include "gemm_rs/tile_scheduler/threadblock_swizzle_segment_util.hpp"
 
+// <NT> gemm_reduce_scatter <module name>
+//      GemmRS::zero_buffers / forward / forward_barrier / forward_reduce_scatter / profiling
+//      SegmentInfo::get_gemm_rs_threadblock_segments_info / calc_gemm_rs_threadblock_segments_info / bsr_reduce / pad_m_to_TPxTile
 namespace bytedance::flux::ths_op {
 using GemmRSOpCls = TorchClassWrapper<GemmRS>;
 namespace py = pybind11;

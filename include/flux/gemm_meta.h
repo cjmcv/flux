@@ -21,8 +21,15 @@
 #include "cute/container/tuple.hpp"
 #include "flux/flux.h"
 
+// <NT> meta 指元编程概念中的 元，不仅包含模板参数，
+// 还包括编译期的类型检查、条件判断、代码生成规则等方面。
+// CUTLASS 借助 C++ 模板元编程来达成编译时的计算与代码生成。
+// 模板元编程能够在编译阶段就开展计算和决策，从而避免运行时的开销，
+// 并且能够依据不同的配置参数生成高度优化的代码。
+
 namespace bytedance::flux {
 
+// <NT> 用于指定gemm参数的数据类型
 template <class... Ts>
 struct GemmDTypeConfig : public FluxNamedTupleBase<GemmDTypeConfig, Ts...> {
  public:
@@ -92,6 +99,7 @@ template <class T>
 inline constexpr bool is_gemm_dtype_config_v =
     detail::is_gemm_dtype_config<decay_and_strip_t<T>>::value;
 
+// <NT> 使用cute::make_tuple构建 GemmDTypeConfig 的函数
 template <
     class DTypeA,
     class DTypeB,
@@ -129,6 +137,7 @@ to_gemm_dtype_config(cute::tuple<Ts...> const &tup) {
 
 /////////////////////////////////////////////////////
 // Impl-specific meta
+// <NT> GemmV2Meta / GemmV3Meta, 通过 UnifiedImplMeta 统一被下面的 GemmMeta 使用。
 /////////////////////////////////////////////////////
 template <class... Ts>
 struct GemmV2Meta : FluxNamedTupleBase<GemmV2Meta, Ts...> {
@@ -215,6 +224,7 @@ using UnifiedImplMeta = std::variant<None, unified_type_t<GemmV2Meta>, unified_t
 
 /////////////////////////////////////////////////////
 // Comm-specific meta
+// <NT> ReduceScatterMeta / GatherRSMeta, 通过 UnifiedCommMeta 统一被下面的 GemmMeta 使用。
 /////////////////////////////////////////////////////
 template <class... Ts>
 struct ReduceScatterMeta : FluxNamedTupleBase<ReduceScatterMeta, Ts...> {
@@ -297,6 +307,7 @@ using UnifiedCommMeta =
 
 /////////////////////////////////////////////////////
 // GemmMeta: params does not change
+// <NT> gemm的meta最外层，里面使用了上面定义的 类型相关的GemmDTypeConfig / gemm版本相关的UnifiedImplMeta / 通信相关的UnifiedCommMeta
 /////////////////////////////////////////////////////
 template <class... Ts>
 struct GemmMeta : FluxNamedTupleBase<GemmMeta, Ts...> {
@@ -438,6 +449,7 @@ filter_layout(GemmMeta<Ts...> meta) {
 /////////////////////////////////////////////////////
 // Create a tuple of GemmMeta by cartesian product
 // of given sets of elements
+// <NT> 在generator中使用，给定多份多元组参数，生成各种各样的GemmMeta。
 template <
     class... DTypes,
     class... Archs,

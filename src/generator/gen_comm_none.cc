@@ -323,6 +323,7 @@ main(int argc, char const **args) {
     return 0;
   }
   std::cout << "Running comm_none generator...\n";
+  // <NT> 每个make_tuple对应meta_item_list, impl_header, impl_name
   return main_template(
       options,
       {

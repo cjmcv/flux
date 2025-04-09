@@ -23,6 +23,8 @@
 #include "cute/layout.hpp"
 
 namespace bytedance::flux {
+
+// <NT> 统一的TileShape类型
 using UnifiedTileShape = cute::tuple<int64_t, int64_t, int64_t>;
 template <class T, __CUTE_REQUIRES(cute::is_tuple<T>::value)>
 constexpr UnifiedTileShape
@@ -35,6 +37,7 @@ unify_type(T const &tile_shape) {
 }
 
 /////////////////////////////////////////////////////
+// <NT> Impl v2的超参数，包含 warp_shape, instruction_shape 和 streamk_mode
 // Impl specific gemm hparams
 /////////////////////////////////////////////////////
 template <class... Ts>
@@ -73,6 +76,15 @@ constexpr GemmV2HParams<Ts...>
 to_gemm_v2_hparams(cute::tuple<Ts...> const &tuple) {
   return {tuple};
 }
+
+// <NT> Impl v3的超参数，包含 cluster_shape 和 kernel_schedule
+// cluster_shape: 集群？中threadblocks的shape，如Shape<_1,_2,_1>
+// kernel_schedule： 根据Collective Builder中的默认设置来启动内核（cutlass::gemm::collective::KernelScheduleAuto）
+
+// using ClusterShape        = Shape<_1,_2,_1>;                                // Shape of the threadblocks in a cluster
+// using StageCountType = cutlass::gemm::collective::StageCountAuto;           // Stage count maximized based on the tile size
+// using KernelSchedule = cutlass::gemm::collective::KernelScheduleAuto;       // Kernel to launch based on the default setting in the Collective Builder 
+//                        包含如KernelMultistage/KernelTmaWarpSpecializedPingpong等，在(3rdparty/cutlass/include/cutlass/gemm/dispatch_policy.hpp)
 
 template <class... Ts>
 struct GemmV3HParams : public FluxNamedTupleBase<GemmV3HParams, Ts...> {

@@ -175,6 +175,7 @@ class OpRegistry {
   static bool check_heuristic_rule(
       UnifiedGemmMeta const &, UnifiedGemmHParams const &, RuntimeConfig const &);
 
+  // <NT> 调用到TuningConfigRegistry::instance().get，会读取tuning_config中的cu里注册的tuning配置。
   template <class... Ts>
   UnifiedGemmHParams
   get_hparams(

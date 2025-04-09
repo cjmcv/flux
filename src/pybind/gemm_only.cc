@@ -21,6 +21,11 @@
 #include "comm_none/ths_op/gemm_grouped_v2.h"
 #include "comm_none/ths_op/gemm_grouped_v3.h"
 
+// <NT> gemm_only <module name>
+//      GemmOnly::forward / profiling
+//      BlockScaleGemm::forward / forward_multistream / reference / profiling
+//      GemmGroupedV2::forward
+//      GemmGroupedV3::forward / profiling
 namespace bytedance::flux::ths_op {
 
 namespace py = pybind11;

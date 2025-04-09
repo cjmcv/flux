@@ -27,7 +27,11 @@ import torch
 
 import flux
 
+# <NT> 表示使用 16 个工作空间，每个工作空间的大小为 8MB, 这种配置适用于大多数常见的深度学习模型和任务，能够在性能和内存占用之间取得较好的平衡.
+# 工作空间（workspace）是一个用于存储中间计算结果、临时数据或者辅助信息的内存区域。
+# 通过工作空间，可以避免频繁地在设备内存和主机内存之间进行数据传输，从而提高计算效率。
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
+# <NT> 让 PyTorch 采用确定性算法，保证每次运行的结果相同（某些情形下为了提升计算性能，可能会使用非确定性算法）
 torch.use_deterministic_algorithms(True, warn_only=True)
 torch.set_printoptions(precision=8)
 torch.manual_seed(3)
@@ -36,6 +40,9 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 torch.backends.cuda.matmul.allow_tf32 = False
 np.random.seed(3)
+# <NT> functools.partial作用是固定一个函数的某些参数，然后生成一个新的可调用对象。
+# print里，当 flush=True 时，会强制将缓冲区中的数据立即输出，而不是等到缓冲区满或者程序结束才输出。
+# flush默认为False，这里则将 flush 参数固定为 True，然后把新生成的函数对象重新赋值给 print。
 print = partial(print, flush=True)
 
 
@@ -48,7 +55,7 @@ class TuningConfig:
     dtype: str
     has_bias: bool
 
-
+# <NT> itertools.product 会从多个集合中各取一个元素组成的所有可能的有序对或元组的集合
 def gen_tuning_space():
     space: List[TuningConfig] = []
     space_M = [1024, 2048, 4096, 8192, 16384]

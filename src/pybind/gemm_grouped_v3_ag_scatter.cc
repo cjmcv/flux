@@ -18,6 +18,8 @@
 #include "flux/ths_op/ths_pybind.h"
 #include "moe_ag_scatter/ths_op/gemm_grouped_v3_ag_scatter.h"
 
+// <NT> gemm_grouped_v3_ag_scatter <module name>
+//      GemmGroupedV3AGScatter::clear_buffers / forward / forward_multiple_weights / profiling
 namespace bytedance::flux::ths_op {
 
 namespace py = pybind11;

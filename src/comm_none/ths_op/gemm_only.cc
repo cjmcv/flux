@@ -15,6 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// <NT> ATen (A TENsor library)是 PyTorch 底层的张量库，它为所有的张量操作提供了基础支持。
+//      c10 (Core10) 是一个底层库，它为 PyTorch 提供了基础的数据结构、工具和抽象。
+
 #include "comm_none/ths_op/gemm_only.h"
 #include "flux/args/comm_none.h"
 #include "flux/cuda/cuda_common.h"
@@ -42,6 +45,16 @@ namespace flux {
 namespace ths_op {
 using torch::Tensor;
 
+// <NT> c10::ScalarType 表示张量的数据类型(c10/core/ScalarType.h)。
+//      c10::optional 表示一个值可能存在也可能不存在的情况。
+//                    类似于 C++17 标准库中 std::optional 的类型。
+//      c10::intrusive_ptr 引用计数型的智能指针，std::shared_ptr 会在内部维护一个独立的引用计数对象，
+//                         而 intrusive_ptr 则是把引用计数嵌入到被管理的对象本身之中，
+//                         被管理的类要实现 add_ref 和 release 这两个函数(c10/util/intrusive_ptr.h)
+//                         这里用于管理 ProfilingContext, 该类是派生于 CustomClassHolder, 继而派生于 c10::intrusive_ptr_target。
+//      torch::Tensor (ATen/core/TensorBody.h)
+
+// <NT> GemmOnlyImpl 是 GemmOnly 的嵌套类, 里面实现的函数，如get_gemm_meta/get_rt_conf/forward_impl等都是 GemmOnlyImpl 的。
 class GemmOnly::GemmOnlyImpl {
  private:
   const c10::ScalarType input_dtype;
@@ -355,6 +368,7 @@ class GemmOnly::GemmOnlyImpl {
   }
 };
 
+// <NT> 实现GemmOnly的函数，仅仅是对其嵌套类GemmOnlyImpl的直接调用。
 GemmOnly::GemmOnly(
     c10::ScalarType input_dtype,
     c10::ScalarType output_dtype,

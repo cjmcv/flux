@@ -15,6 +15,15 @@
 #
 ################################################################################
 
+# <NT> 从 Python 3.5 开始，引入了类型提示功能，它能提升代码的可读性和可维护性，
+# 还能借助静态类型检查工具（像 mypy）来发现潜在的类型错误。cpp_mod.pyi 文件可用来提供详细的类型提示信息。
+# 如 cpp_mod.py 中有bsr_reduce = _get_flux_member("bsr_reduce")，
+# 这里可以添加def bsr_reduce(input: torch.Tensor, output: torch.Tensor, block_h: int, block_w: int): ...
+# 这样，静态类型检查工具就能依据 cpp_mod.pyi 里的类型提示对使用 cpp_mod.add 函数的代码进行检查。
+# 
+# 另外通过 pybind11 或者 ctypes 封装的 C++ 函数，在 Python 里调用时可能无法直观地看出参数和返回值的类型，
+# 这时就可以在 cpp_mod.pyi 中进行明确的类型标注。
+
 import ctypes
 from enum import Enum
 from typing import List, Optional, Tuple
