@@ -167,3 +167,5 @@ to the related papers:
 
 Founded in 2023, ByteDance Seed Team is dedicated to crafting the industry's most advanced AI foundation models. The team aspires to become a world-class research team and make significant contributions to the advancement of science and society.
 
+./build.sh --arch 89 --jobs 6
+python3 test/python/gemm_only/test_gemm_only.py 4096 12288 6144 --dtype=bfloat16

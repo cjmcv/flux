@@ -185,6 +185,7 @@ class OpRegistry {
 
     auto unified_meta = unify_type(meta);
     // Try get record from tuning config registery
+    printf("hello.\n");
     auto config_record = TuningConfigRegistry::instance().get(unified_meta, runtime_config);
     if (config_record != nullptr) {
       if (filter(*config_record)) {

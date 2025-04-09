@@ -18,7 +18,7 @@ include_directories(
 )
 
 add_executable(gen_comm_none gen_comm_none.cc)
-add_executable(gen_ag_gemm gen_ag_gemm.cc)
-add_executable(gen_gemm_rs gen_gemm_rs.cc)
-add_executable(gen_moe_ag_scatter gen_moe_ag_scatter.cc)
-add_executable(gen_moe_gather_rs gen_moe_gather_rs.cc)
+# add_executable(gen_ag_gemm gen_ag_gemm.cc)
+# add_executable(gen_gemm_rs gen_gemm_rs.cc)
+# add_executable(gen_moe_ag_scatter gen_moe_ag_scatter.cc)
+# add_executable(gen_moe_gather_rs gen_moe_gather_rs.cc)

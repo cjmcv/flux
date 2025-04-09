@@ -51,11 +51,11 @@ class TuningConfig:
 
 def gen_tuning_space():
     space: List[TuningConfig] = []
-    space_M = [1024, 2048, 4096, 8192, 16384]
-    space_N = [6144, 12288, 49152]
+    space_M = [1024, 2048, 4096, 8192] # , 16384
+    space_N = [6144, 12288] # , 49152
     space_K = [3072, 6144, 12288]
-    space_transpose_weight = [False, True]
-    space_dtype = [torch.bfloat16, torch.float16]
+    space_transpose_weight = [False] # , True
+    space_dtype = [torch.bfloat16] # , torch.float16
     space_has_bias = [False, True]
     for M, N, K, transpose_weight, dtype, has_bias in itertools.product(
         space_M, space_N, space_K, space_transpose_weight, space_dtype, space_has_bias
@@ -108,7 +108,7 @@ def tune_one_config(prof_ctx: flux.ProfilingContext, config: TuningConfig):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--output_dir", default="", type=str, help="Directory to store generated files"
+        "--output_dir", default="./", type=str, help="Directory to store generated files"
     )
     return parser.parse_args()
 

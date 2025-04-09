@@ -1,0 +1,192 @@
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=6144,k=3072,comm_spec=None)
+ * TopK=1 (1.94 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=6144,k=6144,comm_spec=None)
+ * TopK=1 (3.8 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=6144,k=12288,comm_spec=None)
+ * TopK=1 (7.54 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=12288,k=3072,comm_spec=None)
+ * TopK=1 (3.07 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=12288,k=6144,comm_spec=None)
+ * TopK=1 (6.08 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=12288,k=12288,comm_spec=None)
+ * TopK=1 (12.7 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=6144,k=3072,comm_spec=None)
+ * TopK=1 (3.06 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=6144,k=6144,comm_spec=None)
+ * TopK=1 (6.35 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=6144,k=12288,comm_spec=None)
+ * TopK=1 (12.7 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=12288,k=3072,comm_spec=None)
+ * TopK=1 (6.13 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=12288,k=6144,comm_spec=None)
+ * TopK=1 (12.5 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=12288,k=12288,comm_spec=None)
+ * TopK=1 (26.3 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=6144,k=3072,comm_spec=None)
+ * TopK=1 (6.37 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=6144,k=6144,comm_spec=None)
+ * TopK=1 (12.8 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=6144,k=12288,comm_spec=None)
+ * TopK=1 (26.3 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=12288,k=3072,comm_spec=None)
+ * TopK=1 (12.8 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=12288,k=6144,comm_spec=None)
+ * TopK=1 (25.5 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=12288,k=12288,comm_spec=None)
+ * TopK=1 (52.6 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=6144,k=3072,comm_spec=None)
+ * TopK=1 (12.7 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=6144,k=6144,comm_spec=None)
+ * TopK=1 (25.2 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=6144,k=12288,comm_spec=None)
+ * TopK=1 (52.7 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=12288,k=3072,comm_spec=None)
+ * TopK=1 (25.6 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=12288,k=6144,comm_spec=None)
+ * TopK=1 (51.8 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=Void,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=12288,k=12288,comm_spec=None)
+ * TopK=1 (106 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=6144,k=3072,comm_spec=None)
+ * TopK=1 (1.99 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=6144,k=6144,comm_spec=None)
+ * TopK=1 (3.84 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=6144,k=12288,comm_spec=None)
+ * TopK=1 (5.99 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=12288,k=3072,comm_spec=None)
+ * TopK=1 (3.08 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=12288,k=6144,comm_spec=None)
+ * TopK=1 (6.16 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=1024,n=12288,k=12288,comm_spec=None)
+ * TopK=1 (12.6 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=6144,k=3072,comm_spec=None)
+ * TopK=1 (3.12 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=6144,k=6144,comm_spec=None)
+ * TopK=1 (6.43 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=6144,k=12288,comm_spec=None)
+ * TopK=1 (13.1 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=12288,k=3072,comm_spec=None)
+ * TopK=1 (6.54 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=12288,k=6144,comm_spec=None)
+ * TopK=1 (13 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=2048,n=12288,k=12288,comm_spec=None)
+ * TopK=1 (26.1 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=6144,k=3072,comm_spec=None)
+ * TopK=1 (6.24 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=6144,k=6144,comm_spec=None)
+ * TopK=1 (12.6 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=6144,k=12288,comm_spec=None)
+ * TopK=1 (25.9 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=12288,k=3072,comm_spec=None)
+ * TopK=1 (13.4 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=12288,k=6144,comm_spec=None)
+ * TopK=1 (25.5 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=4096,n=12288,k=12288,comm_spec=None)
+ * TopK=1 (52.5 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=6144,k=3072,comm_spec=None)
+ * TopK=1 (13 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=6144,k=6144,comm_spec=None)
+ * TopK=1 (25.7 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=6144,k=12288,comm_spec=None)
+ * TopK=1 (52.7 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=12288,k=3072,comm_spec=None)
+ * TopK=1 (26.9 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=12288,k=6144,comm_spec=None)
+ * TopK=1 (52.3 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
+GemmMeta(dtype=GemmDTypeConfig(a=BF16,b=BF16,c=BF16,d=BF16,acc=FP32,blockscale=FP32),arch=Sm89,comm_op=CommNone,gemm_layout=RCR,impl=GemmV2,impl_spec=GemmV2Meta(fast_accum=0),comm_spec=None)
+RuntimeConfig(m=8192,n=12288,k=12288,comm_spec=None)
+ * TopK=1 (109 ms): GemmHParams(impl_spec=GemmV2HParams(warp_shape=(64,64,32),instruction_shape=(16,8,16),streamk_mode=StreamkSK),comm_spec=None,tile_shape=(128,128,32),gemm_kind=GemmStreamK,mainloop_stage=4,raster_order=RasterAlongN)
+
