@@ -38,12 +38,12 @@ DTYPE_MAP = {
     "s32": torch.int32,
 }
 
-RING_MODE_MAP = {
-    "auto": None,
-    "all2all": flux.AGRingMode.All2All,
-    "ring1d": flux.AGRingMode.Ring1D,
-    "ring2d": flux.AGRingMode.Ring2D,
-}
+# RING_MODE_MAP = {
+#     "auto": None,
+#     "all2all": flux.AGRingMode.All2All,
+#     "ring1d": flux.AGRingMode.Ring1D,
+#     "ring2d": flux.AGRingMode.Ring2D,
+# }
 
 
 def init_seed(seed=0):
@@ -256,10 +256,9 @@ def bitwise_eq(x: torch.Tensor, y: torch.Tensor):
 
     return torch.equal(x.view(torch.int8), y.view(torch.int8))
 
-
+    # "RING_MODE_MAP",
 __all__ = [
     "DTYPE_MAP",
-    "RING_MODE_MAP",
     "TP_GROUP",
     "NNODES",
     "init_seed",

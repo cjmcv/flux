@@ -11,7 +11,6 @@ execute_process(
 file(GLOB OP_REGS ${CMAKE_CURRENT_BINARY_DIR}/registers/*.cu)
 file(GLOB TUNING_CONFIGS tuning_config/*.cu)
 set(CU_FILES
-  cutlass_blockscale_gemm_impl.cu
   ${OP_REGS}
   ${TUNING_CONFIGS}
 )

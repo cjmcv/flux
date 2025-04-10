@@ -18,8 +18,8 @@
 #include "flux/ths_op/ths_op.h"
 #include "flux/ths_op/flux_shm.h"
 #include "flux/ths_op/ths_pybind.h"
-#include "coll/ths_op/all_gather_types.h"
-#include "coll/ths_op/reduce_scatter_op.h"
+// #include "coll/ths_op/all_gather_types.h"
+// #include "coll/ths_op/reduce_scatter_op.h"
 #include <c10/cuda/CUDAStream.h>
 #include "flux/cuda/moe_utils.h"
 
@@ -134,39 +134,39 @@ init_moe_arguments(py::module &m) {
           py::arg("output_dtype") = py::none());
 }
 
-void
-init_coll_arguments(py::module &m) {
-  py::enum_<AGRingMode>(m, "AGRingMode", py::arithmetic())
-      .value("All2All", AGRingMode::All2All)
-      .value("Ring1D", AGRingMode::Ring1D)
-      .value("Ring2D", AGRingMode::Ring2D);
-  py::class_<AllGatherOptionWithOptional>(m, "AllGatherOption")
-      .def(py::init([]() { return new AllGatherOptionWithOptional(); }))
-      .def_readwrite("input_buffer_copied", &AllGatherOptionWithOptional::input_buffer_copied)
-      .def_readwrite("use_read", &AllGatherOptionWithOptional::use_read)
-      .def_readwrite("mode", &AllGatherOptionWithOptional::mode)
-      .def_readwrite("fuse_sync", &AllGatherOptionWithOptional::fuse_sync)
-      .def_readwrite("use_cuda_core_local", &AllGatherOptionWithOptional::use_cuda_core_local)
-      .def_readwrite("use_cuda_core_ag", &AllGatherOptionWithOptional::use_cuda_core_ag);
-  m.def("get_default_ag_ring_mode", []() -> AGRingMode { return get_default_ag_ring_mode(); });
+// void
+// init_coll_arguments(py::module &m) {
+//   py::enum_<AGRingMode>(m, "AGRingMode", py::arithmetic())
+//       .value("All2All", AGRingMode::All2All)
+//       .value("Ring1D", AGRingMode::Ring1D)
+//       .value("Ring2D", AGRingMode::Ring2D);
+//   py::class_<AllGatherOptionWithOptional>(m, "AllGatherOption")
+//       .def(py::init([]() { return new AllGatherOptionWithOptional(); }))
+//       .def_readwrite("input_buffer_copied", &AllGatherOptionWithOptional::input_buffer_copied)
+//       .def_readwrite("use_read", &AllGatherOptionWithOptional::use_read)
+//       .def_readwrite("mode", &AllGatherOptionWithOptional::mode)
+//       .def_readwrite("fuse_sync", &AllGatherOptionWithOptional::fuse_sync)
+//       .def_readwrite("use_cuda_core_local", &AllGatherOptionWithOptional::use_cuda_core_local)
+//       .def_readwrite("use_cuda_core_ag", &AllGatherOptionWithOptional::use_cuda_core_ag);
+//   m.def("get_default_ag_ring_mode", []() -> AGRingMode { return get_default_ag_ring_mode(); });
 
-  py::enum_<RingMode>(m, "RingMode", py::arithmetic())
-      .value("All2All", RingMode::All2All)
-      .value("Ring1D", RingMode::Ring1D)
-      .value("Ring2D", RingMode::Ring2D);
-  py::class_<ReduceScatterOptionWithOptional>(m, "ReduceScatterOption")
-      .def(py::init([]() { return new ReduceScatterOptionWithOptional(); }))
-      .def_readwrite("use_barrier_queue", &ReduceScatterOptionWithOptional::use_barrier_queue)
-      .def_readwrite("use_1d_ring", &ReduceScatterOptionWithOptional::use_1d_ring)
-      .def_readwrite("use_p2p_read", &ReduceScatterOptionWithOptional::use_p2p_read)
-      .def_readwrite("use_cudaMemcpyAsync", &ReduceScatterOptionWithOptional::use_cudaMemcpyAsync)
-      .def_readwrite("use_gemmk", &ReduceScatterOptionWithOptional::use_gemmk)
-      .def_readwrite("per_tile_flags", &ReduceScatterOptionWithOptional::per_tile_flags)
-      .def_readwrite("n_split", &ReduceScatterOptionWithOptional::n_split)
-      .def_readwrite("num_blocks", &ReduceScatterOptionWithOptional::num_blocks)
-      .def_readwrite("ring_mode", &ReduceScatterOptionWithOptional::ring_mode);
-  m.def("get_default_rs_ring_mode", []() -> RingMode { return get_default_rs_ring_mode(); });
-}
+//   py::enum_<RingMode>(m, "RingMode", py::arithmetic())
+//       .value("All2All", RingMode::All2All)
+//       .value("Ring1D", RingMode::Ring1D)
+//       .value("Ring2D", RingMode::Ring2D);
+//   py::class_<ReduceScatterOptionWithOptional>(m, "ReduceScatterOption")
+//       .def(py::init([]() { return new ReduceScatterOptionWithOptional(); }))
+//       .def_readwrite("use_barrier_queue", &ReduceScatterOptionWithOptional::use_barrier_queue)
+//       .def_readwrite("use_1d_ring", &ReduceScatterOptionWithOptional::use_1d_ring)
+//       .def_readwrite("use_p2p_read", &ReduceScatterOptionWithOptional::use_p2p_read)
+//       .def_readwrite("use_cudaMemcpyAsync", &ReduceScatterOptionWithOptional::use_cudaMemcpyAsync)
+//       .def_readwrite("use_gemmk", &ReduceScatterOptionWithOptional::use_gemmk)
+//       .def_readwrite("per_tile_flags", &ReduceScatterOptionWithOptional::per_tile_flags)
+//       .def_readwrite("n_split", &ReduceScatterOptionWithOptional::n_split)
+//       .def_readwrite("num_blocks", &ReduceScatterOptionWithOptional::num_blocks)
+//       .def_readwrite("ring_mode", &ReduceScatterOptionWithOptional::ring_mode);
+//   m.def("get_default_rs_ring_mode", []() -> RingMode { return get_default_rs_ring_mode(); });
+// }
 
 
 PYBIND11_MODULE(FLUX_TORCH_EXTENSION_NAME, m) {
@@ -210,7 +210,7 @@ PYBIND11_MODULE(FLUX_TORCH_EXTENSION_NAME, m) {
   init_dist_env_tp(m);
   init_dist_env_tp_with_ep(m);
   init_moe_arguments(m);
-  init_coll_arguments(m);
+  // init_coll_arguments(m);
 
   // Initialize ops in registry
   ThsOpsInitRegistry::instance().initialize_all(m);
