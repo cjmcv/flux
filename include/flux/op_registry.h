@@ -157,10 +157,8 @@ class OpRegistry {
       return;
     }
 #if defined(FLUX_DEBUG)
-    if (get_int_from_env("RANK", 0) == 0) {
-      std::cout << "register creator for meta:[" << meta << "], hparams:[" << hparams
+    std::cout << "register creator for meta:[" << meta << "], hparams:[" << hparams
                 << "] with hparams_idx:[" << hparams_idx << "]" << std::endl;
-    }
 #endif
     meta_reg.emplace(unified_hparams, std::move(creator));
 
@@ -189,10 +187,8 @@ class OpRegistry {
     if (config_record != nullptr) {
       if (filter(*config_record)) {
 #if defined(FLUX_DEBUG)
-        if (get_int_from_env("RANK", 0) == 0) {
-          std::cout << "get record for (" << unified_meta << " x " << runtime_config
+        std::cout << "get record for (" << unified_meta << " x " << runtime_config
                     << ") from config reg: " << *config_record << std::endl;
-        }
 #endif
         return *config_record;
       }
@@ -211,10 +207,8 @@ class OpRegistry {
       auto const &hparams = hparams_pair.second;
       if (filter(hparams)) {
 #if defined(FLUX_DEBUG)
-        if (get_int_from_env("RANK", 0) == 0) {
-          std::cout << "fallback to registered hparams for (" << unified_meta << " x "
+        std::cout << "fallback to registered hparams for (" << unified_meta << " x "
                     << runtime_config << "), hparams: " << hparams << std::endl;
-        }
 #endif
         if (first_valid == nullptr) {
           first_valid = &hparams;

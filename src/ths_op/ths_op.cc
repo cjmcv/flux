@@ -66,40 +66,40 @@ set_deterministic(bool use_deterministic_algorithms, bool deterministic_algorith
 }
 }  // namespace
 
-class TorchDeterministicGuard::TorchDeterministicGuardImpl {
- public:
-  TorchDeterministicGuardImpl(bool use_deterministic_algorithms)
-      : use_deterministic_algorithms_old_(get_deterministic()),
-        deterministic_algorithms_warn_only_old_(
-            at::globalContext().deterministicAlgorithmsWarnOnly()) {
-    set_deterministic(use_deterministic_algorithms, use_deterministic_algorithms_old_);
-  }
+// class TorchDeterministicGuard::TorchDeterministicGuardImpl {
+//  public:
+//   TorchDeterministicGuardImpl(bool use_deterministic_algorithms)
+//       : use_deterministic_algorithms_old_(get_deterministic()),
+//         deterministic_algorithms_warn_only_old_(
+//             at::globalContext().deterministicAlgorithmsWarnOnly()) {
+//     set_deterministic(use_deterministic_algorithms, use_deterministic_algorithms_old_);
+//   }
 
-  ~TorchDeterministicGuardImpl() { exit(); }
+//   ~TorchDeterministicGuardImpl() { exit(); }
 
-  void
-  exit() {
-    if (exited_)
-      return;
-    set_deterministic(
-        deterministic_algorithms_warn_only_old_, deterministic_algorithms_warn_only_old_);
-  }
+//   void
+//   exit() {
+//     if (exited_)
+//       return;
+//     set_deterministic(
+//         deterministic_algorithms_warn_only_old_, deterministic_algorithms_warn_only_old_);
+//   }
 
- private:
-  bool use_deterministic_algorithms_old_;
-  bool deterministic_algorithms_warn_only_old_;
-  bool exited_ = false;
-};
+//  private:
+//   bool use_deterministic_algorithms_old_;
+//   bool deterministic_algorithms_warn_only_old_;
+//   bool exited_ = false;
+// };
 
-TorchDeterministicGuard::TorchDeterministicGuard(bool use_deterministic_algorithms)
-    : impl_(new TorchDeterministicGuardImpl(use_deterministic_algorithms)) {}
+// TorchDeterministicGuard::TorchDeterministicGuard(bool use_deterministic_algorithms)
+//     : impl_(new TorchDeterministicGuardImpl(use_deterministic_algorithms)) {}
 
-TorchDeterministicGuard::~TorchDeterministicGuard() { delete impl_; }
+// TorchDeterministicGuard::~TorchDeterministicGuard() { delete impl_; }
 
-void
-TorchDeterministicGuard::exit() {
-  impl_->exit();
-}
+// void
+// TorchDeterministicGuard::exit() {
+//   impl_->exit();
+// }
 
 DataTypeEnum
 from_torch_dtype(at::ScalarType torch_dtype) {
@@ -302,88 +302,6 @@ ProfilingContext::record_best(UnifiedGemmMeta const &meta, RuntimeConfig const &
   auto best_hparams = top_hparams.begin()->second;
   codegen.add(meta, rt_conf, best_hparams);
   return best_hparams;
-}
-
-DistEnvTP::DistEnvTP(c10::intrusive_ptr<c10d::ProcessGroup> tp_group, int nnodes)
-    : DistEnv(tp_group->getRank(), tp_group->getSize(), nnodes), tp_group(tp_group) {}
-
-std::string
-DistEnvTP::toString() const {
-  std::stringstream ss;
-  ss << "DistEnvTP(";
-  ss << "rank=" << rank;
-  ss << "world_size=" << world_size;
-  ss << "nnodes=" << nnodes;
-  ss << ")";
-  return std::move(ss).str();
-}
-
-DistEnvTPWithEP::DistEnvTPWithEP(
-    c10::intrusive_ptr<c10d::ProcessGroup> tp_group_,
-    int nnodes,
-    c10::intrusive_ptr<c10d::ProcessGroup> ep_group)
-    : DistEnv(tp_group_->getRank(), tp_group_->getSize(), nnodes),
-      tp_group(tp_group_),
-      ep_group(ep_group),
-      ep_rank(ep_group != nullptr ? ep_group->getRank() : 0),
-      ep_size(ep_group != nullptr ? ep_group->getSize() : 1),
-      ffn_tp_size(world_size / ep_size),
-      ffn_tp_rank(rank % ffn_tp_size) {
-  FLUX_CHECK_DIV(world_size, ep_size);
-}
-
-std::string
-DistEnvTPWithEP::toString() const {
-  std::stringstream ss;
-  ss << "DistEnvTPWithEP(";
-  ss << "rank=" << rank;
-  ss << ",world_size=" << world_size;
-  ss << ",nnodes=" << nnodes;
-  ss << ",ep_rank=" << ep_rank;
-  ss << ",ep_size=" << ep_size;
-  ss << ")";
-  return std::move(ss).str();
-}
-
-MoeArguments::MoeArguments(
-    int32_t max_ntokens,
-    int32_t hidden,
-    int32_t ffn_hidden,
-    int32_t nexperts,
-    int32_t topk,
-    c10::ScalarType input_dtype,
-    c10::ScalarType output_dtype)
-    : max_ntokens(max_ntokens),
-      hidden(hidden),
-      ffn_hidden(ffn_hidden),
-      nexperts(nexperts),
-      topk(topk),
-      input_dtype(input_dtype),
-      output_dtype(output_dtype) {}
-
-void
-lazy_init_buffer_tensor(torch::Tensor *tensor, int64_t buffer_size) {
-  if (buffer_size <= 0 || tensor == nullptr) {
-    return;
-  }
-
-  buffer_size = (buffer_size + 127) / 128 * 128;
-
-  if (!tensor->defined() || buffer_size > tensor->numel()) {
-    auto options =
-        torch::TensorOptions().dtype(c10::ScalarType::Byte).device(torch::Device(torch::kCUDA));
-    *tensor = torch::empty({buffer_size}, options);
-  }
-}
-
-void
-copy_tensor_with_kernel_async(const torch::Tensor src, torch::Tensor dst, cudaStream_t stream) {
-  FLUX_CHECK_EQ(src.scalar_type(), dst.scalar_type());
-  FLUX_CHECK_EQ(src.sizes(), dst.sizes());
-  FLUX_CHECK_EQ(src.numel(), dst.numel());
-  FLUX_CHECK(src.is_cuda() || src.is_pinned());
-  FLUX_CHECK(dst.is_cuda() || dst.is_pinned());
-  copy_continous_aligned(dst.data_ptr(), src.data_ptr(), src.nbytes(), 1, 1024, stream);
 }
 
 }  // namespace bytedance::flux::ths_op

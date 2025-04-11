@@ -127,13 +127,13 @@ cuda_stub() {
   return _stubs::cuda_stub_;
 }
 
-CUresult
-CUStreamWaitValue(CUstream stream, CUdeviceptr addr, cuuint32_t value, unsigned int flags) {
-  return cuda_stub().cuStreamWaitValue32_v2(stream, addr, value, flags);
-}
-CUresult
-CUStreamWriteValue(CUstream stream, CUdeviceptr addr, cuuint32_t value, unsigned int flags) {
-  return cuda_stub().cuStreamWriteValue32_v2(stream, addr, value, flags);
-}
+// CUresult
+// CUStreamWaitValue(CUstream stream, CUdeviceptr addr, cuuint32_t value, unsigned int flags) {
+//   return cuda_stub().cuStreamWaitValue32_v2(stream, addr, value, flags);
+// }
+// CUresult
+// CUStreamWriteValue(CUstream stream, CUdeviceptr addr, cuuint32_t value, unsigned int flags) {
+//   return cuda_stub().cuStreamWriteValue32_v2(stream, addr, value, flags);
+// }
 
 }  // namespace bytedance::flux

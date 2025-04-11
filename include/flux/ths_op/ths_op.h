@@ -18,7 +18,7 @@
 #pragma once
 #include "c10/util/Optional.h"
 #include "flux/flux.h"
-#include "flux/utils.h"
+// #include "flux/utils.h"
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"
@@ -99,46 +99,46 @@ class ProfilingContext : public torch::CustomClassHolder {
   UnifiedGemmHParams record_best(UnifiedGemmMeta const &meta, RuntimeConfig const &rt_conf);
 };
 
-struct DistEnvTP : public DistEnv {
-  c10::intrusive_ptr<c10d::ProcessGroup> tp_group;
-  DistEnvTP(c10::intrusive_ptr<c10d::ProcessGroup> tp_group, int nnodes = 1);
-  std::string toString() const;
-};
+// struct DistEnvTP : public DistEnv {
+//   c10::intrusive_ptr<c10d::ProcessGroup> tp_group;
+//   DistEnvTP(c10::intrusive_ptr<c10d::ProcessGroup> tp_group, int nnodes = 1);
+//   std::string toString() const;
+// };
 
-struct DistEnvTPWithEP : public DistEnv {
-  c10::intrusive_ptr<c10d::ProcessGroup> tp_group;
-  c10::intrusive_ptr<c10d::ProcessGroup> ep_group;
-  int32_t ep_rank;
-  int32_t ep_size;
-  int32_t ffn_tp_size;
-  int32_t ffn_tp_rank;
+// struct DistEnvTPWithEP : public DistEnv {
+//   c10::intrusive_ptr<c10d::ProcessGroup> tp_group;
+//   c10::intrusive_ptr<c10d::ProcessGroup> ep_group;
+//   int32_t ep_rank;
+//   int32_t ep_size;
+//   int32_t ffn_tp_size;
+//   int32_t ffn_tp_rank;
 
-  DistEnvTPWithEP(
-      c10::intrusive_ptr<c10d::ProcessGroup> tp_group,
-      int nnodes = 1,
-      c10::intrusive_ptr<c10d::ProcessGroup> ep_group = nullptr);
-  std::string toString() const;
-};
+//   DistEnvTPWithEP(
+//       c10::intrusive_ptr<c10d::ProcessGroup> tp_group,
+//       int nnodes = 1,
+//       c10::intrusive_ptr<c10d::ProcessGroup> ep_group = nullptr);
+//   std::string toString() const;
+// };
 
-struct MoeArguments : public torch::CustomClassHolder {
-  const int32_t max_ntokens;
-  const int32_t hidden;
-  const int32_t ffn_hidden;
-  const int32_t nexperts;
-  const int32_t topk;
+// struct MoeArguments : public torch::CustomClassHolder {
+//   const int32_t max_ntokens;
+//   const int32_t hidden;
+//   const int32_t ffn_hidden;
+//   const int32_t nexperts;
+//   const int32_t topk;
 
-  const c10::ScalarType input_dtype;
-  const c10::ScalarType output_dtype;
+//   const c10::ScalarType input_dtype;
+//   const c10::ScalarType output_dtype;
 
-  MoeArguments(
-      int32_t max_ntokens,
-      int32_t hidden,
-      int32_t ffn_hidden,
-      int32_t nexperts,
-      int32_t topk,
-      c10::ScalarType input_dtype,
-      c10::ScalarType output_dtype);
-};
+//   MoeArguments(
+//       int32_t max_ntokens,
+//       int32_t hidden,
+//       int32_t ffn_hidden,
+//       int32_t nexperts,
+//       int32_t topk,
+//       c10::ScalarType input_dtype,
+//       c10::ScalarType output_dtype);
+// };
 
 /** torch::empty filled with uninitialized data but not if torch.use_deterministic_algorithms() and
   torch.utils.deterministic.fill_uninitialized_memory are both set to True. use this c++ utility to
@@ -148,38 +148,38 @@ struct MoeArguments : public torch::CustomClassHolder {
     TorchDeterministicGuard _();
     auto tensor = torch::empty(...);
  */
-class TorchDeterministicGuard {
- public:
-  TorchDeterministicGuard(bool use_deterministic_algorithms);
-  // set back deterministic state. if already run exit(), won't set deterministic back again
-  ~TorchDeterministicGuard();
-  // set back deterministic on manual run exit().
-  void exit();
+// class TorchDeterministicGuard {
+//  public:
+//   TorchDeterministicGuard(bool use_deterministic_algorithms);
+//   // set back deterministic state. if already run exit(), won't set deterministic back again
+//   ~TorchDeterministicGuard();
+//   // set back deterministic on manual run exit().
+//   void exit();
 
- private:
-  class TorchDeterministicGuardImpl;
-  TorchDeterministicGuardImpl *impl_ = nullptr;
-};
+//  private:
+//   class TorchDeterministicGuardImpl;
+//   TorchDeterministicGuardImpl *impl_ = nullptr;
+// };
 
-// torch::empty zero data if torch.use_deterministic_algorithms() is set to True, which is slow.
-// use this c++ utility to skip tensor initialization for better performance.
-template <typename... T>
-torch::Tensor
-empty_with_uninitialized_data(T... args) {
-  TorchDeterministicGuard _(false);
-  return torch::empty(args...);
-}
+// // torch::empty zero data if torch.use_deterministic_algorithms() is set to True, which is slow.
+// // use this c++ utility to skip tensor initialization for better performance.
+// template <typename... T>
+// torch::Tensor
+// empty_with_uninitialized_data(T... args) {
+//   TorchDeterministicGuard _(false);
+//   return torch::empty(args...);
+// }
 
 // used CUDA core to copy torch::Tensor instead of cudaMemcpyAsync. to avoid conflict with other
 // cudaMemcpyAsync activities. usually small torch::Tensor is copied with this
-void copy_tensor_with_kernel_async(
-    const torch::Tensor src, torch::Tensor dst, cudaStream_t stream);
+// void copy_tensor_with_kernel_async(
+//     const torch::Tensor src, torch::Tensor dst, cudaStream_t stream);
 
 // bool bitwise_check(torch::Tensor A, torch::Tensor B);
 // void uniform_initialize(torch::Tensor tensor, uint64_t seed, double min, double max);
 // void cudaipc_barrier_all_on_stream(
 //     cudaStream_t stream, std::vector<torch::Tensor> &sync_buffer, int rank);
-void lazy_init_buffer_tensor(torch::Tensor *tensor, int64_t buffer_size);
+// void lazy_init_buffer_tensor(torch::Tensor *tensor, int64_t buffer_size);
 #ifdef FLUX_SHM_USE_NVSHMEM
 torch::Tensor topk_scatter_reduce(
     std::vector<torch::Tensor> inputs, torch::Tensor scatter_idx, int64_t TOPK);

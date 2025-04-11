@@ -20,48 +20,8 @@
 
 namespace bytedance::flux {
 
-template <class... Ts>
-struct ReduceScatterRuntimeConfigTpl : FluxNamedTupleBase<ReduceScatterRuntimeConfigTpl, Ts...> {
-  using Base = FluxNamedTupleBase<ReduceScatterRuntimeConfigTpl, Ts...>;
-  static constexpr char const *Name = "ReduceScatterRuntimeConfig";
-  static constexpr char const *LowerName = "reduce_scatter_runtime_config";
-  static constexpr std::array<char const *, 2> Fields = {"world_size", "nnodes"};
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(world_size, 0)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(nnodes, 1)
-
-  constexpr ReduceScatterRuntimeConfigTpl(cute::tuple<Ts...> const &tup) : Base(tup) {}
-};
-
-using ReduceScatterRuntimeConfig = ReduceScatterRuntimeConfigTpl<int, int>;
-
-inline ReduceScatterRuntimeConfig
-make_reduce_scatter_runtime_config(int world_size = 1, int nnodes = 1) {
-  return cute::make_tuple(world_size, nnodes);
-}
-
-template <class... Ts>
-struct AllGatherRuntimeConfigTpl : FluxNamedTupleBase<AllGatherRuntimeConfigTpl, Ts...> {
-  using Base = FluxNamedTupleBase<AllGatherRuntimeConfigTpl, Ts...>;
-  static constexpr char const *Name = "AllGatherRuntimeConfig";
-  static constexpr char const *LowerName = "all_gather_runtime_config";
-  static constexpr std::array<char const *, 3> Fields = {"world_size", "nnodes", "ring_mode"};
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(world_size, 0)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(nnodes, 1)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(ring_mode, 2)
-
-  constexpr AllGatherRuntimeConfigTpl(cute::tuple<Ts...> const &tup) : Base(tup) {}
-};
-
-using AllGatherRuntimeConfig = AllGatherRuntimeConfigTpl<int, int, int>;
-
-inline AllGatherRuntimeConfig
-make_all_gather_runtime_config(int world_size = 1, int nnodes = 1, int ring_mode = 0) {
-  return cute::make_tuple(world_size, nnodes, ring_mode);
-}
-
-
 using UnifiedCommRuntimeConfig =
-    std::variant<None, ReduceScatterRuntimeConfig, AllGatherRuntimeConfig>;
+    std::variant<None>; // , ReduceScatterRuntimeConfig, AllGatherRuntimeConfig
 
 // Runtime config used for Dispacher of ops.
 template <class... Ts>

@@ -16,9 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "flux/gemm_hparams.h"
-#include "flux/op_registry_proto_utils.h"
 #include "flux/flux.h"
-#include "flux/utils.h"
+// #include "flux/utils.h"
 #include "flux/op_registry.h"
 #include <mutex>
 
@@ -50,18 +49,6 @@ get_arch() {
 TuningConfigRegistry &
 TuningConfigRegistry::instance() {
   static TuningConfigRegistry inst;
-  const char *env = getenv("FLUX_TUNE_CONFIG_FILE");
-  if (env != nullptr) {
-    static std::once_flag flag;
-    std::call_once(flag, load_tune_config_from_file, inst, env);
-  } else {
-#if defined(FLUX_DEBUG)
-    if (get_int_from_env("RANK", 0) == 0) {
-      std::cerr << "FLUX_TUNE_CONFIG_FILE not set. no tune config file specified, using default "
-                   "configs\n";
-    }
-#endif
-  }
   return inst;
 }
 

@@ -20,8 +20,6 @@ import importlib
 import logging
 from pathlib import Path
 
-import torch
-
 FLUX_TORCH_EXTENSION_NAME = "flux_ths_pybind"
 
 
@@ -47,27 +45,15 @@ flux_mod = importlib.import_module(FLUX_TORCH_EXTENSION_NAME)
 class NotCompiled:
     pass
 
-
 def _get_flux_member(member):
     return getattr(flux_mod, member, NotCompiled())
 
-
-def _get_from_torch_classes(name: str):
-    try:
-        return getattr(torch.classes.flux, name)
-    except:
-        return NotCompiled()
-
-
-# bsr_reduce = _get_flux_member("bsr_reduce")
 load_tuning_record = flux_mod.load_tuning_record
 
 ProfilingContext = flux_mod.ProfilingContext
 TuningRecord = flux_mod.TuningRecord
 
-# GEMM only
 GemmOnly = _get_flux_member("GemmOnly")
-BlockScaleGemm = _get_flux_member("BlockScaleGemm")
 
 __all__ = [
     "load_tuning_record",

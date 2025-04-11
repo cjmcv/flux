@@ -75,9 +75,9 @@ target_link_libraries(test_tuning PUBLIC flux_cuda)
 #                            PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 # target_compile_options(reduce_scatter_kernel_perf PUBLIC -g) # -DFLUX_DEBUG=1)
 
-add_executable(test_pingpong_latency test_pingpong_latency.cu)
+# add_executable(test_pingpong_latency test_pingpong_latency.cu)
 
-add_executable(test_globaltimer test_globaltimer.cu)
+# add_executable(test_globaltimer test_globaltimer.cu)
 
 # add_executable(copy_d2h_perf copy_d2h_perf.cu)
 # target_link_libraries(copy_d2h_perf PUBLIC NUMA::NUMA flux_cuda)
@@ -88,6 +88,6 @@ add_executable(test_globaltimer test_globaltimer.cu)
 # target_link_libraries(test_topo_utils PUBLIC ${TORCH_LIBRARIES} flux_cuda flux_cuda_ths_op)
 # target_include_directories(test_topo_utils PUBLIC ${TORCH_INCLUDE_DIRS})
 
-set_property(
-  TARGET test_globaltimer test_pingpong_latency
-  PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+# set_property(
+#   TARGET test_globaltimer test_pingpong_latency
+#   PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)

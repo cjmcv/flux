@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
 
-set(GEMM_OP_REG_INP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cuda/gemm_op_registry.cu.in)
+# set(GEMM_OP_REG_INP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cuda/gemm_op_registry.cu.in)
 
 # append 'flux/src/' to include directory
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})

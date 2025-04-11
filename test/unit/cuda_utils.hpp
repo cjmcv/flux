@@ -119,84 +119,84 @@ class DeviceVector : public Vector<T> {
   std::vector<T> host_vec_;
 };
 
-template <typename T>
-class PinHostVector : public Vector<T> {
- public:
-  PinHostVector() = default;
-  PinHostVector(const PinHostVector &) = default;
-  PinHostVector(PinHostVector &&) = default;
-  PinHostVector(size_t size) : size_(size * sizeof(T)) {
-    CUDA_CHECK(cudaHostAlloc(&ptr_, size_, cudaHostAllocDefault));
-    memset(ptr_, 0, size_);
-    deleter_ = std::shared_ptr<char>(nullptr, [this](void *) { reset(); });
-  }
-  void
-  reset() {
-    if (ptr_) {
-      CUDA_CHECK(cudaFreeHost(ptr_));
-    }
-  }
+// template <typename T>
+// class PinHostVector : public Vector<T> {
+//  public:
+//   PinHostVector() = default;
+//   PinHostVector(const PinHostVector &) = default;
+//   PinHostVector(PinHostVector &&) = default;
+//   PinHostVector(size_t size) : size_(size * sizeof(T)) {
+//     CUDA_CHECK(cudaHostAlloc(&ptr_, size_, cudaHostAllocDefault));
+//     memset(ptr_, 0, size_);
+//     deleter_ = std::shared_ptr<char>(nullptr, [this](void *) { reset(); });
+//   }
+//   void
+//   reset() {
+//     if (ptr_) {
+//       CUDA_CHECK(cudaFreeHost(ptr_));
+//     }
+//   }
 
-  std::vector<T>
-  cpu() override {
-    return std::vector<T>((T *)ptr_, (T *)ptr_ + size_ / sizeof(T));
-  }
+//   std::vector<T>
+//   cpu() override {
+//     return std::vector<T>((T *)ptr_, (T *)ptr_ + size_ / sizeof(T));
+//   }
 
- protected:
-  using Vector<T>::ptr_, Vector<T>::deleter_;
+//  protected:
+//   using Vector<T>::ptr_, Vector<T>::deleter_;
 
- private:
-  size_t size_ = 0;
-};
+//  private:
+//   size_t size_ = 0;
+// };
 
-template <typename T>
-class NumaVector : public Vector<T> {
- public:
-  NumaVector() = default;
-  NumaVector(const NumaVector &) = default;
-  NumaVector(NumaVector &&) = default;
-  // node < 0 for non-numa node
-  NumaVector(size_t elems, int numa_node, bool pin_data = true)
-      : size_(elems * sizeof(T)), numa_node_(numa_node), pin_data_(pin_data) {
-    if (numa_node_ < 0) {
-      ptr_ = new T[elems];
-    } else {
-      ptr_ = numa_alloc_onnode(size_, numa_node_);
-    }
-    FLUX_CHECK(ptr_ != nullptr);
-    if (pin_data_) {
-      CUDA_CHECK(cudaHostRegister(ptr_, size_, cudaHostRegisterDefault));
-    }
-    memset(ptr_, 0, size_);
-    deleter_ = std::shared_ptr<char>(nullptr, [this](void *) { reset(); });
-  }
-  void
-  reset() {
-    if (ptr_) {
-      if (pin_data_) {
-        CUDA_CHECK(cudaHostUnregister(ptr_));
-      }
-      if (numa_node_ < 0) {
-        delete[] (T *)ptr_;
-      } else {
-        numa_free(ptr_, size_);
-      }
-    }
-  }
+// template <typename T>
+// class NumaVector : public Vector<T> {
+//  public:
+//   NumaVector() = default;
+//   NumaVector(const NumaVector &) = default;
+//   NumaVector(NumaVector &&) = default;
+//   // node < 0 for non-numa node
+//   NumaVector(size_t elems, int numa_node, bool pin_data = true)
+//       : size_(elems * sizeof(T)), numa_node_(numa_node), pin_data_(pin_data) {
+//     if (numa_node_ < 0) {
+//       ptr_ = new T[elems];
+//     } else {
+//       ptr_ = numa_alloc_onnode(size_, numa_node_);
+//     }
+//     FLUX_CHECK(ptr_ != nullptr);
+//     if (pin_data_) {
+//       CUDA_CHECK(cudaHostRegister(ptr_, size_, cudaHostRegisterDefault));
+//     }
+//     memset(ptr_, 0, size_);
+//     deleter_ = std::shared_ptr<char>(nullptr, [this](void *) { reset(); });
+//   }
+//   void
+//   reset() {
+//     if (ptr_) {
+//       if (pin_data_) {
+//         CUDA_CHECK(cudaHostUnregister(ptr_));
+//       }
+//       if (numa_node_ < 0) {
+//         delete[] (T *)ptr_;
+//       } else {
+//         numa_free(ptr_, size_);
+//       }
+//     }
+//   }
 
-  std::vector<T>
-  cpu() override {
-    return std::vector<T>((T *)ptr_, (T *)ptr_ + size_ / sizeof(T));
-  }
+//   std::vector<T>
+//   cpu() override {
+//     return std::vector<T>((T *)ptr_, (T *)ptr_ + size_ / sizeof(T));
+//   }
 
- protected:
-  using Vector<T>::ptr_, Vector<T>::deleter_;
+//  protected:
+//   using Vector<T>::ptr_, Vector<T>::deleter_;
 
- private:
-  size_t size_;
-  int numa_node_;
-  bool pin_data_;
-};
+//  private:
+//   size_t size_;
+//   int numa_node_;
+//   bool pin_data_;
+// };
 
 class CudaStream {
  public:

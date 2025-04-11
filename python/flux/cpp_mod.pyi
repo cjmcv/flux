@@ -15,39 +15,8 @@
 #
 ################################################################################
 
-import ctypes
-from enum import Enum
-from typing import List, Optional, Tuple
-import typing
-
+from typing import List, Optional
 import torch
-import torch.distributed as dist
-import torch.distributed
-
-# def bsr_reduce(input: torch.Tensor, output: torch.Tensor, block_h: int, block_w: int): ...
-# def bitwise_check(A: torch.Tensor, B: torch.Tensor) -> bool: ...
-# def uniform_initialize(tensor: torch.Tensor, seed: int, min: float, max: float) -> bool: ...
-# def init_flux_shm(pg: dist.ProcessGroup) -> None: ...
-# def create_tensor(shape: List[int], dtype: torch.dtype, pg: dist.ProcessGroup) -> torch.Tensor: ...
-# def create_tensor_list(
-#     shape: List[int], dtype: torch.dtype, pg: dist.ProcessGroup
-# ) -> List[torch.Tensor]: ...
-# def flux_create_shm_tensor_list(
-#     shape: List[int], dtype: torch.dtype, pg: dist.ProcessGroup
-# ) -> torch.Tensor: ...
-# def topk_scatter_reduce(
-#     inputs: List[torch.Tensor], scatter_index: torch.Tensor, topk: int
-# ) -> torch.Tensor: ...
-
-# class SegmentInfo:
-#     @property
-#     def segment_origin(self) -> int: ...
-#     @property
-#     def size(self) -> int: ...
-#     @property
-#     def tile_m_start_new(self) -> int: ...
-#     @property
-#     def tile_m_start_origin(self) -> int: ...
 
 class TuningRecord:
     pass

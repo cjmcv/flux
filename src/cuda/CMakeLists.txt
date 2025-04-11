@@ -8,16 +8,9 @@ else ()
   set(flux_proto_inc)
 endif()
 
-  # cudaipc_barrier_all.cu
-  # random_initialize.cu
-  # moe_utils.cu  bitwise_check.cu
-
 set(LIB_FILES
   op_registry.cu
-  op_registry_proto_utils.cc
-  utils.cc
   cuda_common.cc
-  cuda_common.cu
   cuda_stub.cc
   nvml_stub.cc
 )

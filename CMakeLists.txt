@@ -92,6 +92,7 @@ if(BUILD_THS)
     endif()
   endforeach()
 
+  message(STATUS "PYTHON_EXECUTABLE is: ${PYTHON_EXECUTABLE}")
   execute_process(COMMAND ${PYTHON_EXECUTABLE} "-c" "from __future__ import print_function; import os; import torch;
 print(os.path.dirname(torch.__file__),end='');"
                   RESULT_VARIABLE _PYTHON_SUCCESS
