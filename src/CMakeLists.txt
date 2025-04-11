@@ -50,13 +50,6 @@ execute_process(
 )
 
 add_subdirectory(comm_none)
-# add_subdirectory(coll)
-# add_subdirectory(ag_gemm)
-# add_subdirectory(gemm_rs)
-# if(ENABLE_NVSHMEM)
-#   add_subdirectory(moe_ag_scatter)
-#   add_subdirectory(moe_gather_rs)
-# endif()
 message(STATUS "op_targets: ${FLUX_CUDA_OP_TARGETS}")
 
 # this must be after all op subdirectory added

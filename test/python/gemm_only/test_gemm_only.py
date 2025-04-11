@@ -267,8 +267,8 @@ if __name__ == "__main__":
     flux_output = perf_result_flux.output
     torch_output = perf_result_torch.output
 
-    is_bitwise_match = flux.bitwise_check(flux_output, torch_output)
-    print("is bitwise match: ", is_bitwise_match)
+    # is_bitwise_match = flux.bitwise_check(flux_output, torch_output)
+    # print("is bitwise match: ", is_bitwise_match)
     atol = THRESHOLD_MAP[flux_output.dtype]
     rtol = THRESHOLD_MAP[flux_output.dtype]
     flux.torch_allclose(flux_output, torch_output, atol=atol, rtol=rtol)

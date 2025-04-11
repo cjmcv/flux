@@ -23,7 +23,8 @@
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"
 #include "flux/ths_op/util.h"
-#include "flux/ths_op/flux_shm.h"
+// #include "flux/ths_op/flux_shm.h"
+#include <torch/torch.h>
 #include <ATen/core/ivalue.h>
 #include <c10/core/ScalarType.h>
 #include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
@@ -174,10 +175,10 @@ empty_with_uninitialized_data(T... args) {
 void copy_tensor_with_kernel_async(
     const torch::Tensor src, torch::Tensor dst, cudaStream_t stream);
 
-bool bitwise_check(torch::Tensor A, torch::Tensor B);
-void uniform_initialize(torch::Tensor tensor, uint64_t seed, double min, double max);
-void cudaipc_barrier_all_on_stream(
-    cudaStream_t stream, std::vector<torch::Tensor> &sync_buffer, int rank);
+// bool bitwise_check(torch::Tensor A, torch::Tensor B);
+// void uniform_initialize(torch::Tensor tensor, uint64_t seed, double min, double max);
+// void cudaipc_barrier_all_on_stream(
+//     cudaStream_t stream, std::vector<torch::Tensor> &sync_buffer, int rank);
 void lazy_init_buffer_tensor(torch::Tensor *tensor, int64_t buffer_size);
 #ifdef FLUX_SHM_USE_NVSHMEM
 torch::Tensor topk_scatter_reduce(

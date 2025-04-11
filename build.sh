@@ -11,7 +11,7 @@ BUILD_TEST="ON"
 BDIST_WHEEL="OFF"
 WITH_PROTOBUF="OFF"
 FLUX_DEBUG="OFF"
-ENABLE_NVSHMEM="OFF"
+# ENABLE_NVSHMEM="OFF"
 
 function clean_py() {
     rm -rf build/lib.*
@@ -26,9 +26,6 @@ function clean_py() {
 function clean_all() {
     clean_py
     rm -rf build/
-    rm -rf 3rdparty/nvshmem/build
-    rm -rf 3rdparty/nccl/build
-    rm -rf 3rdparty/protobuf/build
 }
 
 # Iterate over the command-line arguments
@@ -68,14 +65,6 @@ while [[ $# -gt 0 ]]; do
         BDIST_WHEEL="ON"
         shift # Skip the argument key
         ;;
-    --protobuf)
-        WITH_PROTOBUF="ON"
-        shift
-        ;;
-    --nvshmem)
-        ENABLE_NVSHMEM="ON"
-        shift
-        ;;
     *)
         # Unknown argument
         echo "Unknown argument: $1"
@@ -98,51 +87,6 @@ if [[ -z $JOBS ]]; then
     JOBS=$(nproc --ignore 2)
 fi
 
-##### build protobuf #####
-function build_protobuf() {
-    if [ $WITH_PROTOBUF == "ON" ]; then
-        pushd $PROTOBUF_ROOT
-        mkdir -p $PWD/build/local
-        pushd build
-        CXXFLAGS_EXTRA=""
-        use_cxx11_abi=$(python3 -c "import torch; print(torch._C._GLIBCXX_USE_CXX11_ABI)")
-        if [ $use_cxx11_abi == "False" ]; then
-            CXXFLAGS_EXTRA="-D_GLIBCXX_USE_CXX11_ABI=0"
-        fi
-        CFLAGS="-fPIC" CXXFLAGS="-fPIC ${CXXFLAGS_EXTRA}" cmake ../cmake \
-            -Dprotobuf_BUILD_TESTS=OFF \
-            -Dprotobuf_BUILD_SHARED_LIBS=OFF \
-            -DCMAKE_INSTALL_PREFIX=$(realpath local)
-        make -j$(nproc)
-        make install
-        popd
-        popd
-    fi
-}
-
-function build_nccl() {
-    pushd $NCCL_ROOT
-    export BUILDDIR=${NCCL_ROOT}/build
-    export PREFIX=${BUILDDIR}/local
-
-    if [[ -n $ARCH ]]; then
-        NCCL_COMPILE_OPTIONS_ARCH="" # default none
-        arch_list=()
-        IFS=";" read -ra arch_list <<<"$ARCH"
-        for arch in "${arch_list[@]}"; do
-            NCCL_COMPILE_OPTIONS_ARCH="-gencode=arch=compute_${arch},code=sm_${arch} ${NCCL_COMPILE_OPTIONS_ARCH}"
-        done
-        make -j${nproc} src.staticlib NVCC_GENCODE="${NCCL_COMPILE_OPTIONS_ARCH}" VERBOSE=1
-    else
-        make -j${nproc} src.staticlib VERBOSE=1
-    fi
-    # only install static lib
-    mkdir -p ${PREFIX}/lib
-    cp -P -v ${BUILDDIR}/lib/lib* ${PREFIX}/lib/
-    cp -P -v -r ${BUILDDIR}/include ${PREFIX}/
-    popd
-}
-
 ##### build flux_cuda #####
 function build_flux_cuda() {
     mkdir -p build
@@ -150,7 +94,7 @@ function build_flux_cuda() {
     export LIBFLUX_PREFIX=${PROJECT_ROOT}/python/flux
     if [ ! -f CMakeCache.txt ] || [ -z ${FLUX_BUILD_SKIP_CMAKE} ]; then
         CMAKE_ARGS=(
-            -DENABLE_NVSHMEM=${ENABLE_NVSHMEM}
+            # -DENABLE_NVSHMEM=${ENABLE_NVSHMEM}
             -DCUDAARCHS=${ARCH}
             -DCMAKE_EXPORT_COMPILE_COMMANDS=1
             -DBUILD_TEST=${BUILD_TEST}
@@ -202,12 +146,7 @@ function build_flux_py {
     mkdir -p ${LIBDIR}
 
     pushd ${LIBDIR}
-    if [ $ENABLE_NVSHMEM == "ON" ]; then
-        cp -s -f ../../../3rdparty/nvshmem/build/src/lib/nvshmem_bootstrap_uid.so .
-        cp -s -f ../../../3rdparty/nvshmem/build/src/lib/nvshmem_transport_ibrc.so.3 .
-        cp -s -f ../../../3rdparty/nvshmem/build/src/lib/libnvshmem_host.so.3 .
-        export FLUX_SHM_USE_NVSHMEM=1
-    fi
+
     popd
     ##### build flux torch bindings #####
     MAX_JOBS=${JOBS} python3 setup.py develop --user
@@ -217,13 +156,6 @@ function build_flux_py {
 }
 
 trap merge_compile_commands EXIT
-NCCL_ROOT=$PROJECT_ROOT/3rdparty/nccl
-build_nccl
 
-if [ $ENABLE_NVSHMEM == "ON" ]; then
-    ./build_nvshmem.sh ${build_args} --jobs ${JOBS}
-fi
-
-build_protobuf
 build_flux_cuda
 build_flux_py

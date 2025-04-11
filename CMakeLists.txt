@@ -7,12 +7,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
 set(BUILD_THS ON CACHE INTERNAL "Build Torch op")
 set(BUILD_TEST ON CACHE INTERNAL "Build unit tests")
-set(ENABLE_NVSHMEM ON CACHE INTERNAL "Use NVSHMEM to transfer data")
+# set(ENABLE_NVSHMEM OFF CACHE INTERNAL "Use NVSHMEM to transfer data")
 set(CUTLASS_TRACE OFF CACHE INTERNAL "Print CUTLASS Host Trace info")
 set(FLUX_DEBUG OFF CACHE INTERNAL "Define FLUX_DEBUG")
-OPTION(WITH_PROTOBUF "build with protobuf" OFF)
+# OPTION(WITH_PROTOBUF "build with protobuf" OFF)
 message("PYTHONPATH: ${PYTHONPATH}")
-message("NVShmem Support: ${ENABLE_NVSHMEM}")
+# message("NVShmem Support: ${ENABLE_NVSHMEM}")
 
 # find cuda
 # specify cuda path if other than default
@@ -152,17 +152,6 @@ set(COMMON_HEADER_DIRS
 
 set(COMMON_LIB_DIRS "")
 list(APPEND COMMON_LIB_DIRS "${CUDAToolkit_LIBRARY_DIR}")
-message(ENABLE_NVSHMEM "ENABLE_NVSHMEM is set to: ${ENABLE_NVSHMEM}")
-if(ENABLE_NVSHMEM)
-  add_definitions(-DFLUX_SHM_USE_NVSHMEM)
-  set(NVSHMEM_BUILD_DIR ${PROJECT_SOURCE_DIR}/3rdparty/nvshmem/build)
-  message(STATUS "NVSHMEM build dir: ${NVSHMEM_BUILD_DIR}")
-  if(NOT EXISTS ${NVSHMEM_BUILD_DIR})
-      message(FATAL_ERROR "NVSHMEM not found. Please run ./build_nvshmem.sh first.")
-  endif()
-  list(APPEND COMMON_HEADER_DIRS "${NVSHMEM_BUILD_DIR}/src/include")
-  list(APPEND COMMON_LIB_DIRS "${NVSHMEM_BUILD_DIR}/src/lib")
-endif()
 
 # append headers explicitly for .cu files, in order to enable vscode clangd intellisense
 foreach(inc_dir ${COMMON_HEADER_DIRS})
@@ -177,11 +166,6 @@ include_directories(
 link_directories(
   ${COMMON_LIB_DIRS}
 )
-
-if (WITH_PROTOBUF)
-  FIND_PACKAGE(Protobuf REQUIRED)
-  add_subdirectory(proto)
-endif()
 
 add_subdirectory(src)
 if (BUILD_TEST)

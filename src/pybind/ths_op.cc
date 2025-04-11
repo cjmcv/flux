@@ -16,12 +16,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "flux/ths_op/ths_op.h"
-#include "flux/ths_op/flux_shm.h"
+// #include "flux/ths_op/flux_shm.h"
 #include "flux/ths_op/ths_pybind.h"
 // #include "coll/ths_op/all_gather_types.h"
 // #include "coll/ths_op/reduce_scatter_op.h"
 #include <c10/cuda/CUDAStream.h>
-#include "flux/cuda/moe_utils.h"
+// #include "flux/cuda/moe_utils.h"
 
 namespace bytedance::flux::ths_op {
 
@@ -46,24 +46,24 @@ ThsOpsInitRegistry::initialize_all(py::module &m) const {
   }
 }
 
-torch::Tensor
-calc_scatter_index_impl(
-    const torch::Tensor choosed_experts,  // topk * ntokens
-    const torch::Tensor splits            // of expert_num
-) {
-  CHECK_INPUT(choosed_experts, at::ScalarType::Int);
-  CHECK_INPUT(splits, at::ScalarType::Int);
-  torch::Tensor scatter_index = at::empty_like(choosed_experts);
-  auto stream = at::cuda::getCurrentCUDAStream();
-  calc_scatter_index(
-      choosed_experts.data_ptr<int>(),
-      splits.data_ptr<int>(),
-      scatter_index.data_ptr<int>(),
-      choosed_experts.numel(),
-      splits.numel(),
-      stream);
-  return scatter_index;
-}
+// torch::Tensor
+// calc_scatter_index_impl(
+//     const torch::Tensor choosed_experts,  // topk * ntokens
+//     const torch::Tensor splits            // of expert_num
+// ) {
+//   CHECK_INPUT(choosed_experts, at::ScalarType::Int);
+//   CHECK_INPUT(splits, at::ScalarType::Int);
+//   torch::Tensor scatter_index = at::empty_like(choosed_experts);
+//   auto stream = at::cuda::getCurrentCUDAStream();
+//   calc_scatter_index(
+//       choosed_experts.data_ptr<int>(),
+//       splits.data_ptr<int>(),
+//       scatter_index.data_ptr<int>(),
+//       choosed_experts.numel(),
+//       splits.numel(),
+//       stream);
+//   return scatter_index;
+// }
 
 void
 init_profiling_context(py::module &m) {
@@ -134,83 +134,12 @@ init_moe_arguments(py::module &m) {
           py::arg("output_dtype") = py::none());
 }
 
-// void
-// init_coll_arguments(py::module &m) {
-//   py::enum_<AGRingMode>(m, "AGRingMode", py::arithmetic())
-//       .value("All2All", AGRingMode::All2All)
-//       .value("Ring1D", AGRingMode::Ring1D)
-//       .value("Ring2D", AGRingMode::Ring2D);
-//   py::class_<AllGatherOptionWithOptional>(m, "AllGatherOption")
-//       .def(py::init([]() { return new AllGatherOptionWithOptional(); }))
-//       .def_readwrite("input_buffer_copied", &AllGatherOptionWithOptional::input_buffer_copied)
-//       .def_readwrite("use_read", &AllGatherOptionWithOptional::use_read)
-//       .def_readwrite("mode", &AllGatherOptionWithOptional::mode)
-//       .def_readwrite("fuse_sync", &AllGatherOptionWithOptional::fuse_sync)
-//       .def_readwrite("use_cuda_core_local", &AllGatherOptionWithOptional::use_cuda_core_local)
-//       .def_readwrite("use_cuda_core_ag", &AllGatherOptionWithOptional::use_cuda_core_ag);
-//   m.def("get_default_ag_ring_mode", []() -> AGRingMode { return get_default_ag_ring_mode(); });
-
-//   py::enum_<RingMode>(m, "RingMode", py::arithmetic())
-//       .value("All2All", RingMode::All2All)
-//       .value("Ring1D", RingMode::Ring1D)
-//       .value("Ring2D", RingMode::Ring2D);
-//   py::class_<ReduceScatterOptionWithOptional>(m, "ReduceScatterOption")
-//       .def(py::init([]() { return new ReduceScatterOptionWithOptional(); }))
-//       .def_readwrite("use_barrier_queue", &ReduceScatterOptionWithOptional::use_barrier_queue)
-//       .def_readwrite("use_1d_ring", &ReduceScatterOptionWithOptional::use_1d_ring)
-//       .def_readwrite("use_p2p_read", &ReduceScatterOptionWithOptional::use_p2p_read)
-//       .def_readwrite("use_cudaMemcpyAsync", &ReduceScatterOptionWithOptional::use_cudaMemcpyAsync)
-//       .def_readwrite("use_gemmk", &ReduceScatterOptionWithOptional::use_gemmk)
-//       .def_readwrite("per_tile_flags", &ReduceScatterOptionWithOptional::per_tile_flags)
-//       .def_readwrite("n_split", &ReduceScatterOptionWithOptional::n_split)
-//       .def_readwrite("num_blocks", &ReduceScatterOptionWithOptional::num_blocks)
-//       .def_readwrite("ring_mode", &ReduceScatterOptionWithOptional::ring_mode);
-//   m.def("get_default_rs_ring_mode", []() -> RingMode { return get_default_rs_ring_mode(); });
-// }
-
 
 PYBIND11_MODULE(FLUX_TORCH_EXTENSION_NAME, m) {
-  m.def("bitwise_check", &bitwise_check);
-  m.def("uniform_initialize", &uniform_initialize);
   m.def("load_tuning_record", &load_tuning_record);
-  m.def("init_flux_shm", [](c10::intrusive_ptr<c10d::ProcessGroup> pg) {
-    init_flux_shm(std::make_unique<C10dProcessGroup>("", pg).get());
-  });
-  m.def(
-      "flux_create_tensor_list",
-      py::overload_cast<
-          const std::vector<int64_t> &,
-          c10::ScalarType,
-          c10::intrusive_ptr<c10d::ProcessGroup>,
-          bool>(&flux_create_tensor_list),
-      py::arg("shape"),
-      py::arg("dtype"),
-      py::arg("pg"),
-      py::arg("ring_mode") = false);
-  using GroupBarrierCls = TorchClassWrapper<GroupBarrier>;
-  py::class_<GroupBarrierCls>(m, "GroupBarrier")
-      .def(
-          py::init([](c10::intrusive_ptr<c10d::ProcessGroup> pg, bool ring_mode) {
-            return new GroupBarrierCls(std::make_shared<C10dProcessGroup>("", pg), ring_mode);
-          }),
-          py::arg("process_group"),
-          py::arg("ring_mode") = false)
-      .def("barrier_all", [](GroupBarrierCls &self, intptr_t stream) {
-        self.barrier_all((cudaStream_t)stream);
-      });
-
-  m.def(
-      "calc_scatter_index",
-      &calc_scatter_index_impl,
-      py::arg("choosed_experts"),
-      py::arg("splits"));
 
   init_tuning_record(m);
   init_profiling_context(m);
-  init_dist_env_tp(m);
-  init_dist_env_tp_with_ep(m);
-  init_moe_arguments(m);
-  // init_coll_arguments(m);
 
   // Initialize ops in registry
   ThsOpsInitRegistry::instance().initialize_all(m);

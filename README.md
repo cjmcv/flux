@@ -169,3 +169,4 @@ Founded in 2023, ByteDance Seed Team is dedicated to crafting the industry's mos
 
 ./build.sh --arch 89 --jobs 6
 python3 test/python/gemm_only/test_gemm_only.py 4096 12288 6144 --dtype=bfloat16
+python tools/tune_gemm_only.py

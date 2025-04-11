@@ -29,12 +29,12 @@ namespace bytedance::flux {
  * @param[in] expert_num
  * @param[in] stream
  */
-void calc_scatter_index(
-    const int *choosed_experts,  // of total_num
-    const int *count,            // of expert_num
-    int *scatter_index,          // of total_num
-    const int total_num,         // topk * ntokens
-    int expert_num,
-    cudaStream_t stream);
+// void calc_scatter_index(
+//     const int *choosed_experts,  // of total_num
+//     const int *count,            // of expert_num
+//     int *scatter_index,          // of total_num
+//     const int total_num,         // topk * ntokens
+//     int expert_num,
+//     cudaStream_t stream);
 
 }  // namespace bytedance::flux

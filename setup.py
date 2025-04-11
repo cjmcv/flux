@@ -146,20 +146,20 @@ def cuda_deps():
     return include_dirs, library_dirs, libraries
 
 
-@pathlib_wrapper
-def nccl_deps():
-    nccl_home = Path(os.environ.get("NCCL_ROOT", root_path / "3rdparty/nccl/build/local"))
-    include_dirs = [nccl_home / "include", nccl_home / "include" / "nccl" / "detail" / "include"]
-    library_dirs = [nccl_home / "lib"]
-    libraries = ["nccl_static"]
-    return include_dirs, library_dirs, libraries
+# @pathlib_wrapper
+# def nccl_deps():
+#     nccl_home = Path(os.environ.get("NCCL_ROOT", root_path / "3rdparty/nccl/build/local"))
+#     include_dirs = [nccl_home / "include", nccl_home / "include" / "nccl" / "detail" / "include"]
+#     library_dirs = [nccl_home / "lib"]
+#     libraries = ["nccl_static"]
+#     return include_dirs, library_dirs, libraries
 
 
 def setup_pytorch_extension() -> setuptools.Extension:
     """Setup CppExtension for PyTorch support"""
     include_dirs, library_dirs, libraries = [], [], []
 
-    deps = [nccl_deps(), cutlass_deps(), flux_cuda_deps(), cuda_deps()]
+    deps = [cutlass_deps(), flux_cuda_deps(), cuda_deps()]
     if enable_nvshmem:
         deps.append(nvshmem_deps())
     for include_dir, library_dir, library in deps:
@@ -176,9 +176,9 @@ def setup_pytorch_extension() -> setuptools.Extension:
         "-Wno-deprecated-declarations",
         "-fdiagnostics-color=always",
     ]
-    if enable_nvshmem:
-        cxx_flags.append("-DFLUX_SHM_USE_NVSHMEM")
-    ld_flags = ["-Wl,--exclude-libs=libnccl_static"]
+    # if enable_nvshmem:
+    #     cxx_flags.append("-DFLUX_SHM_USE_NVSHMEM")-Wl,--exclude-libs=libnccl_static
+    # ld_flags = []
     flux_ths_targets = [
         str(x.relative_to(root_path))  # relative path for include_package_data
         for x in Path(root_path / "src" / "pybind").glob("*.cc")
@@ -193,9 +193,9 @@ def setup_pytorch_extension() -> setuptools.Extension:
         include_dirs=include_dirs,
         library_dirs=library_dirs,
         libraries=libraries,
-        extra_compile_args=cxx_flags,
-        extra_link_args=ld_flags,
+        extra_compile_args=cxx_flags,  
     )
+    # extra_link_args=ld_flags,
 
 def get_wheel_url():
     flux_tag_version = get_public_version()

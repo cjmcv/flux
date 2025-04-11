@@ -8,18 +8,18 @@ else ()
   set(flux_proto_inc)
 endif()
 
+  # cudaipc_barrier_all.cu
+  # random_initialize.cu
+  # moe_utils.cu  bitwise_check.cu
+
 set(LIB_FILES
   op_registry.cu
   op_registry_proto_utils.cc
-  cudaipc_barrier_all.cu
-  bitwise_check.cu
-  random_initialize.cu
   utils.cc
   cuda_common.cc
   cuda_common.cu
   cuda_stub.cc
   nvml_stub.cc
-  moe_utils.cu
 )
 
 set(_VER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/version.ld)
@@ -31,17 +31,11 @@ set_target_properties(flux_cuda PROPERTIES
   POSITION_INDEPENDENT_CODE ON
 )
 
-if(ENABLE_NVSHMEM)
-target_link_libraries(flux_cuda
-  PUBLIC -lnvshmem_host CUDA::cudart CUDA::cuda_driver ${FLUX_CUDA_OP_TARGETS}
-  PRIVATE -lnvshmem_device ${flux_proto_lib}
-)
-else()
 target_link_libraries(flux_cuda
   PUBLIC CUDA::cudart CUDA::cuda_driver ${FLUX_CUDA_OP_TARGETS}
   PRIVATE ${flux_proto_lib}
 )
-endif()
+
 target_include_directories(flux_cuda PRIVATE ${flux_proto_inc})
 target_link_options(flux_cuda
   PRIVATE

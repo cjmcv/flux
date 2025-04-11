@@ -17,7 +17,7 @@
 
 #include "flux/ths_op/ths_op.h"
 #include "flux/cuda/cuda_common.h"
-#include "flux/cuda/moe_utils.h"
+// #include "flux/cuda/moe_utils.h"
 #include "flux/flux.h"
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_meta.h"
