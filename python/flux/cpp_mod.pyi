@@ -21,9 +21,6 @@ import torch
 class TuningRecord:
     pass
 
-
-def load_tuning_record(record: TuningRecord) -> None: ...
-
 class ProfilingContext:
     def __init__(self, name: str): ...
     def get_code(self) -> str: ...

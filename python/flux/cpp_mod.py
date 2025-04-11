@@ -48,15 +48,12 @@ class NotCompiled:
 def _get_flux_member(member):
     return getattr(flux_mod, member, NotCompiled())
 
-load_tuning_record = flux_mod.load_tuning_record
-
 ProfilingContext = flux_mod.ProfilingContext
 TuningRecord = flux_mod.TuningRecord
 
 GemmOnly = _get_flux_member("GemmOnly")
 
 __all__ = [
-    "load_tuning_record",
     "TuningRecord",
     "ProfilingContext",
     "GemmOnly",

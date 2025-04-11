@@ -18,12 +18,10 @@
 #pragma once
 #include "c10/util/Optional.h"
 #include "flux/flux.h"
-// #include "flux/utils.h"
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"
 #include "flux/ths_op/util.h"
-// #include "flux/ths_op/flux_shm.h"
 #include <torch/torch.h>
 #include <ATen/core/ivalue.h>
 #include <c10/core/ScalarType.h>
@@ -48,9 +46,6 @@ struct PyTuningRecord : public torch::CustomClassHolder {
 
   PyTuningRecord(UnifiedGemmMeta, RuntimeConfig, UnifiedGemmHParams);
 };
-
-// add a tuning record to TuningConfigRegistry
-void load_tuning_record(PyTuningRecord const &record);
 
 class ProfilingContext : public torch::CustomClassHolder {
  private:

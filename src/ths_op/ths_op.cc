@@ -196,10 +196,6 @@ PyTuningRecord::PyTuningRecord(
     UnifiedGemmMeta meta, RuntimeConfig rt_conf, UnifiedGemmHParams best_hparams)
     : meta(std::move(meta)), rt_conf(std::move(rt_conf)), best_hparams(std::move(best_hparams)) {}
 
-void
-load_tuning_record(PyTuningRecord const &record) {
-  TuningConfigRegistry::instance().add(record.meta, record.rt_conf, record.best_hparams);
-}
 
 ProfilingContext::ProfilingContext(std::string name) : codegen(std::move(name)), counter(0) {}
 

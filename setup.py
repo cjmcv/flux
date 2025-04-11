@@ -18,7 +18,7 @@ from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 # Project directory root
 root_path: Path = Path(__file__).resolve().parent
-enable_nvshmem = int(os.getenv("FLUX_SHM_USE_NVSHMEM", 0))
+
 PACKAGE_NAME = "byte_flux"
 BASE_WHEEL_URL = "https://github.com/bytedance/flux/releases/download/{tag_name}/{wheel_name}"
 FORCE_BUILD = os.getenv("FLASH_ATTENTION_FORCE_BUILD", "FALSE") == "TRUE"
@@ -118,17 +118,6 @@ def read_flux_ths_targets():
                 variables[key] = value
     return [x for x in variables["FLUX_THS_TARGETS"].split(";") if x]
 
-
-@pathlib_wrapper
-def nvshmem_deps():
-    nvshmem_home = Path(os.environ.get("NVSHMEM_HOME", root_path / "3rdparty/nvshmem/build/src"))
-    include_dirs = [nvshmem_home / "include"]
-    library_dirs = [nvshmem_home / "lib"]
-    # libraries = ["nvshmem"]
-    libraries = ["nvshmem_host"]
-    return include_dirs, library_dirs, libraries
-
-
 @pathlib_wrapper
 def flux_cuda_deps():
     include_dirs = [root_path / "include", root_path / "src"]
@@ -145,23 +134,12 @@ def cuda_deps():
     libraries = ["cuda", "cudart", "nvidia-ml"]
     return include_dirs, library_dirs, libraries
 
-
-# @pathlib_wrapper
-# def nccl_deps():
-#     nccl_home = Path(os.environ.get("NCCL_ROOT", root_path / "3rdparty/nccl/build/local"))
-#     include_dirs = [nccl_home / "include", nccl_home / "include" / "nccl" / "detail" / "include"]
-#     library_dirs = [nccl_home / "lib"]
-#     libraries = ["nccl_static"]
-#     return include_dirs, library_dirs, libraries
-
-
 def setup_pytorch_extension() -> setuptools.Extension:
     """Setup CppExtension for PyTorch support"""
     include_dirs, library_dirs, libraries = [], [], []
 
     deps = [cutlass_deps(), flux_cuda_deps(), cuda_deps()]
-    if enable_nvshmem:
-        deps.append(nvshmem_deps())
+
     for include_dir, library_dir, library in deps:
         include_dirs += include_dir
         library_dirs += library_dir
@@ -176,9 +154,7 @@ def setup_pytorch_extension() -> setuptools.Extension:
         "-Wno-deprecated-declarations",
         "-fdiagnostics-color=always",
     ]
-    # if enable_nvshmem:
-    #     cxx_flags.append("-DFLUX_SHM_USE_NVSHMEM")-Wl,--exclude-libs=libnccl_static
-    # ld_flags = []
+
     flux_ths_targets = [
         str(x.relative_to(root_path))  # relative path for include_package_data
         for x in Path(root_path / "src" / "pybind").glob("*.cc")
@@ -253,12 +229,7 @@ def main():
     )
     data_file_list = ["python/flux/lib/libflux_cuda.so"]
     data_file_list += ["python/flux/lib/libflux_cuda_ths_op.so"]
-    if enable_nvshmem:
-        data_file_list += [
-            "python/flux/lib/nvshmem_bootstrap_uid.so",
-            "python/flux/lib/nvshmem_transport_ibrc.so.3",
-            "python/flux/lib/libnvshmem_host.so.3",
-        ]
+
     # Configure package
     setuptools.setup(
         name=PACKAGE_NAME,

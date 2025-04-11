@@ -59,8 +59,6 @@ init_tuning_record(py::module &m) {
 }
 
 PYBIND11_MODULE(FLUX_TORCH_EXTENSION_NAME, m) {
-  m.def("load_tuning_record", &load_tuning_record);
-
   init_tuning_record(m);
   init_profiling_context(m);
 
