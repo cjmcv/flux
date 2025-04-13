@@ -61,12 +61,6 @@ OpRegistry::instance() {
 bool
 OpRegistry::check_heuristic_rule(
     const UnifiedGemmMeta &meta, const UnifiedGemmHParams &hparams, const RuntimeConfig &rt_conf) {
-  if (meta.impl() == _GemmV3{}) {
-    if (rt_conf.m() < 2048) {
-      auto const &v3_hparams = std::get<unified_type_t<GemmV3HParams>>(hparams.impl_spec());
-      return cute::get<0>(v3_hparams.cluster_shape()) == 1;
-    }
-  }
   return true;
 }
 

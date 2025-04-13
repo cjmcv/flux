@@ -70,51 +70,6 @@ test_tuple_filter() {
   FLUX_CHECK(odd_nums == make_tuple(_1{}, _3{}));
 }
 
-// void
-// test_tuple_split_slice() {
-//   auto all_nums = make_tuple(_1{}, _2{}, _3{}, _4{}, _5{});
-//   auto slice_0 = tuple_split_slice<0, 3>(all_nums);
-//   auto slice_1 = tuple_split_slice<1, 3>(all_nums);
-//   auto slice_2 = tuple_split_slice<2, 3>(all_nums);
-//   FLUX_CHECK(slice_0 == make_tuple(_1{}, _2{}));
-//   FLUX_CHECK(slice_1 == make_tuple(_3{}, _4{}));
-//   FLUX_CHECK(slice_2 == make_tuple(_5{}));
-// }
-
-// void
-// test_return_if() {
-//   auto dtype = _FP16{}();
-
-//   auto get_size = [](DataTypeEnum dtype) {
-//     return tuple_return_if(
-//         cute::make_tuple(_BF16{}, _FP16{}, _FP32{}, _Void{}),
-//         /*pred=*/[dtype](auto c_dtype) { return dtype == c_dtype; },
-//         /*found=*/[](auto c_dtype) { return sizeof_dtype(decltype(c_dtype){}); },
-//         /*not_fount=*/[]() { return -1; });
-//   };
-//   FLUX_CHECK(get_size(_BF16{}()) == 2);
-//   FLUX_CHECK(get_size(_FP16{}()) == 2);
-//   FLUX_CHECK(get_size(_FP32{}()) == 4);
-//   FLUX_CHECK(get_size(_Void{}()) == 0);
-//   FLUX_CHECK(get_size(_E4M3{}()) == -1);  // not supported
-// }
-
-// void
-// test_tuple_has_elem() {
-//   auto tup = make_tuple(0, _1{}, _2{}, _FP16{}, _BF16{}, make_tuple(_3{}));
-//   static_assert(tuple_has_elem(tup, _1{}));
-//   static_assert(tuple_has_elem(tup, make_tuple(_3{})));
-//   FLUX_CHECK(tuple_has_elem(tup, 0));
-//   FLUX_CHECK(tuple_has_elem(tup, _1{}));
-//   FLUX_CHECK(tuple_has_elem(tup, _2{}));
-//   FLUX_CHECK(tuple_has_elem(tup, _FP16{}));
-//   FLUX_CHECK(tuple_has_elem(tup, _BF16{}));
-//   FLUX_CHECK(not tuple_has_elem(tup, _1{}()));  // type different
-//   FLUX_CHECK(not tuple_has_elem(tup, 2));
-//   FLUX_CHECK(not tuple_has_elem(tup, 0.0));
-//   FLUX_CHECK(not tuple_has_elem(make_tuple(), 0));
-// }
-
 void
 test_gemm_meta() {
   auto dt_conf = make_gemm_dtype_config(_FP16{});
@@ -127,17 +82,17 @@ test_gemm_meta() {
   FLUX_CHECK_EQ(unified_meta.impl(), _GemmV3{}());
 }
 
-void
-test_gemm_hparams() {
-  auto dt_conf = make_gemm_dtype_config(_FP16{});
-  auto meta = make_gemm_meta(dt_conf, _Sm90{}, _CommNone{}, _RCR{}, _GemmV3{});
-  auto auto_hparams = _AutoHParams{};
-  auto hparams = materialize_hparams(meta, auto_hparams);
-  auto unified_hparams = unify_type(hparams);
-  FLUX_CHECK_EQ(unified_hparams.comm_spec(), None{});
-  FLUX_CHECK_EQ(unified_hparams.raster_order(), _RasterHeuristic{}());
-  FLUX_CHECK_EQ(unified_hparams.mainloop_stage(), 0);
-}
+// void
+// test_gemm_hparams() {
+//   auto dt_conf = make_gemm_dtype_config(_FP16{});
+//   auto meta = make_gemm_meta(dt_conf, _Sm90{}, _CommNone{}, _RCR{}, _GemmV3{});
+//   auto auto_hparams = _AutoHParams{};
+//   auto hparams = materialize_hparams(meta, auto_hparams);
+//   auto unified_hparams = unify_type(hparams);
+//   FLUX_CHECK_EQ(unified_hparams.comm_spec(), None{});
+//   FLUX_CHECK_EQ(unified_hparams.raster_order(), _RasterHeuristic{}());
+//   FLUX_CHECK_EQ(unified_hparams.mainloop_stage(), 0);
+// }
 }  // namespace bytedance::flux
 
 int
@@ -149,7 +104,7 @@ main() {
   // test_tuple_split_slice();
   // test_return_if();
   test_gemm_meta();
-  test_gemm_hparams();
+  // test_gemm_hparams();
   // test_tuple_has_elem();
   return 0;
 }

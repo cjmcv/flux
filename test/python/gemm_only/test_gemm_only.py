@@ -22,11 +22,48 @@ from typing import Optional
 import torch
 
 import flux
-import flux.testing
-from flux.testing import DTYPE_MAP, init_seed, matmul_int8
 from flux.util import is_fp8_dtype
 
+import os
+import random
+import numpy as np
 
+DTYPE_MAP = {
+    "bfloat16": torch.bfloat16,
+    "float16": torch.float16,
+    "float8_e4m3fn": torch.float8_e4m3fn,
+    "float8_e5m2": torch.float8_e5m2,
+    "s8": torch.int8,
+    "s32": torch.int32,
+}
+
+def init_seed(seed=0):
+    os.environ["NCCL_DEBUG"] = os.getenv("NCCL_DEBUG", "ERROR")
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
+    torch.use_deterministic_algorithms(True, warn_only=True)
+    torch.set_printoptions(precision=2)
+    torch.manual_seed(3 + seed)
+    torch.cuda.manual_seed_all(3 + seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = False
+    torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
+    np.random.seed(3 + seed)
+    random.seed(3 + seed)
+
+def matmul_int8(a, b):
+    """
+    torch._int_mm requires A.size(0) needs to be greater than 16
+    """
+    M, _ = a.shape
+    if M <= 16:
+        return torch._int_mm(torch.nn.functional.pad(a, (0, 0, 0, 32 - M)), b)[:M, :]
+    return torch._int_mm(a, b)
+
+#
+
+#
 class PerfResult:
     def __init__(self, name: str, output: torch.Tensor, gemm_time_ms: float) -> None:
         self.name = name
@@ -260,7 +297,7 @@ if __name__ == "__main__":
         output_dtype,
     )
 
-    flux.testing.print_gemm_sol_time(args.M, args.N, args.K, dtype)
+    # flux.testing.print_gemm_sol_time(args.M, args.N, args.K, dtype)
     print(perf_result_torch)
     print(perf_result_flux)
 

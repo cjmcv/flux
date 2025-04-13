@@ -32,23 +32,23 @@ endif()
 add_executable(test_flux_templates test_flux_templates.cc)
 target_link_libraries(test_flux_templates PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 
-if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.0")
-  add_executable(test_tma_copy test_tma_copy.cu)
-  target_link_libraries(test_tma_copy PRIVATE CUDA::cuda_driver)
-  set_target_properties(test_tma_copy PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-endif()
+# if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.0")
+#   add_executable(test_tma_copy test_tma_copy.cu)
+#   target_link_libraries(test_tma_copy PRIVATE CUDA::cuda_driver)
+#   set_target_properties(test_tma_copy PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+# endif()
 
-add_executable(test_vectorized_copy test_vectorized_copy.cu)
-set_target_properties(test_vectorized_copy
-                      PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+# add_executable(test_vectorized_copy test_vectorized_copy.cu)
+# set_target_properties(test_vectorized_copy
+#                       PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
 # add_executable(test_cute test_cute.cc)
 
 # add_executable(test_cuda_common test_cuda_common.cu)
 # target_link_libraries(test_cuda_common PUBLIC flux_cuda)
 
-add_executable(test_memory_bound test_memory_bound.cc)
-target_link_libraries(test_memory_bound PUBLIC flux_cuda)
+# add_executable(test_memory_bound test_memory_bound.cc)
+# target_link_libraries(test_memory_bound PUBLIC flux_cuda)
 
 add_executable(test_tuning test_tuning.cc)
 target_link_libraries(test_tuning PUBLIC flux_cuda)

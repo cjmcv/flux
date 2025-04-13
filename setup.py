@@ -224,7 +224,6 @@ def main():
         where="python",
         include=[
             "flux",
-            "flux.testing",
         ],
     )
     data_file_list = ["python/flux/lib/libflux_cuda.so"]

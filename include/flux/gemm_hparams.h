@@ -74,36 +74,6 @@ to_gemm_v2_hparams(cute::tuple<Ts...> const &tuple) {
   return {tuple};
 }
 
-template <class... Ts>
-struct GemmV3HParams : public FluxNamedTupleBase<GemmV3HParams, Ts...> {
-  using Base = FluxNamedTupleBase<GemmV3HParams, Ts...>;
-  using Base::Base;
-  static constexpr char const *Name = "GemmV3HParams";
-  static constexpr char const *LowerName = "gemm_v3_hparams";
-  static constexpr std::array<char const *, 2> Fields = {"cluster_shape", "kernel_schedule"};
-
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(cluster_shape, 0)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(kernel_schedule, 1)
-
-  friend GemmV3HParams<UnifiedTileShape, GemmKernelScheduleEnum>
-  unify_type(GemmV3HParams const &obj) {
-    return cute::make_tuple(unify_type(obj.cluster_shape()), unify_type(obj.kernel_schedule()));
-  }
-};
-
-template <class ClusterShape, class KernelSchedule = _Cooperative>
-constexpr GemmV3HParams<ClusterShape, KernelSchedule>
-make_gemm_v3_hparams(
-    ClusterShape const &cluster_shape, KernelSchedule const &kernel_schedule = _Cooperative{}) {
-  return {cute::make_tuple(cluster_shape, kernel_schedule)};
-}
-
-template <class... Ts>
-constexpr GemmV3HParams<Ts...>
-to_gemm_v3_hparams(cute::tuple<Ts...> const &tuple) {
-  return {tuple};
-}
-
 /////////////////////////////////////////////////////
 // CommOp specific gemm hparams
 /////////////////////////////////////////////////////
@@ -145,7 +115,7 @@ to_gather_rs_hparams(cute::tuple<Ts...> const &tup) {
 // better performance
 /////////////////////////////////////////////////////
 using UnifiedImplHParams =
-    std::variant<None, unified_type_t<GemmV2HParams>, unified_type_t<GemmV3HParams>>;
+    std::variant<None, unified_type_t<GemmV2HParams>>;
 using UnifiedCommHParams = std::variant<None, unified_type_t<GatherRSHParams>>;
 
 template <class... Ts>
@@ -276,12 +246,6 @@ auto_impl_spec(GemmMeta<Ts...> meta) {
     } else {
       return make_gemm_v2_hparams(Shape<_64, _64, _32>{}, Shape<_16, _8, _16>{});
     }
-  } else if constexpr (meta.impl() == _GemmV3{}) {
-    if constexpr (meta.arch() == _Sm80{}) {
-      return make_gemm_v3_hparams(Shape<_1, _1, _1>{});
-    } else if constexpr (meta.arch() == _Sm90{}) {
-      return make_gemm_v3_hparams(Shape<_2, _1, _1>{});
-    }
   } else {
     static_assert(cutlass::detail::dependent_false<decltype(meta.impl())>, "unsupported impl");
   }
@@ -320,19 +284,6 @@ materialize_tile_shape_m(GemmMeta<Ts...> meta, ImplHParams impl_hparams, TileSha
 
     if constexpr (meta.impl() == _GemmV2{}) {
       return 128;
-    } else if constexpr (meta.impl() == _GemmV3{}) {
-      if constexpr (meta.arch() == _Sm80{}) {
-        return 256;
-      } else {
-        if constexpr (is_tile_n_auto) {
-          return 128;
-        } else {
-          constexpr bool scale_down_for_pingpong =
-              to_gemm_v3_hparams(ImplHParams{}).kernel_schedule() == _PingPong{};
-          constexpr int tile_n = get<1>(tile_shape);
-          return tile_n <= 128 ? 128 : scale_down_for_pingpong ? 64 : 128;
-        }
-      }
     } else {
       static_assert(cutlass::detail::dependent_false<decltype(meta.impl())>, "unsupported impl");
     }
@@ -369,34 +320,6 @@ materialize_tile_shape_n(GemmMeta<Ts...> meta, ImplHParams impl_hparams, TileSha
               (meta.arch() == _Sm80{} && dt_conf.is_input_s8()))
                  ? 64
                  : 128;
-    } else if constexpr (meta.impl() == _GemmV3{}) {
-      if constexpr (meta.arch() == _Sm80{}) {
-        return 128;
-      } else {
-        constexpr bool scale_down_for_pingpong =
-            to_gemm_v3_hparams(ImplHParams{}).kernel_schedule() == _PingPong{};
-        constexpr bool scale_down_for_non_fastacc =
-            dt_conf.is_input_fp8() && !to_gemm_v3_meta(meta.impl_spec()).fast_accum();
-        constexpr int scale =
-            (scale_down_for_pingpong ? 2 : 1) * (scale_down_for_non_fastacc ? 2 : 1);
-        if constexpr (is_tile_m_auto) {
-          // m_auto expected to be 128, scale down tile_n from 256
-          return 256 / scale;
-        } else {
-          constexpr int tile_m = get<0>(tile_shape);
-          if constexpr (tile_m == 128) {
-            return 256 / scale;
-          } else if constexpr (tile_m > 128) {
-            // need scale down more for n
-            static_assert(tile_m % 128 == 0);
-            return 256 / scale / (tile_m / 128);
-          } else {
-            // less scale down because tile_m has scaled down
-            static_assert(128 % tile_m == 0);
-            return 256 / scale * (128 / tile_m);
-          }
-        }
-      }
     } else {
       static_assert(cutlass::detail::dependent_false<decltype(meta.impl())>, "unsupported impl");
     }
@@ -456,10 +379,7 @@ template <class TileShape, class... Ts>
 constexpr auto
 auto_mainloop_stage(GemmMeta<Ts...> meta, TileShape const &) {
   auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
-  if constexpr (
-      (meta.impl() == _GemmV3{}) and meta.arch() == _Sm90{}) {
-    return cute::_0{};  // Auto Stage Count
-  } else if constexpr (meta.arch() == _Sm89{}) {
+  if constexpr (meta.arch() == _Sm89{}) {
     if constexpr (dt_conf.is_input_fp8()) {
       return cute::_3{};
     } else {

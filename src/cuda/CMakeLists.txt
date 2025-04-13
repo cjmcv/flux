@@ -12,8 +12,7 @@ set(LIB_FILES
   op_registry.cu
 
 )
-  # cuda_stub.cc
-  # nvml_stub.cc
+
 set(_VER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/version.ld)
 
 add_library(flux_cuda SHARED ${LIB_FILES})
