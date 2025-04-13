@@ -472,7 +472,7 @@ enum class CommOpEnum : int8_t {
 };
 
 enum class GemmLayoutEnum : int8_t { RRR, RCR, RCC };
-enum class ImplEnum : int8_t { GemmV2, GemmV3, GemmGroupedV2, GemmGroupedV3 };
+enum class ImplEnum : int8_t { GemmV2, GemmV3 };
 
 enum class GemmKindEnum : int8_t { GemmDefault, GemmStreamK };
 enum class CommKindEnum : int8_t { IntraNode, AcrossNode, IntraNodePcie };
@@ -518,8 +518,6 @@ using _Sm90 = cute::C<ArchEnum::Sm90>;
 
 using _GemmV2 = cute::C<ImplEnum::GemmV2>;
 using _GemmV3 = cute::C<ImplEnum::GemmV3>;
-using _GemmGroupedV2 = cute::C<ImplEnum::GemmGroupedV2>;
-using _GemmGroupedV3 = cute::C<ImplEnum::GemmGroupedV3>;
 
 using _True = cute::C<true>;
 using _False = cute::C<false>;
@@ -581,12 +579,6 @@ inline constexpr bool is_of_type_v =
 
 template <class T>
 inline constexpr bool is_flux_enum_v = detail::is_flux_enum_type<T>::value;
-
-template <class Impl, __CUTE_REQUIRES(is_of_type_v<Impl, ImplEnum>)>
-constexpr bool
-is_grouped_gemm_impl(Impl const &impl) {
-  return impl == _GemmGroupedV3{} or impl == _GemmGroupedV2{};
-}
 
 template <class DType, __CUTE_REQUIRES(is_of_type_v<DType, DataTypeEnum>)>
 constexpr bool
@@ -757,8 +749,6 @@ enum_to_string(ImplEnum version) {
   switch (version) {
     case ImplEnum::GemmV2: return "GemmV2";
     case ImplEnum::GemmV3: return "GemmV3";
-    case ImplEnum::GemmGroupedV2: return "GemmGroupedV2";
-    case ImplEnum::GemmGroupedV3: return "GemmGroupedV3";
     default: return "UNK";
   }
 }

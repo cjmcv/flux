@@ -267,7 +267,7 @@ using namespace cute;
 template <class... Ts>
 constexpr auto
 auto_impl_spec(GemmMeta<Ts...> meta) {
-  if constexpr (meta.impl() == _GemmV2{} or meta.impl() == _GemmGroupedV2{}) {
+  if constexpr (meta.impl() == _GemmV2{}) {
     auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
     if constexpr (meta.arch() == _Sm89{} && dt_conf.is_input_fp8()) {
       return make_gemm_v2_hparams(Shape<_64, _32, _64>{}, Shape<_16, _8, _32>{});
@@ -276,7 +276,7 @@ auto_impl_spec(GemmMeta<Ts...> meta) {
     } else {
       return make_gemm_v2_hparams(Shape<_64, _64, _32>{}, Shape<_16, _8, _16>{});
     }
-  } else if constexpr (meta.impl() == _GemmV3{} or meta.impl() == _GemmGroupedV3{}) {
+  } else if constexpr (meta.impl() == _GemmV3{}) {
     if constexpr (meta.arch() == _Sm80{}) {
       return make_gemm_v3_hparams(Shape<_1, _1, _1>{});
     } else if constexpr (meta.arch() == _Sm90{}) {
@@ -318,9 +318,9 @@ materialize_tile_shape_m(GemmMeta<Ts...> meta, ImplHParams impl_hparams, TileSha
       }
     }();
 
-    if constexpr (meta.impl() == _GemmV2{} or meta.impl() == _GemmGroupedV2{}) {
+    if constexpr (meta.impl() == _GemmV2{}) {
       return 128;
-    } else if constexpr (meta.impl() == _GemmV3{} or meta.impl() == _GemmGroupedV3{}) {
+    } else if constexpr (meta.impl() == _GemmV3{}) {
       if constexpr (meta.arch() == _Sm80{}) {
         return 256;
       } else {
@@ -364,12 +364,12 @@ materialize_tile_shape_n(GemmMeta<Ts...> meta, ImplHParams impl_hparams, TileSha
       }
     }();
 
-    if constexpr (meta.impl() == _GemmV2{} or meta.impl() == _GemmGroupedV2{}) {
+    if constexpr (meta.impl() == _GemmV2{}) {
       return ((meta.arch() == _Sm89{} && dt_conf.is_input_fp8()) or
               (meta.arch() == _Sm80{} && dt_conf.is_input_s8()))
                  ? 64
                  : 128;
-    } else if constexpr (meta.impl() == _GemmV3{} or meta.impl() == _GemmGroupedV3{}) {
+    } else if constexpr (meta.impl() == _GemmV3{}) {
       if constexpr (meta.arch() == _Sm80{}) {
         return 128;
       } else {
@@ -419,11 +419,11 @@ materialize_tile_shape_k(GemmMeta<Ts...> meta, ImplHParams impl_hparams, TileSha
     return get<2>(tile_shape);
   } else {
     auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
-    if constexpr (meta.impl() == _GemmV2{} or meta.impl() == _GemmGroupedV2{}) {
+    if constexpr (meta.impl() == _GemmV2{}) {
       return (meta.arch() == _Sm89{} && dt_conf.is_input_fp8())  ? 64
              : (meta.arch() == _Sm80{} && dt_conf.is_input_s8()) ? 128
                                                                  : 32;
-    } else if constexpr (meta.impl() == _GemmV3{} or meta.impl() == _GemmGroupedV3{}) {
+    } else if constexpr (meta.impl() == _GemmV3{}) {
       return meta.arch() == _Sm80{}
                  ? 32
                  : 128 / cute::max(sizeof_dtype(dt_conf.a()), sizeof_dtype(dt_conf.b()));
@@ -445,7 +445,7 @@ materialize_tile_shape(GemmMeta<Ts...> meta, ImplHParams impl_hparams, TileShape
 template <class... Ts>
 constexpr auto
 auto_gemm_kind(GemmMeta<Ts...> meta) {
-  if constexpr (meta.impl() == _GemmV2{} or meta.impl() == _GemmGroupedV2{}) {
+  if constexpr (meta.impl() == _GemmV2{}) {
     return _GemmStreamK{};
   } else {
     return _GemmDefault{};
@@ -457,7 +457,7 @@ constexpr auto
 auto_mainloop_stage(GemmMeta<Ts...> meta, TileShape const &) {
   auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
   if constexpr (
-      (meta.impl() == _GemmV3{} or meta.impl() == _GemmGroupedV3{}) and meta.arch() == _Sm90{}) {
+      (meta.impl() == _GemmV3{}) and meta.arch() == _Sm90{}) {
     return cute::_0{};  // Auto Stage Count
   } else if constexpr (meta.arch() == _Sm89{}) {
     if constexpr (dt_conf.is_input_fp8()) {
@@ -555,7 +555,7 @@ template <class... Ts, class... Us>
 constexpr bool
 filter_kernel_schedule(GemmMeta<Ts...> meta, GemmHParams<Us...> hparams) {
   auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
-  if constexpr (meta.impl() == _GemmV3{} or meta.impl() == _GemmGroupedV3{}) {
+  if constexpr (meta.impl() == _GemmV3{}) {
     auto v3_hparams = to_gemm_v3_hparams(hparams.impl_spec());
     if (not dt_conf.is_input_fp8()) {
       return v3_hparams.kernel_schedule() == _Cooperative{};

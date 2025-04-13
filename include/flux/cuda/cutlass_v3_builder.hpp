@@ -331,9 +331,9 @@ base_mainloop_params(GemmMeta<Ts...> meta, GemmHParams<Us...> hparams) {
 
   return BaseMainloopParams<
       ElementA,
-      cute::conditional_t<is_grouped_gemm_impl(meta.impl()), GmemLayoutA *, GmemLayoutA>,
+      GmemLayoutA,
       ElementB,
-      cute::conditional_t<is_grouped_gemm_impl(meta.impl()), GmemLayoutB *, GmemLayoutB>,
+      GmemLayoutB,
       ElementAccumulator>{};
 }
 
@@ -422,12 +422,7 @@ default_kernel_schedule(GemmMeta<Ts...> meta, GemmHParams<Us...> hparams) {
   using ElementA = decltype(to_cutlass_element(dt_conf.a()));
   using ElementB = decltype(to_cutlass_element(dt_conf.b()));
   constexpr bool is_input_fp8 = builder::detail::is_input_fp8<ElementA, ElementB>();
-  if constexpr (is_grouped_gemm_impl(meta.impl())) {  // Group GEMM
-    return make_declval<cute::conditional_t<
-        is_input_fp8,
-        cutlass::gemm::KernelPtrArrayTmaWarpSpecializedCooperativeFP8FastAccum,
-        cutlass::gemm::KernelPtrArrayTmaWarpSpecializedCooperative>>();
-  } else if constexpr (is_input_fp8 and v3_meta.block_scale()) {  // Groupwise Scaled GEMM
+  if constexpr (is_input_fp8 and v3_meta.block_scale()) {  // Groupwise Scaled GEMM
     // TODO(wenlei.bao): add hparams with ScaleGranularityM
     return make_declval<cute::conditional_t<
         v3_meta.fast_accum(),

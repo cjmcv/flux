@@ -41,14 +41,6 @@
         << static_cast<int>(error) << ") at: " << #status << "\n";       \
   } while (0)
 
-// #define CUTLASS_CHECK_RTN(x)                   \
-//   do {                                         \
-//     cutlass::Status status = (x);              \
-//     if (status != cutlass::Status::kSuccess) { \
-//       return status;                           \
-//     }                                          \
-//   } while (0)
-
 /**
  * Panic wrapper for unwinding CUDA runtime errors
  */
@@ -59,44 +51,8 @@
                                      << "(" << error << ") at: " << #status << "\n";         \
   } while (0)
 
-// #define NCCL_CHECK(status)                                                                   \
-//   do {                                                                                       \
-//     ncclResult_t res = status;                                                               \
-//     FLUX_CHECK(res == ncclSuccess) << "NCCL failure: " << ncclGetErrorString(res) << " / "   \
-//                                    << ncclGetLastError(NULL) << " at : " << #status << "\n"; \
-//   } while (0)
-
-// #ifndef CUDA_MEM_ALIGN
-// #define CUDA_MEM_ALIGN(x) ((x + 31) / 32 * 32)
-// #endif  // CUDA_MEM_ALIGN
-// #define FETCH_128bit(pointer) (reinterpret_cast<float4 *>(pointer))[0]
-// #define FETCH_64bit(pointer) (reinterpret_cast<float2 *>(pointer))[0]
-// #define FETCH_32bit(pointer) (reinterpret_cast<float *>(pointer))[0]
-// #define OFFSET(row, col, ld) ((row) * ld + col)
 namespace bytedance {
 namespace flux {
-
-// template <DataTypeEnum E>
-// auto
-// to_cuda_dtype(cute::C<E> dtype) {
-//   if constexpr (dtype == _E4M3{}) {
-//     return make_declval<__nv_fp8_e4m3>();
-//   } else if constexpr (dtype == _E5M2{}) {
-//     return make_declval<__nv_fp8_e5m2>();
-//   } else if constexpr (dtype == _BF16{}) {
-//     return make_declval<__nv_bfloat16>();
-//   } else if constexpr (dtype == _FP16{}) {
-//     return make_declval<__half>();
-//   } else if constexpr (dtype == _FP32{}) {
-//     return make_declval<float>();
-//   } else if constexpr (dtype == _S8{}) {
-//     return make_declval<int8_t>();
-//   } else if constexpr (dtype == _S32{}) {
-//     return make_declval<int32_t>();
-//   } else {
-//     static_assert(cutlass::detail::dependent_false<cute::C<E>>, "unsupported dtype!");
-//   }
-// }
 
 template <DataTypeEnum E>
 auto

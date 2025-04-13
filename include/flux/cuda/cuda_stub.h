@@ -46,28 +46,5 @@ using CUDA = struct CUDA {
 }
 
 CUDA &cuda_stub();
-// namespace {
-// const char *
-// get_cu_error_string(CUresult statuse) {
-//   const char *msg;
-//   if (cuda_stub().cuGetErrorString(statuse, &msg) == CUDA_SUCCESS) {
-//     return msg;
-//   } else {
-//     return "unknown error";
-//   }
-// }
-// }  // namespace
-
-// #define CU_CHECK(status)                                                                       \
-//   do {                                                                                         \
-//     CUresult error = status;                                                                   \
-//     FLUX_CHECK(error == CUDA_SUCCESS) << "Got bad cuda status: " << get_cu_error_string(error) \
-//                                       << "(" << error << ") at " #status;                      \
-//   } while (0)
-
-// CUresult CUStreamWaitValue(
-//     CUstream stream, CUdeviceptr addr, cuuint32_t value, unsigned int flags);
-// CUresult CUStreamWriteValue(
-//     CUstream stream, CUdeviceptr addr, cuuint32_t value, unsigned int flags);
 
 }  // namespace bytedance::flux

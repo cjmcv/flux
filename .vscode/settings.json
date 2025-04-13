@@ -76,6 +76,7 @@
         "variant": "cpp",
         "__nullptr": "cpp",
         "__config": "cpp",
-        "*.cc--": "cpp"
+        "*.cc--": "cpp",
+        "*.hpp--": "cpp"
     }
 }
