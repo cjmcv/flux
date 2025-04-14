@@ -20,6 +20,14 @@
 #include <torch/all.h>
 #include "flux/ths_op/ths_op.h"
 
+#define CHECK_TYPE(x, st) FLUX_CHECK_EQ(x.scalar_type(), st) << "Inconsistency type of Tensor " #x
+#define CHECK_CUDA(x) FLUX_CHECK(x.is_cuda()) << #x << " must be a CUDA tensor"
+#define CHECK_CONTIGUOUS(x) FLUX_CHECK(x.is_contiguous()) << #x << " must be contiguous"
+#define CHECK_INPUT(x, st) \
+  CHECK_CUDA(x);           \
+  CHECK_CONTIGUOUS(x);     \
+  CHECK_TYPE(x, st)
+  
 namespace bytedance::flux::ths_op {
 class GemmOnly {
  public:

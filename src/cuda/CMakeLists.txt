@@ -1,16 +1,7 @@
 cmake_minimum_required(VERSION 3.17)
-if (WITH_PROTOBUF)
-  add_compile_options("-DWITH_PROTOBUF")
-  set(flux_proto_lib flux_proto ${Protobuf_LIBRARIES})
-  set(flux_proto_inc ${Protobuf_INCLUDE_DIRS})
-else ()
-  set(flux_proto_lib)
-  set(flux_proto_inc)
-endif()
 
 set(LIB_FILES
   op_registry.cu
-
 )
 
 set(_VER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/version.ld)
@@ -24,10 +15,8 @@ set_target_properties(flux_cuda PROPERTIES
 
 target_link_libraries(flux_cuda
   PUBLIC CUDA::cudart CUDA::cuda_driver ${FLUX_CUDA_OP_TARGETS}
-  PRIVATE ${flux_proto_lib}
 )
 
-target_include_directories(flux_cuda PRIVATE ${flux_proto_inc})
 target_link_options(flux_cuda
   PRIVATE
   $<$<PLATFORM_ID:Linux>:LINKER:--exclude-libs=libflux_proto:libprotobuf

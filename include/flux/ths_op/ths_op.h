@@ -21,11 +21,11 @@
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"
-#include "flux/ths_op/util.h"
 #include <torch/torch.h>
 #include <ATen/core/ivalue.h>
 #include <c10/core/ScalarType.h>
 #include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
+
 
 namespace bytedance {
 namespace flux {

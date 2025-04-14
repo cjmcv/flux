@@ -43,6 +43,9 @@ class ThsOpsInitRegistry {
   ThsOpsInitRegistry &operator=(const ThsOpsInitRegistry &) = delete;
 };
 
+// <NT> torch::CustomClassHolder 是 PyTorch 提供的基类，它能让自定义类在 Python 和 C++ 之间顺利交互。
+// 先自定义类，通过 TorchClassWrapper 模板结构体对其进行包装 如TorchClassWrapper<MyCustomClass>，
+// 然后利用 ThsOpsInitRegistry 将 TorchClassWrapper<MyCustomClass> 注册到 PyTorch 库。
 template <typename T>
 struct TorchClassWrapper : public torch::CustomClassHolder, T {
  public:

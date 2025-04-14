@@ -23,7 +23,6 @@
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"
 #include "flux/ths_op/ths_op.h"
-#include "flux/ths_op/util.h"
 #include <ATen/core/jit_type.h>
 #include <ATen/core/List.h>
 #include <ATen/core/TensorBody.h>

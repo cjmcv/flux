@@ -27,7 +27,3 @@ if (BUILD_THS)
   set(FLUX_THS_OP_FILES ${FLUX_THS_OP_FILES} PARENT_SCOPE)
   flux_add_ths_op_target("gemm_only")
 endif()
-
-if (BUILD_TEST)
-  add_subdirectory(test)
-endif()

@@ -10,9 +10,7 @@ set(BUILD_TEST ON CACHE INTERNAL "Build unit tests")
 # set(ENABLE_NVSHMEM OFF CACHE INTERNAL "Use NVSHMEM to transfer data")
 set(CUTLASS_TRACE OFF CACHE INTERNAL "Print CUTLASS Host Trace info")
 set(FLUX_DEBUG OFF CACHE INTERNAL "Define FLUX_DEBUG")
-# OPTION(WITH_PROTOBUF "build with protobuf" OFF)
 message("PYTHONPATH: ${PYTHONPATH}")
-# message("NVShmem Support: ${ENABLE_NVSHMEM}")
 
 # find cuda
 # specify cuda path if other than default

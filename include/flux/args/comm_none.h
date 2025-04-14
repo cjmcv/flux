@@ -55,40 +55,6 @@ struct S8GemmDequantArguments {
   void *D;              // output: m * n
 };
 
-// Block/Group-wise scaling GEMM
-// Aux = ((alpha * scale_a * scale_b) * (blockscale_A * blockscale_B * A @ B) + ((beta * scale_c) *
-// C) + bias D = (Aux) if Aux is fp8:
-//   abs_max_output = max( abs(aux) | (for every aux in Aux) )
-//   Aux = scale_aux * Aux
-// if D is fp8 type:
-//   abs_max_output = max( abs(d) | (for every d in D) )
-//   D = scale_d * D
-struct BlockScaleGemmArguments {
-  // gemm args
-  int m;
-  int n;
-  int k;
-  int l;
-  void const *A;
-  void const *B;
-  uint32_t mma_promotion_interval = 4;
-  void const *blockscale_A;
-  void const *blockscale_B;
-  void const *C;
-  void *D;
-  // epilogue args
-  float alpha = 1.0f;
-  float beta = 0.0f;
-
-  float scale_a = 1.0f;
-  float scale_b = 1.0f;
-  float scale_c = 1.0f;
-  float scale_d = 1.0f;
-  float scale_aux = 1.0f;
-
-  void const *bias = nullptr;
-};
-
 // FP8 GEMM
 // Aux = ((alpha * scale_a * scale_b) * accumulator) + ((beta * scale_c) * source) + bias
 // D = activation(Aux)
@@ -118,42 +84,6 @@ struct GemmFP8Arguments {
   float const *scaleC;
   float const *scaleD;    // require if D is fp8
   float const *scaleAux;  // require if Aux is fp8
-};
-
-struct GemmGroupedV2Arguments {
-  void *problem_sizes;  // cutlass::gemm::GemmCoord*
-  int problem_count;
-  float alpha;
-  float beta;
-  void **ptr_A;
-  void **ptr_B;
-  void **ptr_C;
-  void **ptr_D;
-  // for FP8 arguments
-  void **ptr_Aux = nullptr;     // m * n
-  void **ptr_Vector = nullptr;  // bias: 1 * n
-  float *abs_max_Aux = nullptr;
-  float *abs_max_D = nullptr;
-  // scaling tensors
-  float const **scaleA = nullptr;
-  float const **scaleB = nullptr;
-  float const *scaleC = nullptr;
-  float const *scaleD = nullptr;    // require if D is fp8
-  float const *scaleAux = nullptr;  // require if Aux is fp8
-  int sm_margin = 0;
-};
-
-struct GemmGroupedV3Arguments {
-  int problem_count;
-  float alpha;
-  float beta;
-  cute::tuple<int, int, int> *problem_sizes;
-  void const **ptr_A;
-  void const **ptr_B;
-  void const **ptr_C;
-  void **ptr_D;
-  float **ptr_alpha = nullptr;
-  int sm_margin = 0;
 };
 
 }  // namespace bytedance::flux
