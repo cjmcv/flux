@@ -201,6 +201,7 @@ def parse_args():
     parser.add_argument("M", type=int)
     parser.add_argument("N", type=int)
     parser.add_argument("K", type=int)
+    parser.add_argument("--step", default=5, type=int, help="m step")
     parser.add_argument("--iters", default=50, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
@@ -312,11 +313,11 @@ if __name__ == "__main__":
         if args.transpose_weight:
             raise ValueError("s8 gemm with dequant must in RCR layout")
 
-    plot_x = list(range(1, args.M))
+    plot_x = list(range(1, args.M, args.step))
     flux_perf = []
     torch_perf = []
     is_all_close = True
-    for m in range(1, args.M):
+    for m in range(1, args.M, args.step):
         print(f"M: {m}, N: {args.N}, K: {args.K}")
         run(m, args.N, args.K, args.has_bias, args.transpose_weight, args.iters, flux_perf, torch_perf)
     
@@ -328,6 +329,9 @@ if __name__ == "__main__":
     plt.xlabel('m_size')
     plt.ylabel('ms')
 
+    plt.legend()
+    plt.grid(True)
+
     # plt.xticks(plot_x)
-    plt.savefig('perf.png')
+    plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
     plt.show()
