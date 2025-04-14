@@ -45,62 +45,6 @@
 
 namespace bytedance::flux::ths_op {
 
-namespace {
-bool
-get_deterministic() {
-  return
-#if TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR >= 2
-      at::globalContext().deterministicFillUninitializedMemory();
-#else
-      at::globalContext().deterministicAlgorithms();
-#endif
-}
-void
-set_deterministic(bool use_deterministic_algorithms, bool deterministic_algorithms_warn_only) {
-#if TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR >= 2
-  at::globalContext().setDeterministicFillUninitializedMemory(use_deterministic_algorithms);
-#else
-  at::globalContext().setDeterministicAlgorithms(
-      use_deterministic_algorithms, deterministic_algorithms_warn_only);
-#endif
-}
-}  // namespace
-
-// class TorchDeterministicGuard::TorchDeterministicGuardImpl {
-//  public:
-//   TorchDeterministicGuardImpl(bool use_deterministic_algorithms)
-//       : use_deterministic_algorithms_old_(get_deterministic()),
-//         deterministic_algorithms_warn_only_old_(
-//             at::globalContext().deterministicAlgorithmsWarnOnly()) {
-//     set_deterministic(use_deterministic_algorithms, use_deterministic_algorithms_old_);
-//   }
-
-//   ~TorchDeterministicGuardImpl() { exit(); }
-
-//   void
-//   exit() {
-//     if (exited_)
-//       return;
-//     set_deterministic(
-//         deterministic_algorithms_warn_only_old_, deterministic_algorithms_warn_only_old_);
-//   }
-
-//  private:
-//   bool use_deterministic_algorithms_old_;
-//   bool deterministic_algorithms_warn_only_old_;
-//   bool exited_ = false;
-// };
-
-// TorchDeterministicGuard::TorchDeterministicGuard(bool use_deterministic_algorithms)
-//     : impl_(new TorchDeterministicGuardImpl(use_deterministic_algorithms)) {}
-
-// TorchDeterministicGuard::~TorchDeterministicGuard() { delete impl_; }
-
-// void
-// TorchDeterministicGuard::exit() {
-//   impl_->exit();
-// }
-
 DataTypeEnum
 from_torch_dtype(at::ScalarType torch_dtype) {
   switch (torch_dtype) {
@@ -162,35 +106,6 @@ to_torch_dtype(DataTypeEnum dtype) {
   }
   return at::ScalarType::Undefined;
 }
-
-bool
-is_s8_torch_dtype(at::ScalarType torch_dtype) {
-  return torch_dtype == at::ScalarType::Char;
-}
-
-void CUDART_CB
-closeIpcMemHandleCallback(cudaStream_t stream, cudaError_t status, void *devPtr) {
-  cudaIpcCloseMemHandle(devPtr);
-}
-
-void CUDART_CB
-releaseCpuDataCallback(cudaStream_t stream, cudaError_t status, void *data_ptr) {
-  auto ptr_to_release = reinterpret_cast<void **>(data_ptr);
-  delete[] ptr_to_release;
-}
-
-class AppendCloseIpcMemHandleCallbackRAII {
- public:
-  AppendCloseIpcMemHandleCallbackRAII(cudaStream_t stream, void *dev_ptr)
-      : stream(stream), dev_ptr(dev_ptr) {}
-  ~AppendCloseIpcMemHandleCallbackRAII() {
-    cudaStreamAddCallback(stream, closeIpcMemHandleCallback, dev_ptr, 0);
-  }
-
- private:
-  cudaStream_t stream;
-  void *dev_ptr;
-};
 
 PyTuningRecord::PyTuningRecord(
     UnifiedGemmMeta meta, RuntimeConfig rt_conf, UnifiedGemmHParams best_hparams)

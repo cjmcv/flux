@@ -61,9 +61,6 @@ def matmul_int8(a, b):
         return torch._int_mm(torch.nn.functional.pad(a, (0, 0, 0, 32 - M)), b)[:M, :]
     return torch._int_mm(a, b)
 
-#
-
-#
 class PerfResult:
     def __init__(self, name: str, output: torch.Tensor, gemm_time_ms: float) -> None:
         self.name = name

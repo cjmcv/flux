@@ -33,7 +33,6 @@ namespace ths_op {
 
 DataTypeEnum from_torch_dtype(at::ScalarType torch_dtype);
 at::ScalarType to_torch_dtype(DataTypeEnum dtype);
-bool is_s8_torch_dtype(at::ScalarType torch_dtype);
 // used by MoE
 torch::Tensor setup_shared_memory(
     int64_t rank, int64_t world_size, torch::Tensor local_data, std::vector<void *> *host_ptrs);
