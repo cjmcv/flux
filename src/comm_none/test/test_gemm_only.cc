@@ -21,7 +21,6 @@
 #include "flux/flux.h"
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"
-#include "flux/op_registry.h"
 #include "cutlass/util/device_memory.h"
 #include "cutlass/profiler/device_allocation.h"
 #include "flux/args/comm_none.h"

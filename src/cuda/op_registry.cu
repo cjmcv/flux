@@ -58,11 +58,5 @@ OpRegistry::instance() {
   return inst;
 }
 
-bool
-OpRegistry::check_heuristic_rule(
-    const UnifiedGemmMeta &meta, const UnifiedGemmHParams &hparams, const RuntimeConfig &rt_conf) {
-  return true;
-}
-
 }  // namespace flux
 }  // namespace bytedance

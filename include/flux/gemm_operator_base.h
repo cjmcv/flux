@@ -62,11 +62,6 @@ struct GemmOperatorBase {
   get_barrier_workspace_size(std::any const &args) const {
     return 0;
   }
-
-  virtual UnifiedGemmHParams
-  get_runtime_gemm_hparams() const {
-    throw std::logic_error("get_runtime_gemm_hparams not implemented");
-  }
 };
 
 }  // namespace bytedance::flux

@@ -29,9 +29,37 @@
 #include "flux/gemm_meta.h"
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_operator_base.h"
-#include "flux/runtime_config.h"
 
 namespace bytedance::flux {
+
+///////////////////////////////////////
+// runtime_config
+using UnifiedCommRuntimeConfig =
+    std::variant<None>; // , ReduceScatterRuntimeConfig, AllGatherRuntimeConfig
+
+// Runtime config used for Dispacher of ops.
+template <class... Ts>
+struct RuntimeConfigTpl : FluxNamedTupleBase<RuntimeConfigTpl, Ts...> {
+  using Base = FluxNamedTupleBase<RuntimeConfigTpl, Ts...>;
+  static constexpr char const *Name = "RuntimeConfig";
+  static constexpr char const *LowerName = "runtime_config";
+  static constexpr std::array<char const *, 4> Fields = {"m", "n", "k", "comm_spec"};
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(m, 0)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(n, 1)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(k, 2)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(comm_spec, 3)
+
+  constexpr RuntimeConfigTpl(cute::tuple<Ts...> const &tup) : Base(tup) {}
+};
+
+using RuntimeConfig = RuntimeConfigTpl<int, int, int, UnifiedCommRuntimeConfig>;
+
+inline RuntimeConfig
+make_runtime_config(
+    int m = 0, int n = 0, int k = 0, UnifiedCommRuntimeConfig const &comm_rt_conf = None{}) {
+  return {cute::make_tuple(m, n, k, comm_rt_conf)};
+}
+
 
 // get arch of current device
 ArchEnum get_arch();
@@ -169,10 +197,6 @@ class OpRegistry {
     gemm_hparams_[unified_meta].emplace(hparams_idx, std::move(unified_hparams));
   }
 
-  // checkes if a combination is acceptable
-  static bool check_heuristic_rule(
-      UnifiedGemmMeta const &, UnifiedGemmHParams const &, RuntimeConfig const &);
-
   template <class... Ts>
   UnifiedGemmHParams
   get_hparams(
@@ -213,9 +237,7 @@ class OpRegistry {
         if (first_valid == nullptr) {
           first_valid = &hparams;
         }
-        if (check_heuristic_rule(unified_meta, hparams, runtime_config)) {
-          return hparams;
-        }
+        return hparams;
       }
     }
     FLUX_CHECK(first_valid != nullptr)

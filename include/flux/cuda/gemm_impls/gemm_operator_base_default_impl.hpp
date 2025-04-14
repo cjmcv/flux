@@ -32,14 +32,6 @@ namespace bytedance::flux {
 template <class DerivedImpl>
 struct GemmOperatorBaseDefaultImplMixin : public GemmOperatorBase {
  public:
-  // meta programming checkers
-  template <class T, typename = std::void_t<>>
-  struct has_hparams : std::false_type {};
-
-  template <class T>
-  struct has_hparams<T, std::void_t<decltype(T::hparams)>>
-      : detail::is_gemm_hparams<decay_and_strip_t<decltype(T::hparams)>> {};
-
   template <class T, typename = std::void_t<>>
   struct is_cutlass3_gemm_universal_adapter : std::false_type {};
 
@@ -135,12 +127,6 @@ struct GemmOperatorBaseDefaultImplMixin : public GemmOperatorBase {
   std::size_t
   get_barrier_workspace_size(std::any const &) const override {
     return 0;
-  }
-
-  UnifiedGemmHParams
-  get_runtime_gemm_hparams() const override {
-    static_assert(has_hparams<DerivedImpl>::value);
-    return unify_type(DerivedImpl::hparams);
   }
 };
 

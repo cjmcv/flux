@@ -280,17 +280,6 @@ struct GatherRSMeta : FluxNamedTupleBase<GatherRSMeta, Ts...> {
   };
 };
 
-template <class TopK>
-constexpr GatherRSMeta<TopK>
-make_gather_rs_meta(TopK const &topk) {
-  return {cute::make_tuple(topk)};
-}
-
-template <class... Ts>
-constexpr GatherRSMeta<Ts...>
-to_gather_rs_meta(cute::tuple<Ts...> const &tup) {
-  return {tup};
-}
 
 using UnifiedCommMeta =
     std::variant<None, unified_type_t<ReduceScatterMeta>, unified_type_t<GatherRSMeta>>;
@@ -393,18 +382,6 @@ constexpr GemmMeta<Ts...>
 to_gemm_meta(cute::tuple<Ts...> const &tup) {
   return {tup};
 }
-
-namespace detail {
-
-template <class T>
-struct is_gemm_meta : std::false_type {};
-
-template <class... Ts>
-struct is_gemm_meta<GemmMeta<Ts...>> : std::true_type {};
-}  // namespace detail
-
-template <class T>
-inline constexpr bool is_gemm_meta_v = detail::is_gemm_meta<decay_and_strip_t<T>>::value;
 
 namespace detail {
 template <class... Ts>

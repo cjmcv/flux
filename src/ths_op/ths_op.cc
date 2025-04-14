@@ -22,7 +22,6 @@
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"
-#include "flux/runtime_config.h"
 #include <ATen/Context.h>
 #include <ATen/core/function_schema.h>
 #include <ATen/core/jit_type.h>
