@@ -42,7 +42,7 @@ set(FLUX_INCLUDE_DIRS
 
 
 # Library dependencies.
-append_fluxlib_if_found(flux_cuda)
+# append_fluxlib_if_found(flux_cuda)
 append_fluxlib_if_found(flux_cuda_ths_op)
 
 # When we build libflux with the old libstdc++ ABI, dependent libraries must too.

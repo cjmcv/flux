@@ -51,7 +51,7 @@ add_subdirectory(comm_none)
 message(STATUS "op_targets: ${FLUX_CUDA_OP_TARGETS}")
 
 # this must be after all op subdirectory added
-add_subdirectory(cuda)
+# add_subdirectory(cuda)
 
 if (BUILD_THS)
   add_subdirectory(ths_op)

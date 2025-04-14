@@ -34,7 +34,6 @@ def _preload_libs(libname):
 
 
 def _load_deps():
-    _preload_libs("libflux_cuda.so")
     _preload_libs("libflux_cuda_ths_op.so")
 
 

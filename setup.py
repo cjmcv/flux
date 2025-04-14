@@ -122,7 +122,7 @@ def read_flux_ths_targets():
 def flux_cuda_deps():
     include_dirs = [root_path / "include", root_path / "src"]
     library_dirs = [root_path / "build" / "lib"]
-    libraries = ["flux_cuda", "flux_cuda_ths_op"]
+    libraries = ["flux_cuda_ths_op"]
     return include_dirs, library_dirs, libraries
 
 

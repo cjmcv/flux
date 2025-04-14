@@ -4,6 +4,7 @@ file(GLOB OTHER_THS_FILES *.cc)
 set(FLUX_THS_FILES
     ${FLUX_THS_OP_FILES}
     ${OTHER_THS_FILES}
+    op_registry.cu
 )
 
 message(STATUS "ths_files: ${FLUX_THS_FILES}")
@@ -14,9 +15,7 @@ if (WITH_TRITON_AOT)
 else()
     SET(TRITON_AOT_LIB )
 endif()
-target_link_libraries(flux_cuda_ths_op
-    flux_cuda
-    ${TORCH_LIBRARIES} ${TRITON_AOT_LIB})
+target_link_libraries(flux_cuda_ths_op PUBLIC CUDA::cudart CUDA::cuda_driver ${FLUX_CUDA_OP_TARGETS} ${TORCH_LIBRARIES} ${TRITON_AOT_LIB})
 
 # Write the unchached variable to a file
 get_property(FLUX_THS_TARGETS GLOBAL PROPERTY FLUX_THS_TARGETS)
