@@ -94,19 +94,11 @@ function build_flux_cuda() {
     export LIBFLUX_PREFIX=${PROJECT_ROOT}/python/flux
     if [ ! -f CMakeCache.txt ] || [ -z ${FLUX_BUILD_SKIP_CMAKE} ]; then
         CMAKE_ARGS=(
-            # -DENABLE_NVSHMEM=${ENABLE_NVSHMEM}
             -DCUDAARCHS=${ARCH}
             -DCMAKE_EXPORT_COMPILE_COMMANDS=1
             -DBUILD_TEST=${BUILD_TEST}
             -DCMAKE_INSTALL_PREFIX=${LIBFLUX_PREFIX}
         )
-        if [ $WITH_PROTOBUF == "ON" ]; then
-            CMAKE_ARGS+=(
-                -DWITH_PROTOBUF=ON
-                -DProtobuf_ROOT=${PROTOBUF_ROOT}/build/local
-                -DProtobuf_PROTOC_EXECUTABLE=${PROTOBUF_ROOT}/build/local/bin/protoc
-            )
-        fi
         if [ $FLUX_DEBUG == "ON" ]; then
             CMAKE_ARGS+=(
                 -DFLUX_DEBUG=ON

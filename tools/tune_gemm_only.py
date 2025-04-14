@@ -23,6 +23,7 @@ from functools import partial
 from typing import List
 
 import numpy as np
+import time
 import torch
 
 import flux
@@ -51,24 +52,32 @@ class TuningConfig:
 
 def gen_tuning_space():
     space: List[TuningConfig] = []
-    space_M = [1024, 2048, 4096, 8192] # , 16384
-    space_N = [6144, 12288] # , 49152
-    space_K = [3072, 6144, 12288]
+    space_M = list(range(1, 50)) #  [1024, 2048, 4096, 8192] # , 16384
+    space_NK = [(3584,5120), (5120,2560), (5120,13824), (27648,5120)] # , 49152
     space_transpose_weight = [False] # , True
     space_dtype = [torch.bfloat16] # , torch.float16
-    space_has_bias = [False, True]
-    for M, N, K, transpose_weight, dtype, has_bias in itertools.product(
-        space_M, space_N, space_K, space_transpose_weight, space_dtype, space_has_bias
+    space_has_bias = [False]
+    for M, NK, transpose_weight, dtype, has_bias in itertools.product(
+        space_M, space_NK, space_transpose_weight, space_dtype, space_has_bias
     ):
         config = TuningConfig(
-            M=M, N=N, K=K, transpose_weight=transpose_weight, dtype=dtype, has_bias=has_bias
+            M=M, N=NK[0], K=NK[1], transpose_weight=transpose_weight, dtype=dtype, has_bias=has_bias
         )
         space.append(config)
     return space
 
 
 def get_torch_output(input: torch.Tensor, weight: torch.Tensor):
-    return torch.matmul(input, weight.t()).cpu()
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+    torch.cuda.synchronize()
+    start_event.record()
+    output = torch.matmul(input, weight.t())
+    end_event.record()
+    torch.cuda.synchronize()
+
+    print(f"torch.matmul: {start_event.elapsed_time(end_event)} ms")
+    return output.cpu()
 
 
 def run_flux_profiling(
@@ -95,7 +104,9 @@ def run_flux_profiling(
 def tune_one_config(prof_ctx: flux.ProfilingContext, config: TuningConfig):
     input = torch.rand((config.M, config.K), dtype=config.dtype).cuda()
     weight = torch.rand((config.N, config.K), dtype=config.dtype).cuda()
+    # start_time = time.time()
     torch_output = get_torch_output(input, weight)
+    # print(f"torch compute time: {(time.time() - start_time) * 1000} ms")
     flux_output = run_flux_profiling(prof_ctx, input, weight, config)
 
     if config.dtype == torch.bfloat16:
@@ -108,7 +119,7 @@ def tune_one_config(prof_ctx: flux.ProfilingContext, config: TuningConfig):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--output_dir", default="./", type=str, help="Directory to store generated files"
+        "--output_dir", default="./tools/", type=str, help="Directory to store generated files"
     )
     return parser.parse_args()
 

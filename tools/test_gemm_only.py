@@ -27,6 +27,7 @@ from flux.util import is_fp8_dtype
 import os
 import random
 import numpy as np
+import matplotlib.pyplot as plt
 
 DTYPE_MAP = {
     "bfloat16": torch.bfloat16,
@@ -232,6 +233,70 @@ THRESHOLD_MAP = {
     torch.int32: 0,
 }
 
+def run(M, N, K, has_bias, transpose_weight, iters, flux_perf, torch_perf):
+    input = None
+    weight = None
+    if is_fp8:
+        torch.use_deterministic_algorithms(False, warn_only=True)
+
+    input = rand_tensor((M, K), dtype=dtype)
+    weight = rand_tensor((N, K), dtype=dtype)
+
+    input_scale = None
+    weight_scale = None
+
+    if is_fp8:
+        input_scale = rand_tensor(1, dtype=torch.float32).cuda()
+        weight_scale = rand_tensor(1, dtype=torch.float32).cuda()
+    elif is_s8_dequant:
+        input_scale = rand_tensor((M, 1), dtype=torch.float32)
+        weight_scale = rand_tensor((1, N), dtype=torch.float32)
+
+    bias = None
+    if has_bias:
+        bias_dtype = output_dtype
+        bias_shape = (1, N) if is_fp8 or is_s8_dequant else (M, N)
+        bias = rand_tensor(bias_shape, bias_dtype)
+
+    perf_result_flux = perf_flux(
+        input,
+        weight,
+        bias,
+        input_scale,
+        weight_scale,
+        transpose_weight,
+        is_fp8,
+        is_s8_dequant,
+        iters,
+        output_dtype,
+    )
+    flux_perf.append(perf_result_flux.gemm_time_ms)
+    
+    perf_result_torch = perf_torch(
+        input,
+        weight,
+        bias,
+        input_scale,
+        weight_scale,
+        is_fp8,
+        is_s8_dequant,
+        iters,
+        output_dtype,
+    )
+    torch_perf.append(perf_result_torch.gemm_time_ms)
+
+    print(perf_result_torch)
+    print(perf_result_flux)
+
+    flux_output = perf_result_flux.output
+    torch_output = perf_result_torch.output
+
+    # is_bitwise_match = flux.bitwise_check(flux_output, torch_output)
+    # print("is bitwise match: ", is_bitwise_match)
+    atol = THRESHOLD_MAP[flux_output.dtype]
+    rtol = THRESHOLD_MAP[flux_output.dtype]
+    flux.torch_allclose(flux_output, torch_output, atol=atol, rtol=rtol)
+
 if __name__ == "__main__":
     init_seed()
     args = parse_args()
@@ -246,63 +311,23 @@ if __name__ == "__main__":
     if is_s8_dequant:
         if args.transpose_weight:
             raise ValueError("s8 gemm with dequant must in RCR layout")
-    input = None
-    weight = None
-    if is_fp8:
-        torch.use_deterministic_algorithms(False, warn_only=True)
 
-    input = rand_tensor((args.M, args.K), dtype=dtype)
-    weight = rand_tensor((args.N, args.K), dtype=dtype)
+    plot_x = list(range(1, args.M))
+    flux_perf = []
+    torch_perf = []
+    is_all_close = True
+    for m in range(1, args.M):
+        print(f"M: {m}, N: {args.N}, K: {args.K}")
+        run(m, args.N, args.K, args.has_bias, args.transpose_weight, args.iters, flux_perf, torch_perf)
+    
 
-    input_scale = None
-    weight_scale = None
+    plt.plot(plot_x, flux_perf, label='flux', marker='o')
+    plt.plot(plot_x, torch_perf, label='torch', marker='s')
 
-    if is_fp8:
-        input_scale = rand_tensor(1, dtype=torch.float32).cuda()
-        weight_scale = rand_tensor(1, dtype=torch.float32).cuda()
-    elif is_s8_dequant:
-        input_scale = rand_tensor((args.M, 1), dtype=torch.float32)
-        weight_scale = rand_tensor((1, args.N), dtype=torch.float32)
+    plt.title('perf')
+    plt.xlabel('m_size')
+    plt.ylabel('ms')
 
-    bias = None
-    if args.has_bias:
-        bias_dtype = output_dtype
-        bias_shape = (1, args.N) if is_fp8 or is_s8_dequant else (args.M, args.N)
-        bias = rand_tensor(bias_shape, bias_dtype)
-
-    perf_result_flux = perf_flux(
-        input,
-        weight,
-        bias,
-        input_scale,
-        weight_scale,
-        args.transpose_weight,
-        is_fp8,
-        is_s8_dequant,
-        args.iters,
-        output_dtype,
-    )
-    perf_result_torch = perf_torch(
-        input,
-        weight,
-        bias,
-        input_scale,
-        weight_scale,
-        is_fp8,
-        is_s8_dequant,
-        args.iters,
-        output_dtype,
-    )
-
-    # flux.testing.print_gemm_sol_time(args.M, args.N, args.K, dtype)
-    print(perf_result_torch)
-    print(perf_result_flux)
-
-    flux_output = perf_result_flux.output
-    torch_output = perf_result_torch.output
-
-    # is_bitwise_match = flux.bitwise_check(flux_output, torch_output)
-    # print("is bitwise match: ", is_bitwise_match)
-    atol = THRESHOLD_MAP[flux_output.dtype]
-    rtol = THRESHOLD_MAP[flux_output.dtype]
-    flux.torch_allclose(flux_output, torch_output, atol=atol, rtol=rtol)
+    # plt.xticks(plot_x)
+    plt.savefig('perf.png')
+    plt.show()

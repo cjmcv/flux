@@ -68,7 +68,3 @@ install(
   FILES ${FLUX_HEADERS}
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/flux/
 )
-install(
-  FILES ${PROJECT_SOURCE_DIR}/cmake/FluxConfig.cmake
-  DESTINATION share/cmake/Flux/
-)

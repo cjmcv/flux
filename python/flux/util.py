@@ -65,19 +65,8 @@ def torch_allclose(x, y, rtol, atol, verbose=True):
 def is_fp8_dtype(dtype: torch.dtype) -> bool:
     return dtype.itemsize == 1 and dtype.is_floating_point
 
-
-@contextmanager
-def with_torch_deterministic(mode: bool, warn_only: bool = True):
-    old_mode = torch.are_deterministic_algorithms_enabled()
-    torch.use_deterministic_algorithms(mode, warn_only=warn_only)
-    try:
-        yield
-    finally:
-        torch.use_deterministic_algorithms(old_mode, warn_only=warn_only)
-
 __all__ = [
     "is_fp8_dtype",
     "get_arch",
-    "torch_allclose",
-    "with_torch_deterministic",
+    "torch_allclose"
 ]

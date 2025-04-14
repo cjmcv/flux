@@ -25,33 +25,33 @@ using namespace cute;
 struct GemmV2CommNone_Space {
   static constexpr auto AllGemmMeta_FP16 = make_space_gemm_meta(
       cute::make_tuple(
-          make_gemm_dtype_config(_FP16{}),
+          /*make_gemm_dtype_config(_FP16{}),*/
           make_gemm_dtype_config(_BF16{}),
-          make_gemm_dtype_config(_FP16{}, _FP16{}, _Void{}, _FP16{}),
+          /*make_gemm_dtype_config(_FP16{}, _FP16{}, _Void{}, _FP16{}),*/
           make_gemm_dtype_config(_BF16{}, _BF16{}, _Void{}, _BF16{})),
       cute::make_tuple(_Sm80{}, _Sm89{}),
       cute::make_tuple(_CommNone{}),
-      cute::make_tuple(_RCR{}, _RRR{}),
+      cute::make_tuple(_RCR{}), // , _RRR{}
       cute::make_tuple(_GemmV2{}));
 
-  static constexpr auto AllGemmHParams_FP16 = make_space_gemm_hparams();
-//   static constexpr auto AllGemmHParams_FP16 = make_space_gemm_hparams(
-//     cute::make_tuple(
-//         make_gemm_v2_hparams(Shape<_64, _64, _32>{}, Shape<_16, _8, _16>{}, _StreamkSK{}),
-//         make_gemm_v2_hparams(Shape<_64, _64, _32>{}, Shape<_16, _8, _16>{}, _StreamkDP{})),
-//     cute::make_tuple(Auto{}),
-//     cute::make_tuple(
-//         Shape<_128, _128, _64>{},
-//         Shape<_128, _128, _32>{},
-//         Shape<_64, _128, _32>{},
-//         Shape<_64, _128, _64>{},
-//         Shape<_64, _256, _32>{},
-//         Shape<_64, _256, _64>{},
-//         Shape<_128, _256, _32>{},
-//         Shape<_256, _128, _32>{}),
-//     cute::make_tuple(Auto{}),
-//     cute::make_tuple(cute::_3{}, cute::_4{}, cute::_8{}),
-//     cute::make_tuple(_RasterAlongM{}, _RasterAlongN{}, _RasterHeuristic{}));
+//   static constexpr auto AllGemmHParams_FP16 = make_space_gemm_hparams();
+  static constexpr auto AllGemmHParams_FP16 = make_space_gemm_hparams(
+    cute::make_tuple(
+        make_gemm_v2_hparams(Shape<_64, _64, _32>{}, Shape<_16, _8, _16>{}, _StreamkSK{}),
+        make_gemm_v2_hparams(Shape<_64, _64, _32>{}, Shape<_16, _8, _16>{}, _StreamkDP{})),
+    cute::make_tuple(Auto{}),
+    cute::make_tuple(
+        Shape<_128, _128, _64>{},
+        Shape<_128, _128, _32>{},
+        Shape<_64, _128, _32>{},
+        Shape<_64, _128, _64>{},
+        Shape<_64, _256, _32>{},
+        Shape<_64, _256, _64>{},
+        Shape<_128, _256, _32>{},
+        Shape<_256, _128, _32>{}),
+    cute::make_tuple(Auto{}),
+    cute::make_tuple(cute::_3{}, cute::_4{}, cute::_8{}),
+    cute::make_tuple(_RasterAlongM{}, _RasterAlongN{}, _RasterHeuristic{}));
 
   static constexpr auto AllGemmMeta_FP8 = make_space_gemm_meta(
       cute::make_tuple(
@@ -107,8 +107,8 @@ struct GemmV2CommNone_Space {
   get_space() {
     return merge_gen_space({
         build_gen_space(AllGemmMeta_FP16, AllGemmHParams_FP16),
-        build_gen_space(AllGemmMeta_FP8, AllGemmHParams_FP8),
-        build_gen_space(AllGemmMeta_S8, AllGemmHParams_S8),
+        // build_gen_space(AllGemmMeta_FP8, AllGemmHParams_FP8),
+        // build_gen_space(AllGemmMeta_S8, AllGemmHParams_S8),
     });
   }
 };

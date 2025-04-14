@@ -97,19 +97,6 @@ struct GatherRSHParams : FluxNamedTupleBase<GatherRSHParams, Ts...> {
   }
 };
 
-template <class GatherRSCTAs = cute::Int<20>, class NDIM_PER_S = cute::_1024>
-constexpr GatherRSHParams<GatherRSCTAs, NDIM_PER_S>
-make_gather_rs_hparams(
-    GatherRSCTAs const &nctas = cute::Int<20>{}, NDIM_PER_S ndim_per_s = cute::_1024{}) {
-  return {cute::make_tuple(nctas, ndim_per_s)};
-}
-
-template <class... Ts>
-constexpr GatherRSHParams<Ts...>
-to_gather_rs_hparams(cute::tuple<Ts...> const &tup) {
-  return {tup};
-}
-
 /////////////////////////////////////////////////////
 // GemmHParams: params can change for better
 // better performance
@@ -188,20 +175,6 @@ constexpr GemmHParams<Ts...>
 to_gemm_hparams(cute::tuple<Ts...> const &tup) {
   return {tup};
 }
-
-using _AutoHParams = GemmHParams<Auto, Auto, Auto, Auto, Auto, Auto>;
-
-namespace detail {
-
-template <class T>
-struct is_gemm_hparams : std::false_type {};
-
-template <class... Ts>
-struct is_gemm_hparams<GemmHParams<Ts...>> : std::true_type {};
-}  // namespace detail
-
-template <class T>
-inline constexpr bool is_gemm_hparams_v = detail::is_gemm_hparams<decay_and_strip_t<T>>::value;
 
 // Create a tuple of GemmHParams by cartesian product
 // of given sets of elements
@@ -436,22 +409,6 @@ namespace detail {
 
 template <class... Ts, class... Us>
 constexpr bool
-filter_arch(GemmMeta<Ts...> meta, GemmHParams<Us...> hparams) {
-#if defined(__CUDACC__)
-#if (__CUDACC_VER_MAJOR__ < 11)
-  return false;
-#endif
-#if (__CUDACC_VER_MAJOR__ < 12)
-  if (meta.arch() == _Sm90{} || meta.arch() == _Sm89{})
-    return false;
-#endif
-#endif
-
-  return true;
-}
-
-template <class... Ts, class... Us>
-constexpr bool
 filter_smem(GemmMeta<Ts...> meta, GemmHParams<Us...> hparams) {
   auto [tile_m, tile_n, tile_k] = hparams.tile_shape();
   auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
@@ -471,44 +428,7 @@ filter_smem(GemmMeta<Ts...> meta, GemmHParams<Us...> hparams) {
   return true;
 }
 
-template <class... Ts, class... Us>
-constexpr bool
-filter_kernel_schedule(GemmMeta<Ts...> meta, GemmHParams<Us...> hparams) {
-  auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
-  if constexpr (meta.impl() == _GemmV3{}) {
-    auto v3_hparams = to_gemm_v3_hparams(hparams.impl_spec());
-    if (not dt_conf.is_input_fp8()) {
-      return v3_hparams.kernel_schedule() == _Cooperative{};
-    }
-  }
-  return true;
-}
 
 }  // namespace detail
 
-// return tuple of (meta, materialized_hparams)
-// and applying pre-defined filters
-template <class... GemmMetaTs, class... GemmHParamsTs>
-constexpr auto
-make_space_meta_hparams_pair(
-    cute::tuple<GemmMetaTs...> const &tup_meta, cute::tuple<GemmHParamsTs...> const &tup_hparams) {
-  auto origin_space = tuple_cartesian_product(tup_meta, tup_hparams);
-  auto materialized = tuple_transform(origin_space, [](auto const par) {
-    auto [meta, hparams] = par;
-    return cute::make_tuple(meta, materialize_hparams(meta, hparams));
-  });
-
-  return tuple_filter(materialized, [](auto const par) {
-    auto meta = to_gemm_meta(cute::get<0>(par));
-    auto hparams = materialize_hparams(meta, cute::get<1>(par));
-    // apply predefined filters
-    if constexpr (not detail::filter_arch(meta, hparams)) {
-      return false;
-    }
-    if constexpr (not detail::filter_smem(meta, hparams)) {
-      return false;
-    }
-    return true;
-  });
-}
 }  // namespace bytedance::flux

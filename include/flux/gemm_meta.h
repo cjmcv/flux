@@ -217,47 +217,6 @@ using UnifiedImplMeta = std::variant<None, unified_type_t<GemmV2Meta>, unified_t
 // Comm-specific meta
 /////////////////////////////////////////////////////
 template <class... Ts>
-struct ReduceScatterMeta : FluxNamedTupleBase<ReduceScatterMeta, Ts...> {
-  using Base = FluxNamedTupleBase<ReduceScatterMeta, Ts...>;
-  using Base::Base;
-
-  static constexpr char const *Name = "ReduceScatterMeta";
-  static constexpr char const *LowerName = "reduce_scatter_meta";
-  static constexpr std::array<char const *, 2> Fields = {"fuse_reduction", "comm_kind"};
-
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(fuse_reduction, 0)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(comm_kind, 1)
-
-  constexpr ReduceScatterMeta(cute::tuple<Ts...> const &tup) : Base(tup) { check_type(); }
-
-  friend ReduceScatterMeta<bool, CommKindEnum>
-  unify_type(ReduceScatterMeta const &obj) {
-    return cute::make_tuple(bool(obj.fuse_reduction()), CommKindEnum(obj.comm_kind()));
-  }
-
- protected:
-  constexpr void
-  check_type() const {
-    static_assert(
-        is_of_type_v<decltype(fuse_reduction()), bool>, "fuse_reduction() requires bool");
-    static_assert(
-        is_of_type_v<decltype(comm_kind()), CommKindEnum>, "comm_kind() requires CommKindEnum");
-  };
-};
-
-template <class FuseReduction, class CommKind>
-constexpr ReduceScatterMeta<FuseReduction, CommKind>
-make_reduce_scatter_meta(FuseReduction const &fuse_reduction, CommKind const &comm_kind) {
-  return {cute::make_tuple(fuse_reduction, comm_kind)};
-}
-
-template <class... Ts>
-constexpr ReduceScatterMeta<Ts...>
-to_reduce_scatter_meta(cute::tuple<Ts...> const &tup) {
-  return {tup};
-}
-
-template <class... Ts>
 struct GatherRSMeta : FluxNamedTupleBase<GatherRSMeta, Ts...> {
   using Base = FluxNamedTupleBase<GatherRSMeta, Ts...>;
   using Base::Base;
@@ -282,7 +241,7 @@ struct GatherRSMeta : FluxNamedTupleBase<GatherRSMeta, Ts...> {
 
 
 using UnifiedCommMeta =
-    std::variant<None, unified_type_t<ReduceScatterMeta>, unified_type_t<GatherRSMeta>>;
+    std::variant<None, unified_type_t<GatherRSMeta>>;
 
 /////////////////////////////////////////////////////
 // GemmMeta: params does not change
