@@ -335,6 +335,7 @@ class GemmOnly::GemmOnlyImpl {
           }
 
           float avg_elapsed = int(total_elapsed / iters * 1000) / 1000.0;
+          // printf("avg_elapsed: %f.\n", avg_elapsed);
           ctx->add(meta, rt_conf, hparams, avg_elapsed);
         },
         meta);

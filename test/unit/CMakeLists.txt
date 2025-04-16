@@ -12,3 +12,9 @@ target_link_libraries(test_tuning PUBLIC flux_cuda_ths_op)
 
 add_executable(test_gemm_only test_gemm_only.cc)
 target_link_libraries(test_gemm_only PUBLIC flux_cuda_ths_op)
+
+add_executable(test_gemv_only test_gemv_only.cu)
+target_link_libraries(test_gemv_only PUBLIC flux_cuda_ths_op)
+
+add_executable(test_gemm_simt test_gemm_simt.cu)
+target_link_libraries(test_gemm_simt PUBLIC flux_cuda_ths_op)

@@ -115,7 +115,7 @@ struct GemmV2BaseKernel {
   static constexpr auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
 
   using ArchTag = decltype(to_cutlass_archtag(meta.arch()));
-  using OpClass = cutlass::arch::OpClassTensorOp;
+  using OpClass = cutlass::arch::OpClassTensorOp; // OpClassSimt
 
   using ElementA = decltype(to_cutlass_element(dt_conf.a()));
   using ElementB = decltype(to_cutlass_element(dt_conf.b()));

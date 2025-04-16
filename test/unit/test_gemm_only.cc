@@ -25,6 +25,7 @@
 #include "cutlass/profiler/device_allocation.h"
 #include "flux/args/comm_none.h"
 
+#include "flux/args/comm_none.h"
 namespace bytedance::flux {
 
 template <class DType>
@@ -60,15 +61,40 @@ run_gemm_only(int m, int n, int k) {
   auto rt_conf = make_runtime_config(m, n, k);
 
   auto hparams = OpRegistry::instance().get_hparams(meta, rt_conf);
-  // hparams.gemm_kind() = _GemmStreamK{};
+  
+
+  // make_gemm_hparams(make_gemm_v2_hparams(cute::make_tuple(16l,64l,64l),cute::make_tuple(16l,8l,16l),_StreamkDP{}()),
+  //                   None{},cute::make_tuple(32l,128l,64l),_GemmStreamK{}(),4,_RasterAlongM{}()));
+  //
+  /*
+  inst.add(make_gemm_meta(make_gemm_dtype_config(_BF16{}(),_BF16{}(),_Void{}(),_BF16{}(),_FP32{}(),_FP32{}()),_Sm89{}(),_CommNone{}(),_RCR{}(),_GemmV2{}(),
+  
+  make_gemm_v2_meta(false),None{}),make_runtime_config(1,27648,5120,None{}),make_gemm_hparams(make_gemm_v2_hparams(cute::make_tuple(16l,64l,64l),cute::make_tuple(16l,8l,16l),_StreamkDP{}()),None{},cute::make_tuple(32l,128l,64l),_GemmStreamK{}(),4,_RasterAlongM{}()));
+  
+
+  hparams: "impl_spec", "comm_spec", "tile_shape", "gemm_kind", "mainloop_stage", "raster_order"
+  impl_spec: "warp_shape", "instruction_shape", "streamk_mode"
+  */
+  auto unified_hparams = unify_type(hparams);
+  // auto unified_impl_spec = unify_type(unified_hparams.impl_spec());
+  // FLUX_CHECK_EQ(unified_impl_spec.warp_shape(), cute::make_tuple(16l,64l,64l));
+  // FLUX_CHECK_EQ(unified_impl_spec.instruction_shape(), cute::make_tuple(16l,8l,16l));
+  // FLUX_CHECK_EQ(unified_impl_spec.streamk_mode(), _StreamkDP{}());
+
+  FLUX_CHECK_EQ(unified_hparams.comm_spec(), None{});
+  FLUX_CHECK_EQ(unified_hparams.tile_shape(), cute::make_tuple(32l,128l,64l));
+  FLUX_CHECK_EQ(unified_hparams.gemm_kind(), _GemmStreamK{}());
+  FLUX_CHECK_EQ(unified_hparams.mainloop_stage(), 4);
+  FLUX_CHECK_EQ(unified_hparams.raster_order(), _RasterAlongM{}());
+  //
   auto gemm_op = OpRegistry::instance().get_op(meta, hparams);
   auto stream = nullptr;
   const GemmOnlyArguments args{
-      m, n, k, 1.0, 1.0, block_A.get(), block_B.get(), block_C.get(), block_D.get()};
+      m, n, k, 1.0, 0.0, block_A.get(), block_B.get(), block_C.get(), block_D.get()};
   int64_t workspace_size = gemm_op->get_workspace_size(args);
   workspace.reset(workspace_size);
-  constexpr int warm_iters = 5;
-  constexpr int iters = 10;
+  constexpr int warm_iters = 200;
+  constexpr int iters = 50;
   GpuTimer timer;
   for (int i = 0; i < warm_iters + iters; ++i) {
     if (i == warm_iters) {
@@ -80,6 +106,7 @@ run_gemm_only(int m, int n, int k) {
   timer.stop();
   printf("op time elapsed: %.3f ms\n", timer.elapsed_millis() / iters);
 }
+
 }  // namespace bytedance::flux
 
 int
@@ -92,7 +119,7 @@ main(int argc, char *argv[]) {
   int n = std::atoi(argv[2]);
   int k = std::atoi(argv[3]);
 
-  std::string dtype = "FP16";
+  std::string dtype = "BF16";
   if (argc == 5) {
     dtype = argv[4];
   }

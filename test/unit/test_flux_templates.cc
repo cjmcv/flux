@@ -82,17 +82,17 @@ test_gemm_meta() {
   FLUX_CHECK_EQ(unified_meta.impl(), _GemmV3{}());
 }
 
-// void
-// test_gemm_hparams() {
-//   auto dt_conf = make_gemm_dtype_config(_FP16{});
-//   auto meta = make_gemm_meta(dt_conf, _Sm90{}, _CommNone{}, _RCR{}, _GemmV3{});
-//   auto auto_hparams = _AutoHParams{};
-//   auto hparams = materialize_hparams(meta, auto_hparams);
-//   auto unified_hparams = unify_type(hparams);
-//   FLUX_CHECK_EQ(unified_hparams.comm_spec(), None{});
-//   FLUX_CHECK_EQ(unified_hparams.raster_order(), _RasterHeuristic{}());
-//   FLUX_CHECK_EQ(unified_hparams.mainloop_stage(), 0);
-// }
+void
+test_gemm_hparams() {
+  auto dt_conf = make_gemm_dtype_config(_FP16{});
+  auto meta = make_gemm_meta(dt_conf, _Sm89{}, _CommNone{}, _RCR{}, _GemmV2{});
+  auto auto_hparams = _AutoHParams{};
+  auto hparams = materialize_hparams(meta, auto_hparams);
+  auto unified_hparams = unify_type(hparams);
+  FLUX_CHECK_EQ(unified_hparams.comm_spec(), None{});
+  FLUX_CHECK_EQ(unified_hparams.raster_order(), _RasterHeuristic{}());
+  FLUX_CHECK_EQ(unified_hparams.mainloop_stage(), 0);
+}
 }  // namespace bytedance::flux
 
 int
@@ -104,7 +104,7 @@ main() {
   // test_tuple_split_slice();
   // test_return_if();
   test_gemm_meta();
-  // test_gemm_hparams();
+  test_gemm_hparams();
   // test_tuple_has_elem();
   return 0;
 }

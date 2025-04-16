@@ -176,6 +176,8 @@ to_gemm_hparams(cute::tuple<Ts...> const &tup) {
   return {tup};
 }
 
+using _AutoHParams = GemmHParams<Auto, Auto, Auto, Auto, Auto, Auto>;
+
 // Create a tuple of GemmHParams by cartesian product
 // of given sets of elements
 template <

@@ -71,9 +71,8 @@ class PerfResult:
     def __repr__(self) -> str:
         return f"{self.name}: gemm {self.gemm_time_ms:.3f} ms"
 
-
 def perf_gemm(iters: int, name: str, fn: callable):
-    warmup_iters = 5
+    warmup_iters = 0
     for i in range(warmup_iters):
         output = fn()
     torch.cuda.synchronize()
@@ -182,7 +181,6 @@ def perf_flux(
             output_scale=None,
             fast_accum=False,
         )
-
     return perf_gemm(iters, "flux", fn)
 
 
@@ -259,6 +257,19 @@ def run(M, N, K, has_bias, transpose_weight, iters, flux_perf, torch_perf):
         bias_shape = (1, N) if is_fp8 or is_s8_dequant else (M, N)
         bias = rand_tensor(bias_shape, bias_dtype)
 
+    perf_result_torch = perf_torch(
+        input,
+        weight,
+        bias,
+        input_scale,
+        weight_scale,
+        is_fp8,
+        is_s8_dequant,
+        iters,
+        output_dtype,
+    )
+    torch_perf.append(perf_result_torch.gemm_time_ms)
+
     perf_result_flux = perf_flux(
         input,
         weight,
@@ -272,19 +283,6 @@ def run(M, N, K, has_bias, transpose_weight, iters, flux_perf, torch_perf):
         output_dtype,
     )
     flux_perf.append(perf_result_flux.gemm_time_ms)
-    
-    perf_result_torch = perf_torch(
-        input,
-        weight,
-        bias,
-        input_scale,
-        weight_scale,
-        is_fp8,
-        is_s8_dequant,
-        iters,
-        output_dtype,
-    )
-    torch_perf.append(perf_result_torch.gemm_time_ms)
 
     print(perf_result_torch)
     print(perf_result_flux)
@@ -317,11 +315,17 @@ if __name__ == "__main__":
     flux_perf = []
     torch_perf = []
     is_all_close = True
+
+    # warnup
+    print(f"Warnup M: {100}, N: {args.N}, K: {args.K}")
+    run(100, args.N, args.K, args.has_bias, args.transpose_weight, args.iters, flux_perf, torch_perf)
+
+    flux_perf = []
+    torch_perf = []
     for m in range(1, args.M, args.step):
         print(f"M: {m}, N: {args.N}, K: {args.K}")
         run(m, args.N, args.K, args.has_bias, args.transpose_weight, args.iters, flux_perf, torch_perf)
     
-
     plt.plot(plot_x, flux_perf, label='flux', marker='o')
     plt.plot(plot_x, torch_perf, label='torch', marker='s')
 
