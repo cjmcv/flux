@@ -308,6 +308,30 @@ class GemmOnly::GemmOnlyImpl {
     ProfilingContext tmp_ctx("__tmp__");
     ProfilingContext *ctx = opt_ctx == nullptr ? &tmp_ctx : opt_ctx.get();
 
+    //
+
+    int m = rt_conf.m();
+    int n = rt_conf.n();
+    int k = rt_conf.k();
+
+    int cache_size = 100 * 1024 * 1024; // 100MB 
+    int total_bytes = (m*k + k*n) * 4; //torch.finfo(dtype).bits // 8 # + M*N
+    int problem_count = 1 + int((3 * cache_size) / total_bytes);
+
+    std::vector<torch::Tensor> inputs;
+    std::vector<torch::Tensor> weights;
+    for (int i=0; i<problem_count; i++) {
+      inputs.push_back(input.clone());
+      weights.push_back(weight.clone());      
+    }
+    // for (int i=0; i<problem_count; i++) {
+    //   printf("in: %p, ", inputs[i].data_ptr());
+    // }
+    // for (int i=0; i<problem_count; i++) {
+    //   printf("w: %p, ", weights[i].data_ptr());
+    // }
+    printf("problem_count: %d, %d, %d.\n", problem_count, cache_size, total_bytes);
+
     OpRegistry::instance().visit_hparams(
         [&](UnifiedGemmHParams const &hparams) {
           constexpr int warm_iters = 5;
@@ -316,11 +340,12 @@ class GemmOnly::GemmOnlyImpl {
 
           auto stream = c10::cuda::getCurrentCUDAStream();
           for (int iter = 0; iter < warm_iters + iters; ++iter) {
+            int problem_idx = iter % problem_count;
             GpuTimer timer;
             timer.start(stream);
             auto output [[maybe_unused]] = this->forward_impl(
-                input,
-                weight,
+                inputs[problem_idx],
+                weights[problem_idx],
                 bias,
                 output_buf,
                 input_scale,

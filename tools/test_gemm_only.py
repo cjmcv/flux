@@ -190,7 +190,7 @@ def perf_flux(
     )
 
     def fn(iter_id):
-        problem_idx = iter_id%problem_cnt
+        problem_idx = iter_id % problem_cnt
         return op.forward(
             inputs[problem_idx],
             weights[problem_idx],
@@ -221,7 +221,7 @@ def parse_args():
     parser.add_argument("K", type=int)
     parser.add_argument("--step", default=5, type=int, help="m step")
     parser.add_argument("--warmup_iters", default=20, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=100, type=int, help="perf iterations")
+    parser.add_argument("--iters", default=500, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16",

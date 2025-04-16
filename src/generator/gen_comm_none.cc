@@ -57,7 +57,6 @@ struct GemmV2CommNone_Space {
       cute::make_tuple(cute::_3{}, cute::_4{}), // , cute::_8{}
       cute::make_tuple(_RasterAlongM{}, _RasterAlongN{}, _RasterHeuristic{})), 
     
-    
     make_space_gemm_hparams(
       cute::make_tuple(
           make_gemm_v2_hparams(Shape<_16, _64, _32>{}, Shape<_16, _8, _16>{}, _StreamkSK{}),
@@ -69,20 +68,20 @@ struct GemmV2CommNone_Space {
                     Shape<_16, _256, _64>{}),
             cute::make_tuple(Auto{}),
             cute::make_tuple(cute::_3{}, cute::_4{}), // , cute::_8{}
+            cute::make_tuple(_RasterAlongM{}, _RasterAlongN{}, _RasterHeuristic{})),
+    
+    make_space_gemm_hparams(
+      cute::make_tuple(
+          make_gemm_v2_hparams(Shape<_16, _64, _32>{}, Shape<_16, _8, _8>{}, _StreamkSK{}),
+          make_gemm_v2_hparams(Shape<_16, _64, _64>{}, Shape<_16, _8, _8>{}, _StreamkDP{})),
+    
+          cute::make_tuple(Auto{}),
+          cute::make_tuple(
+                    Shape<_32, _128, _64>{},
+                    Shape<_16, _128, _64>{}),
+            cute::make_tuple(Auto{}),
+            cute::make_tuple(cute::_3{}, cute::_4{}), // , cute::_8{}
             cute::make_tuple(_RasterAlongM{}, _RasterAlongN{}, _RasterHeuristic{}))
-    
-    // make_space_gemm_hparams(
-    //   cute::make_tuple(
-    //       make_gemm_v2_hparams(Shape<_16, _64, _32>{}, Shape<_16, _8, _8>{}, _StreamkSK{}),
-    //       make_gemm_v2_hparams(Shape<_16, _64, _64>{}, Shape<_16, _8, _8>{}, _StreamkDP{})),
-    
-    //       cute::make_tuple(Auto{}),
-    //       cute::make_tuple(
-    //                 Shape<_32, _128, _64>{},
-    //                 Shape<_16, _128, _64>{}),
-    //         cute::make_tuple(Auto{}),
-    //         cute::make_tuple(cute::_3{}, cute::_4{}), // , cute::_8{}
-    //         cute::make_tuple(_RasterAlongM{}, _RasterAlongN{}, _RasterHeuristic{}))
     );
 
   static constexpr auto AllGemmMeta_FP8 = make_space_gemm_meta(
