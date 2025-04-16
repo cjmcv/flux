@@ -71,46 +71,63 @@ class PerfResult:
     def __repr__(self) -> str:
         return f"{self.name}: gemm {self.gemm_time_ms:.3f} ms"
 
-def perf_gemm(iters: int, name: str, fn: callable):
-    warmup_iters = 0
-    for i in range(warmup_iters):
-        output = fn()
-    torch.cuda.synchronize()
+def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
     total_time = 0
-    start = time.time()
-    for i in range(iters):
-        output = fn()
+    
+    for i in range(warmup_iters + iters):
+        if (i == warmup_iters):
+            torch.cuda.synchronize()
+            start = time.time()
+        output = fn(i)
+
     torch.cuda.synchronize()
     end = time.time()
     total_time = end - start
     return PerfResult(name=name, output=output, gemm_time_ms=total_time / iters * 1000)
 
+    # for i in range(warmup_iters):
+    #     output = fn()
+    # torch.cuda.synchronize()
+    
+    # start = time.time()
+    # for i in range(iters):
+    #     output = fn(i)
+    # torch.cuda.synchronize()
+    # end = time.time()
+    # total_time = end - start
+    # return PerfResult(name=name, output=output, gemm_time_ms=total_time / iters * 1000)
+
 
 def perf_torch(
-    input: torch.Tensor,
-    weight: torch.Tensor,
+    inputs: list[torch.Tensor],
+    weights: list[torch.Tensor],
     bias: Optional[torch.Tensor],
     input_scale: Optional[torch.Tensor],
     weight_scale: Optional[torch.Tensor],
     is_fp8: bool,
     is_s8_dequant: bool,
+    warmup_iters: int,
     iters: int,
+    problem_cnt: int,
     output_dtype: torch.dtype,
 ):
     alpha_scale = 1.0
     if is_fp8:
         alpha_scale = input_scale * weight_scale
-        input = input.to(torch.bfloat16)
-        weight = weight.to(torch.bfloat16)
+        for i in range(len(inputs)):
+            inputs[i] = inputs[i].to(torch.bfloat16)
+        for i in range(len(weights)):
+            weights[i] = weights[i].to(torch.bfloat16)
 
-    def fn():
+    def fn(iter_id):
+        problem_idx = iter_id%problem_cnt
         if is_s8_dequant:
-            accum = matmul_int8(input, weight.t()).to(torch.float32)
+            accum = matmul_int8(inputs[problem_idx], weights[problem_idx].t()).to(torch.float32)
             output = input_scale * weight_scale * accum
-        elif input.dtype == torch.int8:
-            output = matmul_int8(input, weight.t())
+        elif inputs[problem_idx].dtype == torch.int8:
+            output = matmul_int8(inputs[problem_idx], weights[problem_idx].t())
         else:
-            output = alpha_scale * torch.matmul(input, weight.t())
+            output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx])
         if is_fp8 or is_s8_dequant:
             output = output.to(torch.bfloat16)
         else:
@@ -119,30 +136,32 @@ def perf_torch(
             output = output + bias
         return output
 
-    return perf_gemm(iters, "torch", fn)
+    return perf_gemm(warmup_iters, iters, "torch", fn)
 
 
 def perf_flux(
-    input: torch.Tensor,
-    weight: torch.Tensor,
+    inputs: list[torch.Tensor],
+    weights: list[torch.Tensor],
     bias: Optional[torch.Tensor],
     input_scale: Optional[torch.Tensor],
     weight_scale: Optional[torch.Tensor],
     transpose_weight: bool,
     is_fp8: bool,
     is_s8_dequant: bool,
+    warmup_iters: int, 
     iters: int,
+    problem_cnt: int,
     output_dtype: torch.dtype,
 ):
-    m = input.size(0)
+    m = inputs[0].size(0)
     if transpose_weight:
         assert (
             is_fp8 == False and is_s8_dequant == False
         ), "FP8/S8 GEMM does not support transpose weight (RRR layout)"
-        weight = weight.t().contiguous()
-        n = weight.size(1)
+        # weight = weight.t().contiguous()
+        n = weights[0].size(1)
     else:
-        n = weight.size(0)
+        n = weights[0].size(0)
 
     def _check_tensor_shape(tensor, shape):
         if not isinstance(tensor, torch.Tensor):
@@ -160,20 +179,21 @@ def perf_flux(
         if not _check_tensor_shape(weight_scale, (1, n)):
             raise ValueError("weight_scale's shape should be (1, n) for S8 GEMM")
 
-    output = torch.empty([m, n], dtype=output_dtype, device=input.device, requires_grad=False)
+    output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
     ## TODO: remove below once moe fp8 gemm invoke get fixed
     use_fp8_gemm = True if is_fp8 else False
     op = flux.GemmOnly(
-        input_dtype=input.dtype,
+        input_dtype=inputs[0].dtype,
         output_dtype=output_dtype,
         transpose_weight=transpose_weight,
         use_fp8_gemm=use_fp8_gemm,
     )
 
-    def fn():
+    def fn(iter_id):
+        problem_idx = iter_id%problem_cnt
         return op.forward(
-            input,
-            weight,
+            inputs[problem_idx],
+            weights[problem_idx],
             bias=bias,
             output_buf=output,
             input_scale=input_scale,
@@ -181,7 +201,7 @@ def perf_flux(
             output_scale=None,
             fast_accum=False,
         )
-    return perf_gemm(iters, "flux", fn)
+    return perf_gemm(warmup_iters, iters, "flux", fn)
 
 
 def rand_tensor(shape: list[int], dtype: torch.dtype):
@@ -200,7 +220,8 @@ def parse_args():
     parser.add_argument("N", type=int)
     parser.add_argument("K", type=int)
     parser.add_argument("--step", default=5, type=int, help="m step")
-    parser.add_argument("--iters", default=50, type=int, help="perf iterations")
+    parser.add_argument("--warmup_iters", default=20, type=int, help="perf warmup iterations")
+    parser.add_argument("--iters", default=100, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16",
@@ -232,14 +253,24 @@ THRESHOLD_MAP = {
     torch.int32: 0,
 }
 
-def run(M, N, K, has_bias, transpose_weight, iters, flux_perf, torch_perf):
-    input = None
-    weight = None
+def run(M, args, flux_perf, torch_perf):
+    #
+    N = args.N
+    K = args.K
+    cache_size = 100 * 1024 * 1024 # 100MB 
+    total_bytes = (M*K + K*N) * torch.finfo(dtype).bits // 8 # + M*N
+
+    problem_count = 1 + int((3 * cache_size) / total_bytes)
+    print("problem_count", problem_count, cache_size, total_bytes)
+    #
+    inputs = []
+    weights = []
     if is_fp8:
         torch.use_deterministic_algorithms(False, warn_only=True)
 
-    input = rand_tensor((M, K), dtype=dtype)
-    weight = rand_tensor((N, K), dtype=dtype)
+    for i in range(problem_count):
+        inputs.append(rand_tensor((M, K), dtype=dtype))
+        weights.append(rand_tensor((N, K), dtype=dtype))
 
     input_scale = None
     weight_scale = None
@@ -252,37 +283,41 @@ def run(M, N, K, has_bias, transpose_weight, iters, flux_perf, torch_perf):
         weight_scale = rand_tensor((1, N), dtype=torch.float32)
 
     bias = None
-    if has_bias:
+    if args.has_bias:
         bias_dtype = output_dtype
         bias_shape = (1, N) if is_fp8 or is_s8_dequant else (M, N)
         bias = rand_tensor(bias_shape, bias_dtype)
 
-    perf_result_torch = perf_torch(
-        input,
-        weight,
-        bias,
-        input_scale,
-        weight_scale,
-        is_fp8,
-        is_s8_dequant,
-        iters,
-        output_dtype,
-    )
-    torch_perf.append(perf_result_torch.gemm_time_ms)
-
     perf_result_flux = perf_flux(
-        input,
-        weight,
+        inputs,
+        weights,
         bias,
         input_scale,
         weight_scale,
-        transpose_weight,
+        args.transpose_weight,
         is_fp8,
         is_s8_dequant,
-        iters,
+        args.warmup_iters,
+        args.iters,
+        problem_count, 
         output_dtype,
     )
     flux_perf.append(perf_result_flux.gemm_time_ms)
+
+    perf_result_torch = perf_torch(
+        inputs,
+        weights,
+        bias,
+        input_scale,
+        weight_scale,
+        is_fp8,
+        is_s8_dequant,
+        args.warmup_iters,
+        args.iters,
+        problem_count,
+        output_dtype,
+    )
+    torch_perf.append(perf_result_torch.gemm_time_ms)
 
     print(perf_result_torch)
     print(perf_result_flux)
@@ -316,20 +351,16 @@ if __name__ == "__main__":
     torch_perf = []
     is_all_close = True
 
-    # warnup
-    print(f"Warnup M: {100}, N: {args.N}, K: {args.K}")
-    run(100, args.N, args.K, args.has_bias, args.transpose_weight, args.iters, flux_perf, torch_perf)
-
     flux_perf = []
     torch_perf = []
     for m in range(1, args.M, args.step):
         print(f"M: {m}, N: {args.N}, K: {args.K}")
-        run(m, args.N, args.K, args.has_bias, args.transpose_weight, args.iters, flux_perf, torch_perf)
+        run(m, args, flux_perf, torch_perf)
     
     plt.plot(plot_x, flux_perf, label='flux', marker='o')
     plt.plot(plot_x, torch_perf, label='torch', marker='s')
 
-    plt.title('perf')
+    plt.title(f'perf-N{args.N}-K{args.K}')
     plt.xlabel('m_size')
     plt.ylabel('ms')
 
