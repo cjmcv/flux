@@ -75,7 +75,6 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT=${SCRIPT_DIR}
-PROTOBUF_ROOT=$PROJECT_ROOT/3rdparty/protobuf
 
 cd ${PROJECT_ROOT}
 
