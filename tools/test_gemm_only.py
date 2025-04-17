@@ -357,8 +357,8 @@ if __name__ == "__main__":
         print(f"M: {m}, N: {args.N}, K: {args.K}")
         run(m, args, flux_perf, torch_perf)
     
-    plt.plot(plot_x, flux_perf, label='flux', marker='o')
-    plt.plot(plot_x, torch_perf, label='torch', marker='s')
+    plt.plot(plot_x, flux_perf, label='flux', marker='o', markersize=3)
+    plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
 
     plt.title(f'perf-N{args.N}-K{args.K}')
     plt.xlabel('m_size')

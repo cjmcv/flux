@@ -28,6 +28,15 @@
 #include "flux/args/comm_none.h"
 namespace bytedance::flux {
 
+// 这里临时注册配置进行手动调优，前提是对应shape在其他地方没有被注册
+// 同时，各种参数的组合必须是 registers 搜索空间里能找到的
+using namespace cute;
+static int config_gemm_only_sm89_2 = []() {
+  auto &inst = TuningConfigRegistry::instance();
+  inst.add(make_gemm_meta(make_gemm_dtype_config(_BF16{}(),_BF16{}(),_Void{}(),_BF16{}(),_FP32{}(),_FP32{}()),_Sm89{}(),_CommNone{}(),_RCR{}(),_GemmV2{}(),make_gemm_v2_meta(false),None{}),make_runtime_config(1,27648,5120,None{}),make_gemm_hparams(make_gemm_v2_hparams(cute::make_tuple(16l,64l,64l),cute::make_tuple(16l,8l,16l),_StreamkDP{}()),None{},cute::make_tuple(32l,128l,64l),_GemmStreamK{}(),3,_RasterHeuristic{}()));
+return 0;
+}();
+
 template <class DType>
 void
 run_gemm_only(int m, int n, int k) {
@@ -63,29 +72,23 @@ run_gemm_only(int m, int n, int k) {
   auto hparams = OpRegistry::instance().get_hparams(meta, rt_conf);
   
 
-  // make_gemm_hparams(make_gemm_v2_hparams(cute::make_tuple(16l,64l,64l),cute::make_tuple(16l,8l,16l),_StreamkDP{}()),
-  //                   None{},cute::make_tuple(32l,128l,64l),_GemmStreamK{}(),4,_RasterAlongM{}()));
-  //
-  /*
-  inst.add(make_gemm_meta(make_gemm_dtype_config(_BF16{}(),_BF16{}(),_Void{}(),_BF16{}(),_FP32{}(),_FP32{}()),_Sm89{}(),_CommNone{}(),_RCR{}(),_GemmV2{}(),
-  
-  make_gemm_v2_meta(false),None{}),make_runtime_config(1,27648,5120,None{}),make_gemm_hparams(make_gemm_v2_hparams(cute::make_tuple(16l,64l,64l),cute::make_tuple(16l,8l,16l),_StreamkDP{}()),None{},cute::make_tuple(32l,128l,64l),_GemmStreamK{}(),4,_RasterAlongM{}()));
-  
+  // hparams: "impl_spec", "comm_spec", "tile_shape", "gemm_kind", "mainloop_stage", "raster_order"
+  // impl_spec: "warp_shape", "instruction_shape", "streamk_mode"
+  auto unified_hparams = to_gemm_hparams(hparams);
+  // hparams.impl_spec(): std::variant<bytedance::flux::None, bytedance::flux::GemmV2HParams<cute::tuple<long int, long int, long int>, cute::tuple<long int, long int, long int>, bytedance::flux::GemmStreamkModeEnum> >&
+  auto impl_spec = std::get<1>(hparams.impl_spec());
+  auto gemm_v2_hparams = to_gemm_v2_hparams(impl_spec);
 
-  hparams: "impl_spec", "comm_spec", "tile_shape", "gemm_kind", "mainloop_stage", "raster_order"
-  impl_spec: "warp_shape", "instruction_shape", "streamk_mode"
-  */
-  auto unified_hparams = unify_type(hparams);
-  // auto unified_impl_spec = unify_type(unified_hparams.impl_spec());
-  // FLUX_CHECK_EQ(unified_impl_spec.warp_shape(), cute::make_tuple(16l,64l,64l));
-  // FLUX_CHECK_EQ(unified_impl_spec.instruction_shape(), cute::make_tuple(16l,8l,16l));
-  // FLUX_CHECK_EQ(unified_impl_spec.streamk_mode(), _StreamkDP{}());
+  // FLUX_CHECK_EQ(gemm_v2_hparams.warp_shape(), cute::make_tuple(16l,64l,64l));
+  // FLUX_CHECK_EQ(gemm_v2_hparams.instruction_shape(), cute::make_tuple(16l,8l,16l));
+  // FLUX_CHECK_EQ(gemm_v2_hparams.streamk_mode(), _StreamkDP{}());
 
-  FLUX_CHECK_EQ(unified_hparams.comm_spec(), None{});
-  FLUX_CHECK_EQ(unified_hparams.tile_shape(), cute::make_tuple(32l,128l,64l));
-  FLUX_CHECK_EQ(unified_hparams.gemm_kind(), _GemmStreamK{}());
-  FLUX_CHECK_EQ(unified_hparams.mainloop_stage(), 4);
-  FLUX_CHECK_EQ(unified_hparams.raster_order(), _RasterAlongM{}());
+  // FLUX_CHECK_EQ(unified_hparams.comm_spec(), None{});
+  // FLUX_CHECK_EQ(unified_hparams.tile_shape(), cute::make_tuple(32l,128l,64l));
+  // FLUX_CHECK_EQ(unified_hparams.gemm_kind(), _GemmStreamK{}());
+  // FLUX_CHECK_EQ(unified_hparams.mainloop_stage(), 4);
+  // FLUX_CHECK_EQ(unified_hparams.raster_order(), _RasterAlongM{}());
+
   //
   auto gemm_op = OpRegistry::instance().get_op(meta, hparams);
   auto stream = nullptr;

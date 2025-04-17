@@ -156,7 +156,7 @@
  
  // Multiply-accumulate blocking/pipelining details
  using ElementAccumulator  = cutlass::half_t;                          // Element type for internal accumulation
- using ArchTag             = cutlass::arch::Sm80;                      // Tag indicating the minimum SM that supports the intended feature
+ using ArchTag             = cutlass::arch::Sm80;                      // Tag indicating the minimum SM that supports the intended feature£¬ GemmUniversal²»Ö§³Ösm89+OpClassTensorOp£¿
  using OperatorClass       = cutlass::arch::OpClassTensorOp;           // Operator class tag
  using ThreadblockShape    = cutlass::gemm::GemmShape<128, 128, 32>;   // Threadblock-level tile size (concept: GemmShape)
  using WarpShape           = cutlass::gemm::GemmShape<64, 64, 32>;     // Warp-level tile size (concept: GemmShape)

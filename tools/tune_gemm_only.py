@@ -57,8 +57,8 @@ def gen_tuning_space():
     space_transpose_weight = [False] # , True
     space_dtype = [torch.bfloat16] # , torch.float16
     space_has_bias = [False]
-    for M, NK, transpose_weight, dtype, has_bias in itertools.product(
-        space_M, space_NK, space_transpose_weight, space_dtype, space_has_bias
+    for NK, M, transpose_weight, dtype, has_bias in itertools.product(
+        space_NK, space_M, space_transpose_weight, space_dtype, space_has_bias
     ):
         config = TuningConfig(
             M=M, N=NK[0], K=NK[1], transpose_weight=transpose_weight, dtype=dtype, has_bias=has_bias
