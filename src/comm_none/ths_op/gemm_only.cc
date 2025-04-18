@@ -46,8 +46,6 @@ class GemmOnly::GemmOnlyImpl {
   const c10::ScalarType input_dtype;
   const c10::ScalarType output_dtype;
   const bool transpose_weight;
-  const bool use_fp8_gemm;
-  const bool use_s8_gemm;
   torch::Tensor gemm_buffer;
 
  private:
@@ -56,7 +54,7 @@ class GemmOnly::GemmOnlyImpl {
     auto arch = get_arch();
     auto input_dtype = from_torch_dtype(this->input_dtype);
     auto output_dtype = from_torch_dtype(this->output_dtype);
-    DataTypeEnum accum_type = use_s8_gemm ? _S32{}() : _FP32{}();
+    DataTypeEnum accum_type = _FP32{}();
 
     auto dt_conf = make_gemm_dtype_config(
         input_dtype, input_dtype, has_bias ? output_dtype : _Void{}(), output_dtype, accum_type);
@@ -67,11 +65,8 @@ class GemmOnly::GemmOnlyImpl {
     UnifiedImplMeta impl_spec = None{};
 
     bool use_fast_accum = fast_accum and dt_conf.is_input_fp8();
-    if (impl == _GemmV2{}) {
-      impl_spec = make_gemm_v2_meta(use_fast_accum);
-    } else if (impl == _GemmV3{}) {
-      impl_spec = make_gemm_v3_meta(use_fast_accum, /*block_scale=*/false);
-    }
+      
+    impl_spec = make_gemm_v2_meta(use_fast_accum);
     auto meta = make_gemm_meta(dt_conf, arch, _CommNone{}, gemm_layout, impl, impl_spec);
     return meta;
   };
@@ -95,21 +90,7 @@ class GemmOnly::GemmOnlyImpl {
     if (bias.has_value()) {
       CHECK_INPUT(bias.value(), this->output_dtype);
       FLUX_CHECK_EQ(bias->dim(), 2);
-      if (use_fp8_gemm) {
-        FLUX_CHECK_EQ(1, bias->size(0));
-      } else if (use_s8_gemm) {
-        // s8 gemm only, bias'shape (m, n)
-        if (this->output_dtype == c10::ScalarType::Int) {
-          FLUX_CHECK_EQ(m, bias->size(0));
-        } else {
-          // s8 gemm with dequant
-          FLUX_CHECK_EQ(1, bias->size(0));
-          FLUX_CHECK(input_scale.has_value());
-          FLUX_CHECK(weight_scale.has_value());
-        }
-      } else {
-        FLUX_CHECK_EQ(m, bias->size(0));
-      }
+      FLUX_CHECK_EQ(m, bias->size(0));
       FLUX_CHECK_EQ(n, bias->size(1));
     }
     if (output_buf.has_value()) {
@@ -117,21 +98,6 @@ class GemmOnly::GemmOnlyImpl {
       FLUX_CHECK_EQ(output_buf->dim(), 2);
       FLUX_CHECK_EQ(m, output_buf->size(0));
       FLUX_CHECK_EQ(n, output_buf->size(1));
-    }
-    if (use_s8_gemm && input_scale.has_value()) {
-      FLUX_CHECK_EQ(input_scale->dim(), 2);
-      FLUX_CHECK_EQ(m, input_scale->size(0));
-      FLUX_CHECK_EQ(1, input_scale->size(1));
-    }
-    if (use_s8_gemm && weight_scale.has_value()) {
-      FLUX_CHECK_EQ(weight_scale->dim(), 2);
-      FLUX_CHECK_EQ(1, weight_scale->size(0));
-      FLUX_CHECK_EQ(n, weight_scale->size(1));
-    }
-    if (use_s8_gemm) {
-      bool gemm_only = this->output_dtype == c10::ScalarType::Int;
-      FLUX_CHECK(input_scale.has_value() != gemm_only);
-      FLUX_CHECK(weight_scale.has_value() != gemm_only);
     }
     int32_t wk = transpose_weight ? weight.size(0) : weight.size(1);
     FLUX_CHECK_EQ(wk, k) << "weight k-dim mismatch";
@@ -179,66 +145,24 @@ class GemmOnly::GemmOnlyImpl {
         return other;
       }
     };
-    if (this->use_fp8_gemm) {
-      const GemmFP8Arguments args{
-          .m = m,
-          .n = n,
-          .k = k,
-          .alpha = 1.0,
-          .beta = 0.0,
-          .A = input.data_ptr(),
-          .B = weight.data_ptr(),
-          .C = nullptr,
-          .Aux = nullptr,
-          .D = output.data_ptr(),
-          .Vector = bias.has_value() ? bias->data_ptr() : nullptr,
-          .abs_max_Aux = nullptr,
-          .abs_max_D = nullptr,
-          .scaleA = (float *)data_ptr_or(input_scale, nullptr),
-          .scaleB = (float *)data_ptr_or(weight_scale, nullptr),
-          .scaleC = nullptr,
-          .scaleD = (float *)data_ptr_or(output_scale, nullptr),
-          .scaleAux = nullptr};
+    
+    // initialize mnk for streamk get_workspace_size
+    const GemmOnlyArguments args{
+      .m = m,
+      .n = n,
+      .k = k,
+      .alpha = 1.0,
+      .beta = bias.has_value() ? 1.0f : 0.0f,
+      .input = input.data_ptr(),
+      .weight = weight.data_ptr(),
+      .bias = bias.has_value() ? bias->data_ptr() : nullptr,
+      .output = output.data_ptr()};
 
-      int64_t workspace_size = gemm_op->get_workspace_size(args);
-      this->lazy_init_gemm_buffer(input, workspace_size);
-      void *workspace = this->gemm_buffer.defined() ? this->gemm_buffer.data_ptr() : nullptr;
-      gemm_op->run(args, workspace, stream);
-    } else if (use_s8_gemm) {
-      const S8GemmDequantArguments args{
-          .m = m,
-          .n = n,
-          .k = k,
-          .alpha = 1.0,
-          .beta = bias.has_value() ? 1.0f : 0.0f,  // beta * bias
-          .A = input.data_ptr(),
-          .B = weight.data_ptr(),
-          .bias = bias.has_value() ? bias->data_ptr() : nullptr,
-          .scale_A = input_scale.has_value() ? input_scale->data_ptr() : nullptr,
-          .scale_B = weight_scale.has_value() ? weight_scale->data_ptr() : nullptr,
-          .D = output.data_ptr()};
-      int64_t workspace_size = gemm_op->get_workspace_size(args);
-      this->lazy_init_gemm_buffer(input, workspace_size);
-      void *workspace = this->gemm_buffer.defined() ? this->gemm_buffer.data_ptr() : nullptr;
-      gemm_op->run(args, workspace, stream);
-    } else {
-      // initialize mnk for streamk get_workspace_size
-      const GemmOnlyArguments args{
-          .m = m,
-          .n = n,
-          .k = k,
-          .alpha = 1.0,
-          .beta = bias.has_value() ? 1.0f : 0.0f,
-          .input = input.data_ptr(),
-          .weight = weight.data_ptr(),
-          .bias = bias.has_value() ? bias->data_ptr() : nullptr,
-          .output = output.data_ptr()};
-
-      int64_t workspace_size = gemm_op->get_workspace_size(args);
-      this->lazy_init_gemm_buffer(input, workspace_size);
-      void *workspace = this->gemm_buffer.defined() ? this->gemm_buffer.data_ptr() : nullptr;
-      gemm_op->run(args, workspace, stream);
-    }
+    int64_t workspace_size = gemm_op->get_workspace_size(args);
+    this->lazy_init_gemm_buffer(input, workspace_size);
+    void *workspace = this->gemm_buffer.defined() ? this->gemm_buffer.data_ptr() : nullptr;
+    gemm_op->run(args, workspace, stream);
+    
 
     return output;
   }
@@ -257,16 +181,10 @@ class GemmOnly::GemmOnlyImpl {
   GemmOnlyImpl(
       c10::ScalarType input_dtype,
       c10::ScalarType output_dtype,
-      bool transpose_weight,
-      bool use_fp8_gemm)
+      bool transpose_weight)
       : input_dtype(input_dtype),
         output_dtype(output_dtype),
-        transpose_weight(transpose_weight),
-        use_fp8_gemm(c10::isFloat8Type(input_dtype) && use_fp8_gemm),
-        use_s8_gemm(is_s8_dtype(from_torch_dtype(input_dtype))) {
-    FLUX_CHECK(!(transpose_weight == true && use_fp8_gemm == true))
-        << "FP8 GEMM does not support transpose weight";
-  }
+        transpose_weight(transpose_weight) {}
 
   torch::Tensor
   forward(
@@ -334,8 +252,8 @@ class GemmOnly::GemmOnlyImpl {
 
     OpRegistry::instance().visit_hparams(
         [&](UnifiedGemmHParams const &hparams) {
-          constexpr int warm_iters = 5;
-          constexpr int iters = 10;
+          constexpr int warm_iters = 20;
+          constexpr int iters = 100;
           float total_elapsed = 0;
 
           auto stream = c10::cuda::getCurrentCUDAStream();
@@ -383,10 +301,9 @@ class GemmOnly::GemmOnlyImpl {
 GemmOnly::GemmOnly(
     c10::ScalarType input_dtype,
     c10::ScalarType output_dtype,
-    bool transpose_weight,
-    bool use_fp8_gemm)
+    bool transpose_weight)
     : impl_(
-          new GemmOnly::GemmOnlyImpl(input_dtype, output_dtype, transpose_weight, use_fp8_gemm)) {}
+          new GemmOnly::GemmOnlyImpl(input_dtype, output_dtype, transpose_weight)) {}
 
 GemmOnly::~GemmOnly() { delete impl_; }
 

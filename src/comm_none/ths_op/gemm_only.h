@@ -34,8 +34,7 @@ class GemmOnly {
   GemmOnly(
       c10::ScalarType input_dtype,
       c10::ScalarType output_dtype,
-      bool transpose_weight,
-      bool use_fp8_gemm);
+      bool transpose_weight);
   ~GemmOnly();
 
   torch::Tensor forward(

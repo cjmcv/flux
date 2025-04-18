@@ -66,28 +66,6 @@ to_gemm_shape(Tuple tuple) {
 }
 
 namespace gemm_v2_impl {
-namespace detail {
-template <class AlwaysVoid, template <class...> class Op, class... Args>
-struct detector : public std::false_type {};
-template <template <class...> class Op, class... Args>
-struct detector<std::void_t<Op<Args...>>, Op, Args...> : public std::true_type {};
-template <template <class...> class Op, class... Args>
-using is_detected = typename detail::detector<void, Op, Args...>;
-
-template <typename T>
-using has_custom_gemm_device_ = decltype(&T::custom_gemm_device);
-
-template <typename T, typename... TArgs>
-using has_custom_evt_d_ = decltype(&T::template custom_evt_d<TArgs...>);
-}  // namespace detail
-
-template <typename T>
-constexpr bool has_custom_gemm_device =
-    detail::is_detected<detail::has_custom_gemm_device_, T>::value;
-template <typename T, typename... TArgs>
-constexpr bool has_custom_evt_d =
-    detail::is_detected<detail::has_custom_evt_d_, T, TArgs...>::value;
-
 template <class TBSwizzle, class AlignmentC, class EVT>
 struct KernelParams {
   auto
@@ -105,8 +83,6 @@ struct KernelParams {
 };
 
 }  // namespace gemm_v2_impl
-
-using SystemBarrier = cutlass::Barrier;
 
 template <class GemmMetaT, class GemmHParamsT, class DerivedImpl>
 struct GemmV2BaseKernel {
@@ -140,10 +116,6 @@ struct GemmV2BaseKernel {
   using InstructionShape = decltype(to_gemm_shape(gemm_v2_hparams.instruction_shape()));
   static constexpr int EVTEpilogueStages = 1;
 
-  static constexpr bool is_fp8_gemm = is_fp8_dtype(dt_conf.a()) && is_fp8_dtype(dt_conf.b());
-  static constexpr bool is_s8_gemm = is_s8_dtype(dt_conf.a()) && is_s8_dtype(dt_conf.b());
-  static constexpr bool is_sm89 = (meta.arch() == _Sm89{});
-
   template <class... Ts>
   auto
   output_tile_thread_map(gemm_v2_impl::KernelParams<Ts...> params) const {
@@ -159,67 +131,7 @@ struct GemmV2BaseKernel {
   template <class... Ts>
   auto
   evt_d(gemm_v2_impl::KernelParams<Ts...> params) const {
-    if constexpr (gemm_v2_impl::has_custom_evt_d<DerivedImpl, Ts...>) {
-      // if Derived has defined evt_d then CRTP it
-      return static_cast<DerivedImpl const *>(this)->custom_evt_d(params);
-    } else if constexpr (is_s8_gemm) {
-      return this->s8gemm_dequant_evt_d(params);
-    } else {
-      return this->default_evt_d(params);
-    }
-  }
-
-  template <class... Ts>
-  auto
-  s8gemm_dequant_evt_d(gemm_v2_impl::KernelParams<Ts...> params) const {
-    using OutputTileThreadMap = decltype(this->output_tile_thread_map(params));
-
-    using Accum = cutlass::epilogue::threadblock::VisitorAccFetch;
-
-    // scale_A: [m, 1], ElementScale
-    using ScaleA = cutlass::epilogue::threadblock::VisitorColBroadcast<
-        OutputTileThreadMap,
-        ElementScale,
-        cute::Stride<cute::_1, cute::_0, int64_t>>;
-
-    // scale_B: [1, n], ElementScale
-    using ScaleB = cutlass::epilogue::threadblock::VisitorRowBroadcast<
-        OutputTileThreadMap,
-        ElementScale,
-        cute::Stride<cute::_0, cute::_1, int64_t>>;
-
-    using MulScale = cutlass::epilogue::threadblock::VisitorCompute<
-        cutlass::multiplies,
-        ElementScale,
-        ElementScale,
-        cutlass::FloatRoundStyle::round_to_nearest>;
-    using MulAccum = cutlass::epilogue::threadblock::VisitorCompute<
-        cutlass::multiplies,
-        ElementScale,
-        ElementScale,
-        cutlass::FloatRoundStyle::round_to_nearest>;
-
-    using EVTCompute0 = cutlass::epilogue::threadblock::Sm80EVT<MulScale, ScaleA, ScaleB>;
-    using EVTCompute1 = cutlass::epilogue::threadblock::Sm80EVT<MulAccum, EVTCompute0, Accum>;
-
-    if constexpr (cute::is_void_v<ElementC>) {  // no bias
-      return make_declval<EVTCompute1>();
-    } else {
-      using Beta = cutlass::epilogue::threadblock::VisitorScalarBroadcast<ElementD>;
-      // bias: [1, n], ElementD
-      using Bias = cutlass::epilogue::threadblock::VisitorRowBroadcast<
-          OutputTileThreadMap,
-          ElementCNonVoid,
-          cute::Stride<cute::_0, cute::_1, int64_t>>;
-      using AddBias = cutlass::epilogue::threadblock::VisitorCompute<
-          cutlass::multiply_add,
-          ElementD,
-          ElementD,
-          cutlass::FloatRoundStyle::round_to_nearest>;
-      using EVTD = cutlass::epilogue::threadblock::
-          Sm80EVT<AddBias, Beta, Bias, EVTCompute1>;  // dequant_accum + beta * bias
-      return make_declval<EVTD>();
-    }
+    return this->default_evt_d(params);
   }
 
   template <class... Ts>
@@ -227,7 +139,7 @@ struct GemmV2BaseKernel {
   default_evt_d(gemm_v2_impl::KernelParams<Ts...> params) const {
     using namespace cutlass::epilogue::threadblock;
     using ElementCompute = ElementD;
-    using EVT_Compute0 = Sm80EVT<
+    using EVT_Compute0 = Sm80EVT<                         // 只有80和90，没有89
         VisitorCompute<
             cutlass::multiplies,
             ElementD,
@@ -253,49 +165,32 @@ struct GemmV2BaseKernel {
               ElementD,
               ElementCompute,
               cutlass::FloatRoundStyle::round_to_nearest>,  // beta * C + (alpha * acc)
-          VisitorScalarBroadcast<ElementAccumulator>,       // beta
-          C,                                                // C
-          EVT_Compute0>;
+              VisitorScalarBroadcast<ElementAccumulator>,       // beta
+              C,                                                // C
+              EVT_Compute0>;
       return make_declval<EVT_Compute1>();
     }
   }
 
   auto
   default_kernel_params() const {
-    if constexpr (cute::is_same_v<ArchTag, cutlass::arch::Sm89> && this->is_fp8_gemm) {
-      using SM89TBSwizzle = cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<8>;
+    using TBSwizzle = cutlass::gemm::threadblock::ThreadblockSwizzleStreamK;
 
-      // using SM89AlignmentC = cute::min(8, 128 / cutlass::sizeof_bits_v<ElementCNonVoid>);
-      using SM89AlignmentC_Type = cute::Int<8>;
+    using AlignmentC_Type = cute::Int<128 / cute::sizeof_bits_v<ElementCNonVoid>>;
 
-      using SM89Epilogue = cutlass::epilogue::thread::LinearCombinationGenericWithScalingAndAbsMax<
-          cutlass::epilogue::thread::Identity,  // maybe not need this, so use Identity
-          ElementCNonVoid,
-          ElementCNonVoid,
-          SM89AlignmentC_Type{},
-          ElementAccumulator,
-          ElementAccumulator>;
+    using namespace cutlass::epilogue::threadblock;
+    auto kparams = gemm_v2_impl::KernelParams<TBSwizzle, AlignmentC_Type, void>();
+    using OutputTileThreadMap = decltype(this->output_tile_thread_map(kparams));
 
-      return gemm_v2_impl::KernelParams<SM89TBSwizzle, SM89AlignmentC_Type, SM89Epilogue>();
-    } else {
-      using TBSwizzle = cutlass::gemm::threadblock::ThreadblockSwizzleStreamK;
+    using EVT_D = decltype(this->evt_d(kparams));
 
-      using AlignmentC_Type = cute::Int<128 / cute::sizeof_bits_v<ElementCNonVoid>>;
-
-      using namespace cutlass::epilogue::threadblock;
-      auto kparams = gemm_v2_impl::KernelParams<TBSwizzle, AlignmentC_Type, void>();
-      using OutputTileThreadMap = decltype(this->output_tile_thread_map(kparams));
-
-      using EVT_D = decltype(this->evt_d(kparams));
-
-      using StoreD = VisitorAuxStore<
-          OutputTileThreadMap,
-          ElementD,
-          cutlass::FloatRoundStyle::round_to_nearest,
-          cute::Stride<int64_t, cute::_1, int64_t>>;
-      using EVT = Sm80EVT<StoreD, EVT_D>;
-      return gemm_v2_impl::KernelParams<TBSwizzle, AlignmentC_Type, EVT>();
-    }
+    using StoreD = VisitorAuxStore<
+        OutputTileThreadMap,
+        ElementD,
+        cutlass::FloatRoundStyle::round_to_nearest,
+        cute::Stride<int64_t, cute::_1, int64_t>>;
+    using EVT = Sm80EVT<StoreD, EVT_D>;
+    return gemm_v2_impl::KernelParams<TBSwizzle, AlignmentC_Type, EVT>();
   }
 
   template <class... Ts>
@@ -331,85 +226,34 @@ struct GemmV2BaseKernel {
         to_gemm_v2_meta(meta.impl_spec()).fast_accum(),
         cutlass::arch::OpMultiplyAddFastAccum,
         cutlass::arch::OpMultiplyAdd>;
-    if constexpr (cute::is_same_v<ArchTag, cutlass::arch::Sm89> && this->is_fp8_gemm) {
-      using SM89Impl = cutlass::gemm::kernel::DefaultGemmWithAbsMax<
-          ElementA,
-          GmemLayoutA,
-          cutlass::ComplexTransform::kNone,
-          AlignmentA,
-          ElementB,
-          GmemLayoutB,
-          cutlass::ComplexTransform::kNone,
-          AlignmentB,
-          ElementCNonVoid,
-          GmemLayoutC,
-          ElementAccumulator,
-          OpClass,
-          ArchTag,
-          ThreadblockShape,
-          WarpShape,
-          InstructionShape,
-          decltype(params.evt()),
-          decltype(params.tb_swizzle()),
-          hparams.mainloop_stage(),
-          Operator>;
-      return make_declval<typename SM89Impl::GemmKernel>();
-    } else if constexpr (this->is_s8_gemm) {
-      using ElementEpilogueCompute = ElementScale;
-      using SM80S8DequantImpl = cutlass::gemm::kernel::DefaultGemmWithVisitor<
-          ElementA,
-          GmemLayoutA,
-          cutlass::ComplexTransform::kNone,
-          AlignmentA,
-          ElementB,
-          GmemLayoutB,
-          cutlass::ComplexTransform::kNone,
-          AlignmentB,
-          ElementCNonVoid,
-          GmemLayoutC,
-          params.alignment_c(),
-          ElementAccumulator,
-          ElementEpilogueCompute,
-          OpClass,
-          ArchTag,
-          ThreadblockShape,
-          WarpShape,
-          InstructionShape,
-          decltype(params.evt()),
-          decltype(params.tb_swizzle()),
-          hparams.mainloop_stage(),
-          cutlass::arch::OpMultiplyAddSaturate,
-          EVTEpilogueStages>;
-      return make_declval<typename SM80S8DequantImpl::GemmKernel>();
-    } else {
-      using ElementCompute = ElementD;
+    
+    using ElementCompute = ElementD;
 
-      using Impl = cutlass::gemm::kernel::DefaultGemmWithVisitor<
-          ElementA,
-          GmemLayoutA,
-          cutlass::ComplexTransform::kNone,
-          AlignmentA,
-          ElementB,
-          GmemLayoutB,
-          cutlass::ComplexTransform::kNone,
-          AlignmentB,
-          ElementCNonVoid,
-          GmemLayoutC,
-          params.alignment_c(),
-          ElementAccumulator,
-          ElementCompute,
-          OpClass,
-          ArchTag,
-          ThreadblockShape,
-          WarpShape,
-          InstructionShape,
-          decltype(params.evt()),
-          decltype(params.tb_swizzle()),
-          hparams.mainloop_stage(),
-          cutlass::arch::OpMultiplyAdd,
-          EVTEpilogueStages>;
-      return make_declval<typename Impl::GemmKernel>();
-    }
+    using Impl = cutlass::gemm::kernel::DefaultGemmWithVisitor<
+        ElementA,
+        GmemLayoutA,
+        cutlass::ComplexTransform::kNone,
+        AlignmentA,
+        ElementB,
+        GmemLayoutB,
+        cutlass::ComplexTransform::kNone,
+        AlignmentB,
+        ElementCNonVoid,
+        GmemLayoutC,
+        params.alignment_c(),
+        ElementAccumulator,
+        ElementCompute,
+        OpClass,
+        ArchTag,
+        ThreadblockShape,
+        WarpShape,
+        InstructionShape,
+        decltype(params.evt()),
+        decltype(params.tb_swizzle()),
+        hparams.mainloop_stage(),
+        cutlass::arch::OpMultiplyAdd,
+        EVTEpilogueStages>;
+    return make_declval<typename Impl::GemmKernel>();
   }
 };
 
@@ -430,9 +274,6 @@ class GemmV2BaseDevice
 
   static constexpr auto hparams = to_gemm_hparams(GemmHParamsT{});
   using KernelBuilder::has_bias;
-  using KernelBuilder::is_fp8_gemm;
-  using KernelBuilder::is_s8_gemm;
-  using KernelBuilder::is_sm89;
   using typename KernelBuilder::ElementA;
   using typename KernelBuilder::ElementB;
   using typename KernelBuilder::ElementC;
@@ -457,12 +298,7 @@ class GemmV2BaseDevice
   //////////////////////////
   auto
   gemm_device() const {
-    if constexpr (gemm_v2_impl::has_custom_gemm_device<DerivedImpl>) {
-      // if Derived has defined gemm_device then CRTP it
-      return static_cast<DerivedImpl const *>(this)->custom_gemm_device();
-    } else {
-      return this->default_gemm_device();
-    }
+    return this->default_gemm_device();
   }
 
   auto
@@ -490,52 +326,6 @@ class GemmV2BaseDevice
       static_assert(
           cute::is_same_v<GmemLayoutC, cutlass::layout::ColumnMajor>, "requires ColumnMajor.");
       return m;
-    }
-  }
-
-  auto
-  s8gemm_callback_args(
-      int m,
-      int n,
-      ElementCNonVoid beta,
-      const ElementCNonVoid *ptr_bias,
-      ElementD *ptr_D,
-      int stride_d,
-      const ElementScale *ptr_scale_A,
-      const ElementScale *ptr_scale_B) const {
-    using EVT = identity_t<decltype(KernelBuilder().default_kernel_params().evt())>;
-
-    if constexpr (has_bias) {
-      return typename EVT::Arguments{
-          {
-              {beta},                                                       // beta
-              {ptr_bias, ElementCNonVoid(0), {cute::_0{}, cute::_1{}, n}},  // bias
-              {
-                  {
-                      {ptr_scale_A, ElementScale(0), {cute::_1{}, cute::_0{}, m}},  // scaleA
-                      {ptr_scale_B, ElementScale(0), {cute::_0{}, cute::_1{}, n}},  // scaleB
-                      {}                                                            // Compute0
-                  },                                                                // EVTCompute0
-                  {},                                                               // Accum
-                  {}                                                                // Compute1
-              },                                                                    // EVTCompute1
-              {}                                                                    // Compute2
-          },
-          {ptr_D, {stride_d, cute::_1{}, m * n}},  // D
-      };
-    } else {
-      return typename EVT::Arguments{
-          {
-              {
-                  {ptr_scale_A, ElementScale(0), {cute::_1{}, cute::_0{}, m}},  // scaleA
-                  {ptr_scale_B, ElementScale(0), {cute::_0{}, cute::_1{}, n}},  // scaleB
-                  {}                                                            // Compute0
-              },                                                                // EVTCompute0
-              {},                                                               // Accum
-              {}                                                                // Compute1
-          },
-          {ptr_D, {stride_d, cute::_1{}, m * n}},  // D
-      };
     }
   }
 

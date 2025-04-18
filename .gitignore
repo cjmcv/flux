@@ -25,5 +25,6 @@ python/flux/version.py
 # due to using tox and pytest and clangd
 .tox
 .vscode
+*.png
 tools/*.cu
 tools/*.prof.log

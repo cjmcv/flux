@@ -55,7 +55,6 @@ class GemmOnly:
         input_dtype: torch.dtype,
         output_dtype: Optional[torch.dtype] = None,
         transpose_weight: bool = False,
-        use_fp8_gemm: bool = False,
     ): ...
     def forward(
         self,

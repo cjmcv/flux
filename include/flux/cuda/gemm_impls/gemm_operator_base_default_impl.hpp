@@ -31,21 +31,6 @@ namespace bytedance::flux {
 //   with default implementation of member functions
 template <class DerivedImpl>
 struct GemmOperatorBaseDefaultImplMixin : public GemmOperatorBase {
- public:
-  template <class T, typename = std::void_t<>>
-  struct is_cutlass3_gemm_universal_adapter : std::false_type {};
-
-  template <class T>
-  struct is_cutlass3_gemm_universal_adapter<
-      T,
-      std::enable_if_t<std::is_same_v<
-          T,
-          cutlass::gemm::device::GemmUniversalAdapter<
-              typename T::GemmKernel,
-              cute::enable_if_t<
-                  cutlass::gemm::detail::IsCutlass3GemmKernel<typename T::GemmKernel>::value>>>>>
-      : std::true_type {};
-
  private:
   std::any gemm_op_;
 
@@ -102,12 +87,8 @@ struct GemmOperatorBaseDefaultImplMixin : public GemmOperatorBase {
     using Gemm = identity_t<decltype(derived()->gemm_device())>;
     auto cu_stream = static_cast<cudaStream_t>(stream);
     Gemm &gemm_op = std::any_cast<Gemm &>(this->gemm_op_);
-    if constexpr (is_cutlass3_gemm_universal_adapter<Gemm>::value) {
-      CUTLASS_CHECK(gemm_op.run(cu_stream, /*cuda_adapter=*/nullptr, launch_with_pdl));
-    } else {
-      CUTLASS_ASSERT(launch_with_pdl == false);
-      CUTLASS_CHECK(gemm_op.run(cu_stream));
-    }
+    CUTLASS_ASSERT(launch_with_pdl == false);
+    CUTLASS_CHECK(gemm_op.run(cu_stream));
   }
 
   std::size_t

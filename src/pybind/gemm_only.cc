@@ -29,17 +29,15 @@ static int _register_gemm_only_ops [[maybe_unused]] = []() {
         .def(
             py::init([](torch::ScalarType input_dtype,
                         py::object py_output_dtype,
-                        bool transpose_weight,
-                        bool use_fp8_gemm) {
+                        bool transpose_weight) {
               auto output_dtype = py_output_dtype.is(py::none())
                                       ? input_dtype
                                       : torch::python::detail::py_object_to_dtype(py_output_dtype);
-              return new GemmOnlyCls(input_dtype, output_dtype, transpose_weight, use_fp8_gemm);
+              return new GemmOnlyCls(input_dtype, output_dtype, transpose_weight);
             }),
             py::arg("input_dtype"),
             py::arg("output_dtype") = py::none(),
-            py::arg("transpose_weight") = false,
-            py::arg("use_fp8_gemm") = false)
+            py::arg("transpose_weight") = false)
         .def(
             "forward",
             &GemmOnlyCls::forward,

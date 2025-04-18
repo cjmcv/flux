@@ -166,52 +166,7 @@ to_gemm_v2_meta(cute::tuple<Ts...> const &tup) {
   return {tup};
 }
 
-template <class... Ts>
-struct GemmV3Meta : FluxNamedTupleBase<GemmV3Meta, Ts...> {
-  using Base = FluxNamedTupleBase<GemmV3Meta, Ts...>;
-  using Base::Base;
-
-  static constexpr char const *Name = "GemmV3Meta";
-  static constexpr char const *LowerName = "gemm_v3_meta";
-  static constexpr std::array<char const *, 2> Fields = {"fast_accum", "block_scale"};
-
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(fast_accum, 0)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(block_scale, 1)
-
-  constexpr GemmV3Meta(cute::tuple<Ts...> const &tup) : Base(tup) { check_type(); }
-
-  friend GemmV3Meta<bool, bool>
-  unify_type(GemmV3Meta const &obj) {
-    return cute::make_tuple(bool(obj.fast_accum()), bool(obj.block_scale()));
-  }
-
- protected:
-  constexpr void
-  check_type() const {
-    static_assert(is_of_type_v<decltype(fast_accum()), bool>, "fast_accum() requires bool type.");
-    static_assert(
-        is_of_type_v<decltype(block_scale()), bool>, "block_scale() requires bool type.");
-  };
-};
-
-template <class FastAccum, class BlockScale = _False>
-constexpr GemmV3Meta<FastAccum, BlockScale>
-make_gemm_v3_meta(FastAccum const &fast_accum, BlockScale const &block_scale = _False{}) {
-  return {cute::make_tuple(fast_accum, block_scale)};
-}
-
-inline constexpr GemmV3Meta<_False, _False>
-to_gemm_v3_meta(None const &) {
-  return {cute::make_tuple(_False{}, _False{})};
-}
-
-template <class... Ts, __CUTE_REQUIRES(sizeof...(Ts) > 0)>
-constexpr GemmV3Meta<Ts...>
-to_gemm_v3_meta(cute::tuple<Ts...> const &tup) {
-  return {tup};
-}
-
-using UnifiedImplMeta = std::variant<None, unified_type_t<GemmV2Meta>, unified_type_t<GemmV3Meta>>;
+using UnifiedImplMeta = std::variant<None, unified_type_t<GemmV2Meta>>;
 
 /////////////////////////////////////////////////////
 // Comm-specific meta
@@ -281,12 +236,7 @@ struct GemmMeta : FluxNamedTupleBase<GemmMeta, Ts...> {
     UnifiedImplMeta impl_spec = unify_type(obj.impl_spec());
     if ((obj.impl() == _GemmV2{}) and std::holds_alternative<None>(impl_spec)) {
       impl_spec = unify_type(to_gemm_v2_meta(std::get<None>(impl_spec)));
-    } else if (
-        (obj.impl() == _GemmV3{}) and
-        std::holds_alternative<None>(impl_spec)) {
-      impl_spec = unify_type(to_gemm_v3_meta(std::get<None>(impl_spec)));
     }
-
     return cute::make_tuple(
         unify_type(make_gemm_dtype_config(obj.dtype())),
         unify_type(obj.arch()),

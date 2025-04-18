@@ -66,122 +66,6 @@ class GemmV2CommNone_Device : public GemmV2BaseDevice<
   static constexpr auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
 
   auto
-  to_s8_gemm_dequant_args_impl(S8GemmDequantArguments const &args) const {
-    using Gemm = identity_t<decltype(this->gemm_device())>;
-    using GemmArguments = typename Gemm::Arguments;
-    using EVT = identity_t<decltype(KernelBuilder().default_kernel_params().evt())>;
-
-    using ElementA = decltype(to_cutlass_element(dt_conf.a()));
-    using ElementB = decltype(to_cutlass_element(dt_conf.b()));
-    using ElementBias = typename Base::ElementCNonVoid;
-    using ElementD = decltype(to_cutlass_element(dt_conf.d()));
-
-    using ElementScale = typename Base::ElementScale;
-
-    auto ptr_A = static_cast<ElementA const *>(args.A);
-    auto ptr_B = static_cast<ElementB const *>(args.B);
-    auto ptr_bias = static_cast<ElementBias const *>(args.bias);
-    auto ptr_D = static_cast<ElementD *>(args.D);
-    auto ptr_scale_A = static_cast<ElementScale const *>(args.scale_A);
-    auto ptr_scale_B = static_cast<ElementScale const *>(args.scale_B);
-    auto beta = static_cast<ElementBias>(args.beta);
-
-    int stride_a = args.k;
-    int stride_b = this->get_stride_b(args.n, args.k);
-    // output's layout is same with bias
-    int stride_c = this->get_stride_c(args.m, args.n);
-    int stride_d = stride_c;
-    auto callback_args = this->s8gemm_callback_args(
-        args.m, args.n, beta, ptr_bias, ptr_D, stride_d, ptr_scale_A, ptr_scale_B);
-
-    auto const &v2_hparams = to_gemm_v2_hparams(hparams.impl_spec());
-    int avail_sms = -1;
-    if (hparams.gemm_kind() == _GemmStreamK{} and v2_hparams.streamk_mode() == _StreamkDP{}) {
-      avail_sms = 1;
-    }
-
-    auto gemm_args = GemmArguments(
-        cutlass::gemm::GemmUniversalMode::kGemm,
-        {args.m, args.n, args.k},  // problem_size
-        1,                         // batch count
-        callback_args,             // EVT args
-        ptr_A,                     // ptr_A
-        ptr_B,                     // ptr_B
-        nullptr,                   // ptr_C (unused)
-        nullptr,                   // ptr_D (unused)
-        args.m * args.k,           // batch stride A
-        args.n * args.k,           // batch stride B
-        0,                         // batch stride C(unused)
-        0,                         // batch stride D(unused)
-        stride_a,                  // stride A
-        stride_b,                  // stride B
-        0,                         // stride C(unused)
-        0,                         // stride D(unused)
-        /*avail_sms=*/avail_sms);
-
-    return gemm_args;
-  }
-
-  auto
-  to_fp8_gemm_args_impl(GemmFP8Arguments const &args) const {
-    using Gemm = identity_t<decltype(this->gemm_device())>;
-    using GemmArguments = typename Gemm::Arguments;
-
-    using EVT = identity_t<decltype(KernelBuilder().default_kernel_params().evt())>;
-
-    using ElementA = decltype(to_cutlass_element(dt_conf.a()));
-    using ElementB = decltype(to_cutlass_element(dt_conf.b()));
-    using ElementC = decltype(to_cutlass_element(dt_conf.c()));
-    using ElementD = decltype(to_cutlass_element(dt_conf.d()));
-
-    auto ptr_A = static_cast<ElementA const *>(args.A);
-    auto ptr_B = static_cast<ElementB const *>(args.B);
-    auto ptr_C = static_cast<ElementC *>(const_cast<void *>(args.C));
-    auto ptr_D = static_cast<ElementD *>(args.D);
-    auto ptr_Aux = static_cast<ElementD *>(args.Aux);
-    auto ptr_Vector = static_cast<ElementC *>(args.Vector);
-
-    int stride_b = this->get_stride_b(args.n, args.k);
-    int stride_c = this->get_stride_c(args.m, args.n);
-    int stride_d = stride_c;
-
-    typename EVT::Params epilogue_params{
-        {ElementD(args.alpha), ElementD(args.beta)},
-        args.scaleA,
-        args.scaleB,
-        args.scaleC,
-        args.scaleD,
-        args.scaleAux,
-        args.abs_max_Aux,
-        args.abs_max_D};
-
-    typename Gemm::Arguments gemm_args{
-        cutlass::gemm::GemmUniversalMode::kGemm,
-        {args.m, args.n, args.k},
-        /* batch_count = */ 1,
-        epilogue_params,
-        ptr_A,
-        ptr_B,
-        ptr_C,
-        ptr_D,
-        ptr_Aux,
-        ptr_Vector,
-        args.m * args.k,
-        args.n * args.k,
-        args.m * args.n,
-        args.m * args.n,
-        (int)args.m,  // Batch stride vector
-        args.k,
-        stride_b,
-        stride_c,
-        stride_d,
-        (int64_t)0  // Leading dimension of vector. This must be 0
-    };
-
-    return gemm_args;
-  }
-
-  auto
   to_gemm_args_impl(GemmOnlyArguments const &args) const {
     using Gemm = identity_t<decltype(this->gemm_device())>;
     using GemmArguments = typename Gemm::Arguments;
@@ -233,13 +117,7 @@ class GemmV2CommNone_Device : public GemmV2BaseDevice<
  public:
   auto
   to_gemm_args(std::any const &args, void *args_workspace) const {
-    if constexpr (this->is_sm89 && this->is_fp8_gemm) {
-      return to_fp8_gemm_args_impl(std::any_cast<GemmFP8Arguments>(args));
-    } else if constexpr (this->is_s8_gemm) {
-      return to_s8_gemm_dequant_args_impl(std::any_cast<S8GemmDequantArguments>(args));
-    } else {
-      return to_gemm_args_impl(std::any_cast<GemmOnlyArguments>(args));
-    }
+    return to_gemm_args_impl(std::any_cast<GemmOnlyArguments>(args));
   }
 };
 }  // namespace bytedance::flux

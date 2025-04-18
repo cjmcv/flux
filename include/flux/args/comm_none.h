@@ -32,58 +32,5 @@ struct GemmOnlyArguments {
   void *output;
 };
 
-// GEMM with dequantization
-// Dequant[i, j] = scale_a[i] * scale_b[j] * accumulator[i, j]
-// D = Dequant + bias
-// Accumulator dtype can be different from scale, Dequant calculation is based on scale dtype,
-// D/bias dtype can be different from Dequant.
-// For example:
-//    Dequant and scale_a/scale_b: fp32
-//    accumulator: s32
-//    D and bias: bf16
-struct S8GemmDequantArguments {
-  int m;
-  int n;
-  int k;
-  float alpha;
-  float beta;
-  void const *A;        // m * k
-  void const *B;        // k * n
-  void const *bias;     // bias, 1 * n
-  void const *scale_A;  // m * 1
-  void const *scale_B;  // 1 * n
-  void *D;              // output: m * n
-};
-
-// FP8 GEMM
-// Aux = ((alpha * scale_a * scale_b) * accumulator) + ((beta * scale_c) * source) + bias
-// D = activation(Aux)
-// if Aux is fp8:
-//   abs_max_output = max( abs(aux) | (for every aux in Aux) )
-//   Aux = scale_aux * Aux
-// if D is fp8 type:
-//   abs_max_output = max( abs(d) | (for every d in D) )
-//   D = scale_d * D
-struct GemmFP8Arguments {
-  int m;
-  int n;
-  int k;
-  float alpha;
-  float beta;
-  void const *A;  // m * k
-  void const *B;  // k * n
-  void const *C;  // m * n
-  void *Aux;      // m * n
-  void *D;        // output: m * n
-  void *Vector;   // bias: 1 * n
-  float *abs_max_Aux;
-  float *abs_max_D;
-  // scaling tensors
-  float const *scaleA;
-  float const *scaleB;
-  float const *scaleC;
-  float const *scaleD;    // require if D is fp8
-  float const *scaleAux;  // require if Aux is fp8
-};
 
 }  // namespace bytedance::flux
