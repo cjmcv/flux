@@ -18,3 +18,6 @@ target_link_libraries(test_gemv_only PUBLIC flux_cuda_ths_op)
 
 add_executable(test_gemm_simt test_gemm_simt.cu)
 target_link_libraries(test_gemm_simt PUBLIC flux_cuda_ths_op)
+
+add_executable(test_dual_gemm dual_gemm/dual_gemm.cu)
+target_link_libraries(test_dual_gemm PUBLIC flux_cuda_ths_op)
