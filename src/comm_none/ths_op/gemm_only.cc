@@ -67,7 +67,7 @@ class GemmOnly::GemmOnlyImpl {
     bool use_fast_accum = fast_accum and dt_conf.is_input_fp8();
       
     impl_spec = make_gemm_v2_meta(use_fast_accum);
-    auto meta = make_gemm_meta(dt_conf, arch, _CommNone{}, gemm_layout, impl, impl_spec);
+    auto meta = make_gemm_meta(dt_conf, arch, gemm_layout, impl, impl_spec);
     return meta;
   };
 

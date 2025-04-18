@@ -169,36 +169,6 @@ to_gemm_v2_meta(cute::tuple<Ts...> const &tup) {
 using UnifiedImplMeta = std::variant<None, unified_type_t<GemmV2Meta>>;
 
 /////////////////////////////////////////////////////
-// Comm-specific meta
-/////////////////////////////////////////////////////
-template <class... Ts>
-struct GatherRSMeta : FluxNamedTupleBase<GatherRSMeta, Ts...> {
-  using Base = FluxNamedTupleBase<GatherRSMeta, Ts...>;
-  using Base::Base;
-
-  static constexpr char const *Name = "GatherRSMeta";
-  static constexpr char const *LowerName = "gather_rs_meta";
-  static constexpr std::array<char const *, 1> Fields = {"topk"};
-
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(topk, 0)
-  constexpr GatherRSMeta(cute::tuple<Ts...> const &tup) : Base(tup) { check_type(); }
-
-  friend GatherRSMeta<int>
-  unify_type(GatherRSMeta const &obj) {
-    return cute::make_tuple(int(obj.topk()));
-  }
-
-  constexpr void
-  check_type() const {
-    static_assert(is_of_type_v<decltype(topk()), int>, "topk() requires int");
-  };
-};
-
-
-using UnifiedCommMeta =
-    std::variant<None, unified_type_t<GatherRSMeta>>;
-
-/////////////////////////////////////////////////////
 // GemmMeta: params does not change
 /////////////////////////////////////////////////////
 template <class... Ts>
@@ -208,15 +178,13 @@ struct GemmMeta : FluxNamedTupleBase<GemmMeta, Ts...> {
 
   static constexpr const char *Name = "GemmMeta";
   static constexpr const char *LowerName = "gemm_meta";
-  static constexpr std::array<const char *, 7> Fields = {
-      "dtype", "arch", "comm_op", "gemm_layout", "impl", "impl_spec", "comm_spec"};
+  static constexpr std::array<const char *, 5> Fields = {
+      "dtype", "arch", "gemm_layout", "impl", "impl_spec"};
   FLUX_NAMED_TUPLE_DEFINE_FIELD(dtype, 0)
   FLUX_NAMED_TUPLE_DEFINE_FIELD(arch, 1)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(comm_op, 2)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(gemm_layout, 3)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(impl, 4)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(impl_spec, 5)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(comm_spec, 6)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(gemm_layout, 2)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(impl, 3)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(impl_spec, 4)
 
   constexpr GemmMeta() : Base() { check_type(); }
   constexpr GemmMeta(cute::tuple<Ts...> const &tup) : Base(tup) { check_type(); }
@@ -225,11 +193,9 @@ struct GemmMeta : FluxNamedTupleBase<GemmMeta, Ts...> {
   using UnifiedGemmMeta = GemmMeta<
       UnifiedDTConf,
       ArchEnum,
-      CommOpEnum,
       GemmLayoutEnum,
       ImplEnum,
-      UnifiedImplMeta,
-      UnifiedCommMeta>;
+      UnifiedImplMeta>;
 
   friend UnifiedGemmMeta
   unify_type(GemmMeta const &obj) {
@@ -240,11 +206,9 @@ struct GemmMeta : FluxNamedTupleBase<GemmMeta, Ts...> {
     return cute::make_tuple(
         unify_type(make_gemm_dtype_config(obj.dtype())),
         unify_type(obj.arch()),
-        unify_type(obj.comm_op()),
         unify_type(obj.gemm_layout()),
         unify_type(obj.impl()),
-        cute::move(impl_spec),
-        UnifiedCommMeta(unify_type(obj.comm_spec())));
+        cute::move(impl_spec));
   }
 
  protected:
@@ -255,8 +219,6 @@ struct GemmMeta : FluxNamedTupleBase<GemmMeta, Ts...> {
             is_gemm_dtype_config_v<decltype(this->dtype())>,
         "dtype() requires to be DataTypeEnum or GemmDTypeConfig.");
     static_assert(is_of_type_v<decltype(this->arch()), ArchEnum>, "arch() requires ArchEnum.");
-    static_assert(
-        is_of_type_v<decltype(this->comm_op()), CommOpEnum>, "comm_op() requires CommOpEnum.");
     static_assert(
         is_of_type_v<decltype(this->gemm_layout()), GemmLayoutEnum>,
         "gemm_layout() requires GemmLayoutEnum.");
@@ -269,21 +231,17 @@ using UnifiedGemmMeta = unified_type_t<GemmMeta>;
 template <
     class DataType,
     class Arch,
-    class CommOp,
     class GemmLayout,
     class Impl,
-    class ImplSpec = None,
-    class CommSpec = None>
-constexpr GemmMeta<DataType, Arch, CommOp, GemmLayout, Impl, ImplSpec, CommSpec>
+    class ImplSpec = None>
+constexpr GemmMeta<DataType, Arch, GemmLayout, Impl, ImplSpec>
 make_gemm_meta(
     DataType const &data_type,
     Arch const &arch,
-    CommOp const &comm_op,
     GemmLayout const &gemm_layout,
     Impl const &impl,
-    ImplSpec const &impl_spec = None{},
-    CommSpec const &comm_spec = None{}) {
-  return {cute::make_tuple(data_type, arch, comm_op, gemm_layout, impl, impl_spec, comm_spec)};
+    ImplSpec const &impl_spec = None{}) {
+  return {cute::make_tuple(data_type, arch, gemm_layout, impl, impl_spec)};
 }
 
 template <class... Ts>
@@ -327,23 +285,19 @@ filter_layout(GemmMeta<Ts...> meta) {
 template <
     class... DTypes,
     class... Archs,
-    class... CommOps,
     class... GemmLayouts,
     class... Impls,
-    class ImplSpecs = cute::tuple<None>,
-    class CommSpecs = cute::tuple<None>>
+    class ImplSpecs = cute::tuple<None>>
 constexpr auto
 make_space_gemm_meta(
     cute::tuple<DTypes...> const &dtypes,
     cute::tuple<Archs...> const &archs,
-    cute::tuple<CommOps...> const &comm_ops,
     cute::tuple<GemmLayouts...> const &gemm_layouts,
     cute::tuple<Impls...> const &impls,
-    ImplSpecs const &impl_specs = cute::make_tuple(None{}),
-    CommSpecs const &comm_specs = cute::make_tuple(None{})) {
+    ImplSpecs const &impl_specs = cute::make_tuple(None{})) {
   auto gemm_meta_space = tuple_transform(
       tuple_cartesian_product(
-          dtypes, archs, comm_ops, gemm_layouts, impls, impl_specs, comm_specs),
+          dtypes, archs, gemm_layouts, impls, impl_specs),
       [](auto tup) { return to_gemm_meta(tup); });
   return tuple_filter(gemm_meta_space, [](auto const tup) {
     auto meta = to_gemm_meta(tup);

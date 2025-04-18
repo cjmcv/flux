@@ -73,11 +73,11 @@ test_tuple_filter() {
 void
 test_gemm_meta() {
   auto dt_conf = make_gemm_dtype_config(_FP16{});
-  auto meta = make_gemm_meta(dt_conf, _Sm90{}, _CommNone{}, _RCR{}, _GemmV3{});
+  auto meta = make_gemm_meta(dt_conf, _Sm90{}, _RCR{}, _GemmV3{});
   auto unified_meta = unify_type(meta);
   FLUX_CHECK_EQ(unified_meta.dtype(), unify_type(dt_conf));
   FLUX_CHECK_EQ(unified_meta.arch(), _Sm90{}());
-  FLUX_CHECK_EQ(unified_meta.comm_op(), _CommNone{}());
+  // FLUX_CHECK_EQ(unified_meta.comm_op(), _CommNone{}());
   FLUX_CHECK_EQ(unified_meta.gemm_layout(), _RCR{}());
   FLUX_CHECK_EQ(unified_meta.impl(), _GemmV3{}());
 }
@@ -85,11 +85,11 @@ test_gemm_meta() {
 void
 test_gemm_hparams() {
   auto dt_conf = make_gemm_dtype_config(_FP16{});
-  auto meta = make_gemm_meta(dt_conf, _Sm89{}, _CommNone{}, _RCR{}, _GemmV2{});
+  auto meta = make_gemm_meta(dt_conf, _Sm89{}, _RCR{}, _GemmV2{});
   auto auto_hparams = _AutoHParams{};
   auto hparams = materialize_hparams(meta, auto_hparams);
   auto unified_hparams = unify_type(hparams);
-  FLUX_CHECK_EQ(unified_hparams.comm_spec(), None{});
+  // FLUX_CHECK_EQ(unified_hparams.comm_spec(), None{});
   FLUX_CHECK_EQ(unified_hparams.raster_order(), _RasterHeuristic{}());
   FLUX_CHECK_EQ(unified_hparams.mainloop_stage(), 0);
 }

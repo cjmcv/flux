@@ -301,20 +301,11 @@ tuple_cartesian_product(Tuples &&...tups) {
 /////////////////////////////////////////////////////
 enum class DataTypeEnum : int8_t { Void, FP16, BF16, FP32, E4M3, E5M2, S8, S32 };
 enum class ArchEnum : int { Sm80 = 80, Sm89 = 89, Sm90 = 90 };
-enum class CommOpEnum : int8_t {
-  CommNone,                   // gemm only, wo/ communication
-  AllGather,                  // tp allgather + gemm, comm not fused into gemm kernel
-  ReduceScatter,              // gemm + tp reduce-scatter
-  GatherRS,                   // MoE tp, gemm + gather + rs
-  AGKernel,                   // tp allgather + gemm, comm fused into gemm kernel
-  AGScatter,                  // MoE tp, ag + scatter + gemm
-};
 
 enum class GemmLayoutEnum : int8_t { RRR, RCR, RCC };
 enum class ImplEnum : int8_t { GemmV2, GemmV3 };
 
 enum class GemmKindEnum : int8_t { GemmDefault, GemmStreamK };
-enum class CommKindEnum : int8_t { IntraNode, AcrossNode, IntraNodePcie };
 
 enum class GemmStreamkModeEnum : int8_t { SK, DP };
 enum class GemmRasterOrderEnum : int8_t { Heuristic, AlongM, AlongN };
@@ -324,17 +315,6 @@ enum class GemmKernelScheduleEnum : int8_t { Cooperative, PingPong };
 /////////////////////////////////////////////////////
 // Aliases for constant types
 /////////////////////////////////////////////////////
-using _CommNone = cute::C<CommOpEnum::CommNone>;
-using _AllGather = cute::C<CommOpEnum::AllGather>;
-using _ReduceScatter = cute::C<CommOpEnum::ReduceScatter>;
-using _GatherRS = cute::C<CommOpEnum::GatherRS>;
-using _AGKernel = cute::C<CommOpEnum::AGKernel>;
-using _AGScatter = cute::C<CommOpEnum::AGScatter>;
-
-using _IntraNode = cute::C<CommKindEnum::IntraNode>;
-using _AcrossNode = cute::C<CommKindEnum::AcrossNode>;
-using _IntraNodePcie = cute::C<CommKindEnum::IntraNodePcie>;
-
 using _GemmDefault = cute::C<GemmKindEnum::GemmDefault>;
 using _GemmStreamK = cute::C<GemmKindEnum::GemmStreamK>;
 
@@ -393,7 +373,6 @@ template <class T>
 struct is_flux_enum_type {
   using U = decay_and_strip_t<T>;
   static constexpr bool value =
-      cute::is_same_v<U, CommOpEnum> or cute::is_same_v<U, CommKindEnum> or
       cute::is_same_v<U, GemmKindEnum> or cute::is_same_v<U, GemmLayoutEnum> or
       cute::is_same_v<U, DataTypeEnum> or cute::is_same_v<U, ArchEnum> or
       cute::is_same_v<U, ImplEnum> or cute::is_same_v<U, GemmStreamkModeEnum> or
@@ -516,29 +495,6 @@ struct TypeWrapper {
 ///////////////////////////////////////////////////////////////
 // Print
 ///////////////////////////////////////////////////////////////
-inline char const *
-enum_to_string(CommOpEnum comm_op) {
-  switch (comm_op) {
-    case CommOpEnum::CommNone: return "CommNone";
-    case CommOpEnum::AllGather: return "AllGather";
-    case CommOpEnum::AGKernel: return "AGKernel";
-    case CommOpEnum::ReduceScatter: return "ReduceScatter";
-    case CommOpEnum::GatherRS: return "GatherRS";
-    case CommOpEnum::AGScatter: return "AGScatter";
-    default: return "UNK";
-  }
-}
-
-inline char const *
-enum_to_string(CommKindEnum comm_t) {
-  switch (comm_t) {
-    case CommKindEnum::IntraNode: return "IntraNode";
-    case CommKindEnum::AcrossNode: return "AcrossNode";
-    case CommKindEnum::IntraNodePcie: return "IntraNodePcie";
-    default: return "UNK";
-  }
-}
-
 inline char const *
 enum_to_string(GemmKindEnum gemm_type) {
   switch (gemm_type) {

@@ -33,7 +33,6 @@ tuning(int m, int n, int k) {
   auto meta = make_gemm_meta(
       _FP16{},
       arch,
-      _CommNone{},
       _RCR{},
       ((int)arch < (int)_Sm90{}()) ? _GemmV2{}() : _GemmV3{}());
   using Element = decltype(to_cutlass_element(meta.dtype()));

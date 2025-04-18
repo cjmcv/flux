@@ -34,8 +34,8 @@ namespace bytedance::flux {
 
 ///////////////////////////////////////
 // runtime_config
-using UnifiedCommRuntimeConfig =
-    std::variant<None>; // , ReduceScatterRuntimeConfig, AllGatherRuntimeConfig
+// using UnifiedCommRuntimeConfig =
+//     std::variant<None>; // , ReduceScatterRuntimeConfig, AllGatherRuntimeConfig
 
 // Runtime config used for Dispacher of ops.
 template <class... Ts>
@@ -43,21 +43,20 @@ struct RuntimeConfigTpl : FluxNamedTupleBase<RuntimeConfigTpl, Ts...> {
   using Base = FluxNamedTupleBase<RuntimeConfigTpl, Ts...>;
   static constexpr char const *Name = "RuntimeConfig";
   static constexpr char const *LowerName = "runtime_config";
-  static constexpr std::array<char const *, 4> Fields = {"m", "n", "k", "comm_spec"};
+  static constexpr std::array<char const *, 3> Fields = {"m", "n", "k"};
   FLUX_NAMED_TUPLE_DEFINE_FIELD(m, 0)
   FLUX_NAMED_TUPLE_DEFINE_FIELD(n, 1)
   FLUX_NAMED_TUPLE_DEFINE_FIELD(k, 2)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(comm_spec, 3)
 
   constexpr RuntimeConfigTpl(cute::tuple<Ts...> const &tup) : Base(tup) {}
 };
 
-using RuntimeConfig = RuntimeConfigTpl<int, int, int, UnifiedCommRuntimeConfig>;
+using RuntimeConfig = RuntimeConfigTpl<int, int, int>;
 
 inline RuntimeConfig
 make_runtime_config(
-    int m = 0, int n = 0, int k = 0, UnifiedCommRuntimeConfig const &comm_rt_conf = None{}) {
-  return {cute::make_tuple(m, n, k, comm_rt_conf)};
+    int m = 0, int n = 0, int k = 0) {
+  return {cute::make_tuple(m, n, k)};
 }
 
 

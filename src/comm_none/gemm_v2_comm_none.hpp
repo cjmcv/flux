@@ -39,7 +39,6 @@ struct GemmV2CommNone_Kernel : public GemmV2BaseKernel<
                                    GemmV2CommNone_Kernel<GemmMetaT, GemmHParamsT>> {
   using Base = GemmV2BaseKernel<GemmMetaT, GemmHParamsT, GemmV2CommNone_Kernel>;
   static constexpr auto meta = to_gemm_meta(GemmMetaT{});
-  static_assert(meta.comm_op() == _CommNone{}, "requires _CommNone{}");
 
   auto
   gemm_kernel() const {

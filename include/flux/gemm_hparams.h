@@ -112,18 +112,17 @@ struct GemmHParams : FluxNamedTupleBase<GemmHParams, Ts...> {
   using Base::Base;
   static constexpr char const *Name = "GemmHParams";
   static constexpr char const *LowerName = "gemm_hparams";
-  static constexpr std::array<char const *, 6> Fields = {
-      "impl_spec", "comm_spec", "tile_shape", "gemm_kind", "mainloop_stage", "raster_order"};
+  static constexpr std::array<char const *, 5> Fields = {
+      "impl_spec", "tile_shape", "gemm_kind", "mainloop_stage", "raster_order"};
   FLUX_NAMED_TUPLE_DEFINE_FIELD(impl_spec, 0)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(comm_spec, 1)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(tile_shape, 2)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(gemm_kind, 3)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(mainloop_stage, 4)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(raster_order, 5)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(tile_shape, 1)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(gemm_kind, 2)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(mainloop_stage, 3)
+  FLUX_NAMED_TUPLE_DEFINE_FIELD(raster_order, 4)
 
   constexpr bool
   is_materialized() const noexcept {
-    bool has_auto = is_auto_v<decltype(impl_spec())> or is_auto_v<decltype(comm_spec())> or
+    bool has_auto = is_auto_v<decltype(impl_spec())> or 
                     is_auto_v<decltype(tile_shape())> or is_auto_v<decltype(gemm_kind())> or
                     is_auto_v<decltype(mainloop_stage())> or is_auto_v<decltype(raster_order())>;
     return not has_auto;
@@ -131,7 +130,6 @@ struct GemmHParams : FluxNamedTupleBase<GemmHParams, Ts...> {
 
   using UnifiedGemmHParams = GemmHParams<
       UnifiedImplHParams,
-      UnifiedCommHParams,
       UnifiedTileShape,
       GemmKindEnum,
       int,
@@ -141,7 +139,6 @@ struct GemmHParams : FluxNamedTupleBase<GemmHParams, Ts...> {
   unify_type(GemmHParams const &obj) {
     return cute::make_tuple(
         UnifiedImplHParams(unify_type(obj.impl_spec())),
-        UnifiedCommHParams(unify_type(obj.comm_spec())),
         unify_type(obj.tile_shape()),
         unify_type(obj.gemm_kind()),
         int(obj.mainloop_stage()),
@@ -153,21 +150,19 @@ using UnifiedGemmHParams = unified_type_t<GemmHParams>;
 
 template <
     class ImplSpecific,
-    class CommSpecific,
     class TileShape,
     class GemmKind = _GemmDefault,
     class MainloopStage = cute::_0,
     class RasterOrder = _RasterHeuristic>
-constexpr GemmHParams<ImplSpecific, CommSpecific, TileShape, GemmKind, MainloopStage, RasterOrder>
+constexpr GemmHParams<ImplSpecific, TileShape, GemmKind, MainloopStage, RasterOrder>
 make_gemm_hparams(
     ImplSpecific const &impl_spec = Auto{},
-    CommSpecific const &comm_spec = Auto{},
     TileShape const &tile_shape = Auto{},
     GemmKind const &gemm_kind = _GemmDefault{},
     MainloopStage const &mainloop_stage = cute::_0{},
     RasterOrder const &raster_order = _RasterHeuristic{}) {
   return {
-      cute::make_tuple(impl_spec, comm_spec, tile_shape, gemm_kind, mainloop_stage, raster_order)};
+      cute::make_tuple(impl_spec, tile_shape, gemm_kind, mainloop_stage, raster_order)};
 }
 
 template <class... Ts>
@@ -176,13 +171,12 @@ to_gemm_hparams(cute::tuple<Ts...> const &tup) {
   return {tup};
 }
 
-using _AutoHParams = GemmHParams<Auto, Auto, Auto, Auto, Auto, Auto>;
+using _AutoHParams = GemmHParams<Auto, Auto, Auto, Auto, Auto>;
 
 // Create a tuple of GemmHParams by cartesian product
 // of given sets of elements
 template <
     class ImplSpecifics = cute::tuple<Auto>,
-    class CommSpecifics = cute::tuple<Auto>,
     class TileShapes = cute::tuple<Auto>,
     class GemmKinds = cute::tuple<Auto>,
     class MainloopStages = cute::tuple<Auto>,
@@ -190,14 +184,13 @@ template <
 constexpr auto
 make_space_gemm_hparams(
     ImplSpecifics const &impl_specs = cute::make_tuple(Auto{}),
-    CommSpecifics const &comm_specifids = cute::make_tuple(Auto{}),
     TileShapes const &tile_shapes = cute::make_tuple(Auto{}),
     GemmKinds const &gemm_kinds = cute::make_tuple(Auto{}),
     MainloopStages const &mainloop_stages = cute::make_tuple(Auto{}),
     RasterOrders const &raster_orders = cute::make_tuple(Auto{})) {
   auto gemm_hparams_spaces = tuple_transform(
       tuple_cartesian_product(
-          impl_specs, comm_specifids, tile_shapes, gemm_kinds, mainloop_stages, raster_orders),
+          impl_specs, tile_shapes, gemm_kinds, mainloop_stages, raster_orders),
       [](auto tup) { return to_gemm_hparams(tup); });
   return gemm_hparams_spaces;
 }
@@ -224,12 +217,6 @@ auto_impl_spec(GemmMeta<Ts...> meta) {
   } else {
     static_assert(cutlass::detail::dependent_false<decltype(meta.impl())>, "unsupported impl");
   }
-}
-
-template <class... Ts>
-constexpr auto
-auto_comm_spec(GemmMeta<Ts...> meta) {
-  return None{};
 }
 
 template <class... Ts, class ImplHParams, class TileShape>
@@ -392,7 +379,6 @@ materialize_hparams(GemmMeta<Ts...> meta, GemmHParams<Us...> hparams) {
 
   auto auto_impl_spec = detail::auto_impl_spec(meta);
   auto impl_spec = is_auto_or(hparams.impl_spec(), auto_impl_spec);
-  auto auto_comm_spec = detail::auto_comm_spec(meta);
   auto tile_shape = detail::materialize_tile_shape(meta, impl_spec, hparams.tile_shape());
   auto auto_gemm_kind = detail::auto_gemm_kind(meta);
   auto auto_mainloop_stage = detail::auto_mainloop_stage(meta, tile_shape);
@@ -400,7 +386,6 @@ materialize_hparams(GemmMeta<Ts...> meta, GemmHParams<Us...> hparams) {
 
   return make_gemm_hparams(
       impl_spec,
-      is_auto_or(hparams.comm_spec(), auto_comm_spec),
       tile_shape,
       is_auto_or(hparams.gemm_kind(), auto_gemm_kind),
       is_auto_or(hparams.mainloop_stage(), auto_mainloop_stage),

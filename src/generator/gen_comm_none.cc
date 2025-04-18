@@ -31,7 +31,6 @@ struct GemmV2CommNone_Space {
     //       make_gemm_dtype_config(_BF16{}, _BF16{}, _Void{}, _BF16{})),
       cute::make_tuple(make_gemm_dtype_config(_BF16{}, _BF16{}, _Void{}, _BF16{})),
       cute::make_tuple(_Sm80{}, _Sm89{}),
-      cute::make_tuple(_CommNone{}),
       cute::make_tuple(_RCR{}), // , _RRR{}
       cute::make_tuple(_GemmV2{}));
 
@@ -91,13 +90,11 @@ struct GemmV2CommNone_Space {
           make_gemm_dtype_config(_E5M2{}, _E5M2{}, _Void{}, _BF16{}),
           make_gemm_dtype_config(_E5M2{}, _E5M2{}, _BF16{}, _BF16{})),
       cute::make_tuple(_Sm89{}),
-      cute::make_tuple(_CommNone{}),
       cute::make_tuple(_RCR{}),  // Only register RCR layout for FP8 GEMM
       cute::make_tuple(_GemmV2{}),
       cute::make_tuple(make_gemm_v2_meta(_True{}), make_gemm_v2_meta(_False{})));
 
   static constexpr auto AllGemmHParams_FP8 = make_space_gemm_hparams(
-      cute::make_tuple(Auto{}),
       cute::make_tuple(Auto{}),
       cute::make_tuple(Auto{}),
       cute::make_tuple(Auto{}),
@@ -109,7 +106,6 @@ struct GemmV2CommNone_Space {
           make_gemm_dtype_config(_S8{}, _S8{}, _BF16{}, _BF16{}, _S32{}),
           make_gemm_dtype_config(_S8{}, _S8{}, _Void{}, _BF16{}, _S32{})),
       cute::make_tuple(_Sm80{}, _Sm89{}),
-      cute::make_tuple(_CommNone{}),
       cute::make_tuple(_RCR{}),
       cute::make_tuple(_GemmV2{}));
 
@@ -121,7 +117,6 @@ struct GemmV2CommNone_Space {
           cute::make_tuple(Auto{}),
           cute::make_tuple(
               Shape<_128, _64, _128>{}, Shape<_128, _128, _128>{}, Shape<_64, _64, _128>{}),
-          cute::make_tuple(Auto{}),
           cute::make_tuple(cute::_3{}, cute::_4{}),
           cute::make_tuple(_RasterAlongM{}, _RasterAlongN{}, _RasterHeuristic{})),
       make_space_gemm_hparams(
@@ -130,7 +125,6 @@ struct GemmV2CommNone_Space {
               make_gemm_v2_hparams(Shape<_64, _64, _64>{}, Shape<_16, _8, _32>{}, _StreamkDP{})),
           cute::make_tuple(Auto{}),
           cute::make_tuple(cute::Shape<cute::_128, cute::_128, cute::_64>{}),
-          cute::make_tuple(Auto{}),
           cute::make_tuple(cute::_5{}),
           cute::make_tuple(_RasterAlongM{}, _RasterAlongN{}, _RasterHeuristic{})));
 
