@@ -34,9 +34,6 @@ namespace bytedance::flux {
 
 ///////////////////////////////////////
 // runtime_config
-// using UnifiedCommRuntimeConfig =
-//     std::variant<None>; // , ReduceScatterRuntimeConfig, AllGatherRuntimeConfig
-
 // Runtime config used for Dispacher of ops.
 template <class... Ts>
 struct RuntimeConfigTpl : FluxNamedTupleBase<RuntimeConfigTpl, Ts...> {

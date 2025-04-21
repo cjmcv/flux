@@ -196,37 +196,7 @@ struct GemmV2BaseKernel {
   template <class... Ts>
   auto
   default_gemm_kernel(gemm_v2_impl::KernelParams<Ts...> params) const {
-    /*
-    Ada FP8 GEMM.
 
-    In addition to using FP8 Tensor Core instructions, the Ada FP8 GEMM uses a distinct epilogue
-    that enables additional scaling of operands/outputs, storing a pre-activation-function output
-    tensor (called the "auxiliary" output), and computing the absolute maximum value of the
-    outputs.
-
-    Pseudocode for this epilogue is as follows:
-
-    Aux = ((alpha * scale_a * scale_b) * accumulator) + ((beta * scale_c) * source) + bias
-    D = activation(Aux)
-
-    if Aux is fp8 type:
-        abs_max_output = max( abs(aux) | (for every aux in Aux))
-        Aux = scale_aux * Aux
-    endif
-
-    if D is fp8 type:
-        abs_max_output = max( abs(d) | (for every d in D))
-        D = scale_d * D
-    endif
-
-    Parameter Aux is optionally stored to global memory
-    */
-
-    using Operator = cute::conditional_t<
-        to_gemm_v2_meta(meta.impl_spec()).fast_accum(),
-        cutlass::arch::OpMultiplyAddFastAccum,
-        cutlass::arch::OpMultiplyAdd>;
-    
     using ElementCompute = ElementD;
 
     using Impl = cutlass::gemm::kernel::DefaultGemmWithVisitor<

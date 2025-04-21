@@ -33,9 +33,6 @@ namespace ths_op {
 
 DataTypeEnum from_torch_dtype(at::ScalarType torch_dtype);
 at::ScalarType to_torch_dtype(DataTypeEnum dtype);
-// used by MoE
-torch::Tensor setup_shared_memory(
-    int64_t rank, int64_t world_size, torch::Tensor local_data, std::vector<void *> *host_ptrs);
 
 // Wraps c++ types in class holder, in order to communicate with python
 struct PyTuningRecord : public torch::CustomClassHolder {
