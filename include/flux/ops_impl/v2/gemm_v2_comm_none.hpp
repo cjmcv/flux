@@ -28,7 +28,7 @@
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_operator_base.h"
 #include "flux/args/comm_none.h"
-#include "cutlass/gemm/device/gemm_universal_with_absmax.h"
+// #include "cutlass/gemm/device/gemm_universal_with_absmax.h"
 
 namespace bytedance::flux {
 

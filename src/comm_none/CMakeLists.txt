@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.17)
 
+#####################
+
+#####################
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/registers")
 execute_process(
   COMMAND ${FLUX_GENERATOR_BINARY_DIR}/gen_comm_none "--dir=./registers" "--archs=${CUDAARCHS}"
@@ -9,6 +12,8 @@ execute_process(
 )
 
 file(GLOB OP_REGS ${CMAKE_CURRENT_BINARY_DIR}/registers/*.cu)
+message(STATUS "OP_REGS: ${OP_REGS}")
+
 file(GLOB TUNING_CONFIGS tuning_config/*.cu)
 set(CU_FILES
   ${OP_REGS}

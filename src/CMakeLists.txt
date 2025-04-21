@@ -22,6 +22,7 @@ if (BUILD_THS)
   set(FLUX_THS_OP_FILES "") # ths op source files of subdirectory
 endif()
 
+#######################################
 include(ExternalProject)
 ExternalProject_Add(
   FLUX_GENERATOR
@@ -46,6 +47,7 @@ execute_process(
   WORKING_DIRECTORY ${FLUX_GENERATOR_BINARY_DIR}
   COMMAND_ERROR_IS_FATAL ANY
 )
+#######################################
 
 add_subdirectory(comm_none)
 message(STATUS "op_targets: ${FLUX_CUDA_OP_TARGETS}")

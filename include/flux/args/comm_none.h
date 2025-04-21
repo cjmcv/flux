@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #pragma once
-#include "cute/int_tuple.hpp"
 
 namespace bytedance::flux {
 
