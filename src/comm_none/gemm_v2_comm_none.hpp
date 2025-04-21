@@ -24,7 +24,7 @@
 #include "cutlass/layout/matrix.h"
 #include "cutlass/util/packed_stride.hpp"
 #include "flux/flux.h"
-#include "flux/cuda/gemm_impls/gemm_v2_impl.hpp"
+#include "gemm_v2_impl.hpp"
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_operator_base.h"
 #include "flux/args/comm_none.h"

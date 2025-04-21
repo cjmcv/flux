@@ -38,7 +38,7 @@ def cutlass_deps():
 
 
 def read_flux_ths_targets():
-    file_path = root_path / "build/src/ths_op/flux_ths_targets.txt"
+    file_path = root_path / "build/src/flux_ths_targets.txt"
     variables = {}
     if not os.path.exists(file_path):
         # flux is installed through pip3, the flux_ths_files.txt is not generated

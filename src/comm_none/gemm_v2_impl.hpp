@@ -28,7 +28,7 @@
 #include "flux/cuda/cuda_common.h"
 #include "flux/gemm_operator_base.h"
 #include "flux/op_registry.h"
-#include "flux/cuda/gemm_impls/gemm_operator_base_default_impl.hpp"
+#include "gemm_operator_base_default_impl.hpp"
 
 #include "cute/int_tuple.hpp"
 #include "cute/layout.hpp"

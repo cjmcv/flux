@@ -92,6 +92,16 @@ to_cutlass_archtag(cute::C<E> arch) {
   }
 }
 
+inline ArchEnum get_arch() {
+  int major, minor;
+  cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, 0);
+  cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, 0);
+  int arch_num = major * 10 + minor;
+  FLUX_CHECK(arch_num == 80 || arch_num == 89 || arch_num == 90)
+      << "unsupported arch: " << arch_num;
+  return ArchEnum{arch_num};
+}
+
 template <GemmLayoutEnum E>
 auto
 to_cutlass_layout_a(cute::C<E> layout) {

@@ -22,7 +22,7 @@
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"
-#include "flux/ths_op/ths_op.h"
+#include "../ths_op2.h"
 #include <ATen/core/jit_type.h>
 #include <ATen/core/List.h>
 #include <ATen/core/TensorBody.h>

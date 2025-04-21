@@ -1,4 +1,4 @@
-//===- ths_pybind.h ----------------------------------------------- C++ ---===//
+//===- ths_op.h --------------------------------------------------- C++ ---===//
 //
 // Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +15,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <torch/extension.h>
-#include "flux/ths_op/ths_op.h"
-#include <torch/python.h>
+#pragma once
+#include "c10/util/Optional.h"
+#include "flux/flux.h"
+#include "flux/gemm_hparams.h"
+#include "flux/gemm_meta.h"
+#include "flux/op_registry.h"
+#include <torch/torch.h>
+#include <ATen/core/ivalue.h>
+#include <c10/core/ScalarType.h>
+#include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
 #include <torch/csrc/utils/pybind.h>
 
 #define FLUX_TORCH_EXTENSION_NAME flux_ths_pybind
 
-namespace py = pybind11;
+namespace bytedance {
+namespace flux {
+namespace ths_op {
 
-namespace bytedance::flux::ths_op {
+// DataTypeEnum from_torch_dtype(at::ScalarType torch_dtype);
+// at::ScalarType to_torch_dtype(DataTypeEnum dtype);
+
 // Registry of functions that register
 // functions into module
 class ThsOpsInitRegistry {
@@ -43,13 +54,7 @@ class ThsOpsInitRegistry {
   ThsOpsInitRegistry &operator=(const ThsOpsInitRegistry &) = delete;
 };
 
-// <NT> torch::CustomClassHolder 是 PyTorch 提供的基类，它能让自定义类在 Python 和 C++ 之间顺利交互。
-// 先自定义类，通过 TorchClassWrapper 模板结构体对其进行包装 如TorchClassWrapper<MyCustomClass>，
-// 然后利用 ThsOpsInitRegistry 将 TorchClassWrapper<MyCustomClass> 注册到 PyTorch 库。
-template <typename T>
-struct TorchClassWrapper : public torch::CustomClassHolder, T {
- public:
-  using T::T;
-};
 
-}  // namespace bytedance::flux::ths_op
+}  // namespace ths_op
+}  // namespace flux
+}  // namespace bytedance

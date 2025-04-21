@@ -15,8 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "flux/ths_op/ths_op.h"
-#include "flux/ths_op/ths_pybind.h"
+#include "ths_op.h"
+#include "../comm_none/ths_op2.h"
+// #include "ths_pybind.h"
 #include <c10/cuda/CUDAStream.h>
 
 namespace bytedance::flux::ths_op {

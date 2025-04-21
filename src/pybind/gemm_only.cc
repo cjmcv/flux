@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "comm_none/ths_op/gemm_only.h"
-#include "flux/ths_op/ths_pybind.h"
+#include "ths_op.h"
 
 namespace bytedance::flux::ths_op {
 

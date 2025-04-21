@@ -18,7 +18,7 @@
 #pragma once
 
 #include <torch/all.h>
-#include "flux/ths_op/ths_op.h"
+#include "../ths_op2.h"
 
 #define CHECK_TYPE(x, st) FLUX_CHECK_EQ(x.scalar_type(), st) << "Inconsistency type of Tensor " #x
 #define CHECK_CUDA(x) FLUX_CHECK(x.is_cuda()) << #x << " must be a CUDA tensor"

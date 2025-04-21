@@ -56,10 +56,6 @@ make_runtime_config(
   return {cute::make_tuple(m, n, k)};
 }
 
-
-// get arch of current device
-ArchEnum get_arch();
-
 class TuningConfigGenerator {
  private:
   static constexpr auto Indent = "  ";
@@ -137,7 +133,13 @@ class TuningConfigRegistry {
     return iter == registry_.end() ? nullptr : &(iter->second);
   }
 
-  static TuningConfigRegistry &instance();
+  // static TuningConfigRegistry &instance();
+
+  static TuningConfigRegistry &
+  instance() {
+    static TuningConfigRegistry inst;
+    return inst;
+  }
 
  private:
   // [GemmMeta, RuntimeConfig] -> GemmHParams
@@ -156,7 +158,11 @@ class OpRegistry {
   using HParamsFilter = std::function<bool(UnifiedGemmHParams const &)>;
   using Dispatcher = std::function<UnifiedGemmHParams(RuntimeConfig const &)>;
 
-  static OpRegistry &instance();
+  static OpRegistry &
+  instance() {
+    static OpRegistry inst;
+    return inst;
+  }
 
   // Register a hparams for a specific meta, with hparams_idx are the priority, hparams with
   // smaller hparams_idx will be stored before ones with larger hparams_idx
