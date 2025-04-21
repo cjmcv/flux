@@ -17,7 +17,7 @@
 
 #pragma once
 #include "cutlass/fast_math.h"
-#include "flux/cuda/cuda_common.h"
+#include "flux/common_cuda.h"
 #include "flux/flux.h"
 #include "flux/gemm_operator_base.h"
 #include "cutlass/workspace.h"

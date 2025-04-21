@@ -25,84 +25,18 @@
 #include <ATen/core/ivalue.h>
 #include <c10/core/ScalarType.h>
 #include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
-// #include <torch/csrc/utils/pybind.h>
-
-#define FLUX_TORCH_EXTENSION_NAME flux_ths_pybind
 
 namespace bytedance {
 namespace flux {
 namespace ths_op {
 
-
-inline DataTypeEnum
-from_torch_dtype(at::ScalarType torch_dtype) {
-  switch (torch_dtype) {
-    case at::ScalarType::Float: {
-      return _FP32{};
-    }; break;
-    case at::ScalarType::Int: {
-      return _S32{};
-    }; break;
-    case at::ScalarType::Char: {
-      return _S8{};
-    }; break;
-    case at::ScalarType::Half: {
-      return _FP16{};
-    }; break;
-    case at::ScalarType::BFloat16: {
-      return _BF16{};
-    }; break;
-    case at::ScalarType::Float8_e4m3fn: {
-      return _E4M3{};
-    }; break;
-    case at::ScalarType::Float8_e5m2: {
-      return _E5M2{};
-    }; break;
-    default:
-      throw std::runtime_error(
-          std::string("unsupported torch_dtype:") + at::toString(torch_dtype));
-  }
-  return DataTypeEnum{};
-}
-
-inline at::ScalarType
-to_torch_dtype(DataTypeEnum dtype) {
-  switch (dtype) {
-    case _FP32{}: {
-      return at::ScalarType::Float;
-    }; break;
-    case _S32{}: {
-      return at::ScalarType::Int;
-    }; break;
-    case _S8{}: {
-      return at::ScalarType::Char;
-    }; break;
-    case _FP16{}: {
-      return at::ScalarType::Half;
-    }; break;
-    case _BF16{}: {
-      return at::ScalarType::BFloat16;
-    }; break;
-    case _E4M3{}: {
-      return at::ScalarType::Float8_e4m3fn;
-    }; break;
-    case _E5M2{}: {
-      return at::ScalarType::Float8_e5m2;
-    }; break;
-    default:
-      throw std::runtime_error(
-          std::string("unsupported dtype: ") + std::string(enum_to_string(dtype)));
-  }
-  return at::ScalarType::Undefined;
-}
-
 // Wraps c++ types in class holder, in order to communicate with python
-struct PyTuningRecord : public torch::CustomClassHolder {
+struct TuningRecord : public torch::CustomClassHolder {
   UnifiedGemmMeta meta;
   RuntimeConfig rt_conf;
   UnifiedGemmHParams best_hparams;
 
-  PyTuningRecord(
+  TuningRecord(
     UnifiedGemmMeta meta, RuntimeConfig rt_conf, UnifiedGemmHParams best_hparams)
     : meta(std::move(meta)), rt_conf(std::move(rt_conf)), best_hparams(std::move(best_hparams)) {}
 };
@@ -158,8 +92,8 @@ class ProfilingContext : public torch::CustomClassHolder {
     return ret;
   }
 
-  std::vector<PyTuningRecord> get_all_records() const {
-    std::vector<PyTuningRecord> rets;
+  std::vector<TuningRecord> get_all_records() const {
+    std::vector<TuningRecord> rets;
     for (auto const &par : prof_results) {
       std::ostringstream ss;
       auto [meta, rt_conf] = par.first;
@@ -183,7 +117,7 @@ class ProfilingContext : public torch::CustomClassHolder {
     return std::move(ss).str();
   }
 
-  PyTuningRecord get_latest_record() const {
+  TuningRecord get_latest_record() const {
     FLUX_CHECK(latest_key_ptr != nullptr) << "no latest prof results found";
     auto key = *latest_key_ptr;
     auto iter = prof_results.find(key);
@@ -191,7 +125,7 @@ class ProfilingContext : public torch::CustomClassHolder {
         << "key not found: (" << key.first << ", " << key.second << ")";
     auto [meta, rt_conf] = key;
     auto const &top_hparams = iter->second;
-    return PyTuningRecord(meta, rt_conf, top_hparams.begin()->second);
+    return TuningRecord(meta, rt_conf, top_hparams.begin()->second);
   }
 
   // add a single record
@@ -221,15 +155,6 @@ class ProfilingContext : public torch::CustomClassHolder {
     codegen.add(meta, rt_conf, best_hparams);
     return best_hparams;
   }
-};
-
-// <NT> torch::CustomClassHolder 是 PyTorch 提供的基类，它能让自定义类在 Python 和 C++ 之间顺利交互。
-// 先自定义类，通过 TorchClassWrapper 模板结构体对其进行包装 如TorchClassWrapper<MyCustomClass>，
-// 然后利用 ThsOpsInitRegistry 将 TorchClassWrapper<MyCustomClass> 注册到 PyTorch 库。
-template <typename T>
-struct TorchClassWrapper : public torch::CustomClassHolder, T {
- public:
-  using T::T;
 };
 
 }  // namespace ths_op

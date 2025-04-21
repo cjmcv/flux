@@ -36,20 +36,6 @@ def cutlass_deps():
     libraries = []
     return include_dirs, library_dirs, libraries
 
-
-def read_flux_ths_targets():
-    file_path = root_path / "build/src/flux_ths_targets.txt"
-    variables = {}
-    if not os.path.exists(file_path):
-        # flux is installed through pip3, the flux_ths_files.txt is not generated
-        return []
-    with open(file_path, "r") as file:
-        for line in file:
-            if "=" in line:
-                key, value = line.strip().split("=", 1)
-                variables[key] = value
-    return [x for x in variables["FLUX_THS_TARGETS"].split(";") if x]
-
 @pathlib_wrapper
 def flux_cuda_deps():
     include_dirs = [root_path / "include", root_path / "src"]
@@ -90,7 +76,6 @@ def setup_pytorch_extension() -> setuptools.Extension:
     flux_ths_targets = [
         str(x.relative_to(root_path))  # relative path for include_package_data
         for x in Path(root_path / "src" / "pybind").glob("*.cc")
-        if x.stem in read_flux_ths_targets()
     ]
 
     from torch.utils.cpp_extension import CppExtension

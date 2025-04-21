@@ -58,7 +58,7 @@
 
 // #include "cutlass/test/unit/gemm/device/testbed_utils.h"
 
-#include "flux/cuda/cuda_common.h"
+#include "flux/common_cuda.h"
 
 #define EXPECT_TRUE 
 #define EXPECT_GT

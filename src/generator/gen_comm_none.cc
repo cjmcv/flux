@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "flux/flux.h"
-#include "./generator_utils.h"
+#include "generator_utils.h"
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_meta.h"
 
@@ -156,7 +156,7 @@ main(int argc, char const **args) {
       {
           cute::make_tuple(
               GemmV2CommNone_Space::get_space(),
-              std::string("comm_none/gemm_v2_comm_none.hpp"),
+              std::string("flux/ops_impl/v2/gemm_v2_comm_none.hpp"),
               std::string("GemmV2CommNone")),
       });
 }

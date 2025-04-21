@@ -132,7 +132,7 @@
  #include "cutlass/util/tensor_view_io.h"
  
 //  #include "helper.h"
- #include "flux/cuda/cuda_common.h"
+ #include "flux/common_cuda.h"
  
  
  /////////////////////////////////////////////////////////////////////////////////////////////////

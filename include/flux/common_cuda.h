@@ -1,4 +1,4 @@
-//===- cuda_common.h ---------------------------------------------- C++ ---===//
+//===- common_cuda.h ---------------------------------------------- C++ ---===//
 //
 // Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -53,7 +53,7 @@
 
 namespace bytedance {
 namespace flux {
-
+ 
 template <DataTypeEnum E>
 auto
 to_cutlass_element(cute::C<E> dtype) {

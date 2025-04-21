@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ths_op.h"
-#include "../comm_none/ths_op2.h"
+#include "flux/tuning.h"
 // #include "ths_pybind.h"
 #include <c10/cuda/CUDAStream.h>
 
@@ -56,7 +56,7 @@ init_profiling_context(py::module &m) {
 
 void
 init_tuning_record(py::module &m) {
-  py::class_<PyTuningRecord, c10::intrusive_ptr<PyTuningRecord>>(m, "TuningRecord");
+  py::class_<TuningRecord, c10::intrusive_ptr<TuningRecord>>(m, "TuningRecord");
 }
 
 PYBIND11_MODULE(FLUX_TORCH_EXTENSION_NAME, m) {

@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "comm_none/ths_op/gemm_only.h"
+#include "comm_none/gemm_only.h"
 #include "ths_op.h"
 
 namespace bytedance::flux::ths_op {

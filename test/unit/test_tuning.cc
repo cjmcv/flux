@@ -19,7 +19,7 @@
 #include <sstream>
 #include "flux/flux.h"
 #include "flux/gemm_hparams.h"
-#include "flux/cuda/cuda_common.h"
+#include "flux/common_cuda.h"
 #include "flux/op_registry.h"
 #include "cutlass/util/device_memory.h"
 #include "flux/args/comm_none.h"

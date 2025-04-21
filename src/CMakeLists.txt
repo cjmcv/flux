@@ -50,24 +50,12 @@ execute_process(
 add_subdirectory(comm_none)
 message(STATUS "op_targets: ${FLUX_CUDA_OP_TARGETS}")
 
-# this must be after all op subdirectory added
-# add_subdirectory(cuda)
-
-# if (BUILD_THS)
-#   add_subdirectory(ths_op)
-# endif()
-
 ############ flux_cuda_ths_op ################
 set(FLUX_THS_FILES ${FLUX_THS_OP_FILES})
 message(STATUS "ths_files: ${FLUX_THS_FILES}") # comm_none/gemm_only.cc
 
 add_library(flux_cuda_ths_op SHARED ${FLUX_THS_FILES})
 target_link_libraries(flux_cuda_ths_op PUBLIC CUDA::cudart CUDA::cuda_driver ${FLUX_CUDA_OP_TARGETS} ${TORCH_LIBRARIES})
-
-# Write the unchached variable to a file
-get_property(FLUX_THS_TARGETS GLOBAL PROPERTY FLUX_THS_TARGETS)
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/flux_ths_targets.txt" "FLUX_THS_TARGETS=ths_op;${FLUX_THS_TARGETS}\n")
-message(STATUS "CMAKE_CURRENT_BINARY_DIR: ${CMAKE_CURRENT_BINARY_DIR}")
 
 install(TARGETS flux_cuda_ths_op
     PUBLIC_HEADER DESTINATION include

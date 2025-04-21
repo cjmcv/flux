@@ -17,7 +17,7 @@
 
 #include <cassert>
 #include <exception>
-#include "flux/cuda/cuda_common.h"
+#include "flux/common_cuda.h"
 #include "flux/flux.h"
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"

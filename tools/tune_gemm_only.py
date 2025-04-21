@@ -68,15 +68,15 @@ def gen_tuning_space():
 
 
 def get_torch_output(input: torch.Tensor, weight: torch.Tensor):
-    start_event = torch.cuda.Event(enable_timing=True)
-    end_event = torch.cuda.Event(enable_timing=True)
-    torch.cuda.synchronize()
-    start_event.record()
+    # start_event = torch.cuda.Event(enable_timing=True)
+    # end_event = torch.cuda.Event(enable_timing=True)
+    # torch.cuda.synchronize()
+    # start_event.record()
     output = torch.matmul(input, weight.t())
-    end_event.record()
-    torch.cuda.synchronize()
+    # end_event.record()
+    # torch.cuda.synchronize()
 
-    print(f"torch.matmul: {start_event.elapsed_time(end_event)} ms")
+    # print(f"torch.matmul: {start_event.elapsed_time(end_event)} ms")
     return output.cpu()
 
 

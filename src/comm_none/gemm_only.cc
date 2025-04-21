@@ -15,14 +15,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "comm_none/ths_op/gemm_only.h"
+#include "gemm_only.h"
 #include "flux/args/comm_none.h"
-#include "flux/cuda/cuda_common.h"
+#include "flux/common_cuda.h"
+#include "flux/common_torch.h"
 #include "flux/flux.h"
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_meta.h"
 #include "flux/op_registry.h"
-#include "../ths_op2.h"
+#include "flux/tuning.h"
 #include <ATen/core/jit_type.h>
 #include <ATen/core/List.h>
 #include <ATen/core/TensorBody.h>

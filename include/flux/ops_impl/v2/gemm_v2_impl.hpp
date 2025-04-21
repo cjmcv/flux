@@ -25,10 +25,10 @@
 #include "flux/flux.h"
 #include "flux/gemm_meta.h"
 #include "flux/gemm_hparams.h"
-#include "flux/cuda/cuda_common.h"
+#include "flux/common_cuda.h"
 #include "flux/gemm_operator_base.h"
 #include "flux/op_registry.h"
-#include "gemm_operator_base_default_impl.hpp"
+#include "flux/ops_impl/gemm_operator_base_default_impl.hpp"
 
 #include "cute/int_tuple.hpp"
 #include "cute/layout.hpp"

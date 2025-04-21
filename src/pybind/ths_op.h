@@ -33,8 +33,15 @@ namespace bytedance {
 namespace flux {
 namespace ths_op {
 
-// DataTypeEnum from_torch_dtype(at::ScalarType torch_dtype);
-// at::ScalarType to_torch_dtype(DataTypeEnum dtype);
+
+// <NT> torch::CustomClassHolder 是 PyTorch 提供的基类，它能让自定义类在 Python 和 C++ 之间顺利交互。
+// 先自定义类，通过 TorchClassWrapper 模板结构体对其进行包装 如TorchClassWrapper<MyCustomClass>，
+// 然后利用 ThsOpsInitRegistry 将 TorchClassWrapper<MyCustomClass> 注册到 PyTorch 库。
+template <typename T>
+struct TorchClassWrapper : public torch::CustomClassHolder, T {
+ public:
+  using T::T;
+};
 
 // Registry of functions that register
 // functions into module
