@@ -98,12 +98,6 @@ class CheckFail {
   ::bytedance::flux::detail::CheckFail() << __FILE__ << ":" << __LINE__ << " Check failed: " << x \
                                          << "(" #lhs ") % " << y << "(" #rhs ") != 0"
 
-#define CALL_ONCE(call_once_body)                        \
-  do {                                                   \
-    static std::once_flag __flag__;                      \
-    std::call_once(__flag__, [&]() { call_once_body; }); \
-  } while (0)
-
 // Convert T&,T&&, const T&... to basic T
 template <typename T>
 using decay_and_strip_t = std::remove_cv_t<std::remove_reference_t<std::decay_t<T>>>;
@@ -359,9 +353,6 @@ struct None : cute::tuple<> {};
 template <class T>
 inline constexpr bool is_auto_v = std::is_same_v<decay_and_strip_t<T>, Auto>;
 
-template <class T>
-inline constexpr bool is_none_v = std::is_same_v<decay_and_strip_t<T>, None>;
-
 namespace detail {
 // check if a type is a cute::C<Enum> type
 template <class T, class U>
@@ -430,30 +421,6 @@ sizeof_dtype(DType const &dt) {
   }
 }
 
-// calculate void* ptr with offset of bytes
-CUTLASS_HOST_DEVICE void *
-ptr_offset(void *ptr, ptrdiff_t byte_offset) {
-  return static_cast<char *>(ptr) + byte_offset;
-}
-
-CUTLASS_HOST_DEVICE void const *
-ptr_offset(void const *ptr, ptrdiff_t byte_offset) {
-  return static_cast<char const *>(ptr) + byte_offset;
-}
-
-// pad `sz` to the minimum multiple of `pad`
-CUTLASS_HOST_DEVICE
-int64_t
-pad_to(int64_t sz, int64_t pad) {
-  return (sz + pad - 1) / pad * pad;
-}
-
-template <class... Ts>
-std::tuple<Ts...>
-to_std_tuple(cute::tuple<Ts...> const &tup) {
-  return detail::to_std_tuple_impl(std::make_index_sequence<sizeof...(Ts)>{}, tup);
-}
-
 //  Usage:
 //    - used in type-selecting functions which returns an object of T but doesn't actually
 //      create an instance of T.
@@ -475,22 +442,6 @@ to_std_tuple(cute::tuple<Ts...> const &tup) {
 //  using T = decltype(select_type());
 template <class T>
 T make_declval();
-
-// Wraps a type in value so that it can be used in functions,tuples...
-//
-// usually make_declval<T>() used with with decltype is enough to pass
-// types as values, but make_declval<void>() cannot be used as function
-// arguments (so it also cannot be used in make_tuple). in such case, we
-// can use TypeWrapper<void>{} instead
-template <class T>
-struct TypeWrapper {
-  using type = T;
-
-  constexpr auto
-  get() const {
-    return make_declval<T>();
-  }
-};
 
 ///////////////////////////////////////////////////////////////
 // Print
@@ -630,10 +581,10 @@ to_make_expr(cute::C<v> const &val) {
   return cute::move(ss).str();
 }
 
-inline std::string
-to_make_expr(bool val) {
-  return val ? "true" : "false";
-}
+// inline std::string
+// to_make_expr(bool val) {
+//   return val ? "true" : "false";
+// }
 
 inline std::string
 to_make_expr(int val) {
@@ -706,16 +657,16 @@ to_make_constexpr(EnumT const &val) {
   return cute::move(ss).str();
 }
 
-template <auto v>
-std::string
-to_make_constexpr(cute::C<v> const &val) {
-  return to_make_expr(val);
-}
+// template <auto v>
+// std::string
+// to_make_constexpr(cute::C<v> const &val) {
+//   return to_make_expr(val);
+// }
 
-inline std::string
-to_make_constexpr(bool val) {
-  return val ? "_True{}" : "_False{}";
-}
+// inline std::string
+// to_make_constexpr(bool val) {
+//   return val ? "_True{}" : "_False{}";
+// }
 
 template <class T, __CUTE_REQUIRES(cute::is_std_integral<T>::value)>
 std::string
@@ -725,11 +676,11 @@ to_make_constexpr(T val) {
   return cute::move(ss).str();
 }
 
-template <class T, __CUTE_REQUIRES(cute::is_same_v<T, Auto> or cute::is_same_v<T, None>)>
-std::string
-to_make_constexpr(T const &val) {
-  return to_make_expr(val);
-}
+// template <class T, __CUTE_REQUIRES(cute::is_same_v<T, Auto> or cute::is_same_v<T, None>)>
+// std::string
+// to_make_constexpr(T const &val) {
+//   return to_make_expr(val);
+// }
 
 template <class... T>
 std::enable_if_t<(sizeof...(T) > 0), std::string>
@@ -771,20 +722,20 @@ to_kernel_name(EnumT const &val) {
   return str;
 }
 
-inline std::string
-to_kernel_name(bool val) {
-  return val ? "true" : "false";
-}
+// inline std::string
+// to_kernel_name(bool val) {
+//   return val ? "true" : "false";
+// }
 
 inline std::string
 to_kernel_name(int val) {
   return std::to_string(val);
 }
 
-inline std::string
-to_kernel_name(long val) {
-  return std::to_string(val);
-}
+// inline std::string
+// to_kernel_name(long val) {
+//   return std::to_string(val);
+// }
 
 inline std::string
 to_kernel_name(None const &) {
@@ -1033,6 +984,7 @@ unify_type(std::variant<Ts...> const &val) {
 template <
     template <class... Ts> class Tpl,
     __CUTE_REQUIRES(detail::is_flux_named_tuple<Tpl<>>::value)>
+    
 using unified_type_t = decltype(unify_type(make_declval<Tpl<>>()));
 
 #define FLUX_DEFINE_DEFAULT_SPECIAL_FUNCS(CLS) \

@@ -106,28 +106,6 @@ function build_flux_cuda() {
     popd
 }
 
-function merge_compile_commands() {
-    cd $SCRIPT_DIR
-    if command -v ninja >/dev/null 2>&1; then
-        # generate compile_commands.json
-        ninja -f $(ls ./build/temp.*/build.ninja) -t compdb >build/compile_commands_ths_op.json
-        cat >build/merge_compile_commands.py <<EOF
-import json
-with open("build/compile_commands.json") as f:
-    cmds = json.load(f)
-with open("build/compile_commands_ths_op.json") as f:
-    cmds_ths_op = json.load(f)
-with open("build/compile_commands.json", "w") as f:
-    json.dump(cmds+cmds_ths_op, f, indent=2)
-EOF
-
-        python3 build/merge_compile_commands.py
-        echo "merge compile_commands.json done"
-    else
-        echo "Ninja is not installed. Ninja is required for flux_ths_pybind's compile_commands.json. run 'pip3 install ninja'"
-    fi
-}
-
 function build_flux_py {
     LIBDIR=${PROJECT_ROOT}/python/flux/lib
     mkdir -p ${LIBDIR}
@@ -141,8 +119,6 @@ function build_flux_py {
         MAX_JOBS=${JOBS} python3 setup.py bdist_wheel
     fi
 }
-
-trap merge_compile_commands EXIT
 
 build_flux_cuda
 build_flux_py

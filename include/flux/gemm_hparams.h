@@ -75,35 +75,11 @@ to_gemm_v2_hparams(cute::tuple<Ts...> const &tuple) {
 }
 
 /////////////////////////////////////////////////////
-// CommOp specific gemm hparams
-/////////////////////////////////////////////////////
-/// Tunable Hyper-Parameters
-
-template <class... Ts>
-struct GatherRSHParams : FluxNamedTupleBase<GatherRSHParams, Ts...> {
-  using Base = FluxNamedTupleBase<GatherRSHParams, Ts...>;
-  using Base::Base;
-
-  static constexpr char const *Name = "GatherRSHParams";
-  static constexpr char const *LowerName = "gather_rs_hparams";
-  static constexpr std::array<char const *, 2> Fields = {"gather_rs_ctas", "n_dim_per_split"};
-
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(gather_rs_ctas, 0)
-  FLUX_NAMED_TUPLE_DEFINE_FIELD(n_dim_per_split, 1)
-
-  friend GatherRSHParams<int, int>
-  unify_type(GatherRSHParams const &obj) {
-    return cute::make_tuple(int(obj.gather_rs_ctas()), int(obj.n_dim_per_split()));
-  }
-};
-
-/////////////////////////////////////////////////////
 // GemmHParams: params can change for better
 // better performance
 /////////////////////////////////////////////////////
 using UnifiedImplHParams =
     std::variant<None, unified_type_t<GemmV2HParams>>;
-using UnifiedCommHParams = std::variant<None, unified_type_t<GatherRSHParams>>;
 
 template <class... Ts>
 struct GemmHParams : FluxNamedTupleBase<GemmHParams, Ts...> {
