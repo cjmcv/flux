@@ -1,4 +1,4 @@
-//===- test_gemm_only.cc ------------------------------------------ C++ ---===//
+//===- test_single_gemm.cc ------------------------------------------ C++ ---===//
 //
 // Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,7 +30,7 @@ namespace bytedance::flux {
 // 这里临时注册配置进行手动调优，前提是对应shape在其他地方没有被注册
 // 同时，各种参数的组合必须是 registers 搜索空间里能找到的
 // using namespace cute;
-// static int config_gemm_only_sm89_2 = []() {
+// static int config_single_gemm_sm89_2 = []() {
 //   auto &inst = TuningConfigRegistry::instance();
 //   inst.add(make_gemm_meta(make_gemm_dtype_config(_BF16{}(),_BF16{}(),_Void{}(),_BF16{}(),_FP32{}(),_FP32{}()),_Sm89{}(),_RCR{}(),_GemmV2{}(),make_gemm_v2_meta(false),None{}),make_runtime_config(1,27648,5120),make_gemm_hparams(make_gemm_v2_hparams(cute::make_tuple(16l,64l,64l),cute::make_tuple(16l,8l,16l),_StreamkDP{}()),None{},cute::make_tuple(32l,128l,64l),_GemmStreamK{}(),3,_RasterHeuristic{}()));
 // return 0;
@@ -38,7 +38,7 @@ namespace bytedance::flux {
 
 template <class DType>
 void
-run_gemm_only(int m, int n, int k) {
+run_single_gemm(int m, int n, int k) {
   cudaSetDevice(0);
   auto arch = get_arch();
 
@@ -129,13 +129,13 @@ main(int argc, char *argv[]) {
     using namespace bytedance::flux;
     if (dtype == "FP8" or dtype == "fp8") {
       assert((int)get_arch() > (int)_Sm80{}());
-      bytedance::flux::run_gemm_only<decltype(make_gemm_dtype_config(
+      bytedance::flux::run_single_gemm<decltype(make_gemm_dtype_config(
           _E4M3{}, _E4M3{}, _BF16{}, _BF16{}))>(m, n, k);
     } else if (dtype == "FP16" or dtype == "fp16") {
-      bytedance::flux::run_gemm_only<decltype(make_gemm_dtype_config(
+      bytedance::flux::run_single_gemm<decltype(make_gemm_dtype_config(
           _FP16{}, _FP16{}, _Void{}, _FP16{}))>(m, n, k);
     } else if (dtype == "BF16" or dtype == "bf16") {
-      bytedance::flux::run_gemm_only<decltype(make_gemm_dtype_config(
+      bytedance::flux::run_single_gemm<decltype(make_gemm_dtype_config(
           _BF16{}, _BF16{}, _Void{}, _BF16{}))>(m, n, k);
     } else {
       FLUX_CHECK(false) << "unsupported dtype: " << dtype;

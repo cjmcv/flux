@@ -10,8 +10,8 @@ target_link_libraries(test_flux_templates PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 add_executable(test_tuning test_tuning.cc)
 target_link_libraries(test_tuning PUBLIC flux_cuda_ths_op)
 
-add_executable(test_gemm_only test_gemm_only.cc)
-target_link_libraries(test_gemm_only PUBLIC flux_cuda_ths_op)
+add_executable(test_single_gemm test_single_gemm.cc)
+target_link_libraries(test_single_gemm PUBLIC flux_cuda_ths_op)
 
 add_executable(test_gemv_only test_gemv_only.cu)
 target_link_libraries(test_gemv_only PUBLIC flux_cuda_ths_op)

@@ -23,7 +23,7 @@ namespace bytedance::flux::ths_op {
 namespace py = pybind11;
 using SingleGemmCls = TorchClassWrapper<SingleGemm>;
 
-static int _register_gemm_only_ops [[maybe_unused]] = []() {
+static int _register_single_gemm_ops [[maybe_unused]] = []() {
   ThsOpsInitRegistry::instance().register_one("single_gemm", [](py::module &m) {
     py::class_<SingleGemmCls>(m, "SingleGemm")
         .def(

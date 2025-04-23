@@ -52,7 +52,7 @@ class TuningConfig:
 
 def gen_tuning_space():
     space: List[TuningConfig] = []
-    space_M = list(range(1, 101)) #  [1024, 2048, 4096, 8192] # , 16384
+    space_M = list(range(1, 11)) #  [1024, 2048, 4096, 8192] # , 16384
     space_NK = [(27648,5120)] # (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     space_transpose_weight = [False] # , True
     space_dtype = [torch.bfloat16] # , torch.float16
@@ -130,7 +130,7 @@ if __name__ == "__main__":
         raise Exception(f"{args.output_dir} not exist")
 
     arch: int = flux.get_arch()
-    name: str = f"config_gemm_only_sm{arch}"
+    name: str = f"config_single_gemm_sm{arch}"
     prof_ctx = flux.ProfilingContext(name)
     config_space = gen_tuning_space()
     for i, config in enumerate(config_space):
