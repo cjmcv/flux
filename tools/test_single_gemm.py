@@ -181,7 +181,7 @@ def perf_flux(
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
     ## TODO: remove below once moe fp8 gemm invoke get fixed
-    op = flux.GemmOnly(
+    op = flux.SingleGemm(
         input_dtype=inputs[0].dtype,
         output_dtype=output_dtype,
         transpose_weight=transpose_weight

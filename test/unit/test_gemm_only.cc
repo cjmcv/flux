@@ -24,7 +24,7 @@
 #include "cutlass/util/device_memory.h"
 #include "cutlass/profiler/device_allocation.h"
 
-#include "flux/args/comm_none.h"
+#include "flux/gemm_args.h"
 namespace bytedance::flux {
 
 // 这里临时注册配置进行手动调优，前提是对应shape在其他地方没有被注册
@@ -90,7 +90,7 @@ run_gemm_only(int m, int n, int k) {
   //
   auto gemm_op = OpRegistry::instance().get_op(meta, hparams);
   auto stream = nullptr;
-  const GemmOnlyArguments args{
+  const SingleGemmArguments args{
       m, n, k, 1.0, 0.0, block_A.get(), block_B.get(), block_C.get(), block_D.get()};
   int64_t workspace_size = gemm_op->get_workspace_size(args);
   workspace.reset(workspace_size);

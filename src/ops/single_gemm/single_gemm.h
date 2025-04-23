@@ -1,4 +1,4 @@
-//===- gemm_only.h ----------------------------------------------- C++ ---===//
+//===- single_gemm.h ----------------------------------------------- C++ ---===//
 //
 // Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,13 +29,13 @@
   CHECK_TYPE(x, st)
   
 namespace bytedance::flux::ths_op {
-class GemmOnly {
+class SingleGemm {
  public:
-  GemmOnly(
+  SingleGemm(
       c10::ScalarType input_dtype,
       c10::ScalarType output_dtype,
       bool transpose_weight);
-  ~GemmOnly();
+  ~SingleGemm();
 
   torch::Tensor forward(
       torch::Tensor input,
@@ -58,8 +58,8 @@ class GemmOnly {
       c10::intrusive_ptr<ProfilingContext> opt_ctx);
 
  private:
-  class GemmOnlyImpl;
-  GemmOnlyImpl *impl_ = nullptr;
+  class SingleGemmImpl;
+  SingleGemmImpl *impl_ = nullptr;
 };
 
 }  // namespace bytedance::flux::ths_op

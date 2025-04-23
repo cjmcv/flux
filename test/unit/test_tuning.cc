@@ -22,7 +22,7 @@
 #include "flux/common_cuda.h"
 #include "flux/op_registry.h"
 #include "cutlass/util/device_memory.h"
-#include "flux/args/comm_none.h"
+#include "flux/gemm_args.h"
 
 namespace bytedance::flux {
 
@@ -58,7 +58,7 @@ tuning(int m, int n, int k) {
       [&](UnifiedGemmHParams hparams) {
         auto gemm_op = OpRegistry::instance().get_op(meta, hparams);
 
-        const GemmOnlyArguments args{
+        const SingleGemmArguments args{
             m, n, k, 1.0, 0.0, block_A.get(), block_B.get(), block_C.get(), block_D.get()};
         auto ws_size = gemm_op->get_workspace_size(args);
         if (ws_size > workspace.size()) {
@@ -93,7 +93,7 @@ tuning(int m, int n, int k) {
   std::cout << std::endl;
   std::cout << "Generated config code:\n\n";
 
-  TuningConfigGenerator codegen("_config_gemm_v3_comm_none");
+  TuningConfigGenerator codegen("_config_gemm_v3_single");
   codegen.add(meta, rt_conf, *best_hparams);
   std::cout << codegen.str() << std::endl;
 }

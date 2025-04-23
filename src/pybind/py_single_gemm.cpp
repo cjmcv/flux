@@ -1,4 +1,4 @@
-//===- gemm_only.cc ----------------------------------------------- C++ ---===//
+//===- single_gemm.cc ----------------------------------------------- C++ ---===//
 //
 // Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,17 +15,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "comm_none/gemm_only.h"
+#include "ops/single_gemm/single_gemm.h"
 #include "ths_op.h"
 
 namespace bytedance::flux::ths_op {
 
 namespace py = pybind11;
-using GemmOnlyCls = TorchClassWrapper<GemmOnly>;
+using SingleGemmCls = TorchClassWrapper<SingleGemm>;
 
 static int _register_gemm_only_ops [[maybe_unused]] = []() {
-  ThsOpsInitRegistry::instance().register_one("gemm_only", [](py::module &m) {
-    py::class_<GemmOnlyCls>(m, "GemmOnly")
+  ThsOpsInitRegistry::instance().register_one("single_gemm", [](py::module &m) {
+    py::class_<SingleGemmCls>(m, "SingleGemm")
         .def(
             py::init([](torch::ScalarType input_dtype,
                         py::object py_output_dtype,
@@ -33,14 +33,14 @@ static int _register_gemm_only_ops [[maybe_unused]] = []() {
               auto output_dtype = py_output_dtype.is(py::none())
                                       ? input_dtype
                                       : torch::python::detail::py_object_to_dtype(py_output_dtype);
-              return new GemmOnlyCls(input_dtype, output_dtype, transpose_weight);
+              return new SingleGemmCls(input_dtype, output_dtype, transpose_weight);
             }),
             py::arg("input_dtype"),
             py::arg("output_dtype") = py::none(),
             py::arg("transpose_weight") = false)
         .def(
             "forward",
-            &GemmOnlyCls::forward,
+            &SingleGemmCls::forward,
             py::arg("input"),
             py::arg("weight"),
             py::arg("bias") = py::none(),
@@ -51,7 +51,7 @@ static int _register_gemm_only_ops [[maybe_unused]] = []() {
             py::arg("fast_accum") = false)
         .def(
             "profiling",
-            &GemmOnlyCls::profiling,
+            &SingleGemmCls::profiling,
             py::arg("input"),
             py::arg("weight"),
             py::arg("bias") = py::none(),

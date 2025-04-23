@@ -50,10 +50,10 @@ def _get_flux_member(member):
 ProfilingContext = flux_mod.ProfilingContext
 TuningRecord = flux_mod.TuningRecord
 
-GemmOnly = _get_flux_member("GemmOnly")
+SingleGemm = _get_flux_member("SingleGemm")
 
 __all__ = [
     "TuningRecord",
     "ProfilingContext",
-    "GemmOnly",
+    "SingleGemm",
 ]

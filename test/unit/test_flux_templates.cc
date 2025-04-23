@@ -77,7 +77,7 @@ test_gemm_meta() {
   auto unified_meta = unify_type(meta);
   FLUX_CHECK_EQ(unified_meta.dtype(), unify_type(dt_conf));
   FLUX_CHECK_EQ(unified_meta.arch(), _Sm90{}());
-  // FLUX_CHECK_EQ(unified_meta.comm_op(), _CommNone{}());
+  // FLUX_CHECK_EQ(unified_meta.comm_op(), _Single{}());
   FLUX_CHECK_EQ(unified_meta.gemm_layout(), _RCR{}());
   FLUX_CHECK_EQ(unified_meta.impl(), _GemmV3{}());
 }

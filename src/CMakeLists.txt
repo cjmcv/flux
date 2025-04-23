@@ -49,12 +49,12 @@ execute_process(
 )
 #######################################
 
-add_subdirectory(comm_none)
+add_subdirectory(ops/single_gemm)
 message(STATUS "op_targets: ${FLUX_CUDA_OP_TARGETS}")
 
 ############ flux_cuda_ths_op ################
 set(FLUX_THS_FILES ${FLUX_THS_OP_FILES})
-message(STATUS "ths_files: ${FLUX_THS_FILES}") # comm_none/gemm_only.cc
+message(STATUS "ths_files: ${FLUX_THS_FILES}") # single_gemm/single_gemm.cc
 
 add_library(flux_cuda_ths_op SHARED ${FLUX_THS_FILES})
 target_link_libraries(flux_cuda_ths_op PUBLIC CUDA::cudart CUDA::cuda_driver ${FLUX_CUDA_OP_TARGETS} ${TORCH_LIBRARIES})

@@ -75,7 +75,7 @@ def setup_pytorch_extension() -> setuptools.Extension:
 
     flux_ths_targets = [
         str(x.relative_to(root_path))  # relative path for include_package_data
-        for x in Path(root_path / "src" / "pybind").glob("*.cc")
+        for x in Path(root_path / "src" / "pybind").glob("*.cpp")
     ]
 
     from torch.utils.cpp_extension import CppExtension

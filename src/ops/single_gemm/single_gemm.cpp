@@ -1,4 +1,4 @@
-//===- gemm_only.cc ----------------------------------------------- C++ ---===//
+//===- single_gemm.cc ----------------------------------------------- C++ ---===//
 //
 // Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "gemm_only.h"
-#include "flux/args/comm_none.h"
+#include "single_gemm.h"
+#include "flux/gemm_args.h"
 #include "flux/common_cuda.h"
 #include "flux/common_torch.h"
 #include "flux/flux.h"
@@ -42,7 +42,7 @@ namespace flux {
 namespace ths_op {
 using torch::Tensor;
 
-class GemmOnly::GemmOnlyImpl {
+class SingleGemm::SingleGemmImpl {
  private:
   const c10::ScalarType input_dtype;
   const c10::ScalarType output_dtype;
@@ -148,7 +148,7 @@ class GemmOnly::GemmOnlyImpl {
     };
     
     // initialize mnk for streamk get_workspace_size
-    const GemmOnlyArguments args{
+    const SingleGemmArguments args{
       .m = m,
       .n = n,
       .k = k,
@@ -179,7 +179,7 @@ class GemmOnly::GemmOnlyImpl {
   }
 
  public:
-  GemmOnlyImpl(
+  SingleGemmImpl(
       c10::ScalarType input_dtype,
       c10::ScalarType output_dtype,
       bool transpose_weight)
@@ -299,17 +299,17 @@ class GemmOnly::GemmOnlyImpl {
   }
 };
 
-GemmOnly::GemmOnly(
+SingleGemm::SingleGemm(
     c10::ScalarType input_dtype,
     c10::ScalarType output_dtype,
     bool transpose_weight)
     : impl_(
-          new GemmOnly::GemmOnlyImpl(input_dtype, output_dtype, transpose_weight)) {}
+          new SingleGemm::SingleGemmImpl(input_dtype, output_dtype, transpose_weight)) {}
 
-GemmOnly::~GemmOnly() { delete impl_; }
+SingleGemm::~SingleGemm() { delete impl_; }
 
 torch::Tensor
-GemmOnly::forward(
+SingleGemm::forward(
     torch::Tensor input,
     torch::Tensor weight,
     c10::optional<torch::Tensor> bias,
@@ -318,7 +318,7 @@ GemmOnly::forward(
     c10::optional<torch::Tensor> weight_scale,
     c10::optional<torch::Tensor> output_scale,
     bool fast_accum) {
-  FLUX_CHECK(impl_ != nullptr) << "GemmOnly is not initialized";
+  FLUX_CHECK(impl_ != nullptr) << "SingleGemm is not initialized";
   return impl_->forward(
       std::move(input),
       std::move(weight),
@@ -330,7 +330,7 @@ GemmOnly::forward(
       fast_accum);
 }
 torch::Tensor
-GemmOnly::profiling(
+SingleGemm::profiling(
     torch::Tensor input,
     torch::Tensor weight,
     c10::optional<torch::Tensor> bias,
@@ -340,7 +340,7 @@ GemmOnly::profiling(
     c10::optional<torch::Tensor> output_scale,
     bool fast_accum,
     c10::intrusive_ptr<ProfilingContext> opt_ctx) {
-  FLUX_CHECK(impl_ != nullptr) << "GemmOnly is not initialized";
+  FLUX_CHECK(impl_ != nullptr) << "SingleGemm is not initialized";
   return impl_->profiling(
       std::move(input),
       std::move(weight),

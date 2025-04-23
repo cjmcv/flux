@@ -19,7 +19,7 @@
 
 namespace bytedance::flux {
 
-struct GemmOnlyArguments {
+struct SingleGemmArguments {
   int m;
   int n;
   int k;

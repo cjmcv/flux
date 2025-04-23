@@ -29,7 +29,7 @@ class ProfilingContext:
     def get_latest_record(self) -> TuningRecord: ...
     def get_all_records(self) -> List[TuningRecord]: ...
 
-class GemmOnly:
+class SingleGemm:
     """
     support 4 mode: FP16/BF16 mode, FP8 mode, INT8 Dequant mode, INT8 (GEMM)Only mode
 

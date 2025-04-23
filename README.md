@@ -106,7 +106,7 @@ The core dependencies of Flux are NCCL, CUTLASS, and NVSHMEM, which are located 
 Below are commands to run some basic demos once you have installed Flux successfully.
 ```bash
 # gemm only
-python3 test/python/gemm_only/test_gemm_only.py 4096 12288 6144 --dtype=float16
+python3 test/python/single_gemm/test_gemm_only.py 4096 12288 6144 --dtype=float16
 
 # all-gather fused with gemm (dense MLP layer0)
 ./launch.sh test/python/ag_gemm/test_ag_kernel.py 4096 49152 12288 --dtype=float16 --iters=10
@@ -168,5 +168,5 @@ to the related papers:
 Founded in 2023, ByteDance Seed Team is dedicated to crafting the industry's most advanced AI foundation models. The team aspires to become a world-class research team and make significant contributions to the advancement of science and society.
 
 ./build.sh --arch 89 --jobs 6
-python3 test/python/gemm_only/test_gemm_only.py 4096 12288 6144 --dtype=bfloat16
-python tools/tune_gemm_only.py
+python3 test/python/single_gemm/test_gemm_single.py 4096 12288 6144 --dtype=bfloat16
+python3 tools/tune_gemm_single.py

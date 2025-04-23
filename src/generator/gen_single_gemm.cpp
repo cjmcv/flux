@@ -1,4 +1,4 @@
-//===- gen_comm_none.cc ------------------------------------------ C++ ---===//
+//===- gen_single_gemm.cc ------------------------------------------ C++ ---===//
 //
 // Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +22,7 @@
 namespace bytedance::flux::generator {
 using namespace cute;
 
-struct GemmV2CommNone_Space {
+struct GemmV2Single_Space {
   static constexpr auto AllGemmMeta_FP16 = make_space_gemm_meta(
     //   cute::make_tuple(
     //       make_gemm_dtype_config(_FP16{}),
@@ -150,13 +150,13 @@ main(int argc, char const **args) {
     options.print_usage(std::cout) << std::endl;
     return 0;
   }
-  std::cout << "Running comm_none generator...\n";
+  std::cout << "Running single_gemm generator...\n";
   return main_template(
       options,
       {
           cute::make_tuple(
-              GemmV2CommNone_Space::get_space(),
-              std::string("flux/ops_impl/v2/gemm_v2_comm_none.hpp"),
-              std::string("GemmV2CommNone")),
+              GemmV2Single_Space::get_space(),
+              std::string("flux/ops_impl/v2/gemm_v2_single.hpp"),
+              std::string("GemmV2Single")),
       });
 }

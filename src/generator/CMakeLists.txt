@@ -17,4 +17,4 @@ include_directories(
   ${FLUX_PROJECT_DIR}/3rdparty/cutlass/tools/util/include
 )
 
-add_executable(gen_comm_none gen_comm_none.cc)
+add_executable(gen_single_gemm gen_single_gemm.cpp)

@@ -1,4 +1,4 @@
-//===- gemm_v2_comm_none.hpp -------------------------------------- C++ ---===//
+//===- gemm_v2_single.hpp -------------------------------------- C++ ---===//
 //
 // Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,16 +27,16 @@
 #include "gemm_v2_impl.hpp"
 #include "flux/gemm_hparams.h"
 #include "flux/gemm_operator_base.h"
-#include "flux/args/comm_none.h"
+#include "flux/gemm_args.h"
 
 namespace bytedance::flux {
 
 template <class GemmMetaT, class GemmHParamsT>
-struct GemmV2CommNone_Kernel : public GemmV2BaseKernel<
+struct GemmV2Single_Kernel : public GemmV2BaseKernel<
                                    GemmMetaT,
                                    GemmHParamsT,
-                                   GemmV2CommNone_Kernel<GemmMetaT, GemmHParamsT>> {
-  using Base = GemmV2BaseKernel<GemmMetaT, GemmHParamsT, GemmV2CommNone_Kernel>;
+                                   GemmV2Single_Kernel<GemmMetaT, GemmHParamsT>> {
+  using Base = GemmV2BaseKernel<GemmMetaT, GemmHParamsT, GemmV2Single_Kernel>;
   static constexpr auto meta = to_gemm_meta(GemmMetaT{});
 
   auto
@@ -47,24 +47,24 @@ struct GemmV2CommNone_Kernel : public GemmV2BaseKernel<
 };
 
 template <class GemmMetaT, class GemmHParamsT, class GemmKernelT>
-class GemmV2CommNone_Device : public GemmV2BaseDevice<
+class GemmV2Single_Device : public GemmV2BaseDevice<
                                   GemmMetaT,
                                   GemmHParamsT,
                                   GemmKernelT,
-                                  GemmV2CommNone_Device<GemmMetaT, GemmHParamsT, GemmKernelT>,
-                                  GemmV2CommNone_Kernel<GemmMetaT, GemmHParamsT>> {
+                                  GemmV2Single_Device<GemmMetaT, GemmHParamsT, GemmKernelT>,
+                                  GemmV2Single_Kernel<GemmMetaT, GemmHParamsT>> {
  public:
-  using KernelBuilder = GemmV2CommNone_Kernel<GemmMetaT, GemmHParamsT>;
+  using KernelBuilder = GemmV2Single_Kernel<GemmMetaT, GemmHParamsT>;
   using Base =
-      GemmV2BaseDevice<GemmMetaT, GemmHParamsT, GemmKernelT, GemmV2CommNone_Device, KernelBuilder>;
-  FLUX_DEFINE_DEFAULT_SPECIAL_FUNCS(GemmV2CommNone_Device)
+      GemmV2BaseDevice<GemmMetaT, GemmHParamsT, GemmKernelT, GemmV2Single_Device, KernelBuilder>;
+  FLUX_DEFINE_DEFAULT_SPECIAL_FUNCS(GemmV2Single_Device)
 
   static constexpr auto meta = to_gemm_meta(GemmMetaT{});
   static constexpr auto hparams = to_gemm_hparams(GemmHParamsT{});
   static constexpr auto dt_conf = to_gemm_dtype_config(make_gemm_dtype_config(meta.dtype()));
 
   auto
-  to_gemm_args_impl(GemmOnlyArguments const &args) const {
+  to_gemm_args_impl(SingleGemmArguments const &args) const {
     using Gemm = identity_t<decltype(this->gemm_device())>;
     using GemmArguments = typename Gemm::Arguments;
 
@@ -115,7 +115,7 @@ class GemmV2CommNone_Device : public GemmV2BaseDevice<
  public:
   auto
   to_gemm_args(std::any const &args, void *args_workspace) const {
-    return to_gemm_args_impl(std::any_cast<GemmOnlyArguments>(args));
+    return to_gemm_args_impl(std::any_cast<SingleGemmArguments>(args));
   }
 };
 }  // namespace bytedance::flux
