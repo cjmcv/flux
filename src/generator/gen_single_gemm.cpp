@@ -156,7 +156,7 @@ main(int argc, char const **args) {
       {
           cute::make_tuple(
               GemmV2Single_Space::get_space(),
-              std::string("flux/ops_impl/v2/gemm_v2_single.hpp"),
+              std::string("flux/ops_impl/v2/gemm_v2_device.h"),
               std::string("GemmV2Single")),
       });
 }

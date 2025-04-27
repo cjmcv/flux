@@ -36,6 +36,12 @@
     We assume that B0/B1 have the same shape/layout
 
 ```
+<NT> 
+1. 输入X，同时和两个矩阵一起计算，分别得到C0和C1，经过各自的尾声后得到D0和D1，再合并。
+主要针对一个矩阵计算算力用不满时，性能尤为突出。
+2. Broadcast是针对B1矩阵是一维的情况，进行广播处理。
+3. Batched将矩阵拆分成很多个小矩阵，每个小矩阵视为单独处理。
+
 D0 = epilogue0(X @ B0, C0)
 D1 = epilogue1(X @ B1, C1)
 D2 = element_wise(D0, D1)
@@ -62,7 +68,7 @@ D2 = element_wise(D0, D1)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-cutlass::gemm::GemmCoord problem_size(4096, 4096, 8192);
+cutlass::gemm::GemmCoord problem_size(1024, 1024, 2048);
 cutlass::gemm::GemmCoord batch_problem_size(321, 256, 512);
 
 constexpr int kStages = 3;
@@ -511,7 +517,7 @@ int main() {
     std::to_string(kBatchCount)
   );
 
-  return testRun(80, funcs, test_name);
+  return testRun(89, funcs, test_name);
 }
 
 
