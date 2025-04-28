@@ -459,10 +459,10 @@
  
    // Create a structure of gemm kernel arguments suitable for invoking an instance of DeviceGemmT
    auto arguments = args_from_options(device_gemm, options, options.tensor_a, options.tensor_b, options.tensor_c, options.tensor_d);
- 
+   
    // Using the arguments, query for extra workspace required for matrix multiplication computation
    size_t workspace_size = DeviceGemmT::get_workspace_size(arguments);
- 
+   printf("workspace_size = %d \n", workspace_size);
    // Allocate workspace memory
    cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
  
