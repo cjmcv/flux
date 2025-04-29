@@ -1,6 +1,7 @@
 
 #include "gemm_normal.h"
 #include "flux/ops_impl/normal/gemm_base.h"
+#include "flux/common_torch.h"
 
 #include <ATen/core/jit_type.h>
 #include <ATen/core/List.h>
@@ -48,7 +49,9 @@ public:
       c10::optional<torch::Tensor> output_scale) {
 
     GemmConfigRegister& ins = GemmConfigRegister::instance();
-    GemmBase *op = ins.getGemm({3, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)});
+    using ME = UnifiedMetaEnum;
+    // {id, arch, layout, type_a, type_b, type_c, type_d, type_}
+    GemmBase *op = ins.getGemm({3, (int8_t)ME::Sm80, (int8_t)ME::RCR, from_torch_dtype(this->input_dtype), from_torch_dtype(this->input_dtype), (int8_t)ME::Void, from_torch_dtype(this->output_dtype), (int8_t)ME::FP32});
 
     RtParams rt_params;
     get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_params);

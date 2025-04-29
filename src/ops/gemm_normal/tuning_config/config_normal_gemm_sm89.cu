@@ -6,6 +6,8 @@ namespace xop {
 using namespace cute;
 
 static int config_normal_gemm_sm89 = []() {
+  printf("init GemmConfigRegister.\n");
+
   using         ElementA    = cutlass::half_t;
   using         LayoutA     = cutlass::layout::RowMajor;
   using         ElementB    = cutlass::half_t;
@@ -14,20 +16,7 @@ static int config_normal_gemm_sm89 = []() {
   using         LayoutC     = cutlass::layout::RowMajor;
   using ElementAccumulator  = float;
  
-  // TODO: 1. 使用脚本，按meta和hparam组合成搜索空间，生成注册代码，一份meta会对应多个由不同hparam组成的op。
-  //          如 meta:   _bf16_bf16_void_bf16_fp32_fp32_sm89_rcr_gemmv2_0,
-  //             hparam: _64x64x32_16x8x16_streamksk_128x128x32_gemmstreamk_4_rasteralongn
-  //             得到的op_name是二者叠加：_bf16_bf16_void_bf16_fp32_fp32_sm89_rcr_gemmv2_0___64x64x32_16x8x16_streamksk_128x128x32_gemmstreamk_4_rasteralongn
-  //             注册时：ins.add("op_name", []() { return new op_name(); });
-  //             std::map<std::string, vector<string>> tuning_map;
-  //             vector.push_back(op_name)
-  //             tuning_map[meta_name] = vector
-  //       2. profile时对每个输入，生成其对应的meta_name，不管shape遍历其对应所有op，找到top1，重新生成注册表。
-  //          注册表中会将shape合并到meta中
-  //          std::map<std::string, string> running_map;
-  //          running_map[shape+meta_name] = op_name;
   GemmConfigRegister& ins = GemmConfigRegister::instance();
-  printf("init GemmConfigRegister.\n");
   using GemmSimt = GemmPureV2SimtDevice<ElementA, ElementB, ElementC, ElementAccumulator, LayoutA, LayoutB, LayoutC, cutlass::arch::Sm89, 1, cutlass::gemm::GemmShape<64, 64, 4>, cutlass::gemm::GemmShape<32, 16, 4>>;
   using GemmBasicSk1 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 4, 1, -1>;
   using GemmBasicSk2 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 4, 2, -1>;
@@ -45,14 +34,17 @@ static int config_normal_gemm_sm89 = []() {
 
   // 基础meta: shape(m,n,k), layout, arch, type
   // hparam: stges,shape..
-  // 1级条件：1个problem会固定layout/arch/type，没有其他选择
-  // 2级条件：在1级下，针对某个shape，配置多个hparam
-  ins.add({1, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmSimt(); });
-  ins.add({2, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmBasicSk1(); });
-  ins.add({3, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmBasicSk2(); });
-  ins.add({4, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmStreamKSk1Sm0(); });
-  ins.add({5, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmStreamKSk1Sm1(); });
-  ins.add({6, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmStreamKSk2Sm0(); });
+  // 1）1个problem会固定layout/arch/type，没有其他选择, 统称为meta.
+  // 2）1个meta，会配置多个hparam。同一个meta与不同hparam组合构建op，key的0号位会设置为id号，后面接meta。
+  // 3）tuning时输入某个shape，针对其输入类型构建meta，并拼接从0开始的序列，逐一访问对应的op。
+  //    结束后得到top1的key，拆分得到id+meta，前面拼接shape+meta作为key，id+meta作为value，以value为key获取op.
+  using ME = UnifiedMetaEnum;
+  ins.add({1, (int8_t)ME::Sm80, (int8_t)ME::RCR, (int8_t)ME::FP16, (int8_t)ME::FP16, (int8_t)ME::Void, (int8_t)ME::FP16, (int8_t)ME::FP32}, []() { return new GemmSimt(); });
+  ins.add({2, (int8_t)ME::Sm80, (int8_t)ME::RCR, (int8_t)ME::FP16, (int8_t)ME::FP16, (int8_t)ME::Void, (int8_t)ME::FP16, (int8_t)ME::FP32}, []() { return new GemmBasicSk1(); });
+  ins.add({3, (int8_t)ME::Sm80, (int8_t)ME::RCR, (int8_t)ME::FP16, (int8_t)ME::FP16, (int8_t)ME::Void, (int8_t)ME::FP16, (int8_t)ME::FP32}, []() { return new GemmBasicSk2(); });
+  ins.add({4, (int8_t)ME::Sm80, (int8_t)ME::RCR, (int8_t)ME::FP16, (int8_t)ME::FP16, (int8_t)ME::Void, (int8_t)ME::FP16, (int8_t)ME::FP32}, []() { return new GemmStreamKSk1Sm0(); });
+  ins.add({5, (int8_t)ME::Sm80, (int8_t)ME::RCR, (int8_t)ME::FP16, (int8_t)ME::FP16, (int8_t)ME::Void, (int8_t)ME::FP16, (int8_t)ME::FP32}, []() { return new GemmStreamKSk1Sm1(); });
+  ins.add({6, (int8_t)ME::Sm80, (int8_t)ME::RCR, (int8_t)ME::FP16, (int8_t)ME::FP16, (int8_t)ME::Void, (int8_t)ME::FP16, (int8_t)ME::FP32}, []() { return new GemmStreamKSk2Sm0(); });
   
   return 0;
 }();

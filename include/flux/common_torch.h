@@ -17,7 +17,7 @@
 
 #pragma once
 #include "c10/util/Optional.h"
-// #include "flux/flux.h"
+#include "flux/flux.h"
 #include <torch/torch.h>
 #include <ATen/core/ivalue.h>
 #include <c10/core/ScalarType.h>
@@ -25,36 +25,37 @@
 
 namespace xop {
 
-inline DataTypeEnum
+inline int8_t
 from_torch_dtype(at::ScalarType torch_dtype) {
   switch (torch_dtype) {
     case at::ScalarType::Float: {
-      return _FP32{};
+      return (int)UnifiedMetaEnum::FP32;
     }; break;
     case at::ScalarType::Int: {
-      return _S32{};
+      return (int)UnifiedMetaEnum::S32;
     }; break;
     case at::ScalarType::Char: {
-      return _S8{};
+      return (int)UnifiedMetaEnum::S8;
     }; break;
     case at::ScalarType::Half: {
-      return _FP16{};
+      return (int)UnifiedMetaEnum::FP16;
     }; break;
     case at::ScalarType::BFloat16: {
-      return _BF16{};
+      return (int)UnifiedMetaEnum::BF16;
     }; break;
     case at::ScalarType::Float8_e4m3fn: {
-      return _E4M3{};
+      return (int)UnifiedMetaEnum::E4M3;
     }; break;
     case at::ScalarType::Float8_e5m2: {
-      return _E5M2{};
+      return (int)UnifiedMetaEnum::E5M2;
     }; break;
     default:
       throw std::runtime_error(
           std::string("unsupported torch_dtype:") + at::toString(torch_dtype));
   }
-  return DataTypeEnum{};
+  return -1;
 }
+
 
 inline at::ScalarType
 to_torch_dtype(DataTypeEnum dtype) {

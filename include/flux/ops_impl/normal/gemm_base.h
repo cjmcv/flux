@@ -13,7 +13,7 @@
 #include "cute/util/type_traits.hpp"
 
 namespace xop {
-  
+
 /////////////////////////////////////////////////////////////
 template <typename... Enums>
 using EnumTuple = std::tuple<Enums...>;
@@ -49,8 +49,8 @@ using GemmFactory = std::function<GemmBase*()>;
 // 单例类来管理 gemm_map
 class GemmConfigRegister {
 private:
-  std::map<std::vector<int>, GemmFactory> gemm_map;
-  std::map<std::vector<int>, GemmBase*> created_instances;
+  std::map<std::vector<int8_t>, GemmFactory> gemm_map;
+  std::map<std::vector<int8_t>, GemmBase*> created_instances;
 
   // 私有构造函数，防止外部实例化
   GemmConfigRegister() = default;
@@ -67,10 +67,10 @@ public:
   }
 
   void PrintRegistered(std::string loc_tag) {
-    printf("\nloc_tag: %s, map.size() = %ud \n", loc_tag.c_str(), gemm_map.size());
+    printf("\nloc_tag: %s, map.size() = %zd \n", loc_tag.c_str(), gemm_map.size());
     std::cout << "Registed gemm:" << std::endl;
     for (const auto& pair : gemm_map) {
-      printf("  size: %ud: ", pair.first.size());
+      printf("  size: %zd: ", pair.first.size());
       for (int i=0; i<pair.first.size(); i++) {
         printf("%d, ", pair.first[i]);
       }
@@ -78,11 +78,11 @@ public:
   }
 
   // 注册函数
-  void add(const std::vector<int> key, GemmFactory factory) {
+  void add(const std::vector<int8_t> &key, GemmFactory factory) {
     gemm_map[key] = factory;
   }
 
-  GemmBase* createGemm(const std::vector<int> &key) {
+  GemmBase* createGemm(const std::vector<int8_t> &key) {
     // printf("name: %s.\n", name.c_str());
     // std::cout << key << std::endl;
     auto it = gemm_map.find(key);
@@ -95,7 +95,7 @@ public:
   }
 
   // 获取 Gemm 实例，如果已存在则直接返回，不存在则创建
-  GemmBase* getGemm(const std::vector<int> key) {
+  GemmBase* getGemm(const std::vector<int8_t> key) {
     auto it = created_instances.find(key);
     if (it != created_instances.end()) {
         return it->second;

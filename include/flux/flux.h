@@ -292,6 +292,80 @@ tuple_cartesian_product(Tuples &&...tups) {
 /////////////////////////////////////////////////////
 // Enum classes
 /////////////////////////////////////////////////////
+enum class UnifiedMetaEnum : int8_t {
+  Void, FP16, BF16, FP32, E4M3, E5M2, S8, S32,    // type
+  Sm80, Sm89, Sm90,                               // arch
+  RRR, RCR, RCC                                   // layout
+};
+
+std::string MetaEnumToString(UnifiedMetaEnum value) {
+  switch (value) {
+      case UnifiedMetaEnum::Void:
+          return "Void";
+      case UnifiedMetaEnum::FP16:
+          return "FP16";
+      case UnifiedMetaEnum::BF16:
+          return "BF16";
+      case UnifiedMetaEnum::FP32:
+          return "FP32";
+      case UnifiedMetaEnum::E4M3:
+          return "E4M3";
+      case UnifiedMetaEnum::E5M2:
+          return "E5M2";
+      case UnifiedMetaEnum::S8:
+          return "S8";
+      case UnifiedMetaEnum::S32:
+          return "S32";
+      case UnifiedMetaEnum::Sm80:
+          return "Sm80";
+      case UnifiedMetaEnum::Sm89:
+          return "Sm89";
+      case UnifiedMetaEnum::Sm90:
+          return "Sm90";
+      case UnifiedMetaEnum::RRR:
+          return "RRR";
+      case UnifiedMetaEnum::RCR:
+          return "RCR";
+      case UnifiedMetaEnum::RCC:
+          return "RCC";
+      default:
+          return "Unknown";
+  }
+}
+
+enum class UnifiedHParamEnum : int8_t {
+  GemmV2, GemmV3,                    // version
+  SK, DP,                            // 
+  Heuristic, AlongM, AlongN,         // type
+  Cooperative, PingPong              // type
+};
+
+std::string HParamEnumToString(UnifiedHParamEnum value) {
+  switch (value) {
+      case UnifiedHParamEnum::GemmV2:
+          return "GemmV2";
+      case UnifiedHParamEnum::GemmV3:
+          return "GemmV3";
+      case UnifiedHParamEnum::SK:
+          return "SK";
+      case UnifiedHParamEnum::DP:
+          return "DP";
+      case UnifiedHParamEnum::Heuristic:
+          return "Heuristic";
+      case UnifiedHParamEnum::AlongM:
+          return "AlongM";
+      case UnifiedHParamEnum::AlongN:
+          return "AlongN";
+      case UnifiedHParamEnum::Cooperative:
+          return "Cooperative";
+      case UnifiedHParamEnum::PingPong:
+          return "PingPong";
+      default:
+          return "Unknown";
+  }
+}
+
+
 enum class DataTypeEnum : int8_t { Void, FP16, BF16, FP32, E4M3, E5M2, S8, S32 };
 enum class ArchEnum : int { Sm80 = 80, Sm89 = 89, Sm90 = 90 };
 
