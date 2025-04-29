@@ -51,9 +51,11 @@ ProfilingContext = flux_mod.ProfilingContext
 TuningRecord = flux_mod.TuningRecord
 
 SingleGemm = _get_flux_member("SingleGemm")
+GemmNormal = _get_flux_member("GemmNormal")
 
 __all__ = [
     "TuningRecord",
     "ProfilingContext",
     "SingleGemm",
+    "GemmNormal",
 ]

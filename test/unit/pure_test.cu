@@ -135,326 +135,11 @@
 //  #include "helper.h"
 #include <map>
 #include "flux/common_cuda.h"
-#include "named_tuple.h"
+#include "flux/ops_impl/normal/gemm_v2_impl.h"
+#include "flux/ops_impl/normal/gemm_v2_simt_impl.h"
+
 using namespace xop;
 
-/// Command line options parsing
-struct Options {
-  cutlass::gemm::GemmCoord problem_size;
-  float alpha;
-  float beta;
-
-  void *ptr_A;
-  void *ptr_B;
-  void *ptr_C;
-  void *ptr_D;
-
-  int stride_a;
-  int stride_b;
-  int stride_c;
-  int stride_d;
-  Options() : problem_size({2048, 2048, 2048}), alpha(1.0f), beta(0.0f) {}
-};
-
-
-class GemmBase {
-public:
-  virtual void initialize(Options &options) = 0;
-  virtual void run() = 0;
-};
-
-template <class LayoutA, class LayoutB, class LayoutC>
-class ImplHelper {
-public:
-  ImplHelper(int m, int n, int k): m_(m), n_(n), k_(k) {};
-
-  int get_stride_a() const {
-    if constexpr (cute::is_same_v<LayoutA, cutlass::layout::RowMajor>) {
-      return k_;
-    } else {
-      static_assert(cute::is_same_v<LayoutA, cutlass::layout::ColumnMajor>, "requires ColumnMajor.");
-      return m_;
-    }
-  }
-  int get_stride_b() const {
-    if constexpr (cute::is_same_v<LayoutB, cutlass::layout::RowMajor>) {
-      return n_;
-    } else {
-      static_assert(cute::is_same_v<LayoutB, cutlass::layout::ColumnMajor>, "requires ColumnMajor.");
-      return k_;
-    }
-  }
-  int get_stride_c() const {
-    if constexpr (cute::is_same_v<LayoutC, cutlass::layout::RowMajor>) {
-      return n_;
-    } else {
-      static_assert(cute::is_same_v<LayoutC, cutlass::layout::ColumnMajor>, "requires ColumnMajor.");
-      return m_;
-    }
-  }
-
-private:
-  int m_;
-  int n_;
-  int k_;
-};
-
-// 定义工厂函数类型
-using GemmFactory = std::function<GemmBase*()>;
-
-// 单例类来管理 gemmMap
-class GemmMapManager {
-private:
-    std::map<std::string, GemmFactory> gemmMap;
-    std::map<std::string, GemmBase*> createdInstances;
-
-    // 私有构造函数，防止外部实例化
-    GemmMapManager() = default;
-
-    // 防止拷贝构造和赋值操作
-    GemmMapManager(const GemmMapManager&) = delete;
-    GemmMapManager& operator=(const GemmMapManager&) = delete;
-
-public:
-    // 获取单例实例
-    static GemmMapManager& getInstance() {
-        static GemmMapManager instance;
-        return instance;
-    }
-
-    // 注册函数
-    void registerGemm(const std::string& name, GemmFactory factory) {
-        gemmMap[name] = factory;
-    }
-    GemmBase* createGemm(const std::string& name) {
-      auto it = gemmMap.find(name);
-      if (it != gemmMap.end()) {
-          GemmBase* instance = it->second();
-          createdInstances[name] = instance;
-          return instance;
-      }
-      throw std::runtime_error("Gemm type not found.");
-    }
-    // 获取 Gemm 实例，如果已存在则直接返回，不存在则创建
-    GemmBase* getGemm(const std::string& name) {
-        auto it = createdInstances.find(name);
-        if (it != createdInstances.end()) {
-            return it->second;
-        }
-        return createGemm(name);
-    }
-
-    // 析构时释放所有创建的实例
-    ~GemmMapManager() {
-        for (auto& pair : createdInstances) {
-            delete pair.second;
-        }
-    }
-};
-
-//////////////////////////////////////////////////////////
-template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
-          class LayoutA, class LayoutB, class LayoutC, 
-          class ArchTag, int SplitKFactor,
-          class ThreadblockShape, class WarpShape>
-class GemmPureV2SimtDevice : public GemmBase {
-
-  using EpilogueOpSimt = cutlass::epilogue::thread::LinearCombination<
-      ElementC,               // Element type for C and D matrix operands
-      1,                      // Memory access granularity of C and D matrix in units of elements
-      ElementAccumulator,     // Element type from internal accumaccumulation
-      ElementAccumulator>;    // Data type used to compute linear combination
-
-  using DeviceGemmSimt = cutlass::gemm::device::GemmUniversal<
-    ElementA, LayoutA,
-    ElementB, LayoutB,
-    ElementC, LayoutC,
-    ElementAccumulator,
-    cutlass::arch::OpClassSimt, //OperatorClass,
-    ArchTag, // ArchTag,cutlass::arch::Sm89
-    ThreadblockShape, //cutlass::gemm::GemmShape<64, 64, 4>,
-    WarpShape, //cutlass::gemm::GemmShape<32, 16, 4>,
-    cutlass::gemm::GemmShape<1, 1, 1>,
-    EpilogueOpSimt>;
-
-public:
-  typename DeviceGemmSimt::Arguments args_from_options(const Options &options) {
-
-    return typename DeviceGemmSimt::Arguments(
-      cutlass::gemm::GemmUniversalMode::kGemm,  // universal mode
-      options.problem_size,                     // problem_size
-      SplitKFactor,                             // batch count / splitk slices
-      {                                         // epilogue parameters
-        ElementAccumulator(options.alpha),
-        ElementAccumulator(options.beta)
-      },
-      options.ptr_A,                   // ptr_A
-      options.ptr_B,                   // ptr_B
-      options.ptr_C,                   // ptr_C
-      options.ptr_D,                   // ptr_D
-      options.problem_size.mk().product(),      // batch_stride_A
-      options.problem_size.nk().product(),      // batch_stride_B
-      options.problem_size.mn().product(),      // batch_stride_C
-      options.problem_size.mn().product(),      // batch_stride_D
-      options.stride_a,              // stride_a
-      options.stride_b,              // stride_b
-      options.stride_c,              // stride_c
-      options.stride_d);             // stride_d
-  }
-
-  void initialize(Options &options) {
-    gemm_dev_ = DeviceGemmSimt();
-
-    ImplHelper<LayoutA, LayoutB, LayoutC> helper(options.problem_size.m(), options.problem_size.n(), options.problem_size.k());
-    options.stride_a = helper.get_stride_a();
-    options.stride_b = helper.get_stride_b();
-    options.stride_c = helper.get_stride_c();
-    options.stride_d = helper.get_stride_c();
-
-    // Using the arguments, query for extra workspace required for matrix multiplication computation
-    auto arguments = args_from_options(options);
-    size_t workspace_size = DeviceGemmSimt::get_workspace_size(arguments);
-  
-    // Allocate workspace memory
-    cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
-  
-    // Check the problem size is supported or not
-    CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
-  
-    // Initialize CUTLASS kernel with arguments and workspace pointer
-    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace.get()));
-  }
-
-  void run() {
-    CUTLASS_CHECK(gemm_dev_());
-  }
-
-private:
-  DeviceGemmSimt gemm_dev_;
-};
-
-//////////////////////////////////////////////////////////
-template <class ElementA, class LayoutA,
-          class ElementB, class LayoutB,
-          class ElementC, class LayoutC,
-          class ElementAccumulator,
-          class ArchTag, 
-          class ThreadblockShape, class WarpShape, class InstructionShape,
-          class ThreadBlockSwizzle, int NumStages, int SplitKFactor, int AvailSms>
-class GemmPureV2Impl : public GemmBase  {
-
-  // Epilogue output operator
-  using EpilogueOp = cutlass::epilogue::thread::LinearCombination<
-      ElementC,               // Element type for C and D matrix operands
-      128 / cutlass::sizeof_bits<ElementC>::value, // Memory access granularity of C and D matrix in units of elements
-      ElementAccumulator,     // Element type from internal accumaccumulation
-      ElementAccumulator>;    // Data type used to compute linear combination
-
-  // Classic data-parallel device GEMM implementation type
-  using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<
-      ElementA, LayoutA,
-      ElementB, LayoutB,
-      ElementC, LayoutC,
-      ElementAccumulator,
-      cutlass::arch::OpClassTensorOp,
-      ArchTag,
-      ThreadblockShape,
-      WarpShape,
-      InstructionShape,
-      EpilogueOp,
-      ThreadBlockSwizzle, // cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<> / cutlass::gemm::threadblock::ThreadblockSwizzleStreamK
-      NumStages,
-      128 / cutlass::sizeof_bits<ElementA>::value,  // AlignmentA, Memory access granularity/alignment of A matrix in units of elements (up to 16 bytes)
-      128 / cutlass::sizeof_bits<ElementB>::value>; // AlignmentB
-
-public:
-  void initialize(Options &options) {
-    gemm_dev_ = DeviceGemmBasic();
-    // Using the arguments, query for extra workspace required for matrix multiplication computation
-    ImplHelper<LayoutA, LayoutB, LayoutC> helper(options.problem_size.m(), options.problem_size.n(), options.problem_size.k());
-    options.stride_a = helper.get_stride_a();
-    options.stride_b = helper.get_stride_b();
-    options.stride_c = helper.get_stride_c();
-    options.stride_d = helper.get_stride_c();
-    auto arguments = args_from_options(options);
-    size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
-  
-    // Allocate workspace memory
-    if (workspace_.size() < workspace_size)
-      workspace_.reallocate(workspace_size);
-  
-    // Check the problem size is supported or not
-    CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
-  
-    // Initialize CUTLASS kernel with arguments and workspace pointer
-    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_.get()));
-  }
-
-  void run() {
-    CUTLASS_CHECK(gemm_dev_());
-  }
-
-private:
-  // avail_sms: Number of device SMs to use is unlimited
-  //         1: Set loadbalancing width to 1 SM (no load balancing)
-  //        -1: Reset loadbalancing width to unspecified SMs (i.e., the number of device SMs)
-  typename DeviceGemmBasic::Arguments args_from_options(const Options &options) {
-    if constexpr (cute::is_same_v<ThreadBlockSwizzle, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>>) {
-      return typename DeviceGemmBasic::Arguments(
-        cutlass::gemm::GemmUniversalMode::kGemm,  // universal mode
-        options.problem_size,                     // problem_size
-        SplitKFactor,                   // batch count / splitk slices
-        {                                         // epilogue parameters
-          ElementAccumulator(options.alpha),
-          ElementAccumulator(options.beta)
-        },
-        options.ptr_A,                   // ptr_A
-        options.ptr_B,                   // ptr_B
-        options.ptr_C,                   // ptr_C
-        options.ptr_D,                   // ptr_D
-        options.problem_size.mk().product(),      // batch_stride_A
-        options.problem_size.nk().product(),      // batch_stride_B
-        options.problem_size.mn().product(),      // batch_stride_C
-        options.problem_size.mn().product(),      // batch_stride_D
-        options.stride_a,              // stride_a
-        options.stride_b,              // stride_b
-        options.stride_c,              // stride_c
-        options.stride_d);             // stride_d    
-    }
-    else {
-      return typename DeviceGemmBasic::Arguments(
-        cutlass::gemm::GemmUniversalMode::kGemm,  // universal mode
-        options.problem_size,                     // problem_size
-        SplitKFactor,                   // batch count / splitk slices
-        {                                         // epilogue parameters
-          ElementAccumulator(options.alpha),
-          ElementAccumulator(options.beta)
-        },
-        options.ptr_A,                   // ptr_A
-        options.ptr_B,                   // ptr_B
-        options.ptr_C,                   // ptr_C
-        options.ptr_D,                   // ptr_D
-        options.problem_size.mk().product(),      // batch_stride_A
-        options.problem_size.nk().product(),      // batch_stride_B
-        options.problem_size.mn().product(),      // batch_stride_C
-        options.problem_size.mn().product(),      // batch_stride_D
-        options.stride_a,              // stride_a
-        options.stride_b,              // stride_b
-        options.stride_c,              // stride_c
-        options.stride_d,              // stride_d
-        AvailSms);                                // avail_sms
-    }
-  }
-
-private:
-  DeviceGemmBasic gemm_dev_;
-  cutlass::device_memory::allocation<uint8_t> workspace_;
-};
-
- /////////////////////////////////////////////////////////////////////////////////////////////////
- /// Testbed utility types
- /////////////////////////////////////////////////////////////////////////////////////////////////
- 
 /// Result structure
 struct Result
 {
@@ -482,7 +167,7 @@ struct Result
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /// Execute a given example GEMM computation
 template <class ElementC, class LayoutC>
-Result run(GemmBase *gemm, std::string description, Options &options, int iterations, 
+Result run(GemmBase *gemm, std::string description, RtParams &rt_params, int iterations, 
            cutlass::HostTensor<ElementC, LayoutC> &tensor_d,
            cutlass::HostTensor<ElementC, LayoutC> &tensor_ref_d)
 {
@@ -494,7 +179,7 @@ Result run(GemmBase *gemm, std::string description, Options &options, int iterat
   tensor_d.sync_device();
 
   // Create a structure of gemm kernel arguments suitable for invoking an instance of DeviceGemmT
-  gemm->initialize(options);
+  gemm->initialize(rt_params);
   gemm->run();
 
   // Copy output data from CUTLASS and reference kernel to host for comparison
@@ -521,7 +206,7 @@ Result run(GemmBase *gemm, std::string description, Options &options, int iterat
     // Compute average runtime and GFLOPs.
     float elapsed_ms = timer.elapsed_millis();
     result.avg_runtime_ms = double(elapsed_ms) / double(iterations);
-    result.gflops = 2.0 * double(options.problem_size.product()) / double(1.0e9) / (result.avg_runtime_ms * 1000.0);
+    result.gflops = 2.0 * double(rt_params.m*rt_params.n*rt_params.k) / double(1.0e9) / (result.avg_runtime_ms * 1000.0);
 
     std::cout << "  Avg runtime: " << result.avg_runtime_ms << " ms" << std::endl;
     std::cout << "  GFLOPs: " << result.gflops << std::endl;
@@ -533,7 +218,46 @@ Result run(GemmBase *gemm, std::string description, Options &options, int iterat
 
   return result;
 }
+
+static int config_normal_gemm_sm89 = []() {
+  using         ElementA    = cutlass::half_t;
+  using         LayoutA     = cutlass::layout::RowMajor;
+  using         ElementB    = cutlass::half_t;
+  using         LayoutB     = cutlass::layout::ColumnMajor;
+  using         ElementC    = cutlass::half_t;
+  using         LayoutC     = cutlass::layout::RowMajor;
+  using ElementAccumulator  = cutlass::half_t;
  
+  // TODO: 1. 使用脚本，按meta和hparam组合成搜索空间，生成注册代码，一份meta会对应多个由不同hparam组成的op。
+  //          如 meta:   _bf16_bf16_void_bf16_fp32_fp32_sm89_rcr_gemmv2_0,
+  //             hparam: _64x64x32_16x8x16_streamksk_128x128x32_gemmstreamk_4_rasteralongn
+  //             得到的op_name是二者叠加：_bf16_bf16_void_bf16_fp32_fp32_sm89_rcr_gemmv2_0___64x64x32_16x8x16_streamksk_128x128x32_gemmstreamk_4_rasteralongn
+  //             注册时：ins.add("op_name", []() { return new op_name(); });
+  //             std::map<std::string, vector<string>> tuning_map;
+  //             vector.push_back(op_name)
+  //             tuning_map[meta_name] = vector
+  //       2. profile时对每个输入，生成其对应的meta_name，不管shape遍历其对应所有op，找到top1，重新生成注册表。
+  //          注册表中会将shape合并到meta中
+  //          std::map<std::string, string> running_map;
+  //          running_map[shape+meta_name] = op_name;
+  GemmConfigRegister& ins = GemmConfigRegister::instance();
+  using GemmSimt = GemmPureV2SimtDevice<ElementA, ElementB, ElementC, ElementAccumulator, LayoutA, LayoutB, LayoutC, cutlass::arch::Sm89, 1, cutlass::gemm::GemmShape<64, 64, 4>, cutlass::gemm::GemmShape<32, 16, 4>>;
+  using GemmBasicSk1 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 4, 1, -1>;
+  using GemmBasicSk2 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 4, 2, -1>;
+  using GemmStreamKSk1Sm0 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::ThreadblockSwizzleStreamK, 4, 1, -1>;
+  using GemmStreamKSk1Sm1 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::ThreadblockSwizzleStreamK, 4, 1, 1>;
+  using GemmStreamKSk2Sm0 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::ThreadblockSwizzleStreamK, 4, 2, 1>;
+
+  ins.add("GemmSimt", []() { return new GemmSimt(); });
+  ins.add("GemmBasicSk1", []() { return new GemmBasicSk1(); });
+  ins.add("GemmBasicSk2", []() { return new GemmBasicSk2(); });
+  ins.add("GemmStreamKSk1Sm0", []() { return new GemmStreamKSk1Sm0(); });
+  ins.add("GemmStreamKSk1Sm1", []() { return new GemmStreamKSk1Sm1(); });
+  ins.add("GemmStreamKSk2Sm0", []() { return new GemmStreamKSk2Sm0(); });
+  
+  return 0;
+}();
+
 /// Program entrypoint
 int main(int argc, const char **argv)
 {
@@ -577,12 +301,20 @@ int main(int argc, const char **argv)
   cutlass::HostTensor<ElementC, LayoutC> tensor_d;
   cutlass::HostTensor<ElementC, LayoutC> tensor_ref_d;
 
-  Options options;
-  tensor_a.resize(options.problem_size.mk());       // <- Create matrix A with dimensions M x K
-  tensor_b.resize(options.problem_size.kn());       // <- Create matrix B with dimensions K x N
-  tensor_c.resize(options.problem_size.mn());       // <- Create matrix C with dimensions M x N
-  tensor_d.resize(options.problem_size.mn());       // <- Create matrix D with dimensions M x N used to store output from CUTLASS kernel
-  tensor_ref_d.resize(options.problem_size.mn());   // <- Create matrix D with dimensions M x N used to store output from reference kernel
+  RtParams rt_params;
+  rt_params.m = 2048;
+  rt_params.n = 2048;
+  rt_params.k = 2048;
+
+  rt_params.alpha = 1.0f;
+  rt_params.beta = 0.0f;
+
+  cutlass::gemm::GemmCoord problem_size = {rt_params.m, rt_params.n, rt_params.k};
+  tensor_a.resize(problem_size.mk());       // <- Create matrix A with dimensions M x K
+  tensor_b.resize(problem_size.kn());       // <- Create matrix B with dimensions K x N
+  tensor_c.resize(problem_size.mn());       // <- Create matrix C with dimensions M x N
+  tensor_d.resize(problem_size.mn());       // <- Create matrix D with dimensions M x N used to store output from CUTLASS kernel
+  tensor_ref_d.resize(problem_size.mn());   // <- Create matrix D with dimensions M x N used to store output from reference kernel
 
   // Fill matrix A on host with uniform-random data [-2, 2]
   cutlass::reference::host::TensorFillRandomUniform(tensor_a.host_view(), 1, ElementA(2), ElementA(-2), 0);
@@ -601,10 +333,10 @@ int main(int argc, const char **argv)
   tensor_b.sync_device();
   tensor_c.sync_device();
 
-  options.ptr_A = tensor_a.device_data();
-  options.ptr_B = tensor_b.device_data();
-  options.ptr_C = tensor_c.device_data();
-  options.ptr_D = tensor_d.device_data();
+  rt_params.ptr_A = tensor_a.device_data();
+  rt_params.ptr_B = tensor_b.device_data();
+  rt_params.ptr_C = tensor_c.device_data();
+  rt_params.ptr_D = tensor_d.device_data();
 
   // Zero-initialize reference output matrix D
   cutlass::reference::host::TensorFill(tensor_ref_d.host_view());
@@ -627,11 +359,11 @@ using DeviceGemmReference = cutlass::reference::device::Gemm<
 
   // Launch device reference gemm kernel
   gemm_reference(
-    options.problem_size,
-    ElementAccumulator(options.alpha),
+    {rt_params.m, rt_params.n, rt_params.k},
+    ElementAccumulator(rt_params.alpha),
     tensor_a.device_ref(),
     tensor_b.device_ref(),
-    ElementAccumulator(options.beta),
+    ElementAccumulator(rt_params.beta),
     tensor_c.device_ref(),
     tensor_ref_d.device_ref());
 
@@ -641,44 +373,26 @@ using DeviceGemmReference = cutlass::reference::device::Gemm<
   // Copy output data from reference kernel to host for comparison
   tensor_ref_d.sync_host();
  
- 
-  //
   // Evaluate CUTLASS kernels
-  GemmMapManager& manager = GemmMapManager::getInstance();
-  using GemmSimt = GemmPureV2SimtDevice<ElementA, ElementB, ElementC, ElementAccumulator, LayoutA, LayoutB, LayoutC, cutlass::arch::Sm89, 1, cutlass::gemm::GemmShape<64, 64, 4>, cutlass::gemm::GemmShape<32, 16, 4>>;
-  using GemmBasicSk1 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 4, 1, -1>;
-  using GemmBasicSk2 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 4, 2, -1>;
-  using GemmStreamKSk1Sm0 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::ThreadblockSwizzleStreamK, 4, 1, -1>;
-  using GemmStreamKSk1Sm1 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::ThreadblockSwizzleStreamK, 4, 1, 1>;
-  using GemmStreamKSk2Sm0 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::ThreadblockSwizzleStreamK, 4, 2, 1>;
-
-  manager.registerGemm("GemmSimt", []() { return new GemmSimt(); });
-  manager.registerGemm("GemmBasicSk1", []() { return new GemmBasicSk1(); });
-  manager.registerGemm("GemmBasicSk2", []() { return new GemmBasicSk2(); });
-  manager.registerGemm("GemmStreamKSk1Sm0", []() { return new GemmStreamKSk1Sm0(); });
-  manager.registerGemm("GemmStreamKSk1Sm1", []() { return new GemmStreamKSk1Sm1(); });
-  manager.registerGemm("GemmStreamKSk2Sm0", []() { return new GemmStreamKSk2Sm0(); });
-
   int iterations = 2000;
-  // xop::GemmBase* gemm_simt = manager.createGemm("GemmSimt");
-  // printf("%p, %p, %p\n", manager.getGemm("GemmSimt"),manager.getGemm("GemmBasic"), manager.getGemm("GemmSimt"));
-  Result basic_simt       = run(manager.getGemm("GemmSimt"), "Basic simt GEMM", options, iterations, tensor_d, tensor_ref_d);
-  Result basic_dp         = run(manager.getGemm("GemmBasicSk1"), "Basic data-parallel GEMM", options, iterations, tensor_d, tensor_ref_d);
-  Result streamk_default  = run(manager.getGemm("GemmStreamKSk1Sm0"), "StreamK GEMM with default load-balancing", options, iterations, tensor_d, tensor_ref_d);
+  GemmConfigRegister& ins = GemmConfigRegister::instance();
+  Result basic_simt       = run(ins.getGemm("GemmSimt"), "Basic simt GEMM", rt_params, iterations, tensor_d, tensor_ref_d);
+  Result basic_dp         = run(ins.getGemm("GemmBasicSk1"), "Basic data-parallel GEMM", rt_params, iterations, tensor_d, tensor_ref_d);
+  Result streamk_default  = run(ins.getGemm("GemmStreamKSk1Sm0"), "StreamK GEMM with default load-balancing", rt_params, iterations, tensor_d, tensor_ref_d);
 
   printf("  Speedup vs Basic-DP: %.3f\n", (basic_dp.avg_runtime_ms / streamk_default.avg_runtime_ms));
 
-  Result streamk_dp       = run(manager.getGemm("GemmStreamKSk1Sm1"), "StreamK emulating basic data-parallel GEMM", options, iterations, tensor_d, tensor_ref_d);
+  Result streamk_dp       = run(ins.getGemm("GemmStreamKSk1Sm1"), "StreamK emulating basic data-parallel GEMM", rt_params, iterations, tensor_d, tensor_ref_d);
   printf("  Speedup vs Basic-DP: %.3f\n", (basic_dp.avg_runtime_ms / streamk_dp.avg_runtime_ms));
  
   // Show that StreamK can emulate "Split-K" with a tile-splitting factor
-  Result basic_splitk = run(manager.getGemm("GemmBasicSk2"), 
+  Result basic_splitk = run(ins.getGemm("GemmBasicSk2"), 
     std::string("Basic split-K GEMM with tile-splitting factor ") + std::to_string(2),
-    options, iterations, tensor_d, tensor_ref_d);
+    rt_params, iterations, tensor_d, tensor_ref_d);
 
-  Result streamk_splitk = run(manager.getGemm("GemmStreamKSk2Sm0"), 
+  Result streamk_splitk = run(ins.getGemm("GemmStreamKSk2Sm0"), 
     std::string("StreamK emulating Split-K GEMM with tile-splitting factor ") + std::to_string(2),
-    options, iterations, tensor_d, tensor_ref_d);
+    rt_params, iterations, tensor_d, tensor_ref_d);
 
   printf("  Speedup vs Basic-SplitK: %.3f\n", (basic_splitk.avg_runtime_ms / streamk_splitk.avg_runtime_ms));
  
