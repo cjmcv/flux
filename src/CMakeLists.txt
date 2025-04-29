@@ -50,7 +50,7 @@ execute_process(
 #######################################
 
 add_subdirectory(ops/gemm_normal)
-add_subdirectory(ops/single_gemm)
+# add_subdirectory(ops/single_gemm)
 message(STATUS "op_targets: ${FLUX_CUDA_OP_TARGETS}")
 
 ############ flux_cuda_ths_op ################

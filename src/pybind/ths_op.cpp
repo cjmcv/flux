@@ -16,9 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ths_op.h"
-#include "flux/tuning.h"
-// #include "ths_pybind.h"
-#include <c10/cuda/CUDAStream.h>
+// #include <c10/cuda/CUDAStream.h>
 
 namespace bytedance::flux::ths_op {
 
@@ -43,25 +41,25 @@ ThsOpsInitRegistry::initialize_all(py::module &m) const {
   }
 }
 
-void
-init_profiling_context(py::module &m) {
-  py::class_<ProfilingContext, c10::intrusive_ptr<ProfilingContext>>(m, "ProfilingContext")
-      .def(py::init<std::string>())
-      .def("get_code", &ProfilingContext::get_code)
-      .def("get_all_prof_results", &ProfilingContext::get_all_prof_results)
-      .def("get_latest_prof_result", &ProfilingContext::get_latest_prof_result)
-      .def("get_latest_record", &ProfilingContext::get_latest_record)
-      .def("get_all_records", &ProfilingContext::get_all_records);
-}
+// void
+// init_profiling_context(py::module &m) {
+//   py::class_<ProfilingContext, c10::intrusive_ptr<ProfilingContext>>(m, "ProfilingContext")
+//       .def(py::init<std::string>())
+//       .def("get_code", &ProfilingContext::get_code)
+//       .def("get_all_prof_results", &ProfilingContext::get_all_prof_results)
+//       .def("get_latest_prof_result", &ProfilingContext::get_latest_prof_result)
+//       .def("get_latest_record", &ProfilingContext::get_latest_record)
+//       .def("get_all_records", &ProfilingContext::get_all_records);
+// }
 
-void
-init_tuning_record(py::module &m) {
-  py::class_<TuningRecord, c10::intrusive_ptr<TuningRecord>>(m, "TuningRecord");
-}
+// void
+// init_tuning_record(py::module &m) {
+//   py::class_<TuningRecord, c10::intrusive_ptr<TuningRecord>>(m, "TuningRecord");
+// }
 
 PYBIND11_MODULE(FLUX_TORCH_EXTENSION_NAME, m) {
-  init_tuning_record(m);
-  init_profiling_context(m);
+  // init_tuning_record(m);
+  // init_profiling_context(m);
 
   // Initialize ops in registry
   ThsOpsInitRegistry::instance().initialize_all(m);

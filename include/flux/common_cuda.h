@@ -51,8 +51,7 @@
                                      << "(" << error << ") at: " << #status << "\n";         \
   } while (0)
 
-namespace bytedance {
-namespace flux {
+namespace xop {
  
 template <DataTypeEnum E>
 auto
@@ -180,5 +179,4 @@ struct GpuTimer {
   }
 };
 
-}  // namespace flux
-}  // namespace bytedance
+}  // namespace xop

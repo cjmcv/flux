@@ -46,8 +46,7 @@
 #define FLUX_UNLIKELY(x) (__builtin_expect(!!(x), 0))
 #endif
 
-namespace bytedance {
-namespace flux {
+namespace xop {
 
 using index_t = int64_t;
 
@@ -79,12 +78,12 @@ class CheckFail {
 // Note that this can only be used in host code
 #define FLUX_CHECK(condition)            \
   if (!(condition))                      \
-  ::bytedance::flux::detail::CheckFail() \
+  ::xop::detail::CheckFail() \
       << __FILE__ << ":" << __LINE__ << " Check failed: " #condition ". "
 
 #define FLUX_CHECK_BINOP(lhs, rhs, op)                                                            \
   if (auto x = (lhs), y = (decltype(x))(rhs); FLUX_UNLIKELY(!(x op y)))                           \
-  ::bytedance::flux::detail::CheckFail() << __FILE__ << ":" << __LINE__ << " Check failed: " << x \
+  ::xop::detail::CheckFail() << __FILE__ << ":" << __LINE__ << " Check failed: " << x \
                                          << "(" #lhs ") " #op " " << y << "(" #rhs ")"
 
 #define FLUX_CHECK_EQ(lhs, rhs) FLUX_CHECK_BINOP((lhs), (rhs), ==)
@@ -95,7 +94,7 @@ class CheckFail {
 #define FLUX_CHECK_GE(lhs, rhs) FLUX_CHECK_BINOP((lhs), (rhs), >=)
 #define FLUX_CHECK_DIV(lhs, rhs)                                                                  \
   if (auto x = (lhs), y = (decltype(x))(rhs); FLUX_UNLIKELY(x % y != 0))                          \
-  ::bytedance::flux::detail::CheckFail() << __FILE__ << ":" << __LINE__ << " Check failed: " << x \
+  ::xop::detail::CheckFail() << __FILE__ << ":" << __LINE__ << " Check failed: " << x \
                                          << "(" #lhs ") % " << y << "(" #rhs ") != 0"
 
 // Convert T&,T&&, const T&... to basic T
@@ -994,5 +993,4 @@ using unified_type_t = decltype(unify_type(make_declval<Tpl<>>()));
   CLS &operator=(const CLS &) = default;       \
   CLS &operator=(CLS &&) = default;
 
-}  // namespace flux
-}  // namespace bytedance
+}  // namespace xop

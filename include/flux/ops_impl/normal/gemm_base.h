@@ -13,65 +13,7 @@
 #include "cute/util/type_traits.hpp"
 
 namespace xop {
-
-
-/////////////////////////////////////////////////////
-// Enum classes
-/////////////////////////////////////////////////////
-enum class DataTypeEnum : int8_t { Void, FP16, BF16, FP32, E4M3, E5M2, S8, S32 };
-enum class ArchEnum : int { Sm80 = 80, Sm89 = 89, Sm90 = 90 };
-
-enum class GemmLayoutEnum : int8_t { RRR, RCR, RCC };
-enum class ImplEnum : int8_t { GemmV2, GemmV3 };
-
-enum class GemmKindEnum : int8_t { GemmDefault, GemmStreamK };
-
-enum class GemmStreamkModeEnum : int8_t { SK, DP };
-enum class GemmRasterOrderEnum : int8_t { Heuristic, AlongM, AlongN };
-
-enum class GemmKernelScheduleEnum : int8_t { Cooperative, PingPong };
-
-/////////////////////////////////////////////////////
-// Aliases for constant types
-/////////////////////////////////////////////////////
-using _GemmDefault = cute::C<GemmKindEnum::GemmDefault>;
-using _GemmStreamK = cute::C<GemmKindEnum::GemmStreamK>;
-
-using _Void = cute::C<DataTypeEnum::Void>;
-using _FP32 = cute::C<DataTypeEnum::FP32>;
-using _FP16 = cute::C<DataTypeEnum::FP16>;
-using _BF16 = cute::C<DataTypeEnum::BF16>;
-using _E4M3 = cute::C<DataTypeEnum::E4M3>;
-using _E5M2 = cute::C<DataTypeEnum::E5M2>;
-using _S32 = cute::C<DataTypeEnum::S32>;
-using _S8 = cute::C<DataTypeEnum::S8>;
-
-using _RRR = cute::C<GemmLayoutEnum::RRR>;
-using _RCR = cute::C<GemmLayoutEnum::RCR>;
-using _RCC = cute::C<GemmLayoutEnum::RCC>;
-
-using _Sm80 = cute::C<ArchEnum::Sm80>;
-using _Sm89 = cute::C<ArchEnum::Sm89>;
-using _Sm90 = cute::C<ArchEnum::Sm90>;
-
-using _GemmV2 = cute::C<ImplEnum::GemmV2>;
-using _GemmV3 = cute::C<ImplEnum::GemmV3>;
-
-using _True = cute::C<true>;
-using _False = cute::C<false>;
-
-using _StreamkSK = cute::C<GemmStreamkModeEnum::SK>;
-using _StreamkDP = cute::C<GemmStreamkModeEnum::DP>;
-using _RasterHeuristic = cute::C<GemmRasterOrderEnum::Heuristic>;
-using _RasterAlongM = cute::C<GemmRasterOrderEnum::AlongM>;
-using _RasterAlongN = cute::C<GemmRasterOrderEnum::AlongN>;
-
-using _Cooperative = cute::C<GemmKernelScheduleEnum::Cooperative>;
-using _PingPong = cute::C<GemmKernelScheduleEnum::PingPong>;
-
-// struct Auto : cute::tuple<> {};
-// struct None : cute::tuple<> {};
-
+  
 /////////////////////////////////////////////////////////////
 template <typename... Enums>
 using EnumTuple = std::tuple<Enums...>;

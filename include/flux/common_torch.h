@@ -17,18 +17,13 @@
 
 #pragma once
 #include "c10/util/Optional.h"
-#include "flux/flux.h"
-#include "flux/gemm_hparams.h"
-#include "flux/gemm_meta.h"
-#include "flux/op_registry.h"
+// #include "flux/flux.h"
 #include <torch/torch.h>
 #include <ATen/core/ivalue.h>
 #include <c10/core/ScalarType.h>
 #include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
 
-namespace bytedance {
-namespace flux {
-namespace ths_op {
+namespace xop {
 
 inline DataTypeEnum
 from_torch_dtype(at::ScalarType torch_dtype) {
@@ -92,6 +87,4 @@ to_torch_dtype(DataTypeEnum dtype) {
   return at::ScalarType::Undefined;
 }
 
-}  // namespace ths_op
-}  // namespace flux
-}  // namespace bytedance
+}  // namespace xop

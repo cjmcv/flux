@@ -43,6 +43,10 @@ static int config_normal_gemm_sm89 = []() {
   // ins.add("GemmStreamKSk1Sm1", []() { return new GemmStreamKSk1Sm1(); });
   // ins.add("GemmStreamKSk2Sm0", []() { return new GemmStreamKSk2Sm0(); });
 
+  // 基础meta: shape(m,n,k), layout, arch, type
+  // hparam: stges,shape..
+  // 1级条件：1个problem会固定layout/arch/type，没有其他选择
+  // 2级条件：在1级下，针对某个shape，配置多个hparam
   ins.add({1, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmSimt(); });
   ins.add({2, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmBasicSk1(); });
   ins.add({3, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmBasicSk2(); });
