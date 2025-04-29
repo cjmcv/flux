@@ -52,5 +52,5 @@ include_directories(${COMMON_HEADER_DIRS})
 # target_link_libraries(37_gemm_layernorm_gemm_fusion PUBLIC flux_cuda_ths_op)
 ##
 
-add_executable(pure_test pure_test.cu)# config_normal_gemm_sm89.cu
-target_link_libraries(pure_test PUBLIC flux_cuda_ths_op)
+# add_executable(pure_test pure_test.cu)# config_normal_gemm_sm89.cu
+# target_link_libraries(pure_test PUBLIC flux_cuda_ths_op)

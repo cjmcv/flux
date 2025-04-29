@@ -12,7 +12,7 @@ static int config_normal_gemm_sm89 = []() {
   using         LayoutB     = cutlass::layout::ColumnMajor;
   using         ElementC    = cutlass::half_t;
   using         LayoutC     = cutlass::layout::RowMajor;
-  using ElementAccumulator  = cutlass::half_t;
+  using ElementAccumulator  = float;
  
   // TODO: 1. 使用脚本，按meta和hparam组合成搜索空间，生成注册代码，一份meta会对应多个由不同hparam组成的op。
   //          如 meta:   _bf16_bf16_void_bf16_fp32_fp32_sm89_rcr_gemmv2_0,
@@ -35,12 +35,20 @@ static int config_normal_gemm_sm89 = []() {
   using GemmStreamKSk1Sm1 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::ThreadblockSwizzleStreamK, 4, 1, 1>;
   using GemmStreamKSk2Sm0 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::ThreadblockSwizzleStreamK, 4, 2, 1>;
 
-  ins.add("GemmSimt", []() { return new GemmSimt(); });
-  ins.add("GemmBasicSk1", []() { return new GemmBasicSk1(); });
-  ins.add("GemmBasicSk2", []() { return new GemmBasicSk2(); });
-  ins.add("GemmStreamKSk1Sm0", []() { return new GemmStreamKSk1Sm0(); });
-  ins.add("GemmStreamKSk1Sm1", []() { return new GemmStreamKSk1Sm1(); });
-  ins.add("GemmStreamKSk2Sm0", []() { return new GemmStreamKSk2Sm0(); });
+  // cute::make_tuple(_BF16{}, _Sm89{}, _RCR{});
+  // ins.add("GemmSimt", []() { return new GemmSimt(); });
+  // ins.add("GemmBasicSk1", []() { return new GemmBasicSk1(); });
+  // ins.add("GemmBasicSk2", []() { return new GemmBasicSk2(); });
+  // ins.add("GemmStreamKSk1Sm0", []() { return new GemmStreamKSk1Sm0(); });
+  // ins.add("GemmStreamKSk1Sm1", []() { return new GemmStreamKSk1Sm1(); });
+  // ins.add("GemmStreamKSk2Sm0", []() { return new GemmStreamKSk2Sm0(); });
+
+  ins.add({1, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmSimt(); });
+  ins.add({2, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmBasicSk1(); });
+  ins.add({3, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmBasicSk2(); });
+  ins.add({4, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmStreamKSk1Sm0(); });
+  ins.add({5, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmStreamKSk1Sm1(); });
+  ins.add({6, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)}, []() { return new GemmStreamKSk2Sm0(); });
   
   return 0;
 }();

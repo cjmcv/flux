@@ -25,7 +25,6 @@
   CHECK_CONTIGUOUS(x);     \
   CHECK_TYPE(x, st)
 //////////////////////////////
-
 namespace xop {
 using torch::Tensor;
 
@@ -48,9 +47,10 @@ public:
       c10::optional<torch::Tensor> weight_scale,
       c10::optional<torch::Tensor> output_scale) {
 
+    GemmConfigRegister& ins = GemmConfigRegister::instance();
+    GemmBase *op = ins.getGemm({3, int(DataTypeEnum::BF16), int(ArchEnum::Sm89), int(GemmLayoutEnum::RCR)});
+
     RtParams rt_params;
-    rt_params.alpha = 1.0f;
-    rt_params.beta = 0.0f;
     get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_params);
 
     torch::Tensor output;
@@ -59,9 +59,7 @@ public:
     } else {
       output = torch::empty({rt_params.m, rt_params.n}, weight.options().dtype(output_dtype));
     }
-    GemmConfigRegister& ins = GemmConfigRegister::instance();
-    GemmBase *op = ins.getGemm("GemmSimt");
-    
+
     op->initialize(rt_params);
     op->run();
 
@@ -194,8 +192,10 @@ private:
     rt_params.k = k;
     rt_params.ptr_A = input.data_ptr();
     rt_params.ptr_B = weight.data_ptr();
-    rt_params.ptr_C = output_buf.value().data_ptr();
-    rt_params.ptr_D = nullptr;
+    rt_params.ptr_C = nullptr;
+    rt_params.ptr_D = output_buf.value().data_ptr();
+    rt_params.alpha = 1.0f;
+    rt_params.beta = 0.0f;
   }
 
 private:

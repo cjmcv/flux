@@ -79,3 +79,33 @@ class SingleGemm:
         fast_accum: bool = False,
         prof_ctx: Optional[ProfilingContext] = None,
     ) -> torch.Tensor: ...
+
+
+class GemmNormal:
+    def __init__(
+        self,
+        input_dtype: torch.dtype,
+        output_dtype: Optional[torch.dtype] = None,
+        transpose_weight: bool = False,
+    ): ...
+    def forward(
+        self,
+        input: torch.Tensor,
+        weight: torch.Tensor,
+        bias: Optional[torch.Tensor] = None,
+        output_buf: Optional[torch.Tensor] = None,
+        input_scale: Optional[torch.Tensor] = None,
+        weight_scale: Optional[torch.Tensor] = None,
+        output_scale: Optional[torch.Tensor] = None,
+        fast_accum: bool = False,
+    ) -> torch.Tensor: ...
+    def profiling(
+        self,
+        input: torch.Tensor,
+        weight: torch.Tensor,
+        bias: Optional[torch.Tensor] = None,
+        output_buf: Optional[torch.Tensor] = None,
+        input_scale: Optional[torch.Tensor] = None,
+        weight_scale: Optional[torch.Tensor] = None,
+        output_scale: Optional[torch.Tensor] = None
+    ) -> torch.Tensor: ...
