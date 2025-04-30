@@ -49,9 +49,8 @@ public:
       c10::optional<torch::Tensor> output_scale) {
 
     GemmConfigRegister& ins = GemmConfigRegister::instance();
-    using ME = UnifiedMetaEnum;
-    // {id, arch, layout, type_a, type_b, type_c, type_d, type_}
-    GemmBase *op = ins.getGemm({3, (int8_t)ME::Sm80, (int8_t)ME::RCR, from_torch_dtype(this->input_dtype), from_torch_dtype(this->input_dtype), (int8_t)ME::Void, from_torch_dtype(this->output_dtype), (int8_t)ME::FP32});
+    
+    GemmBase *op = ins.getGemm(MakeMeta(3));
 
     RtParams rt_params;
     get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_params);
@@ -160,6 +159,23 @@ public:
   }
 
 private:
+  std::vector<int8_t> MakeMeta(int8_t id = 0) {
+    std::vector<int8_t> meta;
+    meta.resize(8);
+    meta[0] = id;                      // id
+    meta[1] = (int8_t)UnifiedMetaEnum::Normal; // meta type
+
+    meta[2] = from_torch_dtype(this->input_dtype);  // type A
+    meta[3] = from_torch_dtype(this->input_dtype);  // type B
+    meta[4] = from_torch_dtype(this->output_dtype); // type C/D
+    meta[5] = (int8_t)UnifiedMetaEnum::FP32;        // type acc
+
+    meta[6] = (int8_t)UnifiedMetaEnum::RCR;         // layout
+    meta[7] = (int8_t)UnifiedMetaEnum::Sm80;        // arch
+
+    return meta;
+  }
+
   void get_rt_conf(
       torch::Tensor input,
       torch::Tensor weight,

@@ -51,11 +51,10 @@ from_torch_dtype(at::ScalarType torch_dtype) {
     }; break;
     default:
       throw std::runtime_error(
-          std::string("unsupported torch_dtype:") + at::toString(torch_dtype));
+        std::string("unsupported torch_dtype:") + at::toString(torch_dtype));
   }
   return -1;
 }
-
 
 inline at::ScalarType
 to_torch_dtype(DataTypeEnum dtype) {

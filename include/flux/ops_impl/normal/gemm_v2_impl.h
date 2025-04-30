@@ -4,10 +4,8 @@
 
 namespace xop {
 
-template <class ElementA, class LayoutA,
-          class ElementB, class LayoutB,
-          class ElementC, class LayoutC,
-          class ElementAccumulator,
+template <class ElementA, class ElementB, class ElementC, class ElementAccumulator,
+          class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, 
           class ThreadblockShape, class WarpShape, class InstructionShape,
           class ThreadBlockSwizzle, int NumStages, int SplitKFactor, int AvailSms>
