@@ -98,14 +98,5 @@ class GemmNormal:
         weight_scale: Optional[torch.Tensor] = None,
         output_scale: Optional[torch.Tensor] = None,
         fast_accum: bool = False,
-    ) -> torch.Tensor: ...
-    def profiling(
-        self,
-        input: torch.Tensor,
-        weight: torch.Tensor,
-        bias: Optional[torch.Tensor] = None,
-        output_buf: Optional[torch.Tensor] = None,
-        input_scale: Optional[torch.Tensor] = None,
-        weight_scale: Optional[torch.Tensor] = None,
-        output_scale: Optional[torch.Tensor] = None
+        tuning_id: int = -1,
     ) -> torch.Tensor: ...

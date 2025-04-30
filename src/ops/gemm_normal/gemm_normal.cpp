@@ -39,6 +39,12 @@ public:
         output_dtype(output_dtype),
         transpose_weight(transpose_weight) {}
 
+  // tuning：tensor进入，先构建meta，依次添加序号充当key，取获取op，计算性能，并进行排序，取top5, 保留整个meta。获取不到新op时表示结束。
+  //         top1的meta从cpp端写入文件，信息包括shape+序号+meta。保存时，meta信息需要按python脚本的生成方式，转为字符串。
+  // python脚本根据tuning结果文件，再次生成op注册表+tuning注册表，
+  //       op注册表：按第一次生成的流程再走一遍，同时检索序号+meta的字符串, 匹配者留下，不匹配的不生成。
+  //       tuning注册表：key是shape+meta，value是序号，test时输入tensor，构建meta，结合shape，获取序号。组成序号+meta，充当op注册表的key，检索搜索op。
+  // python1生成搜索空间op注册表，编译，python2执行tuning脚本，生成tuned表，python1生成top1的op注册表以及tuning注册表。
   torch::Tensor forward(
       torch::Tensor input,
       torch::Tensor weight,
@@ -46,116 +52,28 @@ public:
       c10::optional<torch::Tensor> output_buf,
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
-      c10::optional<torch::Tensor> output_scale) {
+      c10::optional<torch::Tensor> output_scale,
+      bool fast_accum, int tuning_id
+    ) {
 
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     
-    GemmBase *op = ins.getGemm(MakeMeta(3));
+    bool is_tuning = true;
+    if (tuning_id == -1) {
+      is_tuning = false;
+      tuning_id = 3;
+    }
+    GemmBase *op = ins.getGemm(MakeMeta(tuning_id), is_tuning);
+    if (op == nullptr)
+      return torch::Tensor();
 
     RtParams rt_params;
-    get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_params);
-
-    torch::Tensor output;
-    if (output_buf.has_value()) {
-      output = output_buf.value();
-    } else {
-      output = torch::empty({rt_params.m, rt_params.n}, weight.options().dtype(output_dtype));
-    }
+    torch::Tensor output = get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_params);
 
     op->initialize(rt_params);
     op->run();
 
     return output;
-  }
-
-  torch::Tensor profiling(
-      torch::Tensor input,
-      torch::Tensor weight,
-      c10::optional<torch::Tensor> bias,
-      c10::optional<torch::Tensor> output_buf,
-      c10::optional<torch::Tensor> input_scale,
-      c10::optional<torch::Tensor> weight_scale,
-      c10::optional<torch::Tensor> output_scale) {
-
-    torch::Tensor output;
-    return output;
-
-    // auto meta =
-    //     unify_type(this->get_gemm_meta(/*has_bias=*/bias.has_value(), /*fast_accum=*/fast_accum));
-    // auto rt_conf = this->get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale);
-
-    // ProfilingContext tmp_ctx("__tmp__");
-    // ProfilingContext *ctx = opt_ctx == nullptr ? &tmp_ctx : opt_ctx.get();
-
-    // //
-
-    // int m = rt_conf.m();
-    // int n = rt_conf.n();
-    // int k = rt_conf.k();
-
-    // int cache_size = 100 * 1024 * 1024; // 100MB 
-    // int total_bytes = (m*k + k*n) * 4; //torch.finfo(dtype).bits // 8 # + M*N
-    // int problem_count = 1 + int((3 * cache_size) / total_bytes);
-
-    // std::vector<torch::Tensor> inputs;
-    // std::vector<torch::Tensor> weights;
-    // for (int i=0; i<problem_count; i++) {
-    //   inputs.push_back(input.clone());
-    //   weights.push_back(weight.clone());      
-    // }
-    // // for (int i=0; i<problem_count; i++) {
-    // //   printf("in: %p, ", inputs[i].data_ptr());
-    // // }
-    // // for (int i=0; i<problem_count; i++) {
-    // //   printf("w: %p, ", weights[i].data_ptr());
-    // // }
-    // printf("problem_count: %d, %d, %d.\n", problem_count, cache_size, total_bytes);
-
-    // OpRegistry::instance().visit_hparams(
-    //     [&](UnifiedGemmHParams const &hparams) {
-    //       constexpr int warm_iters = 20;
-    //       constexpr int iters = 100;
-    //       float total_elapsed = 0;
-
-    //       auto stream = c10::cuda::getCurrentCUDAStream();
-    //       for (int iter = 0; iter < warm_iters + iters; ++iter) {
-    //         int problem_idx = iter % problem_count;
-    //         GpuTimer timer;
-    //         timer.start(stream);
-    //         auto output [[maybe_unused]] = this->forward_impl(
-    //             inputs[problem_idx],
-    //             weights[problem_idx],
-    //             bias,
-    //             output_buf,
-    //             input_scale,
-    //             weight_scale,
-    //             output_scale,
-    //             fast_accum,
-    //             hparams);
-    //         timer.stop();
-    //         if (iter >= warm_iters) {
-    //           total_elapsed += timer.elapsed_millis();
-    //         }
-    //       }
-
-    //       float avg_elapsed = int(total_elapsed / iters * 1000) / 1000.0;
-    //       // printf("avg_elapsed: %f.\n", avg_elapsed);
-    //       ctx->add(meta, rt_conf, hparams, avg_elapsed);
-    //     },
-    //     meta);
-
-    // auto best_hparams = ctx->record_best(meta, rt_conf);
-
-    // return this->forward_impl(
-    //     std::move(input),
-    //     std::move(weight),
-    //     std::move(bias),
-    //     std::move(output_buf),
-    //     std::move(input_scale),
-    //     std::move(weight_scale),
-    //     std::move(output_scale),
-    //     fast_accum,
-    //     std::move(best_hparams));
   }
 
 private:
@@ -176,13 +94,14 @@ private:
     return meta;
   }
 
-  void get_rt_conf(
+  torch::Tensor get_rt_conf(
       torch::Tensor input,
       torch::Tensor weight,
       c10::optional<torch::Tensor> bias,
       c10::optional<torch::Tensor> output_buf,
       c10::optional<torch::Tensor> input_scale,
-      c10::optional<torch::Tensor> weight_scale, RtParams &rt_params) {
+      c10::optional<torch::Tensor> weight_scale,
+      RtParams &rt_params) {
     CHECK_INPUT(input, this->input_dtype);
     CHECK_INPUT(weight, this->input_dtype);
     TORCH_CHECK(input.dim() == 2, "input shape is not 2");
@@ -197,11 +116,16 @@ private:
       FLUX_CHECK_EQ(m, bias->size(0));
       FLUX_CHECK_EQ(n, bias->size(1));
     }
+    torch::Tensor output;
     if (output_buf.has_value()) {
       CHECK_INPUT(output_buf.value(), this->output_dtype);
       FLUX_CHECK_EQ(output_buf->dim(), 2);
       FLUX_CHECK_EQ(m, output_buf->size(0));
       FLUX_CHECK_EQ(n, output_buf->size(1));
+      output = output_buf.value();
+    }
+    else {
+      output = torch::empty({m, n}, weight.options().dtype(output_dtype));
     }
     int32_t wk = transpose_weight ? weight.size(0) : weight.size(1);
     FLUX_CHECK_EQ(wk, k) << "weight k-dim mismatch";
@@ -212,9 +136,11 @@ private:
     rt_params.ptr_A = input.data_ptr();
     rt_params.ptr_B = weight.data_ptr();
     rt_params.ptr_C = nullptr;
-    rt_params.ptr_D = output_buf.value().data_ptr();
+    rt_params.ptr_D = output.data_ptr();
     rt_params.alpha = 1.0f;
     rt_params.beta = 0.0f;
+
+    return output;
   }
 
 private:
@@ -239,7 +165,7 @@ torch::Tensor GemmNormal::forward(
     c10::optional<torch::Tensor> input_scale,
     c10::optional<torch::Tensor> weight_scale,
     c10::optional<torch::Tensor> output_scale,
-    bool fast_accum) {
+    bool fast_accum, int tuning_id) {
   // FLUX_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
   return impl_->forward(
       std::move(input),
@@ -248,30 +174,9 @@ torch::Tensor GemmNormal::forward(
       std::move(output_buf),
       std::move(input_scale),
       std::move(weight_scale),
-      std::move(output_scale));
-}
-// ,
-//     bool fast_accum,
-//     c10::intrusive_ptr<ProfilingContext> opt_ctx
-      // fast_accum,
-      // std::move(opt_ctx)
-torch::Tensor GemmNormal::profiling(
-    torch::Tensor input,
-    torch::Tensor weight,
-    c10::optional<torch::Tensor> bias,
-    c10::optional<torch::Tensor> output_buf,
-    c10::optional<torch::Tensor> input_scale,
-    c10::optional<torch::Tensor> weight_scale,
-    c10::optional<torch::Tensor> output_scale) {
-  FLUX_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
-  return impl_->profiling(
-      std::move(input),
-      std::move(weight),
-      std::move(bias),
-      std::move(output_buf),
-      std::move(input_scale),
-      std::move(weight_scale),
-      std::move(output_scale));
+      std::move(output_scale),
+      fast_accum, 
+      tuning_id);
 }
 
 }  // namespace xop

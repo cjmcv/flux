@@ -50,17 +50,8 @@ static int _register_single_gemm_ops [[maybe_unused]] = []() {
             py::arg("input_scale") = py::none(),
             py::arg("weight_scale") = py::none(),
             py::arg("output_scale") = py::none(),
-            py::arg("fast_accum") = false)
-        .def(
-            "profiling",
-            &GemmNormalCls::profiling,
-            py::arg("input"),
-            py::arg("weight"),
-            py::arg("bias") = py::none(),
-            py::arg("output_buf") = py::none(),
-            py::arg("input_scale") = py::none(),
-            py::arg("weight_scale") = py::none(),
-            py::arg("output_scale") = py::none());
+            py::arg("fast_accum") = false,
+            py::arg("tuning_id") = -1);
   });
   return 0;
 }();

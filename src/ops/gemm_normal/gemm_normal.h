@@ -20,15 +20,8 @@ public:
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
       c10::optional<torch::Tensor> output_scale,
-      bool fast_accum);
-  torch::Tensor profiling(
-      torch::Tensor lhs,
-      torch::Tensor rhs,
-      c10::optional<torch::Tensor> bias,
-      c10::optional<torch::Tensor> output_buf,
-      c10::optional<torch::Tensor> input_scale,
-      c10::optional<torch::Tensor> weight_scale,
-      c10::optional<torch::Tensor> output_scale);
+      bool fast_accum,
+      int tuning_id);
 
 private:
   class GemmNormalImpl;

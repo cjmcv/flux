@@ -105,8 +105,8 @@ class SearchSpaceGenerator:
         for m in meta:
             xop_meta, cutlass_meta = m
             for id, h in enumerate(hparam):
-                fp[tag].write('  ins.add({{{0},{1},{2}}}, \n'.format(str(id), xop_tag, xop_meta))
-                fp[tag].write('    []() {{ return new GemmPureV2Impl<{0},/*hparam*/{1}>();}});\n\n'.format(cutlass_meta, h))
+                fp[tag].write('  ins.add({{{0},{1},{2}}}, '.format(str(id), xop_tag, xop_meta))
+                fp[tag].write('/*op*/[]() {{ return new GemmPureV2Impl</*meta*/{0},/*hparam*/{1}>();}});\n'.format(cutlass_meta, h))
 
         fp[tag].write('return 0;\n}();\n}')
         fp[tag].write('// clang-format on')

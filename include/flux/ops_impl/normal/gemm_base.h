@@ -82,7 +82,7 @@ public:
     gemm_map[key] = factory;
   }
 
-  GemmBase* createGemm(const std::vector<int8_t> &key) {
+  GemmBase* createGemm(const std::vector<int8_t> &key, bool is_tuning = false) {
     // printf("name: %s.\n", name.c_str());
     // std::cout << key << std::endl;
     auto it = gemm_map.find(key);
@@ -91,16 +91,25 @@ public:
       created_instances[key] = instance;
       return instance;
     }
-    throw std::runtime_error("Gemm type not found.");
+    
+    if (is_tuning == false) {
+      printf("Gemm type {");
+      for (int i=0; i<key.size(); i++)
+        printf("%d-", key[i]);
+      printf("} not found.\n");
+      throw std::runtime_error("Gemm type not found.");
+    }
+
+    return nullptr;
   }
 
   // 获取 Gemm 实例，如果已存在则直接返回，不存在则创建
-  GemmBase* getGemm(const std::vector<int8_t> key) {
+  GemmBase* getGemm(const std::vector<int8_t> key, bool is_tuning = false) {
     auto it = created_instances.find(key);
     if (it != created_instances.end()) {
         return it->second;
     }
-    return createGemm(key);
+    return createGemm(key, is_tuning);
   }
 
   // 析构时释放所有创建的实例

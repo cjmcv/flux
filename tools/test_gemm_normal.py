@@ -180,13 +180,12 @@ def perf_flux(
             raise ValueError("weight_scale's shape should be (1, n) for S8 GEMM")
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
-    ## TODO: remove below once moe fp8 gemm invoke get fixed
+    ## todo: remove below once moe fp8 gemm invoke get fixed
     op = flux.GemmNormal(
         input_dtype=inputs[0].dtype,
         output_dtype=output_dtype,
         transpose_weight=transpose_weight
     )
-
     def fn(iter_id):
         problem_idx = iter_id % problem_cnt
         return op.forward(
@@ -198,6 +197,7 @@ def perf_flux(
             weight_scale=weight_scale,
             output_scale=None,
             fast_accum=False,
+            tuning_id=-1,
         )
     return perf_gemm(warmup_iters, iters, "flux", fn)
 
