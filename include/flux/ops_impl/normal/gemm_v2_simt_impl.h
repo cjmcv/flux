@@ -53,7 +53,7 @@ public:
       rt_params.stride_d);             // stride_d
   }
 
-  void initialize(RtParams &rt_params) {
+  void initialize(RtParams &rt_params, void *stream = nullptr) {
     gemm_dev_ = DeviceGemmSimt();
 
     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_params.m, rt_params.n, rt_params.k);
@@ -73,11 +73,13 @@ public:
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
   
     // Initialize CUTLASS kernel with arguments and workspace pointer
-    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace.get()));
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace.get(), cu_stream));
   }
 
-  void run() {
-    CUTLASS_CHECK(gemm_dev_());
+  void run(void *stream = nullptr) {
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    CUTLASS_CHECK(gemm_dev_.run(cu_stream));
   }
 
 private:

@@ -39,8 +39,8 @@ struct RtParams {
 
 class GemmBase {
 public:
-  virtual void initialize(RtParams &rt_params) = 0;
-  virtual void run() = 0;
+  virtual void initialize(RtParams &rt_params, void *stream = nullptr) = 0;
+  virtual void run(void *stream = nullptr) = 0;
 };
 
 // 定义工厂函数类型
@@ -104,7 +104,7 @@ public:
   }
 
   // 获取 Gemm 实例，如果已存在则直接返回，不存在则创建
-  GemmBase* getGemm(const std::vector<int8_t> key, bool is_tuning = false) {
+  GemmBase* getGemm(const std::vector<int8_t> &key, bool is_tuning = false) {
     auto it = created_instances.find(key);
     if (it != created_instances.end()) {
         return it->second;
@@ -118,6 +118,37 @@ public:
       delete pair.second;
     }
   }
+};
+
+class TunedConfigRegister {
+private:
+  std::map<std::vector<int32_t>, int32_t> tuned_map;
+
+  TunedConfigRegister() = default;
+
+  // 防止拷贝构造和赋值操作
+  TunedConfigRegister(const TunedConfigRegister&) = delete;
+  TunedConfigRegister& operator=(const TunedConfigRegister&) = delete;
+
+public:
+  static TunedConfigRegister& instance() {
+      static TunedConfigRegister instance;
+      return instance;
+  }
+
+  void add(const std::vector<int32_t> &key, int selected_id) {
+    tuned_map[key] = selected_id;
+  }
+
+  int32_t GetSelectedId(const std::vector<int32_t> &key) {
+    auto it = tuned_map.find(key);
+    if (it != tuned_map.end()) {
+      return it->second;
+    }
+    return 0;  // auto
+  }
+
+  ~TunedConfigRegister() {}
 };
 
 } // namespace xop

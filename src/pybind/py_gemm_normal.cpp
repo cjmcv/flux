@@ -50,8 +50,8 @@ static int _register_single_gemm_ops [[maybe_unused]] = []() {
             py::arg("input_scale") = py::none(),
             py::arg("weight_scale") = py::none(),
             py::arg("output_scale") = py::none(),
-            py::arg("fast_accum") = false,
-            py::arg("tuning_id") = -1);
+            py::arg("tuning") = py::none(),
+            py::arg("fast_accum") = false);
   });
   return 0;
 }();

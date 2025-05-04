@@ -196,8 +196,8 @@ def perf_flux(
             input_scale=input_scale,
             weight_scale=weight_scale,
             output_scale=None,
+            tuning = None,
             fast_accum=False,
-            tuning_id=-1,
         )
     return perf_gemm(warmup_iters, iters, "flux", fn)
 

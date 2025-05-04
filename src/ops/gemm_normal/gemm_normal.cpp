@@ -53,26 +53,47 @@ public:
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
       c10::optional<torch::Tensor> output_scale,
-      bool fast_accum, int tuning_id
+      c10::optional<torch::Tensor> tuning,
+      bool fast_accum
     ) {
 
     GemmConfigRegister& ins = GemmConfigRegister::instance();
-    
-    bool is_tuning = true;
-    if (tuning_id == -1) {
-      is_tuning = false;
-      tuning_id = 3;
-    }
-    GemmBase *op = ins.getGemm(MakeMeta(tuning_id), is_tuning);
-    if (op == nullptr)
-      return torch::Tensor();
+    TunedConfigRegister& tins = TunedConfigRegister::instance();
 
     RtParams rt_params;
     torch::Tensor output = get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_params);
+    std::vector<int8_t> id_meta = MakeMeta();     // id + meta
 
+    bool is_tuning = false;
+    int8_t selected_id = 0;
+    if (tuning.has_value()) {
+      int8_t *data = (int8_t *)tuning.value().data_ptr();
+      FLUX_CHECK_EQ(data[0], 1);
+      selected_id = data[1];
+      is_tuning = true;
+    }
+    else {
+      std::vector<int32_t> shape_meta = {rt_params.m, rt_params.n, rt_params.k};       // mnk + meta
+      shape_meta.insert(shape_meta.end(), id_meta.begin()+1, id_meta.end());
+      selected_id = tins.GetSelectedId(shape_meta);      
+    }
+    printf("selected_id: %d.\n", selected_id);
+    id_meta[0] = selected_id;
+    GemmBase *op = ins.getGemm(id_meta, is_tuning);
+    if (op == nullptr)
+      return torch::Tensor();
+
+    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
     op->initialize(rt_params);
-    op->run();
+    op->run(stream);
 
+    if (tuning.has_value()) {
+      int8_t *data = (int8_t *)tuning.value().data_ptr();
+      data[0] = id_meta.size();
+      for (int i=0; i<id_meta.size(); i++) {
+        data[i+1] = id_meta[i];
+      }
+    }
     return output;
   }
 
@@ -80,7 +101,7 @@ private:
   std::vector<int8_t> MakeMeta(int8_t id = 0) {
     std::vector<int8_t> meta;
     meta.resize(8);
-    meta[0] = id;                      // id
+    meta[0] = id;                              // id
     meta[1] = (int8_t)UnifiedMetaEnum::Normal; // meta type
 
     meta[2] = from_torch_dtype(this->input_dtype);  // type A
@@ -143,10 +164,20 @@ private:
     return output;
   }
 
+  void lazy_init_gemm_buffer(torch::Tensor input, int64_t buffer_size) {
+    if (buffer_size <= 0)
+      return;
+    buffer_size = (buffer_size + 127) / 128 * 128;
+    if (!this->gemm_buffer.defined() || buffer_size > this->gemm_buffer.numel()) {
+      this->gemm_buffer = torch::empty({buffer_size}, input.options().dtype(at::ScalarType::Byte));
+    }
+  }
+  
 private:
   const c10::ScalarType input_dtype;
   const c10::ScalarType output_dtype;
   const bool transpose_weight;
+  torch::Tensor gemm_buffer;
 };
 
 GemmNormal::GemmNormal(
@@ -165,7 +196,8 @@ torch::Tensor GemmNormal::forward(
     c10::optional<torch::Tensor> input_scale,
     c10::optional<torch::Tensor> weight_scale,
     c10::optional<torch::Tensor> output_scale,
-    bool fast_accum, int tuning_id) {
+    c10::optional<torch::Tensor> tuning,
+    bool fast_accum) {
   // FLUX_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
   return impl_->forward(
       std::move(input),
@@ -175,8 +207,8 @@ torch::Tensor GemmNormal::forward(
       std::move(input_scale),
       std::move(weight_scale),
       std::move(output_scale),
-      fast_accum, 
-      tuning_id);
+      std::move(tuning),
+      fast_accum);
 }
 
 }  // namespace xop

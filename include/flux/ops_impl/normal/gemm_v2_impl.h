@@ -36,7 +36,7 @@ class GemmPureV2Impl : public GemmBase  {
       128 / cutlass::sizeof_bits<ElementB>::value>; // AlignmentB
 
 public:
-  void initialize(RtParams &rt_params) {
+  void initialize(RtParams &rt_params, void *stream = nullptr) {
     gemm_dev_ = DeviceGemmBasic();
     // Using the arguments, query for extra workspace required for matrix multiplication computation
     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_params.m, rt_params.n, rt_params.k);
@@ -48,18 +48,22 @@ public:
     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
   
     // Allocate workspace memory
-    if (workspace_.size() < workspace_size)
-      workspace_.reallocate(workspace_size);
-  
+    printf("workspace_.size(): %d, workspace_size: %d.\n", workspace_.size(), workspace_size);
+    if (workspace_.size() < workspace_size) {
+      workspace_.reallocate(workspace_size);      
+    }
+
     // Check the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
   
     // Initialize CUTLASS kernel with arguments and workspace pointer
-    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_.get()));
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_.get(), cu_stream));
   }
 
-  void run() {
-    CUTLASS_CHECK(gemm_dev_());
+  void run(void *stream = nullptr) {
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    CUTLASS_CHECK(gemm_dev_.run(cu_stream));
   }
 
 private:

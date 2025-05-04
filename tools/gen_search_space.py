@@ -45,7 +45,7 @@ class SearchSpaceGenerator:
     
     def get_meta_space(self):
         data_type = [('FP16', 'FP16', 'FP16', 'FP32')] # a,b,cd,acc
-        layout = ['RCR', 'RRR']
+        layout = ['RCR'] # , 'RRR'
         arch = ['Sm80'] # , 'Sm89'
 
         res = []
@@ -66,23 +66,30 @@ class SearchSpaceGenerator:
         return res
 
     def get_hparam_space(self):
-        block_shapes = [(128, 128, 32)]
-        warp_shapes = [(64, 64, 32)]
-        instruction_shapes = [(16, 8, 16), (16, 8, 8)]
+        # block_shapes = [(128, 128, 32), (64, 256, 32)]
+        # warp_shapes = [(64, 64, 32)]
+        # instruction_shapes = [(16, 8, 16), (16, 8, 8)]
+        bwi_shapes = [((128, 128, 32), (64, 64, 32), (16, 8, 16)),
+                      ((64, 256, 32), (64, 64, 32), (16, 8, 16)),
+                      ((64, 128, 32), (32, 64, 32), (16, 8, 16)),
+                      ((64, 64, 32), (32, 32, 32), (16, 8, 8))]
+
         swizzles = ['Identity', 'StreamK']
         stages = [3, 4]
         splitk_factors = [1, 2]
         avail_smss = [-1, 1]
 
         res = []
-        for bshape, wsshape, ishape, swizzle, stage, splitk_factor, avail_sm in itertools.product(
-            block_shapes, warp_shapes, instruction_shapes, swizzles, stages, splitk_factors, avail_smss):
-
+        for bwi_shape, swizzle, stage, splitk_factor, avail_sm in itertools.product(
+            bwi_shapes, swizzles, stages, splitk_factors, avail_smss):
+            bshape = bwi_shape[0]
+            wshape = bwi_shape[1]
+            ishape = bwi_shape[2]
             # Ignore special case.
             if (swizzle == 'Identity' and avail_sm != 1):
                 continue
             hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
-                self.cstw(bshape), self.cstw(wsshape), self.cstw(ishape), self.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
+                self.cstw(bshape), self.cstw(wshape), self.cstw(ishape), self.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
             
             res.append(hparam_str)
         return res
@@ -108,7 +115,7 @@ class SearchSpaceGenerator:
                 fp[tag].write('  ins.add({{{0},{1},{2}}}, '.format(str(id), xop_tag, xop_meta))
                 fp[tag].write('/*op*/[]() {{ return new GemmPureV2Impl</*meta*/{0},/*hparam*/{1}>();}});\n'.format(cutlass_meta, h))
 
-        fp[tag].write('return 0;\n}();\n}')
+        fp[tag].write('  return 0;\n}();\n}')
         fp[tag].write('// clang-format on')
         
     
