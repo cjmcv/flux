@@ -1,7 +1,7 @@
 
 #include "gemm_normal.h"
-#include "flux/ops_impl/normal/gemm_base.h"
-#include "flux/common_torch.h"
+#include "ctlop/ops_impl/gemm_normal/gemm_base.h"
+#include "ctlop/common_torch.h"
 
 #include <ATen/core/jit_type.h>
 #include <ATen/core/List.h>
@@ -17,16 +17,16 @@
 #include <utility>
 
 /////////////////////////////
-#include "flux/flux.h"
-#define CHECK_TYPE(x, st) FLUX_CHECK_EQ(x.scalar_type(), st) << "Inconsistency type of Tensor " #x
-#define CHECK_CUDA(x) FLUX_CHECK(x.is_cuda()) << #x << " must be a CUDA tensor"
-#define CHECK_CONTIGUOUS(x) FLUX_CHECK(x.is_contiguous()) << #x << " must be contiguous"
+#include "ctlop/ctlop.h"
+#define CHECK_TYPE(x, st) CTLOP_CHECK_EQ(x.scalar_type(), st) << "Inconsistency type of Tensor " #x
+#define CHECK_CUDA(x) CTLOP_CHECK(x.is_cuda()) << #x << " must be a CUDA tensor"
+#define CHECK_CONTIGUOUS(x) CTLOP_CHECK(x.is_contiguous()) << #x << " must be contiguous"
 #define CHECK_INPUT(x, st) \
   CHECK_CUDA(x);           \
   CHECK_CONTIGUOUS(x);     \
   CHECK_TYPE(x, st)
 //////////////////////////////
-namespace xop {
+namespace ctlop {
 using torch::Tensor;
 
 class GemmNormal::GemmNormalImpl {
@@ -68,7 +68,7 @@ public:
     int8_t selected_id = 0;
     if (tuning.has_value()) {
       int8_t *data = (int8_t *)tuning.value().data_ptr();
-      FLUX_CHECK_EQ(data[0], 1);
+      CTLOP_CHECK_EQ(data[0], 1);
       selected_id = data[1];
       is_tuning = true;
     }
@@ -133,23 +133,23 @@ private:
 
     if (bias.has_value()) {
       CHECK_INPUT(bias.value(), this->output_dtype);
-      FLUX_CHECK_EQ(bias->dim(), 2);
-      FLUX_CHECK_EQ(m, bias->size(0));
-      FLUX_CHECK_EQ(n, bias->size(1));
+      CTLOP_CHECK_EQ(bias->dim(), 2);
+      CTLOP_CHECK_EQ(m, bias->size(0));
+      CTLOP_CHECK_EQ(n, bias->size(1));
     }
     torch::Tensor output;
     if (output_buf.has_value()) {
       CHECK_INPUT(output_buf.value(), this->output_dtype);
-      FLUX_CHECK_EQ(output_buf->dim(), 2);
-      FLUX_CHECK_EQ(m, output_buf->size(0));
-      FLUX_CHECK_EQ(n, output_buf->size(1));
+      CTLOP_CHECK_EQ(output_buf->dim(), 2);
+      CTLOP_CHECK_EQ(m, output_buf->size(0));
+      CTLOP_CHECK_EQ(n, output_buf->size(1));
       output = output_buf.value();
     }
     else {
       output = torch::empty({m, n}, weight.options().dtype(output_dtype));
     }
     int32_t wk = transpose_weight ? weight.size(0) : weight.size(1);
-    FLUX_CHECK_EQ(wk, k) << "weight k-dim mismatch";
+    CTLOP_CHECK_EQ(wk, k) << "weight k-dim mismatch";
 
     rt_params.m = m;
     rt_params.n = n;
@@ -188,7 +188,7 @@ torch::Tensor GemmNormal::forward(
     c10::optional<torch::Tensor> output_scale,
     c10::optional<torch::Tensor> tuning,
     bool fast_accum) {
-  // FLUX_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
+  // CTLOP_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
   return impl_->forward(
       std::move(input),
       std::move(weight),
@@ -201,4 +201,4 @@ torch::Tensor GemmNormal::forward(
       fast_accum);
 }
 
-}  // namespace xop
+}  // namespace ctlop

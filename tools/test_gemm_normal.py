@@ -21,8 +21,8 @@ from typing import Optional
 
 import torch
 
-import flux
-from flux.util import is_fp8_dtype
+import ctlop
+from ctlop.util import is_fp8_dtype
 
 import os
 import random
@@ -139,7 +139,7 @@ def perf_torch(
     return perf_gemm(warmup_iters, iters, "torch", fn)
 
 
-def perf_flux(
+def perf_ctlop(
     inputs: list[torch.Tensor],
     weights: list[torch.Tensor],
     bias: Optional[torch.Tensor],
@@ -181,7 +181,7 @@ def perf_flux(
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
     ## todo: remove below once moe fp8 gemm invoke get fixed
-    op = flux.GemmNormal(
+    op = ctlop.GemmNormal(
         input_dtype=inputs[0].dtype,
         output_dtype=output_dtype,
         transpose_weight=transpose_weight
@@ -199,7 +199,7 @@ def perf_flux(
             tuning = None,
             fast_accum=False,
         )
-    return perf_gemm(warmup_iters, iters, "flux", fn)
+    return perf_gemm(warmup_iters, iters, "ctlop", fn)
 
 
 def rand_tensor(shape: list[int], dtype: torch.dtype):
@@ -251,7 +251,7 @@ THRESHOLD_MAP = {
     torch.int32: 0,
 }
 
-def run(M, args, flux_perf, torch_perf):
+def run(M, args, ctlop_perf, torch_perf):
     #
     N = args.N
     K = args.K
@@ -286,7 +286,7 @@ def run(M, args, flux_perf, torch_perf):
         bias_shape = (1, N) if is_fp8 or is_s8_dequant else (M, N)
         bias = rand_tensor(bias_shape, bias_dtype)
 
-    perf_result_flux = perf_flux(
+    perf_result_ctlop = perf_ctlop(
         inputs,
         weights,
         bias,
@@ -300,7 +300,7 @@ def run(M, args, flux_perf, torch_perf):
         problem_count, 
         output_dtype,
     )
-    flux_perf.append(perf_result_flux.gemm_time_ms)
+    ctlop_perf.append(perf_result_ctlop.gemm_time_ms)
 
     perf_result_torch = perf_torch(
         inputs,
@@ -318,16 +318,16 @@ def run(M, args, flux_perf, torch_perf):
     torch_perf.append(perf_result_torch.gemm_time_ms)
 
     print(perf_result_torch)
-    print(perf_result_flux)
+    print(perf_result_ctlop)
 
-    flux_output = perf_result_flux.output
+    ctlop_output = perf_result_ctlop.output
     torch_output = perf_result_torch.output
 
-    # is_bitwise_match = flux.bitwise_check(flux_output, torch_output)
+    # is_bitwise_match = ctlop.bitwise_check(ctlop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
-    atol = THRESHOLD_MAP[flux_output.dtype]
-    rtol = THRESHOLD_MAP[flux_output.dtype]
-    flux.torch_allclose(flux_output, torch_output, atol=atol, rtol=rtol)
+    atol = THRESHOLD_MAP[ctlop_output.dtype]
+    rtol = THRESHOLD_MAP[ctlop_output.dtype]
+    ctlop.torch_allclose(ctlop_output, torch_output, atol=atol, rtol=rtol)
 
 if __name__ == "__main__":
     init_seed()
@@ -345,17 +345,17 @@ if __name__ == "__main__":
             raise ValueError("s8 gemm with dequant must in RCR layout")
 
     plot_x = list(range(1, args.M, args.step))
-    flux_perf = []
+    ctlop_perf = []
     torch_perf = []
     is_all_close = True
 
-    flux_perf = []
+    ctlop_perf = []
     torch_perf = []
     for m in range(1, args.M, args.step):
         print(f"M: {m}, N: {args.N}, K: {args.K}")
-        run(m, args, flux_perf, torch_perf)
+        run(m, args, ctlop_perf, torch_perf)
     
-    plt.plot(plot_x, flux_perf, label='flux', marker='o', markersize=3)
+    plt.plot(plot_x, ctlop_perf, label='ctlop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
 
     plt.title(f'perf-N{args.N}-K{args.K}')

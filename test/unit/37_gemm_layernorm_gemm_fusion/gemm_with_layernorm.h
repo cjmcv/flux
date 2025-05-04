@@ -61,8 +61,8 @@
 
 #include "gemm_with_epilogue_visitor.h"
 // #include "helper.h"
-#include "flux/common_cuda.h"
-using namespace bytedance::flux;
+#include "ctlop/common_cuda.h"
+using namespace ctlop;
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace cutlass {

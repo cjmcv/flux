@@ -1,14 +1,12 @@
 cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
-project(FLUX LANGUAGES C CXX CUDA)
+project(CTLOP LANGUAGES C CXX CUDA)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 
 # cmake global settings
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
-set(BUILD_THS ON CACHE INTERNAL "Build Torch op")
 set(BUILD_TEST ON CACHE INTERNAL "Build unit tests")
 set(CUTLASS_TRACE OFF CACHE INTERNAL "Print CUTLASS Host Trace info")
-set(FLUX_DEBUG OFF CACHE INTERNAL "Define FLUX_DEBUG")
 message("PYTHONPATH: ${PYTHONPATH}")
 
 # find cuda
@@ -59,11 +57,6 @@ if(CUTLASS_TRACE)
   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DCUTLASS_DEBUG_TRACE_LEVEL=1")
 endif()
 
-if(FLUX_DEBUG)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFLUX_DEBUG")
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DFLUX_DEBUG")
-endif()
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -O3")
 
@@ -71,68 +64,68 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-if(BUILD_THS)
-  message("Build THS on")
-  find_package(Python 3 REQUIRED)
-  find_program(PYTHON_EXECUTABLE NAMES python3 python)
+###################
+message("Build THS on")
+find_package(Python 3 REQUIRED)
+find_program(PYTHON_EXECUTABLE NAMES python3 python)
 
-  set(TORCH_CUDA_ARCH_LIST)
-  foreach(ARCH ${CMAKE_CUDA_ARCHITECTURES})
-    if(ARCH STREQUAL "80")
-	    list(APPEND TORCH_CUDA_ARCH_LIST "8.0")
-    elseif(ARCH STREQUAL "89")
-      list(APPEND TORCH_CUDA_ARCH_LIST "8.9")
-    elseif(ARCH STREQUAL "90")
-      list(APPEND TORCH_CUDA_ARCH_LIST "9.0")
-    else()
-      message(WARNING "Unsupported CUDA arch [${ARCH}] for TORCH_CUDA_ARCH")
-    endif()
-  endforeach()
+set(TORCH_CUDA_ARCH_LIST)
+foreach(ARCH ${CMAKE_CUDA_ARCHITECTURES})
+  if(ARCH STREQUAL "80")
+    list(APPEND TORCH_CUDA_ARCH_LIST "8.0")
+  elseif(ARCH STREQUAL "89")
+    list(APPEND TORCH_CUDA_ARCH_LIST "8.9")
+  elseif(ARCH STREQUAL "90")
+    list(APPEND TORCH_CUDA_ARCH_LIST "9.0")
+  else()
+    message(WARNING "Unsupported CUDA arch [${ARCH}] for TORCH_CUDA_ARCH")
+  endif()
+endforeach()
 
-  message(STATUS "PYTHON_EXECUTABLE is: ${PYTHON_EXECUTABLE}")
-  execute_process(COMMAND ${PYTHON_EXECUTABLE} "-c" "from __future__ import print_function; import os; import torch;
+message(STATUS "PYTHON_EXECUTABLE is: ${PYTHON_EXECUTABLE}")
+execute_process(COMMAND ${PYTHON_EXECUTABLE} "-c" "from __future__ import print_function; import os; import torch;
 print(os.path.dirname(torch.__file__),end='');"
-                  RESULT_VARIABLE _PYTHON_SUCCESS
-                  OUTPUT_VARIABLE TORCH_DIR)
-  if (NOT _PYTHON_SUCCESS MATCHES 0)
-      message("PY:${PYTHONPATH}")
-      message(FATAL_ERROR "Torch config Error.")
-  endif()
-  list(APPEND CMAKE_PREFIX_PATH ${TORCH_DIR})
-  find_package(Torch REQUIRED)
-  find_library(TORCH_PYTHON_LIBRARY torch_python PATH "${TORCH_DIR}/lib")
+                RESULT_VARIABLE _PYTHON_SUCCESS
+                OUTPUT_VARIABLE TORCH_DIR)
+if (NOT _PYTHON_SUCCESS MATCHES 0)
+    message("PY:${PYTHONPATH}")
+    message(FATAL_ERROR "Torch config Error.")
+endif()
+list(APPEND CMAKE_PREFIX_PATH ${TORCH_DIR})
+find_package(Torch REQUIRED)
+find_library(TORCH_PYTHON_LIBRARY torch_python PATH "${TORCH_DIR}/lib")
 
-  if(TORCH_CXX_FLAGS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
-  endif()
+if(TORCH_CXX_FLAGS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+endif()
 
-  execute_process(COMMAND ${PYTHON_EXECUTABLE} "-c" "from __future__ import print_function; from distutils import sysconfig;
+execute_process(COMMAND ${PYTHON_EXECUTABLE} "-c" "from __future__ import print_function; from distutils import sysconfig;
 print(sysconfig.get_python_inc());
 print(sysconfig.get_config_var('EXT_SUFFIX'));"
-                  RESULT_VARIABLE _PYTHON_SUCCESS
-                  OUTPUT_VARIABLE _PYTHON_VALUES)
-  if (NOT _PYTHON_SUCCESS MATCHES 0)
-      message("PY:${PYTHON_EXECUTABLE}")
-      message(FATAL_ERROR "Python config Error.")
-  endif()
-  string(REGEX REPLACE ";" "\\\\;" _PYTHON_VALUES ${_PYTHON_VALUES})
-  string(REGEX REPLACE "\n" ";" _PYTHON_VALUES ${_PYTHON_VALUES})
-  list(GET _PYTHON_VALUES 0 PY_INCLUDE_DIR)
-  list(GET _PYTHON_VALUES 1 PY_SUFFIX)
-  list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR})
-
-  execute_process(COMMAND ${PYTHON_EXECUTABLE} "-c"
-                  "from torch.utils import cpp_extension; import re; import torch;                                    \
-                   version = tuple(int(i) for i in re.match('(\\d+)\\.(\\d+)\\.(\\d+)', torch.__version__).groups()); \
-                   args = ([],True,False,False) if version >= (1, 8, 0) else ([],True,False);                         \
-                   print(' '.join(cpp_extension._prepare_ldflags(*args)),end='');"
-                  RESULT_VARIABLE _PYTHON_SUCCESS
-                  OUTPUT_VARIABLE TORCH_LINK)
-  message("-- TORCH_LINK ${TORCH_LINK}")
-  if (NOT _PYTHON_SUCCESS MATCHES 0)
-      message(FATAL_ERROR "PyTorch link config Error.")
-  endif()
+                RESULT_VARIABLE _PYTHON_SUCCESS
+                OUTPUT_VARIABLE _PYTHON_VALUES)
+if (NOT _PYTHON_SUCCESS MATCHES 0)
+    message("PY:${PYTHON_EXECUTABLE}")
+    message(FATAL_ERROR "Python config Error.")
 endif()
+string(REGEX REPLACE ";" "\\\\;" _PYTHON_VALUES ${_PYTHON_VALUES})
+string(REGEX REPLACE "\n" ";" _PYTHON_VALUES ${_PYTHON_VALUES})
+list(GET _PYTHON_VALUES 0 PY_INCLUDE_DIR)
+list(GET _PYTHON_VALUES 1 PY_SUFFIX)
+list(APPEND COMMON_HEADER_DIRS ${PY_INCLUDE_DIR})
+
+execute_process(COMMAND ${PYTHON_EXECUTABLE} "-c"
+                "from torch.utils import cpp_extension; import re; import torch;                                    \
+                  version = tuple(int(i) for i in re.match('(\\d+)\\.(\\d+)\\.(\\d+)', torch.__version__).groups()); \
+                  args = ([],True,False,False) if version >= (1, 8, 0) else ([],True,False);                         \
+                  print(' '.join(cpp_extension._prepare_ldflags(*args)),end='');"
+                RESULT_VARIABLE _PYTHON_SUCCESS
+                OUTPUT_VARIABLE TORCH_LINK)
+message("-- TORCH_LINK ${TORCH_LINK}")
+if (NOT _PYTHON_SUCCESS MATCHES 0)
+    message(FATAL_ERROR "PyTorch link config Error.")
+endif()
+#########################
 
 # force use sm90a for cutlass
 string(REGEX REPLACE "sm_90" "sm_90a" CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS})

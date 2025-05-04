@@ -90,11 +90,11 @@
 
 // Includes from examples directory
 // #include "helper.h"
-#include "flux/common_cuda.h"
+#include "ctlop/common_cuda.h"
 #include "hopper_fp8_commandline.hpp"
 #include "reference/host/gemm_with_groupwise_scaling.h"
 
-using namespace bytedance::flux;
+using namespace ctlop;
 using namespace cute;
 
 using ProblemShape = cutlass::gemm::GroupProblemShape<Shape<int,int,int>>; // <M,N,K> per group

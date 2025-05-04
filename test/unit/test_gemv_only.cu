@@ -58,7 +58,7 @@
 
 // #include "cutlass/test/unit/gemm/device/testbed_utils.h"
 
-#include "flux/common_cuda.h"
+#include "ctlop/common_cuda.h"
 
 #define EXPECT_TRUE 
 #define EXPECT_GT
@@ -342,7 +342,7 @@ public:
     //
     // Run the GEMV
     //
-    bytedance::flux::GpuTimer timer;
+    ctlop::GpuTimer timer;
     constexpr int warm_iters = 5;
     constexpr int iters = 10;
     status = gemm_op();

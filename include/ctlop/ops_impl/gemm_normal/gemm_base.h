@@ -13,11 +13,7 @@
 #include "cute/numeric/integral_constant.hpp"
 #include "cute/util/type_traits.hpp"
 
-namespace xop {
-
-/////////////////////////////////////////////////////////////
-template <typename... Enums>
-using EnumTuple = std::tuple<Enums...>;
+namespace ctlop {
 
 struct RtParams {
   int m;
@@ -176,4 +172,4 @@ public:
   ~TunedConfigRegister() {}
 };
 
-} // namespace xop
+} // namespace ctlop

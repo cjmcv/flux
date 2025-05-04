@@ -10,7 +10,7 @@ import numpy as np
 import time
 import torch
 
-import flux
+import ctlop
 
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 torch.use_deterministic_algorithms(True, warn_only=True)
@@ -89,7 +89,7 @@ class Meta(IntEnum):
             Meta.RCC: "RCC",
         }.get(self, "Unknown")
 
-def run_flux_profiling(input: torch.Tensor, weight: torch.Tensor, config: TuningConfig, fp):
+def run_ctlop_profiling(input: torch.Tensor, weight: torch.Tensor, config: TuningConfig, fp):
     m = input.size(0)
     k = input.size(1)
     if config.transpose_weight:
@@ -104,7 +104,7 @@ def run_flux_profiling(input: torch.Tensor, weight: torch.Tensor, config: Tuning
 
     tuning = torch.zeros(20, dtype=torch.int8, device='cpu')
     output = torch.empty([m, n], dtype=input.dtype, device=input.device, requires_grad=False)
-    op = flux.GemmNormal(input_dtype=input.dtype, output_dtype=input.dtype, transpose_weight=config.transpose_weight)
+    op = ctlop.GemmNormal(input_dtype=input.dtype, output_dtype=input.dtype, transpose_weight=config.transpose_weight)
 
     fastest_time = 99999
     fastest_id = 0
@@ -159,13 +159,13 @@ def tune_one_config(config: TuningConfig, fp):
     # start_time = time.time()
     torch_output = get_torch_output(input, weight)
     # print(f"torch compute time: {(time.time() - start_time) * 1000} ms")
-    flux_output = run_flux_profiling(input, weight, config, fp)
+    ctlop_output = run_ctlop_profiling(input, weight, config, fp)
 
     if config.dtype == torch.bfloat16:
         atol, rtol = 0.02, 0.02
     else:
         atol, rtol = 0.01, 0.01
-    flux.torch_allclose(flux_output, torch_output, atol=atol, rtol=rtol)
+    ctlop.torch_allclose(ctlop_output, torch_output, atol=atol, rtol=rtol)
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -184,16 +184,16 @@ if __name__ == "__main__":
     fp = {}
     fp[tag] = open("tuned_{0}_sm89.cu".format(tag.lower()), "w")
 
-    fp[tag].write('#include "flux/ops_impl/normal/gemm_v2_impl.h"\n')
-    fp[tag].write('#include "flux/ops_impl/normal/gemm_v2_simt_impl.h"\n\n')
-    fp[tag].write('namespace xop {\n')
+    fp[tag].write('#include "ctlop/ops_impl/gemm_normal/gemm_v2_impl.h"\n')
+    fp[tag].write('#include "ctlop/ops_impl/gemm_normal/gemm_v2_simt_impl.h"\n\n')
+    fp[tag].write('namespace ctlop {\n')
     fp[tag].write('using namespace cutlass;\n')
     fp[tag].write('using ME = UnifiedMetaEnum;\n\n')
     fp[tag].write('static int tuned_{0}_sm89 = []() {{\n'.format(tag.lower()))
     
     fp[tag].write('  TunedConfigRegister& tins = TunedConfigRegister::instance();\n')
     
-    arch: int = flux.get_arch()
+    arch: int = ctlop.get_arch()
     name: str = f"config_single_gemm_sm{arch}"
     config_space = gen_tuning_space()
     for i, config in enumerate(config_space):

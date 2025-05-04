@@ -9,14 +9,13 @@ CMAKE=${CMAKE:-cmake}
 ARCH=""
 BUILD_TEST="ON"
 BDIST_WHEEL="OFF"
-FLUX_DEBUG="OFF"
 
 function clean_py() {
     rm -rf build/lib.*
-    rm -rf python/flux/lib
+    rm -rf python/ctlop/lib
     rm -rf .eggs/
-    rm -rf python/byte_flux.egg-info
-    rm -rf python/flux_ths_pybind.*
+    rm -rf python/ctlop.egg-info
+    rm -rf python/ctlop_pybind.*
 }
 
 function clean_all() {
@@ -53,10 +52,6 @@ while [[ $# -gt 0 ]]; do
         clean_all
         exit 0
         ;;
-    --debug)
-        FLUX_DEBUG="ON"
-        shift
-        ;;
     --package)
         BDIST_WHEEL="ON"
         shift # Skip the argument key
@@ -82,23 +77,18 @@ if [[ -z $JOBS ]]; then
     JOBS=$(nproc --ignore 2)
 fi
 
-##### build flux_cuda #####
-function build_flux_cuda() {
+##### build ctlop_cuda #####
+function build_ctlop_cuda() {
     mkdir -p build
     pushd build
-    export LIBFLUX_PREFIX=${PROJECT_ROOT}/python/flux
-    if [ ! -f CMakeCache.txt ] || [ -z ${FLUX_BUILD_SKIP_CMAKE} ]; then
+    export LIBCTLOP_PREFIX=${PROJECT_ROOT}/python/ctlop
+    if [ ! -f CMakeCache.txt ] || [ -z ${CTLOP_BUILD_SKIP_CMAKE} ]; then
         CMAKE_ARGS=(
             -DCUDAARCHS=${ARCH}
             -DCMAKE_EXPORT_COMPILE_COMMANDS=1
             -DBUILD_TEST=${BUILD_TEST}
-            -DCMAKE_INSTALL_PREFIX=${LIBFLUX_PREFIX}
+            -DCMAKE_INSTALL_PREFIX=${LIBCTLOP_PREFIX}
         )
-        if [ $FLUX_DEBUG == "ON" ]; then
-            CMAKE_ARGS+=(
-                -DFLUX_DEBUG=ON
-            )
-        fi
         ${CMAKE} .. ${CMAKE_ARGS[@]}
     fi
     make -j${JOBS} VERBOSE=1
@@ -106,19 +96,19 @@ function build_flux_cuda() {
     popd
 }
 
-function build_flux_py {
-    LIBDIR=${PROJECT_ROOT}/python/flux/lib
+function build_ctlop_py {
+    LIBDIR=${PROJECT_ROOT}/python/ctlop/lib
     mkdir -p ${LIBDIR}
 
     pushd ${LIBDIR}
 
     popd
-    ##### build flux torch bindings #####
+    ##### build ctlop torch bindings #####
     MAX_JOBS=${JOBS} python3 setup.py develop --user
     if [ $BDIST_WHEEL == "ON" ]; then
         MAX_JOBS=${JOBS} python3 setup.py bdist_wheel
     fi
 }
 
-build_flux_cuda
-build_flux_py
+build_ctlop_cuda
+build_ctlop_py

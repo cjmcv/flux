@@ -50,7 +50,7 @@
 #include "cutlass/gemm/device/gemm_universal.h"
 
 #include "dual_gemm_common.h"
-#include "flux/common_cuda.h"
+#include "ctlop/common_cuda.h"
 // #include "helper.h"
 
 #define CHECK_GT(val1, val2) \

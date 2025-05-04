@@ -132,7 +132,7 @@
  #include "cutlass/util/tensor_view_io.h"
  
 //  #include "helper.h"
- #include "flux/common_cuda.h"
+ #include "ctlop/common_cuda.h"
  
  
  /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -489,7 +489,7 @@
    // Run profiling loop
    if (options.iterations > 0)
    {
-     bytedance::flux::GpuTimer timer;
+     ctlop::GpuTimer timer;
      timer.start();
      for (int iter = 0; iter < options.iterations; ++iter) {
        CUTLASS_CHECK(device_gemm());

@@ -20,7 +20,7 @@ import importlib
 import logging
 from pathlib import Path
 
-FLUX_TORCH_EXTENSION_NAME = "flux_ths_pybind"
+CTLOP_TORCH_EXTENSION_NAME = "ctlop_pybind"
 
 
 def _preload_libs(libname):
@@ -34,28 +34,22 @@ def _preload_libs(libname):
 
 
 def _load_deps():
-    _preload_libs("libflux_cuda_ths_op.so")
+    _preload_libs("libctlop.so")
 
 
 _load_deps()
-flux_mod = importlib.import_module(FLUX_TORCH_EXTENSION_NAME)
+ctlop_mod = importlib.import_module(CTLOP_TORCH_EXTENSION_NAME)
 
 
 class NotCompiled:
     pass
 
-def _get_flux_member(member):
-    return getattr(flux_mod, member, NotCompiled())
+def _get_ctlop_member(member):
+    return getattr(ctlop_mod, member, NotCompiled())
 
-# ProfilingContext = flux_mod.ProfilingContext
-# TuningRecord = flux_mod.TuningRecord
-
-SingleGemm = _get_flux_member("SingleGemm")
-GemmNormal = _get_flux_member("GemmNormal")
+SingleGemm = _get_ctlop_member("SingleGemm")
+GemmNormal = _get_ctlop_member("GemmNormal")
 
 __all__ = [
-    # "TuningRecord",
-    # "ProfilingContext",
-    "SingleGemm",
     "GemmNormal",
 ]

@@ -2,7 +2,7 @@
 #include "gemm_base.h"
 #include "params_util.h"
 
-namespace xop {
+namespace ctlop {
 
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator,
           class LayoutA, class LayoutB, class LayoutC,
@@ -120,4 +120,4 @@ private:
   DeviceGemmBasic gemm_dev_;
 };
 
-} // namespace xop
+} // namespace ctlop

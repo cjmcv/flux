@@ -1,7 +1,7 @@
-#include "flux/ops_impl/normal/gemm_v2_impl.h"
-#include "flux/ops_impl/normal/gemm_v2_simt_impl.h"
+#include "ctlop/ops_impl/gemm_normal/gemm_v2_impl.h"
+#include "ctlop/ops_impl/gemm_normal/gemm_v2_simt_impl.h"
 
-namespace xop {
+namespace ctlop {
 using namespace cutlass;
 using ME = UnifiedMetaEnum;
 

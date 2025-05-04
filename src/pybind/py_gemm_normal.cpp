@@ -18,9 +18,9 @@
 #include "ops/gemm_normal/gemm_normal.h"
 #include "ths_op.h"
 
-using namespace xop;
+using namespace ctlop;
 
-namespace bytedance::flux::ths_op {
+namespace ctlop {
 
 namespace py = pybind11;
 using GemmNormalCls = TorchClassWrapper<GemmNormal>;
@@ -55,4 +55,4 @@ static int _register_single_gemm_ops [[maybe_unused]] = []() {
   });
   return 0;
 }();
-}  // namespace xop
+}  // namespace ctlop

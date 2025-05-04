@@ -9,7 +9,7 @@ import itertools
 # print(sys.path)
 
 class SearchSpaceGenerator:
-    # xop type warp
+    # ctlop type warp
     def xtw(self, type):
         return "(int8_t)ME::" + type
     # cutlass type warp
@@ -19,7 +19,7 @@ class SearchSpaceGenerator:
     def cstw(self, shape):
         return 'cutlass::gemm::GemmShape<{0},{1},{2}>'.format(str(shape[0]), str(shape[1]), str(shape[2]))
 
-    def xop_to_cutlasstype(self, xop_type):
+    def ctlop_to_cutlasstype(self, ctlop_type):
         string_to_string = {
             "Normal": "Error",
             "Void": "Void",
@@ -41,7 +41,7 @@ class SearchSpaceGenerator:
             "StreamK": "gemm::threadblock::ThreadblockSwizzleStreamK",
         }
         # 返回对应的字符串，如果没有匹配的值，则返回"Unknown"
-        return string_to_string.get(xop_type, "Unknown")
+        return string_to_string.get(ctlop_type, "Unknown")
     
     def get_meta_space(self):
         data_type = [('FP16', 'FP16', 'FP16', 'FP32')] # a,b,cd,acc
@@ -50,19 +50,19 @@ class SearchSpaceGenerator:
 
         res = []
         for t, l, a in itertools.product(data_type, layout, arch):
-            meta_xop_str = ''
+            meta_ctlop_str = ''
             meta_cutlass_str = ''
             for ti in t:
-                meta_xop_str += self.xtw(ti) + ', '
-                meta_cutlass_str += self.xop_to_cutlasstype(ti) + ', '
+                meta_ctlop_str += self.xtw(ti) + ', '
+                meta_cutlass_str += self.ctlop_to_cutlasstype(ti) + ', '
 
-            meta_xop_str += self.xtw(l) + ', '
-            meta_cutlass_str += self.xop_to_cutlasstype(l) + ', '
+            meta_ctlop_str += self.xtw(l) + ', '
+            meta_cutlass_str += self.ctlop_to_cutlasstype(l) + ', '
 
-            meta_xop_str += self.xtw(a)
-            meta_cutlass_str += self.xop_to_cutlasstype(a)
+            meta_ctlop_str += self.xtw(a)
+            meta_cutlass_str += self.ctlop_to_cutlasstype(a)
 
-            res.append((meta_xop_str, meta_cutlass_str))
+            res.append((meta_ctlop_str, meta_cutlass_str))
         return res
 
     def get_hparam_space(self):
@@ -89,7 +89,7 @@ class SearchSpaceGenerator:
             if (swizzle == 'Identity' and avail_sm != 1):
                 continue
             hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
-                self.cstw(bshape), self.cstw(wshape), self.cstw(ishape), self.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
+                self.cstw(bshape), self.cstw(wshape), self.cstw(ishape), self.ctlop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
             
             res.append(hparam_str)
         return res
@@ -98,21 +98,21 @@ class SearchSpaceGenerator:
         fp = {}
         fp[tag] = open("config_{0}_sm89.cu".format(tag.lower()), "w")
         fp[tag].write('// clang-format off\n')
-        fp[tag].write('#include "flux/ops_impl/normal/gemm_v2_impl.h"\n')
-        fp[tag].write('#include "flux/ops_impl/normal/gemm_v2_simt_impl.h"\n\n')
-        fp[tag].write('namespace xop {\n')
+        fp[tag].write('#include "ctlop/ops_impl/gemm_normal/gemm_v2_impl.h"\n')
+        fp[tag].write('#include "ctlop/ops_impl/gemm_normal/gemm_v2_simt_impl.h"\n\n')
+        fp[tag].write('namespace ctlop {\n')
         fp[tag].write('using namespace cutlass;\n')
         fp[tag].write('using ME = UnifiedMetaEnum;\n\n')
         fp[tag].write('static int config_{0}_sm89 = []() {{\n'.format(tag.lower()))
         fp[tag].write('  GemmConfigRegister& ins = GemmConfigRegister::instance();\n')
 
-        xop_tag = self.xtw(tag)
+        ctlop_tag = self.xtw(tag)
         meta = self.get_meta_space()
         hparam = self.get_hparam_space()
         for m in meta:
-            xop_meta, cutlass_meta = m
+            ctlop_meta, cutlass_meta = m
             for id, h in enumerate(hparam):
-                fp[tag].write('  ins.add({{{0},{1},{2}}}, '.format(str(id), xop_tag, xop_meta))
+                fp[tag].write('  ins.add({{{0},{1},{2}}}, '.format(str(id), ctlop_tag, ctlop_meta))
                 fp[tag].write('/*op*/[]() {{ return new GemmPureV2Impl</*meta*/{0},/*hparam*/{1}>();}});\n'.format(cutlass_meta, h))
 
         fp[tag].write('  return 0;\n}();\n}')
