@@ -34,7 +34,7 @@ class TuningConfig:
 
 def gen_tuning_space():
     space: List[TuningConfig] = []
-    space_M = list(range(65, 101)) #  [1024, 2048, 4096, 8192] # , 16384
+    space_M = list(range(1, 101)) #  [1024, 2048, 4096, 8192] # , 16384
     space_NK = [(27648,5120)] # (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     space_transpose_weight = [False] # , True
     space_dtype = [torch.float16] # , torch.bfloat16

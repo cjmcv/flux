@@ -163,21 +163,11 @@ private:
 
     return output;
   }
-
-  void lazy_init_gemm_buffer(torch::Tensor input, int64_t buffer_size) {
-    if (buffer_size <= 0)
-      return;
-    buffer_size = (buffer_size + 127) / 128 * 128;
-    if (!this->gemm_buffer.defined() || buffer_size > this->gemm_buffer.numel()) {
-      this->gemm_buffer = torch::empty({buffer_size}, input.options().dtype(at::ScalarType::Byte));
-    }
-  }
   
 private:
   const c10::ScalarType input_dtype;
   const c10::ScalarType output_dtype;
   const bool transpose_weight;
-  torch::Tensor gemm_buffer;
 };
 
 GemmNormal::GemmNormal(

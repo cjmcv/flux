@@ -48,17 +48,14 @@ public:
     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
   
     // Allocate workspace memory
-    printf("workspace_.size(): %d, workspace_size: %d.\n", workspace_.size(), workspace_size);
-    if (workspace_.size() < workspace_size) {
-      workspace_.reallocate(workspace_size);      
-    }
+    void *workspace_ptr = GlobalBuffer::getInstance().ResizeBufferIfNeeded(workspace_size);
 
     // Check the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
   
     // Initialize CUTLASS kernel with arguments and workspace pointer
     auto cu_stream = static_cast<cudaStream_t>(stream);
-    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_.get(), cu_stream));
+    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_ptr, cu_stream));
   }
 
   void run(void *stream = nullptr) {
@@ -121,7 +118,6 @@ private:
 
 private:
   DeviceGemmBasic gemm_dev_;
-  cutlass::device_memory::allocation<uint8_t> workspace_;
 };
 
 } // namespace xop

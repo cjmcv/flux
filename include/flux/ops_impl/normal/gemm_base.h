@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 
+#include "cutlass/util/device_memory.h"
 #include "cute/algorithm/tuple_algorithms.hpp"
 #include "cute/config.hpp"
 #include "cute/container/tuple.hpp"
@@ -41,6 +42,30 @@ class GemmBase {
 public:
   virtual void initialize(RtParams &rt_params, void *stream = nullptr) = 0;
   virtual void run(void *stream = nullptr) = 0;
+};
+
+
+class GlobalBuffer {
+private:
+  GlobalBuffer() = default;
+  GlobalBuffer(const GlobalBuffer&) = delete;
+  GlobalBuffer& operator=(const GlobalBuffer&) = delete;
+
+  cutlass::device_memory::allocation<uint8_t> workspace_;
+
+public:
+  static GlobalBuffer& getInstance() {
+    static GlobalBuffer instance;
+    return instance;
+  }
+
+  void* ResizeBufferIfNeeded(size_t workspace_size) {
+    workspace_size = (workspace_size + 127) / 128 * 128;
+    if (workspace_.size() < workspace_size) {
+      workspace_.reset(workspace_size);
+    }
+    return workspace_.get();
+  }
 };
 
 // 定义工厂函数类型
