@@ -65,7 +65,6 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 ###################
-message("Build THS on")
 find_package(Python 3 REQUIRED)
 find_program(PYTHON_EXECUTABLE NAMES python3 python)
 
