@@ -222,7 +222,7 @@ def parse_args():
     parser.add_argument("--iters", default=500, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
-        default="float16",
+        default="bfloat16",
         type=str,
         choices=list(DTYPE_MAP.keys()),
     )

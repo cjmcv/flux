@@ -38,7 +38,7 @@ def gen_tuning_space():
     space_M = list(range(1, 31)) #  [1024, 2048, 4096, 8192] # , 16384
     space_NK = [(512,256)] # (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     space_transpose_weight = [False] # , True
-    space_dtype = [torch.float16] # , torch.bfloat16
+    space_dtype = [torch.bfloat16] # , torch.bfloat16
     space_has_bias = [False]
     for NK, M, transpose_weight, dtype, has_bias in itertools.product(
         space_NK, space_M, space_transpose_weight, space_dtype, space_has_bias
@@ -72,7 +72,7 @@ def run_ctlop_profiling(input: torch.Tensor, weight: torch.Tensor, config: Tunin
     op = ctlop.GemmNormal(input_dtype=input.dtype, output_dtype=input.dtype, transpose_weight=config.transpose_weight)
 
     fastest_time = 99999
-    fastest_config = [0,Meta.GemmNormal]
+    fastest_config = [0, Meta.GemmNormal]
     for schema in [Meta.GemmNormal, Meta.GemmNormalSimt]:
         for id in range(100):
             # warmup and check if exist.
@@ -136,16 +136,13 @@ def tune_one_config(config: TuningConfig, fp):
         atol, rtol = 0.01, 0.01
     ctlop.torch_allclose(ctlop_output, torch_output, atol=atol, rtol=rtol)
 
-def parse_args():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--output_dir", default="./tools/", type=str, help="Directory to store generated files"
     )
-    return parser.parse_args()
+    args = parser.parse_args()
 
-
-if __name__ == "__main__":
-    args = parse_args()
     if args.output_dir and not os.path.isdir(args.output_dir):
         raise Exception(f"{args.output_dir} not exist")
 
