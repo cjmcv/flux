@@ -62,7 +62,7 @@ class CheckFail {
 // Enum classes
 /////////////////////////////////////////////////////
 enum class UnifiedMetaEnum : int8_t {
-  Normal = 0,                                          // meta type
+  GemmNormal = 0, GemmNormalSimt,                      // meta type
   Void = 10, FP16, BF16, FP32, E4M3, E5M2, S8, S32,    // data type
   Sm80 = 20, Sm89, Sm90,                               // arch
   RRR = 30, RCR, RCC                                   // layout
@@ -70,8 +70,8 @@ enum class UnifiedMetaEnum : int8_t {
 
 inline std::string MetaEnumToString(UnifiedMetaEnum value) {
   switch (value) {
-    case UnifiedMetaEnum::Normal:
-      return "Normal";
+    case UnifiedMetaEnum::GemmNormal:
+      return "GemmNormal";
     case UnifiedMetaEnum::Void:
       return "Void";
     case UnifiedMetaEnum::FP16:

@@ -1,6 +1,6 @@
 
 #include "gemm_normal.h"
-#include "ctlop/ops_impl/gemm_normal/gemm_base.h"
+#include "ctlop/ops_impl/global_resource.h"
 #include "ctlop/common_torch.h"
 
 #include <ATen/core/jit_type.h>
@@ -60,31 +60,34 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    RtParams rt_params;
-    torch::Tensor output = get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_params);
+    RtArguments rt_args;
+    torch::Tensor output = get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
     std::vector<int8_t> id_meta = MakeMeta();     // id + meta
 
     bool is_tuning = false;
     int8_t selected_id = 0;
+    int8_t selected_schema = (int8_t)UnifiedMetaEnum::GemmNormal;
     if (tuning.has_value()) {
       int8_t *data = (int8_t *)tuning.value().data_ptr();
       CTLOP_CHECK_EQ(data[0], 1);
       selected_id = data[1];
+      selected_schema = data[2];
       is_tuning = true;
     }
     else {
-      std::vector<int32_t> shape_meta = {rt_params.m, rt_params.n, rt_params.k};       // mnk + meta
-      shape_meta.insert(shape_meta.end(), id_meta.begin()+1, id_meta.end());
-      selected_id = tins.GetSelectedId(shape_meta);      
+      std::vector<int32_t> shape_meta = {rt_args.m, rt_args.n, rt_args.k};       // mnk + meta
+      shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
+      tins.GetSelectedConfig(shape_meta, &selected_id, &selected_schema);      
     }
-    printf("selected_id: %d.\n", selected_id);
+    printf("selected_id: %d, selected_schema: %d.\n", selected_id, selected_schema);
     id_meta[0] = selected_id;
-    GemmBase *op = ins.getGemm(id_meta, is_tuning);
+    id_meta[1] = selected_schema;
+    GemmBase *op = ins.GetOp(id_meta, is_tuning);
     if (op == nullptr)
       return torch::Tensor();
 
     cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-    op->initialize(rt_params);
+    op->initialize(rt_args);
     op->run(stream);
 
     if (tuning.has_value()) {
@@ -101,8 +104,8 @@ private:
   std::vector<int8_t> MakeMeta(int8_t id = 0) {
     std::vector<int8_t> meta;
     meta.resize(8);
-    meta[0] = id;                              // id
-    meta[1] = (int8_t)UnifiedMetaEnum::Normal; // meta type
+    meta[0] = id;                                  // id
+    meta[1] = (int8_t)UnifiedMetaEnum::GemmNormal; // meta type (GemmNormal / GemmNormalSimt)
 
     meta[2] = from_torch_dtype(this->input_dtype);  // type A
     meta[3] = from_torch_dtype(this->input_dtype);  // type B
@@ -122,7 +125,7 @@ private:
       c10::optional<torch::Tensor> output_buf,
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
-      RtParams &rt_params) {
+      RtArguments &rt_args) {
     CHECK_INPUT(input, this->input_dtype);
     CHECK_INPUT(weight, this->input_dtype);
     TORCH_CHECK(input.dim() == 2, "input shape is not 2");
@@ -151,15 +154,15 @@ private:
     int32_t wk = transpose_weight ? weight.size(0) : weight.size(1);
     CTLOP_CHECK_EQ(wk, k) << "weight k-dim mismatch";
 
-    rt_params.m = m;
-    rt_params.n = n;
-    rt_params.k = k;
-    rt_params.ptr_A = input.data_ptr();
-    rt_params.ptr_B = weight.data_ptr();
-    rt_params.ptr_C = nullptr;
-    rt_params.ptr_D = output.data_ptr();
-    rt_params.alpha = 1.0f;
-    rt_params.beta = 0.0f;
+    rt_args.m = m;
+    rt_args.n = n;
+    rt_args.k = k;
+    rt_args.ptr_A = input.data_ptr();
+    rt_args.ptr_B = weight.data_ptr();
+    rt_args.ptr_C = nullptr;
+    rt_args.ptr_D = output.data_ptr();
+    rt_args.alpha = 1.0f;
+    rt_args.beta = 0.0f;
 
     return output;
   }

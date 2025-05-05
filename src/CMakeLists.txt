@@ -17,17 +17,16 @@ function (ctlop_add_ths_op_target TARGET)
   set_property(GLOBAL PROPERTY CTLOP_THS_TARGETS "${TARGET};${CTLOP_THS_TARGETS_LOCAL}")
 endfunction()
 
+#######################################################
 set(CTLOP_CUDA_OP_TARGETS "") # cu op targets of subdirectory
 set(CTLOP_THS_OP_FILES "") # ths op source files of subdirectory
 
-#######################################################
 add_subdirectory(ops/gemm_normal)
 # add_subdirectory(ops/single_gemm)
 message(STATUS "op_targets: ${CTLOP_CUDA_OP_TARGETS}")
 
-############ ctlop ################
 set(CTLOP_THS_FILES ${CTLOP_THS_OP_FILES})
-message(STATUS "ths_files: ${CTLOP_THS_FILES}") # single_gemm/single_gemm.cc
+message(STATUS "ths_files: ${CTLOP_THS_FILES}")
 
 add_library(ctlop SHARED ${CTLOP_THS_FILES})
 target_link_libraries(ctlop PUBLIC CUDA::cudart CUDA::cuda_driver ${CTLOP_CUDA_OP_TARGETS} ${TORCH_LIBRARIES})
@@ -41,7 +40,7 @@ include(GNUInstallDirs)
 install(
   DIRECTORY ./ "${PROJECT_SOURCE_DIR}/include/ctlop/"
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ctlop/
-  FILES_MATCHING PATTERN "*/ths_op/*.h")
+  FILES_MATCHING PATTERN "*/ops_impl/*.h")
 
 file(GLOB CTLOP_HEADERS ${PROJECT_SOURCE_DIR}/include/ctlop/*.h)
 install(

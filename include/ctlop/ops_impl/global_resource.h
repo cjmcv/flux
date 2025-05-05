@@ -13,30 +13,14 @@
 #include "cute/numeric/integral_constant.hpp"
 #include "cute/util/type_traits.hpp"
 
+#include "arguments.h"
+
 namespace ctlop {
 
-struct RtParams {
-  int m;
-  int n;
-  int k;
-
-  float alpha;
-  float beta;
-
-  void *ptr_A;
-  void *ptr_B;
-  void *ptr_C;
-  void *ptr_D;
-
-  int stride_a;
-  int stride_b;
-  int stride_c;
-  int stride_d;
-};
-
+// GemmDeviceBase
 class GemmBase {
 public:
-  virtual void initialize(RtParams &rt_params, void *stream = nullptr) = 0;
+  virtual void initialize(RtArguments &rt_args, void *stream = nullptr) = 0;
   virtual void run(void *stream = nullptr) = 0;
 };
 
@@ -50,7 +34,7 @@ private:
   cutlass::device_memory::allocation<uint8_t> workspace_;
 
 public:
-  static GlobalBuffer& getInstance() {
+  static GlobalBuffer& instance() {
     static GlobalBuffer instance;
     return instance;
   }
@@ -103,7 +87,7 @@ public:
     gemm_map[key] = factory;
   }
 
-  GemmBase* createGemm(const std::vector<int8_t> &key, bool is_tuning = false) {
+  GemmBase* CreateOp(const std::vector<int8_t> &key, bool is_tuning = false) {
     // printf("name: %s.\n", name.c_str());
     // std::cout << key << std::endl;
     auto it = gemm_map.find(key);
@@ -125,12 +109,12 @@ public:
   }
 
   // 获取 Gemm 实例，如果已存在则直接返回，不存在则创建
-  GemmBase* getGemm(const std::vector<int8_t> &key, bool is_tuning = false) {
+  GemmBase* GetOp(const std::vector<int8_t> &key, bool is_tuning = false) {
     auto it = created_instances.find(key);
     if (it != created_instances.end()) {
         return it->second;
     }
-    return createGemm(key, is_tuning);
+    return CreateOp(key, is_tuning);
   }
 
   // 析构时释放所有创建的实例
@@ -143,7 +127,7 @@ public:
 
 class TunedConfigRegister {
 private:
-  std::map<std::vector<int32_t>, int32_t> tuned_map;
+  std::map<std::vector<int32_t>, std::vector<int8_t>> tuned_map;
 
   TunedConfigRegister() = default;
 
@@ -157,17 +141,21 @@ public:
       return instance;
   }
 
-  void add(const std::vector<int32_t> &key, int selected_id) {
-    tuned_map[key] = selected_id;
+  void add(const std::vector<int32_t> &key, const std::vector<int8_t> &select_config) {
+    tuned_map[key] = select_config;
   }
 
-  int32_t GetSelectedId(const std::vector<int32_t> &key) {
+  void GetSelectedConfig(const std::vector<int32_t> &key, int8_t *selected_id, int8_t *schema_id) {
     auto it = tuned_map.find(key);
     if (it != tuned_map.end()) {
-      return it->second;
+      *selected_id = it->second[0];
+      *schema_id = it->second[1];
+      return;
     }
-    return 0;  // auto
+    *selected_id = 0;  // todo: 如何选择auto方案，选择tuned中最近的一个？
+    *schema_id = 0;
   }
+
 
   ~TunedConfigRegister() {}
 };

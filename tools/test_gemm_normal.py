@@ -344,17 +344,13 @@ if __name__ == "__main__":
         if args.transpose_weight:
             raise ValueError("s8 gemm with dequant must in RCR layout")
 
-    plot_x = list(range(1, args.M, args.step))
-    ctlop_perf = []
-    torch_perf = []
-    is_all_close = True
-
     ctlop_perf = []
     torch_perf = []
     for m in range(1, args.M, args.step):
         print(f"M: {m}, N: {args.N}, K: {args.K}")
         run(m, args, ctlop_perf, torch_perf)
-    
+
+    plot_x = list(range(1, args.M, args.step))
     plt.plot(plot_x, ctlop_perf, label='ctlop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
 

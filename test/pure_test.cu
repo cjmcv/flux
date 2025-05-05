@@ -167,7 +167,7 @@ struct Result
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /// Execute a given example GEMM computation
 template <class ElementC, class LayoutC>
-Result run(GemmBase *gemm, std::string description, RtParams &rt_params, int iterations, 
+Result run(GemmBase *gemm, std::string description, RtArguments &rt_args, int iterations, 
            cutlass::HostTensor<ElementC, LayoutC> &tensor_d,
            cutlass::HostTensor<ElementC, LayoutC> &tensor_ref_d)
 {
@@ -179,7 +179,7 @@ Result run(GemmBase *gemm, std::string description, RtParams &rt_params, int ite
   tensor_d.sync_device();
 
   // Create a structure of gemm kernel arguments suitable for invoking an instance of DeviceGemmT
-  gemm->initialize(rt_params);
+  gemm->initialize(rt_args);
   gemm->run();
 
   // Copy output data from CUTLASS and reference kernel to host for comparison
@@ -206,7 +206,7 @@ Result run(GemmBase *gemm, std::string description, RtParams &rt_params, int ite
     // Compute average runtime and GFLOPs.
     float elapsed_ms = timer.elapsed_millis();
     result.avg_runtime_ms = double(elapsed_ms) / double(iterations);
-    result.gflops = 2.0 * double(rt_params.m*rt_params.n*rt_params.k) / double(1.0e9) / (result.avg_runtime_ms * 1000.0);
+    result.gflops = 2.0 * double(rt_args.m*rt_args.n*rt_args.k) / double(1.0e9) / (result.avg_runtime_ms * 1000.0);
 
     std::cout << "  Avg runtime: " << result.avg_runtime_ms << " ms" << std::endl;
     std::cout << "  GFLOPs: " << result.gflops << std::endl;
@@ -241,7 +241,7 @@ static int config_normal_gemm_sm89 = []() {
   //          std::map<std::string, string> running_map;
   //          running_map[shape+meta_name] = op_name;
   GemmConfigRegister& ins = GemmConfigRegister::instance();
-  using GemmSimt = GemmPureV2SimtDevice<ElementA, ElementB, ElementC, ElementAccumulator, LayoutA, LayoutB, LayoutC, cutlass::arch::Sm89, 1, cutlass::gemm::GemmShape<64, 64, 4>, cutlass::gemm::GemmShape<32, 16, 4>>;
+  using GemmSimt = GemmPureV2SimtImpl<ElementA, ElementB, ElementC, ElementAccumulator, LayoutA, LayoutB, LayoutC, cutlass::arch::Sm89, 1, cutlass::gemm::GemmShape<64, 64, 4>, cutlass::gemm::GemmShape<32, 16, 4>>;
   using GemmBasicSk1 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 4, 1, -1>;
   using GemmBasicSk2 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 4, 2, -1>;
   using GemmStreamKSk1Sm0 = GemmPureV2Impl<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ElementAccumulator, cutlass::arch::Sm80, cutlass::gemm::GemmShape<128, 128, 32>, cutlass::gemm::GemmShape<64, 64, 32>, cutlass::gemm::GemmShape<16, 8, 16>, cutlass::gemm::threadblock::ThreadblockSwizzleStreamK, 4, 1, -1>;
@@ -301,15 +301,15 @@ int main(int argc, const char **argv)
   cutlass::HostTensor<ElementC, LayoutC> tensor_d;
   cutlass::HostTensor<ElementC, LayoutC> tensor_ref_d;
 
-  RtParams rt_params;
-  rt_params.m = 2048;
-  rt_params.n = 2048;
-  rt_params.k = 2048;
+  RtArguments rt_args;
+  rt_args.m = 2048;
+  rt_args.n = 2048;
+  rt_args.k = 2048;
 
-  rt_params.alpha = 1.0f;
-  rt_params.beta = 0.0f;
+  rt_args.alpha = 1.0f;
+  rt_args.beta = 0.0f;
 
-  cutlass::gemm::GemmCoord problem_size = {rt_params.m, rt_params.n, rt_params.k};
+  cutlass::gemm::GemmCoord problem_size = {rt_args.m, rt_args.n, rt_args.k};
   tensor_a.resize(problem_size.mk());       // <- Create matrix A with dimensions M x K
   tensor_b.resize(problem_size.kn());       // <- Create matrix B with dimensions K x N
   tensor_c.resize(problem_size.mn());       // <- Create matrix C with dimensions M x N
@@ -333,10 +333,10 @@ int main(int argc, const char **argv)
   tensor_b.sync_device();
   tensor_c.sync_device();
 
-  rt_params.ptr_A = tensor_a.device_data();
-  rt_params.ptr_B = tensor_b.device_data();
-  rt_params.ptr_C = tensor_c.device_data();
-  rt_params.ptr_D = tensor_d.device_data();
+  rt_args.ptr_A = tensor_a.device_data();
+  rt_args.ptr_B = tensor_b.device_data();
+  rt_args.ptr_C = tensor_c.device_data();
+  rt_args.ptr_D = tensor_d.device_data();
 
   // Zero-initialize reference output matrix D
   cutlass::reference::host::TensorFill(tensor_ref_d.host_view());
@@ -359,11 +359,11 @@ using DeviceGemmReference = cutlass::reference::device::Gemm<
 
   // Launch device reference gemm kernel
   gemm_reference(
-    {rt_params.m, rt_params.n, rt_params.k},
-    ElementAccumulator(rt_params.alpha),
+    {rt_args.m, rt_args.n, rt_args.k},
+    ElementAccumulator(rt_args.alpha),
     tensor_a.device_ref(),
     tensor_b.device_ref(),
-    ElementAccumulator(rt_params.beta),
+    ElementAccumulator(rt_args.beta),
     tensor_c.device_ref(),
     tensor_ref_d.device_ref());
 
@@ -376,23 +376,23 @@ using DeviceGemmReference = cutlass::reference::device::Gemm<
   // Evaluate CUTLASS kernels
   int iterations = 2000;
   GemmConfigRegister& ins = GemmConfigRegister::instance();
-  Result basic_simt       = run(ins.getGemm("GemmSimt"), "Basic simt GEMM", rt_params, iterations, tensor_d, tensor_ref_d);
-  Result basic_dp         = run(ins.getGemm("GemmBasicSk1"), "Basic data-parallel GEMM", rt_params, iterations, tensor_d, tensor_ref_d);
-  Result streamk_default  = run(ins.getGemm("GemmStreamKSk1Sm0"), "StreamK GEMM with default load-balancing", rt_params, iterations, tensor_d, tensor_ref_d);
+  Result basic_simt       = run(ins.GetOp("GemmSimt"), "Basic simt GEMM", rt_args, iterations, tensor_d, tensor_ref_d);
+  Result basic_dp         = run(ins.GetOp("GemmBasicSk1"), "Basic data-parallel GEMM", rt_args, iterations, tensor_d, tensor_ref_d);
+  Result streamk_default  = run(ins.GetOp("GemmStreamKSk1Sm0"), "StreamK GEMM with default load-balancing", rt_args, iterations, tensor_d, tensor_ref_d);
 
   printf("  Speedup vs Basic-DP: %.3f\n", (basic_dp.avg_runtime_ms / streamk_default.avg_runtime_ms));
 
-  Result streamk_dp       = run(ins.getGemm("GemmStreamKSk1Sm1"), "StreamK emulating basic data-parallel GEMM", rt_params, iterations, tensor_d, tensor_ref_d);
+  Result streamk_dp       = run(ins.GetOp("GemmStreamKSk1Sm1"), "StreamK emulating basic data-parallel GEMM", rt_args, iterations, tensor_d, tensor_ref_d);
   printf("  Speedup vs Basic-DP: %.3f\n", (basic_dp.avg_runtime_ms / streamk_dp.avg_runtime_ms));
  
   // Show that StreamK can emulate "Split-K" with a tile-splitting factor
-  Result basic_splitk = run(ins.getGemm("GemmBasicSk2"), 
+  Result basic_splitk = run(ins.GetOp("GemmBasicSk2"), 
     std::string("Basic split-K GEMM with tile-splitting factor ") + std::to_string(2),
-    rt_params, iterations, tensor_d, tensor_ref_d);
+    rt_args, iterations, tensor_d, tensor_ref_d);
 
-  Result streamk_splitk = run(ins.getGemm("GemmStreamKSk2Sm0"), 
+  Result streamk_splitk = run(ins.GetOp("GemmStreamKSk2Sm0"), 
     std::string("StreamK emulating Split-K GEMM with tile-splitting factor ") + std::to_string(2),
-    rt_params, iterations, tensor_d, tensor_ref_d);
+    rt_args, iterations, tensor_d, tensor_ref_d);
 
   printf("  Speedup vs Basic-SplitK: %.3f\n", (basic_splitk.avg_runtime_ms / streamk_splitk.avg_runtime_ms));
  
