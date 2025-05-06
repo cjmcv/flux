@@ -201,6 +201,10 @@ public:
 
 public:
   void initialize(const RtBlockScaleFp8Arguments<Gemm> &rt_args, void *stream = nullptr) {
+
+    static_assert(cute::is_same_v<ElementAccumulator, ElementBlockScale>,
+      "ElementAccumulator and ElementBlockScale should be same datatype");
+
     // Instantiate CUTLASS kernel depending on templates
     gemm_dev_ = Gemm();
 
@@ -337,60 +341,7 @@ using         LayoutAux    = LayoutC;
 using         ElementAmax  = float;
 using         ElementBias  = float;
 
-// Core kernel configurations
-using ElementAccumulator  = float;                                          // Element type for internal accumulation
-using ElementBlockScale   = float;                                          // Element type for blockscaling during accumulation
-using ElementCompute      = float;                                          // Element type for epilogue computation
-using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
-using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
-using TileShape           = Shape<_128,_128,_128>;                           // Threadblock-level tile size
-using ClusterShape        = Shape<_1,_2,_1>;                                // Shape of the threadblocks in a cluster
-/////////////////////0///////////////////////
-using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<>;
-using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
-
-using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
-using FusionOperation     = cutlass::epilogue::fusion::ScaledLinCombPerRowBiasEltActAmaxAux<
-    LayoutAux, cutlass::epilogue::thread::ReLU, ElementD, ElementCompute, ElementAux, ElementAmax, ElementBias, ElementC>;
-
-using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
-    ArchTag, OperatorClass,
-    TileShape, ClusterShape,
-    EpilogueTileType,
-    ElementAccumulator, ElementCompute,
-    ElementC, LayoutC, AlignmentC,
-    ElementD, LayoutD, AlignmentD,
-    EpilogueSchedule,
-    FusionOperation
-  >::CollectiveOp;
-
-using CollectiveMainloopWithBlockWiseScaling = typename cutlass::gemm::collective::CollectiveBuilder<
-    ArchTag, OperatorClass,
-    ElementA, LayoutA, AlignmentA,
-    ElementB, LayoutB, AlignmentB,
-    ElementAccumulator,
-    TileShape, ClusterShape,
-    cutlass::gemm::collective::StageCountAutoCarveout<
-      static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))
-    >,
-    KernelSchedule
-  >::CollectiveOp;
-
-using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
-    Shape<int,int,int,int>, // Indicates ProblemShape
-    CollectiveMainloopWithBlockWiseScaling,
-    CollectiveEpilogue
->;
-
-using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
 /////////////////////1///////////////////////
-
-// Extract information from Gemm kernel.
-using EpilogueOutputOp  = typename Gemm::EpilogueOutputOp;
-using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
-using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
-using ActivationFunctor = typename EpilogueOutputOp::ActivationFn;
-
 constexpr bool IsDFp8 =
     cute::is_same_v<ElementD, cutlass::float_e4m3_t> or
     cute::is_same_v<ElementD, cutlass::float_e5m2_t>;
@@ -399,8 +350,6 @@ constexpr bool IsAuxFp8 =
     cute::is_same_v<ElementAux, cutlass::float_e4m3_t> or
     cute::is_same_v<ElementAux, cutlass::float_e5m2_t>;
 
-static_assert(cute::is_same_v<ElementAccumulator, ElementBlockScale>,
-             "ElementAccumulator and ElementBlockScale should be same datatype");
 
 /// Initialization
 #endif // defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
@@ -434,8 +383,13 @@ struct Result
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /// GEMM setup and evaluation
 /////////////////////////////////////////////////////////////////////////////////////////////////
-template <class Gemm>
+template <class GemmImpl>
 struct Buffer {
+  using ElementBlockScale = typename GemmImpl::ElementBlockScale;
+  using TileShape         = typename GemmImpl::TileShape;
+  using EpilogueOutputOp  = typename GemmImpl::Gemm::EpilogueOutputOp;
+  using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
+  using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
 
   uint64_t seed;
 
@@ -656,11 +610,15 @@ struct Buffer {
 
 
 
-template <class Gemm>
-bool verify(const Options &options, Buffer<Gemm> &buffer) {
+template <class GemmImpl>
+bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
   //
   // Compute reference output
   //
+  using TileShape         = typename GemmImpl::TileShape;
+  using ElementAccumulator= typename GemmImpl::ElementAccumulator;
+  using ElementCompute    = typename GemmImpl::ElementCompute;
+  using Gemm              = typename GemmImpl::Gemm;
   using EpilogueOutputOp  = typename Gemm::EpilogueOutputOp;
   using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
   using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
@@ -816,7 +774,7 @@ int run(Options &options)
   
 
   using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC, RasterOrderOptions::AlongN, 1>;
-  Buffer<GemmFp8Impl::Gemm> buffer;
+  Buffer<GemmFp8Impl> buffer;
   buffer.initialize(options);
 
   RtBlockScaleFp8Arguments<GemmFp8Impl::Gemm> rt_args;
@@ -864,7 +822,7 @@ int run(Options &options)
   // Check if output from CUTLASS kernel and reference kernel are equal or not
   Result result;
   if (options.verify) {
-    result.passed = verify<GemmFp8Impl::Gemm>(options, buffer);
+    result.passed = verify<GemmFp8Impl>(options, buffer);
 
     std::cout << "  Disposition: " << (result.passed ? "Passed" : "Failed") << std::endl;
   }
