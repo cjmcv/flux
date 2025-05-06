@@ -82,6 +82,9 @@
 #include "hopper_fp8_commandline.hpp"
 #include "reference/host/gemm_with_blockwise_scaling.h"
 
+#include "ctlop/ops_impl/global_resource.h"
+#include "ctlop/ops_impl/args_util.h"
+
 using namespace ctlop;
 using namespace cute;
 
@@ -102,7 +105,7 @@ using         LayoutB     = cutlass::layout::ColumnMajor;                   // L
 constexpr int AlignmentB  = 128 / cutlass::sizeof_bits<ElementB>::value;    // Memory access granularity/alignment of B matrix in units of elements (up to 16 bytes)
 
 // C matrix configuration
-using         ElementC    = float;                          // Element type for C and D matrix operands
+using         ElementC    = cutlass::bfloat16_t;                          // Element type for C and D matrix operands
 using         LayoutC     = cutlass::layout::RowMajor;                   // Layout type for C and D matrix operands
 constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 
@@ -125,6 +128,7 @@ using ArchTag             = cutlass::arch::Sm90;                            // T
 using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
 using TileShape           = Shape<_128,_128,_128>;                           // Threadblock-level tile size
 using ClusterShape        = Shape<_1,_2,_1>;                                // Shape of the threadblocks in a cluster
+/////////////////////0///////////////////////
 using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<>;
 using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
 
@@ -162,6 +166,7 @@ using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
 >;
 
 using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
+/////////////////////1///////////////////////
 
 // Extract information from Gemm kernel.
 using EpilogueOutputOp  = typename Gemm::EpilogueOutputOp;
@@ -219,6 +224,143 @@ cutlass::HostTensor<ElementAmax  , LayoutScalar> abs_max_aux;
 cutlass::HostTensor<ElementAmax  , LayoutScalar> reference_abs_max_aux;
 
 #endif // defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
+
+template <class ElementA>
+class GemmBlockScaleFp8Impl {
+
+  using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<>;
+  using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
+  
+  using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
+  using FusionOperation     = cutlass::epilogue::fusion::ScaledLinCombPerRowBiasEltActAmaxAux<
+      LayoutAux, cutlass::epilogue::thread::ReLU, ElementD, ElementCompute, ElementAux, ElementAmax, ElementBias, ElementC>;
+  
+  using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
+      ArchTag, OperatorClass,
+      TileShape, ClusterShape,
+      EpilogueTileType,
+      ElementAccumulator, ElementCompute,
+      ElementC, LayoutC, AlignmentC,
+      ElementD, LayoutD, AlignmentD,
+      EpilogueSchedule,
+      FusionOperation
+    >::CollectiveOp;
+  
+  using CollectiveMainloopWithBlockWiseScaling = typename cutlass::gemm::collective::CollectiveBuilder<
+      ArchTag, OperatorClass,
+      ElementA, LayoutA, AlignmentA,
+      ElementB, LayoutB, AlignmentB,
+      ElementAccumulator,
+      TileShape, ClusterShape,
+      cutlass::gemm::collective::StageCountAutoCarveout<
+        static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))
+      >,
+      KernelSchedule
+    >::CollectiveOp;
+  
+  using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
+      Shape<int,int,int,int>, // Indicates ProblemShape
+      CollectiveMainloopWithBlockWiseScaling,
+      CollectiveEpilogue
+  >;
+  
+  using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
+
+  //
+
+  using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
+
+public:
+  void initialize(const Options<RasterOrderOptions> &options, void *stream = nullptr) {
+    // Instantiate CUTLASS kernel depending on templates
+    gemm_dev_ = Gemm();
+
+    // Create a structure of gemm kernel arguments suitable for invoking an instance of Gemm
+    auto arguments = args_from_options(options);
+
+    // Using the arguments, query for extra workspace required for matrix multiplication computation
+    size_t workspace_size = Gemm::get_workspace_size(arguments);
+
+    // Allocate workspace memory
+    // cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
+    void *workspace_ptr = GlobalBuffer::instance().ResizeBufferIfNeeded(workspace_size);
+
+    // Check if the problem size is supported or not
+    CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
+
+    // Initialize CUTLASS kernel with arguments and workspace pointer
+    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_ptr));
+  }
+
+  void run(void *stream = nullptr) {
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    CUTLASS_CHECK(gemm_dev_.run(cu_stream));
+  }
+
+private:
+  typename Gemm::Arguments args_from_options(const Options<RasterOrderOptions> &options)
+  {
+    typename Gemm::Arguments arguments{
+      cutlass::gemm::GemmUniversalMode::kGemm,
+      {options.m, options.n, options.k, options.l},
+      {tensor_A.device_data(),
+      stride_A,
+      tensor_B.device_data(),
+      stride_B,
+      mma_promotion_interval,
+      blockscale_tensor_A.device_data(),
+      blockscale_tensor_B.device_data()
+      },
+      {
+        {}, // epilogue.thread
+        tensor_C.device_data(), stride_C,
+        tensor_D.device_data(), stride_D
+      }
+    };
+
+    auto &fusion_args = arguments.epilogue.thread;
+    fusion_args.alpha = options.alpha;
+    fusion_args.beta = options.beta;
+    fusion_args.alpha_ptr = scalar_alpha.device_data();
+    fusion_args.beta_ptr = scalar_beta.device_data();
+    fusion_args.scale_a = options.scale_a;
+    fusion_args.scale_b = options.scale_b;
+    fusion_args.scale_c = options.scale_c;
+    fusion_args.scale_a_ptr = scale_A.device_data();
+    fusion_args.scale_b_ptr = scale_B.device_data();
+    fusion_args.scale_c_ptr = scale_C.device_data();
+
+    // ignored if tensor types are not fp8
+    fusion_args.scale_d = options.scale_d;
+    fusion_args.scale_aux = options.scale_aux;
+    fusion_args.scale_d_ptr = scale_D.device_data();
+    fusion_args.scale_aux_ptr = scale_aux.device_data();
+
+    // leaving/setting these as nullptr disables the fusion at runtime
+    fusion_args.bias_ptr = nullptr;
+
+    if (options.save_aux) {
+      fusion_args.aux_ptr = tensor_aux.device_data();
+      fusion_args.dAux = stride_aux;
+      if (options.save_amax) {
+        fusion_args.amax_aux_ptr = abs_max_aux.device_data();
+      }
+    }
+
+    if (options.save_amax) {
+      fusion_args.amax_D_ptr = abs_max_D.device_data();
+    }
+
+    arguments.scheduler.raster_order = options.raster;
+    // The tile scheduler will swizzle up to 8 and with the nearest multiple of 2 (i.e., 1, 2, 4, and 8)
+    arguments.scheduler.max_swizzle_size = options.swizzle;
+
+    return arguments;
+  }
+
+private:
+  Gemm gemm_dev_;
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /// Testbed utility types
@@ -659,26 +801,33 @@ int run(Options<RasterOrderOptions> &options)
 {
   initialize(options);
 
-  // Instantiate CUTLASS kernel depending on templates
-  Gemm gemm;
+  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA>;
+  GemmFp8Impl gemm;
+  gemm.initialize(options);
+  gemm.run();
+  // // Instantiate CUTLASS kernel depending on templates
+  // Gemm gemm;
 
-  // Create a structure of gemm kernel arguments suitable for invoking an instance of Gemm
-  auto arguments = args_from_options(options);
+  // // Create a structure of gemm kernel arguments suitable for invoking an instance of Gemm
+  // auto arguments = args_from_options(options);
 
-  // Using the arguments, query for extra workspace required for matrix multiplication computation
-  size_t workspace_size = Gemm::get_workspace_size(arguments);
+  // // Using the arguments, query for extra workspace required for matrix multiplication computation
+  // size_t workspace_size = Gemm::get_workspace_size(arguments);
 
-  // Allocate workspace memory
-  cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
+  // // Allocate workspace memory
+  // cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
 
-  // Check if the problem size is supported or not
-  CUTLASS_CHECK(gemm.can_implement(arguments));
+  // // Check if the problem size is supported or not
+  // CUTLASS_CHECK(gemm.can_implement(arguments));
 
-  // Initialize CUTLASS kernel with arguments and workspace pointer
-  CUTLASS_CHECK(gemm.initialize(arguments, workspace.get()));
+  // // Initialize CUTLASS kernel with arguments and workspace pointer
+  // CUTLASS_CHECK(gemm.initialize(arguments, workspace.get()));
 
-  // Correctness / Warmup iteration
-  CUTLASS_CHECK(gemm.run());
+
+
+
+  // // Correctness / Warmup iteration
+  // CUTLASS_CHECK(gemm.run());
 
   // Check if output from CUTLASS kernel and reference kernel are equal or not
   Result result;
@@ -698,7 +847,7 @@ int run(Options<RasterOrderOptions> &options)
     for (int iter = 0; iter < options.warmup + options.iterations; ++iter) {
       if (iter == options.warmup)
         timer.start();
-      CUTLASS_CHECK(gemm.run());
+      gemm.run();
     }
     timer.stop();
 

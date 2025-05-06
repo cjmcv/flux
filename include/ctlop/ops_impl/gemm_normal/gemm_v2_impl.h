@@ -121,3 +121,44 @@ private:
 };
 
 } // namespace ctlop
+
+
+///////////////////////////////////////////////////////////////////////////
+// // template
+// template <class ElementA, class ElementB, class ElementC。。。>
+// class GemmPureV2Impl : public GemmBase  {
+
+//   using EpilogueOp = cutlass::epilogue::thread::LinearCombination<。。。>;
+//   using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<。。。>;
+
+// public:
+//   void initialize(RtArguments &rt_args, void *stream = nullptr) {
+//     gemm_dev_ = DeviceGemmBasic();
+//     // Using the arguments, query for extra workspace required for matrix multiplication computation
+//     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args.m, rt_args.n, rt_args.k);
+//     。。。
+//     auto arguments = args_from_options(rt_args);
+//     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
+  
+//     void *workspace_ptr = GlobalBuffer::instance().ResizeBufferIfNeeded(workspace_size);
+//     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
+  
+//     auto cu_stream = static_cast<cudaStream_t>(stream);
+//     CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_ptr, cu_stream));
+//   }
+
+//   void run(void *stream = nullptr) {
+//     auto cu_stream = static_cast<cudaStream_t>(stream);
+//     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
+//   }
+
+// private:
+//   typename DeviceGemmBasic::Arguments args_from_options(const RtArguments &rt_args) {
+//     return typename DeviceGemmBasic::Arguments(
+//       ...
+//     )}
+//   }
+
+// private:
+//   DeviceGemmBasic gemm_dev_;
+// };
