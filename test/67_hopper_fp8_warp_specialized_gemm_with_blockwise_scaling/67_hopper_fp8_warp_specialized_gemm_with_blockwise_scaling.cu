@@ -90,18 +90,16 @@ using namespace cute;
 
 #if defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
 
-using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 template <class Gemm>
 struct RtBlockScaleFp8Arguments {
   using EpilogueOutputOp  = typename Gemm::EpilogueOutputOp;
   using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
   using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
-  using ActivationFunctor = typename EpilogueOutputOp::ActivationFn;
   
   int m;
   int n;
   int k;
-  int l;
+  int l; // batch
 
   float alpha;
   float beta;
@@ -114,9 +112,6 @@ struct RtBlockScaleFp8Arguments {
   ElementScalar *d_scale_C;
   ElementScalar *d_scale_D;
   ElementScalar *d_scale_aux;
-
-  RasterOrderOptions raster;
-  int swizzle;
 
   // Note : This value has to match the KernelSchedule::ScalePromotionInterval
   // Else kernel will fail can_implement() check
@@ -140,8 +135,11 @@ struct RtBlockScaleFp8Arguments {
   ElementScalar *d_abs_max_D;
 };
 
+
+using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 template <class ElementA, class ElementB, class ElementC,
-          class LayoutA, class LayoutB, class LayoutC>
+          class LayoutA, class LayoutB, class LayoutC,
+          RasterOrderOptions RasterOrder, int Swizzle>
 class GemmBlockScaleFp8Impl {
 public:
   ////
@@ -298,9 +296,9 @@ private:
       fusion_args.amax_D_ptr = rt_args.d_abs_max_D; // abs_max_D.device_data();
     }
 
-    arguments.scheduler.raster_order = rt_args.raster;
+    arguments.scheduler.raster_order = RasterOrder;
     // The tile scheduler will swizzle up to 8 and with the nearest multiple of 2 (i.e., 1, 2, 4, and 8)
-    arguments.scheduler.max_swizzle_size = rt_args.swizzle;
+    arguments.scheduler.max_swizzle_size = Swizzle;
 
     return arguments;
   }
@@ -393,12 +391,6 @@ using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
 using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
 using ActivationFunctor = typename EpilogueOutputOp::ActivationFn;
 
-using StrideA = typename Gemm::GemmKernel::StrideA;
-using StrideB = typename Gemm::GemmKernel::StrideB;
-using StrideC = typename Gemm::GemmKernel::StrideC;
-using StrideD = typename Gemm::GemmKernel::StrideD;
-using StrideAux = StrideD;
-
 constexpr bool IsDFp8 =
     cute::is_same_v<ElementD, cutlass::float_e4m3_t> or
     cute::is_same_v<ElementD, cutlass::float_e5m2_t>;
@@ -411,44 +403,11 @@ static_assert(cute::is_same_v<ElementAccumulator, ElementBlockScale>,
              "ElementAccumulator and ElementBlockScale should be same datatype");
 
 /// Initialization
-StrideA stride_A;
-StrideB stride_B;
-StrideC stride_C;
-StrideD stride_D;
-StrideAux stride_aux;
-uint64_t seed;
-
-cutlass::HostTensor<ElementA  , LayoutA  > tensor_A;
-cutlass::HostTensor<ElementB  , LayoutB  > tensor_B;
-cutlass::HostTensor<ElementC  , LayoutC  > tensor_C;
-cutlass::HostTensor<ElementD  , LayoutD  > tensor_D;
-uint32_t mma_promotion_interval;
-cutlass::HostTensor<ElementBlockScale, LayoutA> blockscale_tensor_A;
-cutlass::HostTensor<ElementBlockScale, LayoutB> blockscale_tensor_B;
-cutlass::HostTensor<ElementD  , LayoutD  > tensor_ref_D;
-cutlass::HostTensor<ElementAux, LayoutAux> tensor_aux;
-cutlass::HostTensor<ElementAux, LayoutAux> tensor_ref_aux;
-
-using LayoutScalar = cutlass::layout::PackedVectorLayout;
-cutlass::HostTensor<ElementScalar, LayoutScalar> scalar_alpha;
-cutlass::HostTensor<ElementScalar, LayoutScalar> scalar_beta;
-cutlass::HostTensor<ElementScalar, LayoutScalar> scale_A;
-cutlass::HostTensor<ElementScalar, LayoutScalar> scale_B;
-cutlass::HostTensor<ElementScalar, LayoutScalar> scale_C;
-cutlass::HostTensor<ElementScalar, LayoutScalar> scale_D;
-cutlass::HostTensor<ElementScalar, LayoutScalar> scale_aux;
-cutlass::HostTensor<ElementAmax  , LayoutScalar> abs_max_D;
-cutlass::HostTensor<ElementAmax  , LayoutScalar> reference_abs_max_D;
-cutlass::HostTensor<ElementAmax  , LayoutScalar> abs_max_aux;
-cutlass::HostTensor<ElementAmax  , LayoutScalar> reference_abs_max_aux;
-
 #endif // defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /// Testbed utility types
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-// using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 
 /// Result structure
 struct Result
@@ -475,214 +434,249 @@ struct Result
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /// GEMM setup and evaluation
 /////////////////////////////////////////////////////////////////////////////////////////////////
+template <class Gemm>
+struct Buffer {
 
-/// Helper to initialize a block of device data
-template <typename Element, typename Layout>
-bool initialize_tensor(
-  cutlass::TensorView<Element, Layout> view,
-  cutlass::Distribution::Kind dist_kind,
-  uint64_t seed) {
+  uint64_t seed;
 
-  if (dist_kind == cutlass::Distribution::Uniform) {
+  cutlass::HostTensor<ElementA  , LayoutA  > tensor_A;
+  cutlass::HostTensor<ElementB  , LayoutB  > tensor_B;
+  cutlass::HostTensor<ElementC  , LayoutC  > tensor_C;
+  cutlass::HostTensor<ElementD  , LayoutD  > tensor_D;
+  uint32_t mma_promotion_interval;
+  cutlass::HostTensor<ElementBlockScale, LayoutA> blockscale_tensor_A;
+  cutlass::HostTensor<ElementBlockScale, LayoutB> blockscale_tensor_B;
+  cutlass::HostTensor<ElementD  , LayoutD  > tensor_ref_D;
+  cutlass::HostTensor<ElementAux, LayoutAux> tensor_aux;
+  cutlass::HostTensor<ElementAux, LayoutAux> tensor_ref_aux;
+  
+  using LayoutScalar = cutlass::layout::PackedVectorLayout;
+  cutlass::HostTensor<ElementScalar, LayoutScalar> scalar_alpha;
+  cutlass::HostTensor<ElementScalar, LayoutScalar> scalar_beta;
+  cutlass::HostTensor<ElementScalar, LayoutScalar> scale_A;
+  cutlass::HostTensor<ElementScalar, LayoutScalar> scale_B;
+  cutlass::HostTensor<ElementScalar, LayoutScalar> scale_C;
+  cutlass::HostTensor<ElementScalar, LayoutScalar> scale_D;
+  cutlass::HostTensor<ElementScalar, LayoutScalar> scale_aux;
+  cutlass::HostTensor<ElementAmax  , LayoutScalar> abs_max_D;
+  cutlass::HostTensor<ElementAmax  , LayoutScalar> reference_abs_max_D;
+  cutlass::HostTensor<ElementAmax  , LayoutScalar> abs_max_aux;
+  cutlass::HostTensor<ElementAmax  , LayoutScalar> reference_abs_max_aux;
+  
 
-    double scope_max, scope_min;
-    int bits_input = cutlass::sizeof_bits<Element>::value;
-    int bits_output = cutlass::sizeof_bits<Element>::value;
+  /// Helper to initialize a block of device data
+  template <typename Element, typename Layout>
+  bool initialize_tensor(
+    cutlass::TensorView<Element, Layout> view,
+    cutlass::Distribution::Kind dist_kind,
+    uint64_t seed) {
 
-    if (bits_input == 1) {
-      scope_max = 2;
-      scope_min = 0;
-    } else if (bits_input <= 8) {
-      scope_max = 2;
-      scope_min = -2;
-    } else if (bits_output == 16) {
-      scope_max = 5;
-      scope_min = -5;
-    } else {
-      scope_max = 8;
-      scope_min = -8;
+    if (dist_kind == cutlass::Distribution::Uniform) {
+
+      double scope_max, scope_min;
+      int bits_input = cutlass::sizeof_bits<Element>::value;
+      int bits_output = cutlass::sizeof_bits<Element>::value;
+
+      if (bits_input == 1) {
+        scope_max = 2;
+        scope_min = 0;
+      } else if (bits_input <= 8) {
+        scope_max = 2;
+        scope_min = -2;
+      } else if (bits_output == 16) {
+        scope_max = 5;
+        scope_min = -5;
+      } else {
+        scope_max = 8;
+        scope_min = -8;
+      }
+
+      cutlass::reference::host::TensorFillRandomUniform(
+        view, seed, scope_max, scope_min, bits_input);
+    }
+    else if (dist_kind == cutlass::Distribution::AllZeros) {
+      cutlass::reference::host::TensorFill(view);
+    }
+    else if (dist_kind == cutlass::Distribution::Identity) {
+
+      cutlass::reference::host::TensorFillIdentity(view);
+    }
+    else if (dist_kind == cutlass::Distribution::Gaussian) {
+
+      cutlass::reference::host::TensorFillRandomGaussian(view, seed, 0, 0.5);
+    }
+    else if (dist_kind == cutlass::Distribution::Sequential) {
+      cutlass::reference::host::BlockFillSequential(view.data(), view.capacity());
+    }
+    else {
+      throw std::runtime_error("Not implementated.");
     }
 
-    cutlass::reference::host::TensorFillRandomUniform(
-      view, seed, scope_max, scope_min, bits_input);
-  }
-  else if (dist_kind == cutlass::Distribution::AllZeros) {
-    cutlass::reference::host::TensorFill(view);
-  }
-  else if (dist_kind == cutlass::Distribution::Identity) {
-
-    cutlass::reference::host::TensorFillIdentity(view);
-  }
-  else if (dist_kind == cutlass::Distribution::Gaussian) {
-
-    cutlass::reference::host::TensorFillRandomGaussian(view, seed, 0, 0.5);
-  }
-  else if (dist_kind == cutlass::Distribution::Sequential) {
-    cutlass::reference::host::BlockFillSequential(view.data(), view.capacity());
-  }
-  else {
-    throw std::runtime_error("Not implementated.");
+    return true;
   }
 
-  return true;
-}
+  /// Helper to initialize a block of device data (scale_tensors)
+  template <typename Element, typename Layout>
+  bool initialize_scale_tensor(
+    cutlass::TensorView<Element, Layout> view,
+    cutlass::Distribution::Kind dist_kind,
+    uint64_t seed) {
 
-/// Helper to initialize a block of device data (scale_tensors)
-template <typename Element, typename Layout>
-bool initialize_scale_tensor(
-  cutlass::TensorView<Element, Layout> view,
-  cutlass::Distribution::Kind dist_kind,
-  uint64_t seed) {
+    if (dist_kind == cutlass::Distribution::Uniform) {
 
-  if (dist_kind == cutlass::Distribution::Uniform) {
+      double scope_max, scope_min;
 
-    double scope_max, scope_min;
+      scope_min = -1;
+      scope_max = 1;
 
-    scope_min = -1;
-    scope_max = 1;
+      cutlass::reference::host::TensorFillRandomUniform(
+        view, seed, scope_max, scope_min);
+    }
+    else if (dist_kind == cutlass::Distribution::AllZeros) {
+      cutlass::reference::host::TensorFill(view);
+    }
+    else if (dist_kind == cutlass::Distribution::Identity) {
 
-    cutlass::reference::host::TensorFillRandomUniform(
-      view, seed, scope_max, scope_min);
-  }
-  else if (dist_kind == cutlass::Distribution::AllZeros) {
-    cutlass::reference::host::TensorFill(view);
-  }
-  else if (dist_kind == cutlass::Distribution::Identity) {
+      cutlass::reference::host::TensorFillIdentity(view);
+    }
+    else if (dist_kind == cutlass::Distribution::Gaussian) {
 
-    cutlass::reference::host::TensorFillIdentity(view);
-  }
-  else if (dist_kind == cutlass::Distribution::Gaussian) {
+      cutlass::reference::host::TensorFillRandomGaussian(view, seed, 0, 0.5);
+    }
+    else if (dist_kind == cutlass::Distribution::Sequential) {
+      cutlass::reference::host::BlockFillSequential(view.data(), view.capacity());
+    }
+    else {
+      throw std::runtime_error("Not implementated.");
+    }
 
-    cutlass::reference::host::TensorFillRandomGaussian(view, seed, 0, 0.5);
-  }
-  else if (dist_kind == cutlass::Distribution::Sequential) {
-    cutlass::reference::host::BlockFillSequential(view.data(), view.capacity());
-  }
-  else {
-    throw std::runtime_error("Not implementated.");
-  }
-
-  return true;
-}
-
-/// Initialize operands to be used in the GEMM and reference GEMM
-void initialize(const Options<RasterOrderOptions> &options) {
-
-  // Find Block Scaling tensor shapes based on problem shape and TileShape
-  auto gemm_problem_shape = cute::make_shape(options.m, options.n, options.k);
-  auto blockscale_shape = shape(get<1>(cute::zipped_divide(cute::make_layout(gemm_problem_shape), TileShape{})));
-  auto blockscale_m = cute::get<0>(blockscale_shape);
-  auto blockscale_n = cute::get<1>(blockscale_shape);
-  auto blockscale_k = cute::get<2>(blockscale_shape);
-
-  stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(options.m, options.k, options.l));
-  stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(options.n, options.k, options.l));
-  stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(options.m, options.n, options.l));
-  stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(options.m, options.n, options.l));
-  stride_aux = stride_D;
-
-
-
-  auto a_coord = cutlass::make_Coord(options.m * options.l, options.k);
-  auto c_coord = cutlass::make_Coord(options.m * options.l, options.n);
-  auto b_coord = cutlass::make_Coord(options.k, options.n * options.l);
-  auto blockscale_a_coord = cutlass::make_Coord(blockscale_m * options.l, blockscale_k);
-  auto blockscale_b_coord = cutlass::make_Coord(blockscale_k, blockscale_n * options.l);
-
-  tensor_A.resize(a_coord);
-  blockscale_tensor_A.resize(blockscale_a_coord);
-  tensor_B.resize(b_coord);
-  blockscale_tensor_B.resize(blockscale_b_coord);
-  tensor_C.resize(c_coord);
-  tensor_D.resize(c_coord);
-  tensor_ref_D.resize(c_coord);
-
-  cutlass::Distribution::Kind dist_A = cutlass::Distribution::Uniform;
-  cutlass::Distribution::Kind dist_B = cutlass::Distribution::Uniform;
-  cutlass::Distribution::Kind dist_C = cutlass::Distribution::Uniform;
-  cutlass::Distribution::Kind dist_scaleA = cutlass::Distribution::Uniform;
-  cutlass::Distribution::Kind dist_scaleB = cutlass::Distribution::Uniform;
-
-  initialize_tensor(tensor_A.host_view(), dist_A, seed + 2022);
-  initialize_tensor(tensor_B.host_view(), dist_B, seed + 2023);
-  initialize_tensor(tensor_C.host_view(), dist_C, seed + 2024);
-  initialize_scale_tensor(blockscale_tensor_A.host_view(), dist_scaleA, seed + 2025);
-  initialize_scale_tensor(blockscale_tensor_B.host_view(), dist_scaleB, seed + 2026);
-
-#if 0 // Dump blockscaled tensors
-  std::cout << "blockscale_tensor_A: " << blockscale_a_coord << std::endl;
-  std::cout << blockscale_tensor_A.host_view() << "\n";
-  std::cout << "blockscale_tensor_B: " << blockscale_b_coord << std::endl;
-  std::cout << blockscale_tensor_B.host_view() << "\n";
-#endif
-
-  // Print block scaling tensors on the host side.
-  tensor_A.sync_device();
-  tensor_B.sync_device();
-  tensor_C.sync_device();
-  tensor_D.sync_device();
-  blockscale_tensor_A.sync_device();
-  blockscale_tensor_B.sync_device();
-
-  // Note : This value has to match the KernelSchedule::ScalePromotionInterval
-  // Else kernel will fail can_implement() check
-  // Deprecation Notice : We plan to remove this params member in an upcoming release
-  // Users can safely delete this line from their code, since the default is already 4
-  mma_promotion_interval = 4;
-
-  if (options.save_aux) {
-    tensor_aux.resize(c_coord);
-    tensor_aux.sync_device();
-    tensor_ref_aux.resize(c_coord);
+    return true;
   }
 
-  if (options.device_scale) {
-    scalar_alpha.resize(cutlass::make_Coord(1));
-    scalar_beta.resize(cutlass::make_Coord(1));
-    scale_A.resize(cutlass::make_Coord(1));
-    scale_B.resize(cutlass::make_Coord(1));
-    scale_C.resize(cutlass::make_Coord(1));
-    scale_D.resize(cutlass::make_Coord(1));
-    scale_aux.resize(cutlass::make_Coord(1));
+  /// Initialize operands to be used in the GEMM and reference GEMM
+  void initialize(const Options &options) {
 
-    cutlass::reference::host::TensorFill(scalar_alpha.host_view(), options.alpha);
-    cutlass::reference::host::TensorFill(scalar_beta.host_view(), options.beta);
-    cutlass::reference::host::TensorFill(scale_A.host_view(), options.scale_a);
-    cutlass::reference::host::TensorFill(scale_B.host_view(), options.scale_b);
-    cutlass::reference::host::TensorFill(scale_C.host_view(), options.scale_c);
-    cutlass::reference::host::TensorFill(scale_D.host_view(), options.scale_d);
-    cutlass::reference::host::TensorFill(scale_aux.host_view(), options.scale_aux);
+    // Find Block Scaling tensor shapes based on problem shape and TileShape
+    auto gemm_problem_shape = cute::make_shape(options.m, options.n, options.k);
+    auto blockscale_shape = shape(get<1>(cute::zipped_divide(cute::make_layout(gemm_problem_shape), TileShape{})));
+    auto blockscale_m = cute::get<0>(blockscale_shape);
+    auto blockscale_n = cute::get<1>(blockscale_shape);
+    auto blockscale_k = cute::get<2>(blockscale_shape);
 
-    scalar_alpha.sync_device();
-    scalar_beta.sync_device();
-    scale_A.sync_device();
-    scale_B.sync_device();
-    scale_C.sync_device();
-    scale_D.sync_device();
-    scale_aux.sync_device();
-  }
+    auto a_coord = cutlass::make_Coord(options.m * options.l, options.k);
+    auto c_coord = cutlass::make_Coord(options.m * options.l, options.n);
+    auto b_coord = cutlass::make_Coord(options.k, options.n * options.l);
+    auto blockscale_a_coord = cutlass::make_Coord(blockscale_m * options.l, blockscale_k);
+    auto blockscale_b_coord = cutlass::make_Coord(blockscale_k, blockscale_n * options.l);
 
-  if (IsDFp8 && options.save_amax) {
-    abs_max_D.resize(cutlass::make_Coord(1));
-    initialize_tensor(abs_max_D.host_view(), cutlass::Distribution::AllZeros, 0);
-    abs_max_D.sync_device();
-    reference_abs_max_D.resize(cutlass::make_Coord(1));
-    initialize_tensor(reference_abs_max_D.host_view(), cutlass::Distribution::AllZeros, 0);
-  }
+    tensor_A.resize(a_coord);
+    blockscale_tensor_A.resize(blockscale_a_coord);
+    tensor_B.resize(b_coord);
+    blockscale_tensor_B.resize(blockscale_b_coord);
+    tensor_C.resize(c_coord);
+    tensor_D.resize(c_coord);
+    tensor_ref_D.resize(c_coord);
 
-  if (IsAuxFp8 && options.save_aux && options.save_amax) {
-    abs_max_aux.resize(cutlass::make_Coord(1));
-    initialize_tensor(abs_max_aux.host_view(), cutlass::Distribution::AllZeros, 0);
-    abs_max_aux.sync_device();
-    reference_abs_max_aux.resize(cutlass::make_Coord(1));
-    initialize_tensor(reference_abs_max_aux.host_view(), cutlass::Distribution::AllZeros, 0);
-  }
-}
+    cutlass::Distribution::Kind dist_A = cutlass::Distribution::Uniform;
+    cutlass::Distribution::Kind dist_B = cutlass::Distribution::Uniform;
+    cutlass::Distribution::Kind dist_C = cutlass::Distribution::Uniform;
+    cutlass::Distribution::Kind dist_scaleA = cutlass::Distribution::Uniform;
+    cutlass::Distribution::Kind dist_scaleB = cutlass::Distribution::Uniform;
 
-bool verify(const Options<RasterOrderOptions> &options) {
+    initialize_tensor(tensor_A.host_view(), dist_A, seed + 2022);
+    initialize_tensor(tensor_B.host_view(), dist_B, seed + 2023);
+    initialize_tensor(tensor_C.host_view(), dist_C, seed + 2024);
+    initialize_scale_tensor(blockscale_tensor_A.host_view(), dist_scaleA, seed + 2025);
+    initialize_scale_tensor(blockscale_tensor_B.host_view(), dist_scaleB, seed + 2026);
+
+  #if 0 // Dump blockscaled tensors
+    std::cout << "blockscale_tensor_A: " << blockscale_a_coord << std::endl;
+    std::cout << blockscale_tensor_A.host_view() << "\n";
+    std::cout << "blockscale_tensor_B: " << blockscale_b_coord << std::endl;
+    std::cout << blockscale_tensor_B.host_view() << "\n";
+  #endif
+
+    // Print block scaling tensors on the host side.
+    tensor_A.sync_device();
+    tensor_B.sync_device();
+    tensor_C.sync_device();
+    tensor_D.sync_device();
+    blockscale_tensor_A.sync_device();
+    blockscale_tensor_B.sync_device();
+
+    if (options.save_aux) {
+      tensor_aux.resize(c_coord);
+      tensor_aux.sync_device();
+      tensor_ref_aux.resize(c_coord);
+    }
+
+    if (options.device_scale) {
+      scalar_alpha.resize(cutlass::make_Coord(1));
+      scalar_beta.resize(cutlass::make_Coord(1));
+      scale_A.resize(cutlass::make_Coord(1));
+      scale_B.resize(cutlass::make_Coord(1));
+      scale_C.resize(cutlass::make_Coord(1));
+      scale_D.resize(cutlass::make_Coord(1));
+      scale_aux.resize(cutlass::make_Coord(1));
+
+      cutlass::reference::host::TensorFill(scalar_alpha.host_view(), options.alpha);
+      cutlass::reference::host::TensorFill(scalar_beta.host_view(), options.beta);
+      cutlass::reference::host::TensorFill(scale_A.host_view(), options.scale_a);
+      cutlass::reference::host::TensorFill(scale_B.host_view(), options.scale_b);
+      cutlass::reference::host::TensorFill(scale_C.host_view(), options.scale_c);
+      cutlass::reference::host::TensorFill(scale_D.host_view(), options.scale_d);
+      cutlass::reference::host::TensorFill(scale_aux.host_view(), options.scale_aux);
+
+      scalar_alpha.sync_device();
+      scalar_beta.sync_device();
+      scale_A.sync_device();
+      scale_B.sync_device();
+      scale_C.sync_device();
+      scale_D.sync_device();
+      scale_aux.sync_device();
+    }
+
+    if (IsDFp8 && options.save_amax) {
+      abs_max_D.resize(cutlass::make_Coord(1));
+      initialize_tensor(abs_max_D.host_view(), cutlass::Distribution::AllZeros, 0);
+      abs_max_D.sync_device();
+      reference_abs_max_D.resize(cutlass::make_Coord(1));
+      initialize_tensor(reference_abs_max_D.host_view(), cutlass::Distribution::AllZeros, 0);
+    }
+
+    if (IsAuxFp8 && options.save_aux && options.save_amax) {
+      abs_max_aux.resize(cutlass::make_Coord(1));
+      initialize_tensor(abs_max_aux.host_view(), cutlass::Distribution::AllZeros, 0);
+      abs_max_aux.sync_device();
+      reference_abs_max_aux.resize(cutlass::make_Coord(1));
+      initialize_tensor(reference_abs_max_aux.host_view(), cutlass::Distribution::AllZeros, 0);
+    }
+  }  
+};
+
+
+
+template <class Gemm>
+bool verify(const Options &options, Buffer<Gemm> &buffer) {
   //
   // Compute reference output
   //
+  using EpilogueOutputOp  = typename Gemm::EpilogueOutputOp;
+  using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
+  using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
+  using ActivationFunctor = typename EpilogueOutputOp::ActivationFn;
+
+  using StrideA = typename Gemm::GemmKernel::StrideA;
+  using StrideB = typename Gemm::GemmKernel::StrideB;
+  using StrideC = typename Gemm::GemmKernel::StrideC;
+  using StrideD = typename Gemm::GemmKernel::StrideD;
+  using StrideAux = StrideD;
+
+  StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(options.m, options.k, options.l));
+  StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(options.n, options.k, options.l));
+  StrideC stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(options.m, options.n, options.l));
+  StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(options.m, options.n, options.l));
+  StrideAux stride_aux = stride_D;
 
   // Block scaling tensors shapes based CTA Block (TileShape) and GEMM Problem shape
   auto gemm_problem_shape = cute::make_shape(options.m, options.n, options.k);
@@ -691,44 +685,44 @@ bool verify(const Options<RasterOrderOptions> &options) {
   auto blockscale_k = ceil_div(options.k, get<2>(TileShape{}));
 
   // Create instantiation for device reference gemm kernel
-  auto A = cute::make_tensor(tensor_A.host_data(),
+  auto A = cute::make_tensor(buffer.tensor_A.host_data(),
                              cute::make_layout(
                                 cute::make_shape(options.m, options.k, options.l),
                                 stride_A
                               )
                             );
-  auto B = cute::make_tensor(tensor_B.host_data(),
+  auto B = cute::make_tensor(buffer.tensor_B.host_data(),
                              cute::make_layout(
                                cute::make_shape(options.n, options.k, options.l),
                                stride_B
                               )
                             );
-  auto C = cute::make_tensor(tensor_C.host_data(),
+  auto C = cute::make_tensor(buffer.tensor_C.host_data(),
                              cute::make_layout(
                                 cute::make_shape(options.m, options.n, options.l),
                                 stride_C
                               )
                             );
-  auto D = cute::make_tensor(tensor_ref_D.host_data(),
+  auto D = cute::make_tensor(buffer.tensor_ref_D.host_data(),
                              cute::make_layout(
                                 cute::make_shape(options.m, options.n, options.l),
                                 stride_D
                               )
                             );
-  auto Aux = cute::make_tensor(tensor_ref_aux.host_data(),
+  auto Aux = cute::make_tensor(buffer.tensor_ref_aux.host_data(),
                                cute::make_layout(
                                   cute::make_shape(options.m, options.n, options.l),
                                   stride_aux
                                 )
                               );
 
-  auto blockscale_A = cute::make_tensor(blockscale_tensor_A.host_data(),
+  auto blockscale_A = cute::make_tensor(buffer.blockscale_tensor_A.host_data(),
                                         cute::make_layout(
                                           cute::make_shape(blockscale_m, blockscale_k, options.l),
                                           cute::make_stride(1, blockscale_m, blockscale_m * blockscale_k)
                                         )
                                       );
-  auto blockscale_B = cute::make_tensor(blockscale_tensor_B.host_data(),
+  auto blockscale_B = cute::make_tensor(buffer.blockscale_tensor_B.host_data(),
                                         cute::make_layout(
                                           cute::make_shape(blockscale_n, blockscale_k, options.l),
                                           cute::make_stride(1, blockscale_n, blockscale_n * blockscale_k)
@@ -769,19 +763,19 @@ bool verify(const Options<RasterOrderOptions> &options) {
   epilogue_params.scale_c = options.scale_c;
   epilogue_params.scale_d = options.scale_d;
   epilogue_params.scale_aux = options.scale_aux;
-  epilogue_params.abs_max_D = reference_abs_max_D.host_data();
-  epilogue_params.abs_max_Aux = reference_abs_max_aux.host_data();
+  epilogue_params.abs_max_D = buffer.reference_abs_max_D.host_data();
+  epilogue_params.abs_max_Aux = buffer.reference_abs_max_aux.host_data();
 
   // get reference result
   cutlass::reference::host::Gemm3x(mainloop_params, epilogue_params);
 
   // compare_reference
   bool passed = true;
-  tensor_D.sync_host();
-  passed &= cutlass::reference::host::TensorRelativelyEquals(tensor_D.host_view(), tensor_ref_D.host_view(), ElementAux(options.epsilon), ElementAux(options.non_zero_floor));
-  double mse = cutlass::reference::host::TensorMSE(tensor_D.host_view(), tensor_ref_D.host_view());
-  double mre = cutlass::reference::host::TensorMRE(tensor_D.host_view(), tensor_ref_D.host_view());
-  double max_error = cutlass::reference::host::TensorGreatestError(tensor_D.host_view(), tensor_ref_D.host_view());
+  buffer.tensor_D.sync_host();
+  passed &= cutlass::reference::host::TensorRelativelyEquals(buffer.tensor_D.host_view(), buffer.tensor_ref_D.host_view(), ElementAux(options.epsilon), ElementAux(options.non_zero_floor));
+  double mse = cutlass::reference::host::TensorMSE(buffer.tensor_D.host_view(), buffer.tensor_ref_D.host_view());
+  double mre = cutlass::reference::host::TensorMRE(buffer.tensor_D.host_view(), buffer.tensor_ref_D.host_view());
+  double max_error = cutlass::reference::host::TensorGreatestError(buffer.tensor_D.host_view(), buffer.tensor_ref_D.host_view());
   std::cout << "  Result MSE: " << mse << ", MRE: " << mre << ", greatest error: " << max_error << std::endl;
 
 #if 0
@@ -794,22 +788,22 @@ bool verify(const Options<RasterOrderOptions> &options) {
 #endif
 
   if (IsDFp8 && options.save_amax) {
-    abs_max_D.sync_host();
-    std::cout << "  Abs max D: " << abs_max_D.at(cutlass::make_Coord(0)) << ", reference: " << reference_abs_max_D.at(cutlass::make_Coord(0)) << std::endl;
-    passed &= cutlass::relatively_equal(abs_max_D.at(cutlass::make_Coord(0)), reference_abs_max_D.at(cutlass::make_Coord(0)), ElementScalar(options.epsilon), ElementScalar(options.non_zero_floor));
+    buffer.abs_max_D.sync_host();
+    std::cout << "  Abs max D: " << buffer.abs_max_D.at(cutlass::make_Coord(0)) << ", reference: " << buffer.reference_abs_max_D.at(cutlass::make_Coord(0)) << std::endl;
+    passed &= cutlass::relatively_equal(buffer.abs_max_D.at(cutlass::make_Coord(0)), buffer.reference_abs_max_D.at(cutlass::make_Coord(0)), ElementScalar(options.epsilon), ElementScalar(options.non_zero_floor));
   }
 
   if (options.save_aux) {
-    tensor_aux.sync_host();
-    passed &= cutlass::reference::host::TensorRelativelyEquals(tensor_aux.host_view(), tensor_ref_aux.host_view(), ElementAux(options.epsilon), ElementAux(options.non_zero_floor));
-    mse = cutlass::reference::host::TensorMSE(tensor_aux.host_view(), tensor_ref_aux.host_view());
-    mre = cutlass::reference::host::TensorMRE(tensor_aux.host_view(), tensor_ref_aux.host_view());
-    max_error = cutlass::reference::host::TensorGreatestError(tensor_aux.host_view(), tensor_ref_aux.host_view());
+    buffer.tensor_aux.sync_host();
+    passed &= cutlass::reference::host::TensorRelativelyEquals(buffer.tensor_aux.host_view(), buffer.tensor_ref_aux.host_view(), ElementAux(options.epsilon), ElementAux(options.non_zero_floor));
+    mse = cutlass::reference::host::TensorMSE(buffer.tensor_aux.host_view(), buffer.tensor_ref_aux.host_view());
+    mre = cutlass::reference::host::TensorMRE(buffer.tensor_aux.host_view(), buffer.tensor_ref_aux.host_view());
+    max_error = cutlass::reference::host::TensorGreatestError(buffer.tensor_aux.host_view(), buffer.tensor_ref_aux.host_view());
     std::cout << "  Aux MSE: " << mse << ", MRE: " << mre << ", greatest error: " << max_error << std::endl;
     if (IsAuxFp8 && options.save_amax) {
-      abs_max_aux.sync_host();
-      std::cout << "  Abs max aux: " << abs_max_aux.at(cutlass::make_Coord(0)) << ", reference: " << reference_abs_max_aux.at(cutlass::make_Coord(0)) << std::endl;
-      passed &= cutlass::relatively_equal(abs_max_aux.at(cutlass::make_Coord(0)), reference_abs_max_aux.at(cutlass::make_Coord(0)), ElementScalar(options.epsilon), ElementScalar(options.non_zero_floor));
+      buffer.abs_max_aux.sync_host();
+      std::cout << "  Abs max aux: " << buffer.abs_max_aux.at(cutlass::make_Coord(0)) << ", reference: " << buffer.reference_abs_max_aux.at(cutlass::make_Coord(0)) << std::endl;
+      passed &= cutlass::relatively_equal(buffer.abs_max_aux.at(cutlass::make_Coord(0)), buffer.reference_abs_max_aux.at(cutlass::make_Coord(0)), ElementScalar(options.epsilon), ElementScalar(options.non_zero_floor));
     }
   }
 
@@ -817,11 +811,14 @@ bool verify(const Options<RasterOrderOptions> &options) {
 }
 
 /// Execute a given example GEMM computation
-int run(Options<RasterOrderOptions> &options)
+int run(Options &options)
 {
-  initialize(options);
+  
 
-  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC>;
+  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC, RasterOrderOptions::AlongN, 1>;
+  Buffer<GemmFp8Impl::Gemm> buffer;
+  buffer.initialize(options);
+
   RtBlockScaleFp8Arguments<GemmFp8Impl::Gemm> rt_args;
   {
     rt_args.m = options.m;
@@ -831,36 +828,33 @@ int run(Options<RasterOrderOptions> &options)
   
     rt_args.alpha = options.alpha;
     rt_args.beta = options.beta;
-    rt_args.d_scalar_alpha = scalar_alpha.device_data();
-    rt_args.d_scalar_beta = scalar_beta.device_data();
+    rt_args.d_scalar_alpha = buffer.scalar_alpha.device_data();
+    rt_args.d_scalar_beta = buffer.scalar_beta.device_data();
   
     //
     rt_args.scale_a = 1.f, rt_args.scale_b = 1.f, rt_args.scale_c = 1.f, rt_args.scale_d = 1.f, rt_args.scale_aux = 1.f;
-    rt_args.d_scale_A = scale_A.device_data();
-    rt_args.d_scale_B = scale_B.device_data();
-    rt_args.d_scale_C = scale_C.device_data();
-    rt_args.d_scale_D = scale_D.device_data();
-    rt_args.d_scale_aux = scale_aux.device_data();
-  
-    rt_args.raster = options.raster;
-    rt_args.swizzle = options.swizzle;
+    rt_args.d_scale_A = buffer.scale_A.device_data();
+    rt_args.d_scale_B = buffer.scale_B.device_data();
+    rt_args.d_scale_C = buffer.scale_C.device_data();
+    rt_args.d_scale_D = buffer.scale_D.device_data();
+    rt_args.d_scale_aux = buffer.scale_aux.device_data();
   
     rt_args.mma_promotion_interval = 4;
 
-    rt_args.d_A = tensor_A.device_data();
-    rt_args.d_B = tensor_B.device_data();
-    rt_args.d_C = tensor_C.device_data();
-    rt_args.d_D = tensor_D.device_data();
+    rt_args.d_A = buffer.tensor_A.device_data();
+    rt_args.d_B = buffer.tensor_B.device_data();
+    rt_args.d_C = buffer.tensor_C.device_data();
+    rt_args.d_D = buffer.tensor_D.device_data();
   
-    rt_args.d_blockscale_A = blockscale_tensor_A.device_data();
-    rt_args.d_blockscale_B = blockscale_tensor_B.device_data();
+    rt_args.d_blockscale_A = buffer.blockscale_tensor_A.device_data();
+    rt_args.d_blockscale_B = buffer.blockscale_tensor_B.device_data();
   
     // debug
     rt_args.save_aux = options.save_aux;
     rt_args.save_amax = options.save_amax;
-    rt_args.d_tensor_aux = tensor_aux.device_data();
-    rt_args.d_abs_max_aux = abs_max_aux.device_data();
-    rt_args.d_abs_max_D = abs_max_D.device_data();
+    rt_args.d_tensor_aux = buffer.tensor_aux.device_data();
+    rt_args.d_abs_max_aux = buffer.abs_max_aux.device_data();
+    rt_args.d_abs_max_D = buffer.abs_max_D.device_data();
   }
 
   GemmFp8Impl gemm;
@@ -870,7 +864,7 @@ int run(Options<RasterOrderOptions> &options)
   // Check if output from CUTLASS kernel and reference kernel are equal or not
   Result result;
   if (options.verify) {
-    result.passed = verify(options);
+    result.passed = verify<GemmFp8Impl::Gemm>(options, buffer);
 
     std::cout << "  Disposition: " << (result.passed ? "Passed" : "Failed") << std::endl;
   }
@@ -894,17 +888,8 @@ int run(Options<RasterOrderOptions> &options)
     result.avg_runtime_ms = double(elapsed_ms) / double(options.iterations);
     result.gflops = options.gflops(result.avg_runtime_ms / 1000.0);
 
-    std::string raster = "Heuristic";
-
-    if (options.raster == RasterOrderOptions::AlongN) {
-      raster = "Along N";
-    }
-    else if (options.raster == RasterOrderOptions::AlongM) {
-      raster = "Along M";
-    }
-
     std::cout << "  Problem Size: " << options.m << 'x' << options.n << 'x' << options.k << 'x' << options.l << std::endl;
-    std::cout << "  Rasterization: " << raster << " with a maximum CTA swizzle of " << options.swizzle << std::endl;
+    std::cout << "  Rasterization: " << "Along N" << " with a maximum CTA swizzle of " << 1 << std::endl;
     std::cout << "  Avg runtime: " << result.avg_runtime_ms << " ms" << std::endl;
     std::cout << "  GFLOPS: " << result.gflops << std::endl;
   }
@@ -941,7 +926,7 @@ int main(int argc, char const **args) {
   // Parse options
   //
 
-  Options<RasterOrderOptions> options;
+  Options options;
 
   options.parse(argc, args);
 
