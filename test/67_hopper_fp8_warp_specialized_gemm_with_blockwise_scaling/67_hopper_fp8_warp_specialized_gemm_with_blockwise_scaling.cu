@@ -128,6 +128,7 @@ struct RtBlockScaleFp8Arguments {
 using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 template <class ElementA, class ElementB, class ElementC,
           class LayoutA, class LayoutB, class LayoutC,
+          class ClusterShape, 
           RasterOrderOptions RasterOrder, int Swizzle>
 class GemmBlockScaleFp8Impl {
 public:
@@ -147,7 +148,6 @@ public:
   using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
   using TileShape           = Shape<_128,_128,_128>;                           // Threadblock-level tile size
-  using ClusterShape        = Shape<_1,_2,_1>;                                // Shape of the threadblocks in a cluster
   ////
 
   using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<>;
@@ -159,7 +159,7 @@ public:
   
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
       ArchTag, OperatorClass,
-      TileShape, ClusterShape,
+      TileShape, ClusterShape,  // Shape of the threadblocks in a cluster
       EpilogueTileType,
       ElementAccumulator, ElementCompute,
       ElementC, LayoutC, 128 / cutlass::sizeof_bits<ElementC>::value,
@@ -264,20 +264,20 @@ private:
     auto &fusion_args = arguments.epilogue.thread;
     fusion_args.alpha = rt_args.alpha;
     fusion_args.beta = rt_args.beta;
-    fusion_args.alpha_ptr = (ElementScalar *)rt_args.d_scalar_alpha; // scalar_alpha.device_data();
-    fusion_args.beta_ptr = (ElementScalar *)rt_args.d_scalar_beta; // scalar_beta.device_data();
+    fusion_args.alpha_ptr = nullptr; // (ElementScalar *)rt_args.d_scalar_alpha; // scalar_alpha.device_data();
+    fusion_args.beta_ptr = nullptr; //(ElementScalar *)rt_args.d_scalar_beta; // scalar_beta.device_data();
     fusion_args.scale_a = rt_args.scale_a;
     fusion_args.scale_b = rt_args.scale_b;
     fusion_args.scale_c = rt_args.scale_c;
-    fusion_args.scale_a_ptr = (ElementScalar *)rt_args.d_scale_A; // scale_A.device_data();
-    fusion_args.scale_b_ptr = (ElementScalar *)rt_args.d_scale_B; // scale_B.device_data();
-    fusion_args.scale_c_ptr = (ElementScalar *)rt_args.d_scale_C; // scale_C.device_data();
+    fusion_args.scale_a_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_A; // scale_A.device_data();
+    fusion_args.scale_b_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_B; // scale_B.device_data();
+    fusion_args.scale_c_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_C; // scale_C.device_data();
 
     // ignored if tensor types are not fp8
     fusion_args.scale_d = rt_args.scale_d;
     fusion_args.scale_aux = rt_args.scale_aux;
-    fusion_args.scale_d_ptr = (ElementScalar *)rt_args.d_scale_D; //scale_D.device_data();
-    fusion_args.scale_aux_ptr = (ElementScalar *)rt_args.d_scale_aux; // scale_aux.device_data();
+    fusion_args.scale_d_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_D; //scale_D.device_data();
+    fusion_args.scale_aux_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_aux; // scale_aux.device_data();
 
     // leaving/setting these as nullptr disables the fusion at runtime
     fusion_args.bias_ptr = nullptr;
@@ -543,31 +543,31 @@ struct Buffer {
       tensor_ref_aux.resize(c_coord);
     }
 
-    if (options.device_scale) {
-      scalar_alpha.resize(cutlass::make_Coord(1));
-      scalar_beta.resize(cutlass::make_Coord(1));
-      scale_A.resize(cutlass::make_Coord(1));
-      scale_B.resize(cutlass::make_Coord(1));
-      scale_C.resize(cutlass::make_Coord(1));
-      scale_D.resize(cutlass::make_Coord(1));
-      scale_aux.resize(cutlass::make_Coord(1));
+    // if (options.device_scale) {
+    //   scalar_alpha.resize(cutlass::make_Coord(1));
+    //   scalar_beta.resize(cutlass::make_Coord(1));
+    //   scale_A.resize(cutlass::make_Coord(1));
+    //   scale_B.resize(cutlass::make_Coord(1));
+    //   scale_C.resize(cutlass::make_Coord(1));
+    //   scale_D.resize(cutlass::make_Coord(1));
+    //   scale_aux.resize(cutlass::make_Coord(1));
 
-      cutlass::reference::host::TensorFill(scalar_alpha.host_view(), options.alpha);
-      cutlass::reference::host::TensorFill(scalar_beta.host_view(), options.beta);
-      cutlass::reference::host::TensorFill(scale_A.host_view(), options.scale_a);
-      cutlass::reference::host::TensorFill(scale_B.host_view(), options.scale_b);
-      cutlass::reference::host::TensorFill(scale_C.host_view(), options.scale_c);
-      cutlass::reference::host::TensorFill(scale_D.host_view(), options.scale_d);
-      cutlass::reference::host::TensorFill(scale_aux.host_view(), options.scale_aux);
+    //   cutlass::reference::host::TensorFill(scalar_alpha.host_view(), options.alpha);
+    //   cutlass::reference::host::TensorFill(scalar_beta.host_view(), options.beta);
+    //   cutlass::reference::host::TensorFill(scale_A.host_view(), options.scale_a);
+    //   cutlass::reference::host::TensorFill(scale_B.host_view(), options.scale_b);
+    //   cutlass::reference::host::TensorFill(scale_C.host_view(), options.scale_c);
+    //   cutlass::reference::host::TensorFill(scale_D.host_view(), options.scale_d);
+    //   cutlass::reference::host::TensorFill(scale_aux.host_view(), options.scale_aux);
 
-      scalar_alpha.sync_device();
-      scalar_beta.sync_device();
-      scale_A.sync_device();
-      scale_B.sync_device();
-      scale_C.sync_device();
-      scale_D.sync_device();
-      scale_aux.sync_device();
-    }
+    //   scalar_alpha.sync_device();
+    //   scalar_beta.sync_device();
+    //   scale_A.sync_device();
+    //   scale_B.sync_device();
+    //   scale_C.sync_device();
+    //   scale_D.sync_device();
+    //   scale_aux.sync_device();
+    // }
 
     if (IsDFp8 && options.save_amax) {
       abs_max_D.resize(cutlass::make_Coord(1));
@@ -749,7 +749,7 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
 /// Execute a given example GEMM computation
 int run(Options &options)
 {
-  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC, RasterOrderOptions::AlongN, 1>;
+  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
   Buffer<GemmFp8Impl> buffer;
   buffer.initialize(options);
 
