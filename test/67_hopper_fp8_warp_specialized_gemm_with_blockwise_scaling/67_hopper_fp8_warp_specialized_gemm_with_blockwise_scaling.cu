@@ -90,12 +90,7 @@ using namespace cute;
 
 #if defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
 
-template <class Gemm>
 struct RtBlockScaleFp8Arguments {
-  using EpilogueOutputOp  = typename Gemm::EpilogueOutputOp;
-  using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
-  using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
-  
   int m;
   int n;
   int k;
@@ -103,21 +98,15 @@ struct RtBlockScaleFp8Arguments {
 
   float alpha;
   float beta;
-  ElementScalar *d_scalar_alpha; // scalar_alpha.device_data();
-  ElementScalar *d_scalar_beta;  // scalar_beta.device_data();
+  void *d_scalar_alpha; // ElementScalar* scalar_alpha.device_data();
+  void *d_scalar_beta;  // ElementScalar* scalar_beta.device_data();
  
   float scale_a = 1.f, scale_b = 1.f, scale_c = 1.f, scale_d = 1.f, scale_aux = 1.f;
-  ElementScalar *d_scale_A;
-  ElementScalar *d_scale_B;
-  ElementScalar *d_scale_C;
-  ElementScalar *d_scale_D;
-  ElementScalar *d_scale_aux;
-
-  // Note : This value has to match the KernelSchedule::ScalePromotionInterval
-  // Else kernel will fail can_implement() check
-  // Deprecation Notice : We plan to remove this params member in an upcoming release
-  // Users can safely delete this line from their code, since the default is already 4
-  unsigned int mma_promotion_interval;
+  void *d_scale_A;      // ElementScalar*
+  void *d_scale_B;
+  void *d_scale_C;
+  void *d_scale_D;
+  void *d_scale_aux;
 
   void *d_A; // tensor_A.device_data(),
   void *d_B; // tensor_B.device_data(),
@@ -131,8 +120,8 @@ struct RtBlockScaleFp8Arguments {
   bool save_aux;
   bool save_amax;
   void *d_tensor_aux;
-  ElementScalar *d_abs_max_aux;
-  ElementScalar *d_abs_max_D;
+  void *d_abs_max_aux;
+  void *d_abs_max_D;
 };
 
 
@@ -197,10 +186,19 @@ public:
       CollectiveEpilogue
   >;
   
+  // CORE
   using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
 
+  //
+  using ElementScalar     = typename Gemm::EpilogueOutputOp::ElementScalar;
+  using StrideA = typename Gemm::GemmKernel::StrideA;
+  using StrideB = typename Gemm::GemmKernel::StrideB;
+  using StrideC = typename Gemm::GemmKernel::StrideC;
+  using StrideD = typename Gemm::GemmKernel::StrideD;
+  using StrideAux = StrideD;
+
 public:
-  void initialize(const RtBlockScaleFp8Arguments<Gemm> &rt_args, void *stream = nullptr) {
+  void initialize(const RtBlockScaleFp8Arguments &rt_args, void *stream = nullptr) {
 
     static_assert(cute::is_same_v<ElementAccumulator, ElementBlockScale>,
       "ElementAccumulator and ElementBlockScale should be same datatype");
@@ -231,23 +229,19 @@ public:
   }
 
 private:
-  typename Gemm::Arguments args_from_options(const RtBlockScaleFp8Arguments<Gemm> &rt_args)
+  typename Gemm::Arguments args_from_options(const RtBlockScaleFp8Arguments &rt_args)
   {
-    using EpilogueOutputOp  = typename Gemm::EpilogueOutputOp;
-    using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
-    using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
-
-    using StrideA = typename Gemm::GemmKernel::StrideA;
-    using StrideB = typename Gemm::GemmKernel::StrideB;
-    using StrideC = typename Gemm::GemmKernel::StrideC;
-    using StrideD = typename Gemm::GemmKernel::StrideD;
-    using StrideAux = StrideD;
-
     StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(rt_args.m, rt_args.k, rt_args.l));
     StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(rt_args.n, rt_args.k, rt_args.l));
     StrideC stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(rt_args.m, rt_args.n, rt_args.l));
     StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(rt_args.m, rt_args.n, rt_args.l));
     StrideAux stride_aux = stride_D;
+
+    // Note : This value has to match the KernelSchedule::ScalePromotionInterval
+    // Else kernel will fail can_implement() check
+    // Deprecation Notice : We plan to remove this params member in an upcoming release
+    // Users can safely delete this line from their code, since the default is already 4
+    unsigned int mma_promotion_interval = 4;
 
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGemm,
@@ -256,7 +250,7 @@ private:
       stride_A,
       (ElementB *)rt_args.d_B,
       stride_B,
-      rt_args.mma_promotion_interval,
+      mma_promotion_interval,
       (ElementBlockScale *)rt_args.d_blockscale_A, // blockscale_tensor_A.device_data(),
       (ElementBlockScale *)rt_args.d_blockscale_B, // blockscale_tensor_B.device_data()
       },
@@ -270,20 +264,20 @@ private:
     auto &fusion_args = arguments.epilogue.thread;
     fusion_args.alpha = rt_args.alpha;
     fusion_args.beta = rt_args.beta;
-    fusion_args.alpha_ptr = rt_args.d_scalar_alpha; // scalar_alpha.device_data();
-    fusion_args.beta_ptr = rt_args.d_scalar_beta; // scalar_beta.device_data();
+    fusion_args.alpha_ptr = (ElementScalar *)rt_args.d_scalar_alpha; // scalar_alpha.device_data();
+    fusion_args.beta_ptr = (ElementScalar *)rt_args.d_scalar_beta; // scalar_beta.device_data();
     fusion_args.scale_a = rt_args.scale_a;
     fusion_args.scale_b = rt_args.scale_b;
     fusion_args.scale_c = rt_args.scale_c;
-    fusion_args.scale_a_ptr = rt_args.d_scale_A; // scale_A.device_data();
-    fusion_args.scale_b_ptr = rt_args.d_scale_B; // scale_B.device_data();
-    fusion_args.scale_c_ptr = rt_args.d_scale_C; // scale_C.device_data();
+    fusion_args.scale_a_ptr = (ElementScalar *)rt_args.d_scale_A; // scale_A.device_data();
+    fusion_args.scale_b_ptr = (ElementScalar *)rt_args.d_scale_B; // scale_B.device_data();
+    fusion_args.scale_c_ptr = (ElementScalar *)rt_args.d_scale_C; // scale_C.device_data();
 
     // ignored if tensor types are not fp8
     fusion_args.scale_d = rt_args.scale_d;
     fusion_args.scale_aux = rt_args.scale_aux;
-    fusion_args.scale_d_ptr = rt_args.d_scale_D; //scale_D.device_data();
-    fusion_args.scale_aux_ptr = rt_args.d_scale_aux; // scale_aux.device_data();
+    fusion_args.scale_d_ptr = (ElementScalar *)rt_args.d_scale_D; //scale_D.device_data();
+    fusion_args.scale_aux_ptr = (ElementScalar *)rt_args.d_scale_aux; // scale_aux.device_data();
 
     // leaving/setting these as nullptr disables the fusion at runtime
     fusion_args.bias_ptr = nullptr;
@@ -292,12 +286,12 @@ private:
       fusion_args.aux_ptr = (ElementAux *)rt_args.d_tensor_aux; // tensor_aux.device_data();
       fusion_args.dAux = stride_aux;
       if (rt_args.save_amax) {
-        fusion_args.amax_aux_ptr = rt_args.d_abs_max_aux; // abs_max_aux.device_data();
+        fusion_args.amax_aux_ptr = (ElementScalar *)rt_args.d_abs_max_aux; // abs_max_aux.device_data();
       }
     }
 
     if (rt_args.save_amax) {
-      fusion_args.amax_D_ptr = rt_args.d_abs_max_D; // abs_max_D.device_data();
+      fusion_args.amax_D_ptr = (ElementScalar *)rt_args.d_abs_max_D; // abs_max_D.device_data();
     }
 
     arguments.scheduler.raster_order = RasterOrder;
@@ -318,38 +312,18 @@ private:
 // A matrix configuration
 using         ElementA    = cutlass::float_e4m3_t;                          // Element type for A matrix operand
 using         LayoutA     = cutlass::layout::RowMajor;                      // Layout type for A matrix operand
-constexpr int AlignmentA  = 128 / cutlass::sizeof_bits<ElementA>::value;    // Memory access granularity/alignment of A matrix in units of elements (up to 16 bytes)
-
 // B matrix configuration
 using         ElementB    = cutlass::float_e4m3_t;                          // Element type for B matrix operand
 using         LayoutB     = cutlass::layout::ColumnMajor;                   // Layout type for B matrix operand
-constexpr int AlignmentB  = 128 / cutlass::sizeof_bits<ElementB>::value;    // Memory access granularity/alignment of B matrix in units of elements (up to 16 bytes)
-
 // C matrix configuration
 using         ElementC    = cutlass::bfloat16_t;                          // Element type for C and D matrix operands
 using         LayoutC     = cutlass::layout::RowMajor;                   // Layout type for C and D matrix operands
-constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
-
 // D matrix configuration
 using         ElementD    = ElementC;
 using         LayoutD     = LayoutC;
-constexpr int AlignmentD  = AlignmentC;
-
 // Auxiliary matrix configuration and other fusion types
 using         ElementAux   = ElementC;
 using         LayoutAux    = LayoutC;
-using         ElementAmax  = float;
-using         ElementBias  = float;
-
-/////////////////////1///////////////////////
-constexpr bool IsDFp8 =
-    cute::is_same_v<ElementD, cutlass::float_e4m3_t> or
-    cute::is_same_v<ElementD, cutlass::float_e5m2_t>;
-
-constexpr bool IsAuxFp8 =
-    cute::is_same_v<ElementAux, cutlass::float_e4m3_t> or
-    cute::is_same_v<ElementAux, cutlass::float_e5m2_t>;
-
 
 /// Initialization
 #endif // defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
@@ -383,13 +357,20 @@ struct Result
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /// GEMM setup and evaluation
 /////////////////////////////////////////////////////////////////////////////////////////////////
+constexpr bool IsDFp8 =
+  cute::is_same_v<ElementD, cutlass::float_e4m3_t> or
+  cute::is_same_v<ElementD, cutlass::float_e5m2_t>;
+
+constexpr bool IsAuxFp8 =
+  cute::is_same_v<ElementAux, cutlass::float_e4m3_t> or
+  cute::is_same_v<ElementAux, cutlass::float_e5m2_t>;
+
 template <class GemmImpl>
 struct Buffer {
   using ElementBlockScale = typename GemmImpl::ElementBlockScale;
   using TileShape         = typename GemmImpl::TileShape;
-  using EpilogueOutputOp  = typename GemmImpl::Gemm::EpilogueOutputOp;
-  using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
-  using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
+  using ElementScalar     = typename GemmImpl::ElementScalar;
+  using ElementAmax       = typename GemmImpl::ElementAmax;
 
   uint64_t seed;
 
@@ -397,7 +378,6 @@ struct Buffer {
   cutlass::HostTensor<ElementB  , LayoutB  > tensor_B;
   cutlass::HostTensor<ElementC  , LayoutC  > tensor_C;
   cutlass::HostTensor<ElementD  , LayoutD  > tensor_D;
-  uint32_t mma_promotion_interval;
   cutlass::HostTensor<ElementBlockScale, LayoutA> blockscale_tensor_A;
   cutlass::HostTensor<ElementBlockScale, LayoutB> blockscale_tensor_B;
   cutlass::HostTensor<ElementD  , LayoutD  > tensor_ref_D;
@@ -416,7 +396,6 @@ struct Buffer {
   cutlass::HostTensor<ElementAmax  , LayoutScalar> reference_abs_max_D;
   cutlass::HostTensor<ElementAmax  , LayoutScalar> abs_max_aux;
   cutlass::HostTensor<ElementAmax  , LayoutScalar> reference_abs_max_aux;
-  
 
   /// Helper to initialize a block of device data
   template <typename Element, typename Layout>
@@ -619,16 +598,15 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
   using ElementAccumulator= typename GemmImpl::ElementAccumulator;
   using ElementCompute    = typename GemmImpl::ElementCompute;
   using Gemm              = typename GemmImpl::Gemm;
-  using EpilogueOutputOp  = typename Gemm::EpilogueOutputOp;
-  using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
-  using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
-  using ActivationFunctor = typename EpilogueOutputOp::ActivationFn;
+  using ElementScalar     = typename GemmImpl::ElementScalar;
+  using ElementAmax       = typename GemmImpl::ElementAmax;
+  using ActivationFunctor = typename GemmImpl::Gemm::EpilogueOutputOp::ActivationFn;
 
-  using StrideA = typename Gemm::GemmKernel::StrideA;
-  using StrideB = typename Gemm::GemmKernel::StrideB;
-  using StrideC = typename Gemm::GemmKernel::StrideC;
-  using StrideD = typename Gemm::GemmKernel::StrideD;
-  using StrideAux = StrideD;
+  using StrideA = typename GemmImpl::StrideA;
+  using StrideB = typename GemmImpl::StrideB;
+  using StrideC = typename GemmImpl::StrideC;
+  using StrideD = typename GemmImpl::StrideD;
+  using StrideAux = typename GemmImpl::StrideAux;
 
   StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(options.m, options.k, options.l));
   StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(options.n, options.k, options.l));
@@ -771,13 +749,11 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
 /// Execute a given example GEMM computation
 int run(Options &options)
 {
-  
-
   using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC, RasterOrderOptions::AlongN, 1>;
   Buffer<GemmFp8Impl> buffer;
   buffer.initialize(options);
 
-  RtBlockScaleFp8Arguments<GemmFp8Impl::Gemm> rt_args;
+  RtBlockScaleFp8Arguments rt_args;
   {
     rt_args.m = options.m;
     rt_args.n = options.n;
@@ -796,8 +772,6 @@ int run(Options &options)
     rt_args.d_scale_C = buffer.scale_C.device_data();
     rt_args.d_scale_D = buffer.scale_D.device_data();
     rt_args.d_scale_aux = buffer.scale_aux.device_data();
-  
-    rt_args.mma_promotion_interval = 4;
 
     rt_args.d_A = buffer.tensor_A.device_data();
     rt_args.d_B = buffer.tensor_B.device_data();
