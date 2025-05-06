@@ -60,7 +60,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    RtArguments rt_args;
+    RtArgumentsV2 rt_args;
     torch::Tensor output = get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
     std::vector<int8_t> id_meta = MakeMeta();     // id + meta
 
@@ -125,7 +125,7 @@ private:
       c10::optional<torch::Tensor> output_buf,
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
-      RtArguments &rt_args) {
+      RtArgumentsV2 &rt_args) {
     CHECK_INPUT(input, this->input_dtype);
     CHECK_INPUT(weight, this->input_dtype);
     TORCH_CHECK(input.dim() == 2, "input shape is not 2");

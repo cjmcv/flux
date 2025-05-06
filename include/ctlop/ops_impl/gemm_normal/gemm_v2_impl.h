@@ -36,7 +36,9 @@ class GemmPureV2Impl : public GemmBase  {
       128 / cutlass::sizeof_bits<ElementB>::value>; // AlignmentB
 
 public:
-  void initialize(RtArguments &rt_args, void *stream = nullptr) {
+  void initialize(RtArguments &args, void *stream = nullptr) {
+    RtArgumentsV2& rt_args = dynamic_cast<RtArgumentsV2&>(args);
+
     gemm_dev_ = DeviceGemmBasic();
     // Using the arguments, query for extra workspace required for matrix multiplication computation
     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args.m, rt_args.n, rt_args.k);
@@ -46,7 +48,7 @@ public:
     rt_args.stride_d = helper.get_stride_c();
     auto arguments = args_from_options(rt_args);
     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
-  
+
     // Allocate workspace memory
     void *workspace_ptr = GlobalBuffer::instance().ResizeBufferIfNeeded(workspace_size);
 
@@ -67,7 +69,7 @@ private:
   // avail_sms: Number of device SMs to use is unlimited
   //         1: Set loadbalancing width to 1 SM (no load balancing)
   //        -1: Reset loadbalancing width to unspecified SMs (i.e., the number of device SMs)
-  typename DeviceGemmBasic::Arguments args_from_options(const RtArguments &rt_args) {
+  typename DeviceGemmBasic::Arguments args_from_options(const RtArgumentsV2 &rt_args) {
     cutlass::gemm::GemmCoord problem_size = {rt_args.m, rt_args.n, rt_args.k};
     if constexpr (cute::is_same_v<ThreadBlockSwizzle, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>>) {  
       return typename DeviceGemmBasic::Arguments(

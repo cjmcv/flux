@@ -32,7 +32,7 @@ class GemmPureV2SimtImpl : public GemmBase {
     2>;
 
 public:
-  typename DeviceGemmSimt::Arguments args_from_options(const RtArguments &rt_args) {
+  typename DeviceGemmSimt::Arguments args_from_options(RtArgumentsV2 &rt_args) {
     cutlass::gemm::GemmCoord problem_size = {rt_args.m, rt_args.n, rt_args.k};
     return typename DeviceGemmSimt::Arguments(
       cutlass::gemm::GemmUniversalMode::kGemm,  // universal mode
@@ -56,7 +56,8 @@ public:
       rt_args.stride_d);             // stride_d
   }
 
-  void initialize(RtArguments &rt_args, void *stream = nullptr) {
+  void initialize(RtArguments &args, void *stream = nullptr) {
+    RtArgumentsV2& rt_args = dynamic_cast<RtArgumentsV2&>(args);
     gemm_dev_ = DeviceGemmSimt();
 
     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args.m, rt_args.n, rt_args.k);
