@@ -532,12 +532,19 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
 
 /// Execute a given example GEMM computation
 int run(Options &options)
-{
+{  
   using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
+  //
+  using ME = UnifiedMetaEnum;
+  GemmConfigRegister& ins = GemmConfigRegister::instance();
+  std::vector<int8_t> id_meta = {0,(int8_t)ME::GemmBolckScaleFp8,(int8_t)ME::E4M3, (int8_t)ME::E4M3, (int8_t)ME::E4M3, (int8_t)ME::RCR, (int8_t)ME::Sm90};
+  ins.add(id_meta, /*op*/[]() { return new GemmFp8Impl();});
+  //
+
   Buffer<GemmFp8Impl> buffer;
   buffer.initialize(options);
 
-  RtBlockScaleFp8Arguments rt_args;
+  RtBlockScaleFp8ArgumentsV3 rt_args;
   {
     rt_args.m = options.m;
     rt_args.n = options.n;
@@ -573,9 +580,10 @@ int run(Options &options)
     rt_args.d_abs_max_D = buffer.abs_max_D.device_data();
   }
 
-  GemmFp8Impl gemm;
-  gemm.initialize(rt_args);
-  gemm.run();
+  // GemmFp8Impl gemm;
+  GemmBase *gemm = ins.GetOp(id_meta, false);
+  gemm->initialize(rt_args);
+  gemm->run();
 
   // Check if output from CUTLASS kernel and reference kernel are equal or not
   Result result;
@@ -595,7 +603,7 @@ int run(Options &options)
     for (int iter = 0; iter < options.warmup + options.iterations; ++iter) {
       if (iter == options.warmup)
         timer.start();
-      gemm.run();
+      gemm->run();
     }
     timer.stop();
 

@@ -78,7 +78,7 @@ public:
 
 public:
   void initialize(RtArguments &args, void *stream = nullptr) {
-    RtBlockScaleFp8Arguments& rt_args = dynamic_cast<RtBlockScaleFp8Arguments&>(args);
+    RtBlockScaleFp8ArgumentsV3& rt_args = dynamic_cast<RtBlockScaleFp8ArgumentsV3&>(args);
     static_assert(cute::is_same_v<ElementAccumulator, ElementBlockScale>,
       "ElementAccumulator and ElementBlockScale should be same datatype");
 
@@ -108,7 +108,7 @@ public:
   }
 
 private:
-  typename Gemm::Arguments args_from_options(const RtBlockScaleFp8Arguments &rt_args)
+  typename Gemm::Arguments args_from_options(const RtBlockScaleFp8ArgumentsV3 &rt_args)
   {
     StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(rt_args.m, rt_args.k, rt_args.l));
     StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(rt_args.n, rt_args.k, rt_args.l));

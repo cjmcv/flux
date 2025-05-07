@@ -26,7 +26,7 @@ struct RtArgumentsV2 : public RtArguments {
   int stride_d;
 };
 
-struct RtBlockScaleFp8Arguments : public RtArguments {
+struct RtBlockScaleFp8ArgumentsV3 : public RtArguments {
 
   float alpha;
   float beta;

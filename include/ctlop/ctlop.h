@@ -62,48 +62,48 @@ class CheckFail {
 // Enum classes
 /////////////////////////////////////////////////////
 enum class UnifiedMetaEnum : int8_t {
-  GemmNormal = 0, GemmNormalSimt,                      // meta type
+  GemmNormal = 0, GemmNormalSimt, GemmBolckScaleFp8,   // gemm type
   Void = 10, FP16, BF16, FP32, E4M3, E5M2, S8, S32,    // data type
   Sm80 = 20, Sm89, Sm90,                               // arch
   RRR = 30, RCR, RCC                                   // layout
 };
 
-inline std::string MetaEnumToString(UnifiedMetaEnum value) {
-  switch (value) {
-    case UnifiedMetaEnum::GemmNormal:
-      return "GemmNormal";
-    case UnifiedMetaEnum::Void:
-      return "Void";
-    case UnifiedMetaEnum::FP16:
-      return "FP16";
-    case UnifiedMetaEnum::BF16:
-      return "BF16";
-    case UnifiedMetaEnum::FP32:
-      return "FP32";
-    case UnifiedMetaEnum::E4M3:
-      return "E4M3";
-    case UnifiedMetaEnum::E5M2:
-      return "E5M2";
-    case UnifiedMetaEnum::S8:
-      return "S8";
-    case UnifiedMetaEnum::S32:
-      return "S32";
-    case UnifiedMetaEnum::Sm80:
-      return "Sm80";
-    case UnifiedMetaEnum::Sm89:
-      return "Sm89";
-    case UnifiedMetaEnum::Sm90:
-      return "Sm90";
-    case UnifiedMetaEnum::RRR:
-      return "RRR";
-    case UnifiedMetaEnum::RCR:
-      return "RCR";
-    case UnifiedMetaEnum::RCC:
-      return "RCC";
-    default:
-      return "Unknown";
-  }
-}
+// inline std::string MetaEnumToString(UnifiedMetaEnum value) {
+//   switch (value) {
+//     case UnifiedMetaEnum::GemmNormal:
+//       return "GemmNormal";
+//     case UnifiedMetaEnum::Void:
+//       return "Void";
+//     case UnifiedMetaEnum::FP16:
+//       return "FP16";
+//     case UnifiedMetaEnum::BF16:
+//       return "BF16";
+//     case UnifiedMetaEnum::FP32:
+//       return "FP32";
+//     case UnifiedMetaEnum::E4M3:
+//       return "E4M3";
+//     case UnifiedMetaEnum::E5M2:
+//       return "E5M2";
+//     case UnifiedMetaEnum::S8:
+//       return "S8";
+//     case UnifiedMetaEnum::S32:
+//       return "S32";
+//     case UnifiedMetaEnum::Sm80:
+//       return "Sm80";
+//     case UnifiedMetaEnum::Sm89:
+//       return "Sm89";
+//     case UnifiedMetaEnum::Sm90:
+//       return "Sm90";
+//     case UnifiedMetaEnum::RRR:
+//       return "RRR";
+//     case UnifiedMetaEnum::RCR:
+//       return "RCR";
+//     case UnifiedMetaEnum::RCC:
+//       return "RCC";
+//     default:
+//       return "Unknown";
+//   }
+// }
 
 enum class UnifiedHParamEnum : int8_t {
   GemmV2, GemmV3,                    // version
