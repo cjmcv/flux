@@ -3,13 +3,92 @@ from typing import Tuple
 import torch
 import triton
 
-from sglang.srt.layers.quantization.fp8_kernel import w8a8_block_fp8_matmul
+import tilelang
+import tilelang.language as T
+
+# from sglang.srt.layers.quantization.fp8_kernel import w8a8_block_fp8_matmul
 import ctlop 
 
 import math
 
 def ceil_div(a, b):
     return math.ceil(a / b)
+
+def tl_gemm(
+    M,
+    N,
+    K,
+    in_dtype,
+    out_dtype,
+    accum_dtype,
+):
+    assert in_dtype in [
+        "e4m3_float8",
+    ], "Currently only e4m3_float8 is supported"
+    assert out_dtype in [
+        "bfloat16",
+        "float16",
+    ], "Currently only bfloat16 and float16 are supported"
+
+    TILE_SIZE = (128, 128, 128)
+    block_M = TILE_SIZE[0]
+    block_N = TILE_SIZE[1]
+    block_K = TILE_SIZE[2]
+
+    A_shape = (M, K)
+    Scales_A_shape = (M, T.ceildiv(K, block_K))
+    B_shape = (N, K)
+    Scales_B_shape = (T.ceildiv(N, block_N), T.ceildiv(K, block_K))
+    A_shared_shape = (block_M, block_K)
+    B_shared_shape = (block_N, block_K)
+    C_shared_shape = (block_M, block_N)
+
+    @T.prim_func
+    def main(
+        A: T.Buffer(A_shape, in_dtype),
+        scales_a: T.Buffer(Scales_A_shape, "float32"),
+        B: T.Buffer(B_shape, in_dtype),
+        scales_b: T.Buffer(Scales_B_shape, "float32"),
+        C: T.Buffer((M, N), out_dtype),
+    ):
+        with T.Kernel(T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=128) as (
+            bx,
+            by,
+        ):
+
+            A_shared = T.alloc_shared(A_shared_shape, in_dtype)
+            B_shared = T.alloc_shared(B_shared_shape, in_dtype)
+            C_shared = T.alloc_shared(C_shared_shape, out_dtype)
+            Scale_C_shared = T.alloc_shared((block_M), "float32")
+            C_local = T.alloc_fragment(C_shared_shape, accum_dtype)
+            C_local_accum = T.alloc_fragment(C_shared_shape, accum_dtype)
+
+            # Improve L2 Cache
+            T.use_swizzle(panel_size=10)
+
+            T.clear(C_local)
+            T.clear(C_local_accum)
+            K_iters = T.ceildiv(K, block_K)
+            for k in T.Pipelined(K_iters, num_stages=4):
+                # Load A into shared memory
+                T.copy(A[by * block_M, k * block_K], A_shared)
+                # Load B into shared memory
+                T.copy(B[bx * block_N, k * block_K], B_shared)
+                # Load scale into shared memory
+                Scale_B = scales_b[bx, k]
+                for i in T.Parallel(block_M):
+                    Scale_C_shared[i] = scales_a[by * block_M + i, k] * Scale_B
+
+                T.gemm(A_shared, B_shared, C_local, transpose_B=True)
+                # Promote to enable 2xAcc
+                for i, j in T.Parallel(block_M, block_N):
+                    C_local_accum[i, j] += C_local[i, j] * Scale_C_shared[i]
+                T.clear(C_local)
+            # TMA store
+            T.copy(C_local_accum, C_shared)
+            T.copy(C_shared, C[by * block_M, bx * block_N])
+
+    return main
 
 def per_token_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     assert x.dim() == 2 and x.size(1) % 128 == 0
@@ -35,23 +114,23 @@ def per_block_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x_view.size(0), x_view.size(2)
     )
 
-def fp8_gemm_sglang(
-    x_fp8: torch.Tensor,
-    x_scale: torch.Tensor,
-    y_fp8: torch.Tensor,
-    y_scale: torch.Tensor,
-    m: int,
-    n: int,
-    k: int,
-):
-    """SGLang implementation of FP8 GEMM"""
-    block_size = [128, 128]  # Matches the block size in per_block_cast_to_fp8
+# def fp8_gemm_sglang(
+#     x_fp8: torch.Tensor,
+#     x_scale: torch.Tensor,
+#     y_fp8: torch.Tensor,
+#     y_scale: torch.Tensor,
+#     m: int,
+#     n: int,
+#     k: int,
+# ):
+#     """SGLang implementation of FP8 GEMM"""
+#     block_size = [128, 128]  # Matches the block size in per_block_cast_to_fp8
 
-    # Run SGLang kernel
-    out = w8a8_block_fp8_matmul(
-        x_fp8, y_fp8, x_scale, y_scale, block_size, torch.bfloat16
-    )
-    return out
+#     # Run SGLang kernel
+#     out = w8a8_block_fp8_matmul(
+#         x_fp8, y_fp8, x_scale, y_scale, block_size, torch.bfloat16
+#     )
+#     return out
 
 
 def calculate_diff(m: int, n: int, k: int):
@@ -61,10 +140,17 @@ def calculate_diff(m: int, n: int, k: int):
     x_fp8, x_scale = per_token_cast_to_fp8(x.clone())
     y_fp8, y_scale = per_block_cast_to_fp8(y.clone())
 
-    out_sglang = fp8_gemm_sglang(
-        x_fp8.clone(), x_scale.clone(), y_fp8.clone(), y_scale.clone(), m, n, k
+
+    tilelang_func = tl_gemm(m, n, k, "e4m3_float8", "bfloat16", "float32")
+    tilelang_kernel = tilelang.compile(tilelang_func, out_idx=[-1])
+    out_tilelang = tilelang_kernel(
+        x_fp8.clone(), x_scale.clone(), y_fp8.clone(), y_scale.clone()
     )
-    out_ctlop = out_sglang
+
+    # out_sglang = fp8_gemm_sglang(
+    #     x_fp8.clone(), x_scale.clone(), y_fp8.clone(), y_scale.clone(), m, n, k
+    # )
+
     ctlop_gemm = ctlop.GemmNormal(
         input_dtype=torch.float8_e4m3fn,
         output_dtype=torch.bfloat16,
@@ -81,15 +167,15 @@ def calculate_diff(m: int, n: int, k: int):
             tuning = None,
             fast_accum=False,
         )
-    diff_tilelang_sglang = torch.abs(out_ctlop - out_sglang).mean().item()
+    diff_tilelang_sglang = torch.abs(out_ctlop - out_tilelang).mean().item()
 
     print(f"Shape m={m}, n={n}, k={k}:")
-    # print(f"DeepGEMM output: {out_deepgemm[0, 0:5]}")
-    print(f"SGLang output: {out_sglang[0, 0:5]}")
+    print(f"CtlOp output: {out_ctlop[0, 0:5]}")
+    print(f"TileLang output: {out_tilelang[0, 0:5]}")
     print(f"Mean absolute difference (TileLang-SGLang): {diff_tilelang_sglang}")
 
     ctlop_sglang_match = torch.allclose(
-        out_ctlop, out_sglang, atol=1e-2, rtol=1e-2
+        out_ctlop, out_tilelang, atol=1e-2, rtol=1e-2
     )
 
     if ctlop_sglang_match:
