@@ -105,6 +105,7 @@ using         LayoutC     = cutlass::layout::RowMajor;                   // Layo
 // D matrix configuration
 using         ElementD    = ElementC;
 using         LayoutD     = LayoutC;
+using ElementAccumulator  = float;
 // Auxiliary matrix configuration and other fusion types
 using         ElementAux   = ElementC;
 using         LayoutAux    = LayoutC;
@@ -379,7 +380,6 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
   // Compute reference output
   //
   using TileShape         = typename GemmImpl::TileShape;
-  using ElementAccumulator= typename GemmImpl::ElementAccumulator;
   using ElementCompute    = typename GemmImpl::ElementCompute;
   using Gemm              = typename GemmImpl::Gemm;
   using ElementScalar     = typename GemmImpl::ElementScalar;
@@ -533,11 +533,11 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
 /// Execute a given example GEMM computation
 int run(Options &options)
 {  
-  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
+  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
   //
   using ME = UnifiedMetaEnum;
   GemmConfigRegister& ins = GemmConfigRegister::instance();
-  std::vector<int8_t> id_meta = {0,(int8_t)ME::GemmBolckScaleFp8,(int8_t)ME::E4M3, (int8_t)ME::E4M3, (int8_t)ME::BF16, (int8_t)ME::RCR, (int8_t)ME::Sm90};
+  std::vector<int8_t> id_meta = {0,(int8_t)ME::GemmBolckScaleFp8,(int8_t)ME::E4M3, (int8_t)ME::E4M3, (int8_t)ME::BF16, (int8_t)ME::FP32, (int8_t)ME::RCR, (int8_t)ME::Sm90};
   ins.add(id_meta, /*op*/[]() { return new GemmFp8Impl();});
   //
 

@@ -16,7 +16,7 @@
 namespace ctlop {
 
 using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
-template <class ElementA, class ElementB, class ElementC,
+template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, class ClusterShape, 
           RasterOrderOptions RasterOrder, int Swizzle>
@@ -32,7 +32,6 @@ public:
   using         ElementBias  = float;
 
   // Core kernel configurations
-  using ElementAccumulator  = float;                                          // Element type for internal accumulation
   using ElementBlockScale   = float;                                          // Element type for blockscaling during accumulation
   using ElementCompute      = float;                                          // Element type for epilogue computation
   // using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature

@@ -29,6 +29,17 @@
 namespace ctlop {
 using torch::Tensor;
 
+enum IdMetaEnum {
+  Id = 0, 
+  Schema = 1,
+  TypeA = 2,
+  TypeB = 3,
+  TypeCD = 4,
+  TypeAcc = 5,
+  Layout = 6,
+  Arch = 7
+};
+
 class GemmNormal::GemmNormalImpl {
 public:
   GemmNormalImpl(
@@ -37,7 +48,7 @@ public:
       bool transpose_weight)
       : input_dtype(input_dtype),
         output_dtype(output_dtype),
-        transpose_weight(transpose_weight) {}
+        transpose_weight(transpose_weight) {} // true对应的是RRR，正常的false是RCR
 
   // tuning：tensor进入，先构建meta，依次添加序号充当key，取获取op，计算性能，并进行排序，取top5, 保留整个meta。获取不到新op时表示结束。
   //         top1的meta从cpp端写入文件，信息包括shape+序号+meta。保存时，meta信息需要按python脚本的生成方式，转为字符串。
@@ -60,28 +71,43 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    RtArguments *rt_args = new RtArgumentsV2();
-    torch::Tensor output = get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
-    std::vector<int8_t> id_meta = MakeMeta();     // id + meta
+    std::vector<int8_t> id_meta = MakeDefaultMeta();     // id + meta
+    RtArguments *rt_args;
+    if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
+      rt_args = new RtBlockScaleFp8ArgumentsV3();
+      if (input_scale.has_value() && weight_scale.has_value()) {
+        ((RtBlockScaleFp8ArgumentsV3 *)rt_args)->d_blockscale_A = input_scale.value().data_ptr();
+        ((RtBlockScaleFp8ArgumentsV3 *)rt_args)->d_blockscale_B = weight_scale.value().data_ptr();
+      }
+      id_meta[IdMetaEnum::Schema] = (int8_t)UnifiedMetaEnum::GemmBolckScaleFp8;
+      id_meta[IdMetaEnum::Arch] = (int8_t)UnifiedMetaEnum::Sm90;
+      printf("id_meta: \n");
+      for (int i=0; i<id_meta.size(); i++) {
+        printf("%d, ", id_meta[i]);
+      }
+      printf("\n");
+    }
+    else {
+      id_meta[IdMetaEnum::Schema] = (int8_t)UnifiedMetaEnum::GemmNormal;
+      rt_args = new RtArgumentsV2();
+    }
+    torch::Tensor output = GetBaseRtConf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
+    
 
     bool is_tuning = false;
-    int8_t selected_id = 0;
-    int8_t selected_schema = (int8_t)UnifiedMetaEnum::GemmNormal;
     if (tuning.has_value()) {
       int8_t *data = (int8_t *)tuning.value().data_ptr();
       CTLOP_CHECK_EQ(data[0], 1);
-      selected_id = data[1];
-      selected_schema = data[2];
+      id_meta[IdMetaEnum::Id] = data[1];
+      id_meta[IdMetaEnum::Schema] = data[2];
       is_tuning = true;
     }
     else {
       std::vector<int32_t> shape_meta = {rt_args->m, rt_args->n, rt_args->k};       // mnk + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
-      tins.GetSelectedConfig(shape_meta, &selected_id, &selected_schema);      
+      tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
     }
-    printf("selected_id: %d, selected_schema: %d.\n", selected_id, selected_schema);
-    id_meta[0] = selected_id;
-    id_meta[1] = selected_schema;
+    printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
     GemmBase *op = ins.GetOp(id_meta, is_tuning);
     if (op == nullptr)
       return torch::Tensor();
@@ -102,24 +128,26 @@ public:
   }
 
 private:
-  std::vector<int8_t> MakeMeta(int8_t id = 0) {
+  std::vector<int8_t> MakeDefaultMeta(int8_t id = 0) {
     std::vector<int8_t> meta;
     meta.resize(8);
-    meta[0] = id;                                  // id
-    meta[1] = (int8_t)UnifiedMetaEnum::GemmNormal; // meta type (GemmNormal / GemmNormalSimt)
+    meta[IdMetaEnum::Id] = id;                                  // id
+    meta[IdMetaEnum::Schema] = (int8_t)UnifiedMetaEnum::GemmNormal; // schema type (GemmNormal / GemmNormalSimt / GemmBolckScaleFp8)
 
-    meta[2] = from_torch_dtype(this->input_dtype);  // type A
-    meta[3] = from_torch_dtype(this->input_dtype);  // type B
-    meta[4] = from_torch_dtype(this->output_dtype); // type C/D
-    meta[5] = (int8_t)UnifiedMetaEnum::FP32;        // type acc
-
-    meta[6] = (int8_t)UnifiedMetaEnum::RCR;         // layout
-    meta[7] = (int8_t)UnifiedMetaEnum::Sm80;        // arch
+    meta[IdMetaEnum::TypeA] = from_torch_dtype(this->input_dtype);  // type A
+    meta[IdMetaEnum::TypeB] = from_torch_dtype(this->input_dtype);  // type B
+    meta[IdMetaEnum::TypeCD] = from_torch_dtype(this->output_dtype); // type C/D
+    meta[IdMetaEnum::TypeAcc] = (int8_t)UnifiedMetaEnum::FP32;        // type acc
+    if (transpose_weight)                           // layout
+      meta[IdMetaEnum::Layout] = (int8_t)UnifiedMetaEnum::RRR; 
+    else
+      meta[IdMetaEnum::Layout] = (int8_t)UnifiedMetaEnum::RCR;
+    meta[IdMetaEnum::Arch] = (int8_t)UnifiedMetaEnum::Sm80;        // arch
 
     return meta;
   }
 
-  torch::Tensor get_rt_conf(
+  torch::Tensor GetBaseRtConf(
       torch::Tensor input,
       torch::Tensor weight,
       c10::optional<torch::Tensor> bias,
@@ -133,7 +161,7 @@ private:
     TORCH_CHECK(weight.dim() == 2, "weight dim is not 2");
     int32_t m = input.size(0);
     int32_t k = input.size(1);
-    int32_t n = transpose_weight ? weight.size(1) : weight.size(0);
+    int32_t n = transpose_weight ? weight.size(1) : weight.size(0); // true是RRR，正常使用是false，对应linear层的RCR
 
     if (bias.has_value()) {
       CHECK_INPUT(bias.value(), this->output_dtype);
@@ -173,6 +201,8 @@ private:
   const c10::ScalarType input_dtype;
   const c10::ScalarType output_dtype;
   const bool transpose_weight;
+
+  int8_t default_schema;
 };
 
 GemmNormal::GemmNormal(

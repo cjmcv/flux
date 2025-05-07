@@ -157,7 +157,7 @@ class GemmBolckScaleFp8Schema:
     impl_header = "gemm_normal/gemm_v3_blockscale_fp8_impl.h"
     
     def get_meta_space(self, w):
-        data_type = [('E4M3', 'E4M3', 'BF16')] # a,b,cd
+        data_type = [('E4M3', 'E4M3', 'BF16', 'FP32')] # a,b,cd,acc
         layout = ['RCR'] # , 'RRR'
         arch = ['Sm90']
 

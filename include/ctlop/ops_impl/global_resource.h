@@ -152,8 +152,6 @@ public:
       *schema_id = it->second[1];
       return;
     }
-    *selected_id = 0;  // todo: 如何选择auto方案，选择tuned中最近的一个？
-    *schema_id = 0;
   }
 
 
