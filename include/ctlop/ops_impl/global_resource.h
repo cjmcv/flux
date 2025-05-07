@@ -20,7 +20,7 @@ namespace ctlop {
 // GemmDeviceBase
 class GemmBase {
 public:
-  virtual void initialize(RtArguments &rt_args, void *stream = nullptr) = 0;
+  virtual void initialize(RtArguments *rt_args, void *stream = nullptr) = 0;
   virtual void run(void *stream = nullptr) = 0;
 };
 

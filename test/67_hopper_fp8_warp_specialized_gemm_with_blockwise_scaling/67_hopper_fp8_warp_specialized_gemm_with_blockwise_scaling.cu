@@ -533,11 +533,11 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
 /// Execute a given example GEMM computation
 int run(Options &options)
 {  
-  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
+  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
   //
   using ME = UnifiedMetaEnum;
   GemmConfigRegister& ins = GemmConfigRegister::instance();
-  std::vector<int8_t> id_meta = {0,(int8_t)ME::GemmBolckScaleFp8,(int8_t)ME::E4M3, (int8_t)ME::E4M3, (int8_t)ME::E4M3, (int8_t)ME::RCR, (int8_t)ME::Sm90};
+  std::vector<int8_t> id_meta = {0,(int8_t)ME::GemmBolckScaleFp8,(int8_t)ME::E4M3, (int8_t)ME::E4M3, (int8_t)ME::BF16, (int8_t)ME::RCR, (int8_t)ME::Sm90};
   ins.add(id_meta, /*op*/[]() { return new GemmFp8Impl();});
   //
 
@@ -582,7 +582,7 @@ int run(Options &options)
 
   // GemmFp8Impl gemm;
   GemmBase *gemm = ins.GetOp(id_meta, false);
-  gemm->initialize(rt_args);
+  gemm->initialize(&rt_args);
   gemm->run();
 
   // Check if output from CUTLASS kernel and reference kernel are equal or not

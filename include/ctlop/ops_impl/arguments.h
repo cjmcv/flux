@@ -13,13 +13,13 @@ struct RtArguments {
   void *ptr_C;
   void *ptr_D;  
 
+  float alpha;
+  float beta;
+
   virtual ~RtArguments() {}
 };
 
 struct RtArgumentsV2 : public RtArguments {
-  float alpha;
-  float beta;
-
   int stride_a;
   int stride_b;
   int stride_c;
@@ -27,10 +27,6 @@ struct RtArgumentsV2 : public RtArguments {
 };
 
 struct RtBlockScaleFp8ArgumentsV3 : public RtArguments {
-
-  float alpha;
-  float beta;
-
   float scale_a = 1.f, scale_b = 1.f, scale_c = 1.f, scale_d = 1.f, scale_aux = 1.f;
 
   void *d_blockscale_A; // blockscale_tensor_A.device_data(),

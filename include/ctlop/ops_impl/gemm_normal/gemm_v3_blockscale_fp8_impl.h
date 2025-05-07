@@ -2,12 +2,23 @@
 #include "ctlop/ops_impl/global_resource.h"
 #include "ctlop/ops_impl/args_util.h"
 
+#include "cute/tensor.hpp"
+#include "cutlass/tensor_ref.h"
+#include "cutlass/gemm/dispatch_policy.hpp"
+#include "cutlass/gemm/collective/collective_builder.hpp"
+#include "cutlass/gemm/device/gemm_universal_adapter.h"
+#include "cutlass/gemm/kernel/gemm_universal.hpp"
+#include "cutlass/gemm/kernel/tile_scheduler_params.h"
+#include "cutlass/epilogue/dispatch_policy.hpp"
+#include "cutlass/epilogue/collective/collective_builder.hpp"
+#include "cutlass/util/packed_stride.hpp"
+
 namespace ctlop {
 
 using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 template <class ElementA, class ElementB, class ElementC,
           class LayoutA, class LayoutB, class LayoutC,
-          class ClusterShape, 
+          class ArchTag, class ClusterShape, 
           RasterOrderOptions RasterOrder, int Swizzle>
 class GemmBlockScaleFp8Impl : public GemmBase {
 public:
@@ -24,7 +35,7 @@ public:
   using ElementAccumulator  = float;                                          // Element type for internal accumulation
   using ElementBlockScale   = float;                                          // Element type for blockscaling during accumulation
   using ElementCompute      = float;                                          // Element type for epilogue computation
-  using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
+  // using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
   using TileShape           = cute::Shape<cute::_128, cute::_128, cute::_128>;                           // Threadblock-level tile size
   ////
@@ -77,8 +88,9 @@ public:
   using StrideAux = StrideD;
 
 public:
-  void initialize(RtArguments &args, void *stream = nullptr) {
-    RtBlockScaleFp8ArgumentsV3& rt_args = dynamic_cast<RtBlockScaleFp8ArgumentsV3&>(args);
+  void initialize(RtArguments *args, void *stream = nullptr) {
+    RtBlockScaleFp8ArgumentsV3 *rt_args = dynamic_cast<RtBlockScaleFp8ArgumentsV3*>(args);
+
     static_assert(cute::is_same_v<ElementAccumulator, ElementBlockScale>,
       "ElementAccumulator and ElementBlockScale should be same datatype");
 
@@ -108,12 +120,12 @@ public:
   }
 
 private:
-  typename Gemm::Arguments args_from_options(const RtBlockScaleFp8ArgumentsV3 &rt_args)
+  typename Gemm::Arguments args_from_options(const RtBlockScaleFp8ArgumentsV3 *rt_args)
   {
-    StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(rt_args.m, rt_args.k, rt_args.l));
-    StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(rt_args.n, rt_args.k, rt_args.l));
-    StrideC stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(rt_args.m, rt_args.n, rt_args.l));
-    StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(rt_args.m, rt_args.n, rt_args.l));
+    StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(rt_args->m, rt_args->k, rt_args->l));
+    StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(rt_args->n, rt_args->k, rt_args->l));
+    StrideC stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(rt_args->m, rt_args->n, rt_args->l));
+    StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(rt_args->m, rt_args->n, rt_args->l));
     StrideAux stride_aux = stride_D;
 
     // Note : This value has to match the KernelSchedule::ScalePromotionInterval
@@ -124,53 +136,53 @@ private:
 
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGemm,
-      {rt_args.m, rt_args.n, rt_args.k, rt_args.l},
-      {(ElementA *)rt_args.ptr_A,
+      {rt_args->m, rt_args->n, rt_args->k, rt_args->l},
+      {(ElementA *)rt_args->ptr_A,
       stride_A,
-      (ElementB *)rt_args.ptr_B,
+      (ElementB *)rt_args->ptr_B,
       stride_B,
       mma_promotion_interval,
-      (ElementBlockScale *)rt_args.d_blockscale_A, // blockscale_tensor_A.device_data(),
-      (ElementBlockScale *)rt_args.d_blockscale_B, // blockscale_tensor_B.device_data()
+      (ElementBlockScale *)rt_args->d_blockscale_A, // blockscale_tensor_A.device_data(),
+      (ElementBlockScale *)rt_args->d_blockscale_B, // blockscale_tensor_B.device_data()
       },
       {
         {}, // epilogue.thread
-        (ElementC *)rt_args.ptr_C, stride_C,
-        (ElementD *)rt_args.ptr_D, stride_D
+        (ElementC *)rt_args->ptr_C, stride_C,
+        (ElementD *)rt_args->ptr_D, stride_D
       }
     };
 
     auto &fusion_args = arguments.epilogue.thread;
-    fusion_args.alpha = rt_args.alpha;
-    fusion_args.beta = rt_args.beta;
-    fusion_args.alpha_ptr = nullptr; // (ElementScalar *)rt_args.d_scalar_alpha; // scalar_alpha.device_data();
-    fusion_args.beta_ptr = nullptr; //(ElementScalar *)rt_args.d_scalar_beta; // scalar_beta.device_data();
-    fusion_args.scale_a = rt_args.scale_a;
-    fusion_args.scale_b = rt_args.scale_b;
-    fusion_args.scale_c = rt_args.scale_c;
-    fusion_args.scale_a_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_A; // scale_A.device_data();
-    fusion_args.scale_b_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_B; // scale_B.device_data();
-    fusion_args.scale_c_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_C; // scale_C.device_data();
+    fusion_args.alpha = rt_args->alpha;
+    fusion_args.beta = rt_args->beta;
+    fusion_args.alpha_ptr = nullptr; // (ElementScalar *)rt_args->d_scalar_alpha; // scalar_alpha.device_data();
+    fusion_args.beta_ptr = nullptr; //(ElementScalar *)rt_args->d_scalar_beta; // scalar_beta.device_data();
+    fusion_args.scale_a = rt_args->scale_a;
+    fusion_args.scale_b = rt_args->scale_b;
+    fusion_args.scale_c = rt_args->scale_c;
+    fusion_args.scale_a_ptr = nullptr; //(ElementScalar *)rt_args->d_scale_A; // scale_A.device_data();
+    fusion_args.scale_b_ptr = nullptr; //(ElementScalar *)rt_args->d_scale_B; // scale_B.device_data();
+    fusion_args.scale_c_ptr = nullptr; //(ElementScalar *)rt_args->d_scale_C; // scale_C.device_data();
 
     // ignored if tensor types are not fp8
-    fusion_args.scale_d = rt_args.scale_d;
-    fusion_args.scale_aux = rt_args.scale_aux;
-    fusion_args.scale_d_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_D; //scale_D.device_data();
-    fusion_args.scale_aux_ptr = nullptr; //(ElementScalar *)rt_args.d_scale_aux; // scale_aux.device_data();
+    fusion_args.scale_d = rt_args->scale_d;
+    fusion_args.scale_aux = rt_args->scale_aux;
+    fusion_args.scale_d_ptr = nullptr; //(ElementScalar *)rt_args->d_scale_D; //scale_D.device_data();
+    fusion_args.scale_aux_ptr = nullptr; //(ElementScalar *)rt_args->d_scale_aux; // scale_aux.device_data();
 
     // leaving/setting these as nullptr disables the fusion at runtime
     fusion_args.bias_ptr = nullptr;
 
-    if (rt_args.save_aux) {
-      fusion_args.aux_ptr = (ElementAux *)rt_args.d_tensor_aux; // tensor_aux.device_data();
+    if (rt_args->save_aux) {
+      fusion_args.aux_ptr = (ElementAux *)rt_args->d_tensor_aux; // tensor_aux.device_data();
       fusion_args.dAux = stride_aux;
-      if (rt_args.save_amax) {
-        fusion_args.amax_aux_ptr = (ElementScalar *)rt_args.d_abs_max_aux; // abs_max_aux.device_data();
+      if (rt_args->save_amax) {
+        fusion_args.amax_aux_ptr = (ElementScalar *)rt_args->d_abs_max_aux; // abs_max_aux.device_data();
       }
     }
 
-    if (rt_args.save_amax) {
-      fusion_args.amax_D_ptr = (ElementScalar *)rt_args.d_abs_max_D; // abs_max_D.device_data();
+    if (rt_args->save_amax) {
+      fusion_args.amax_D_ptr = (ElementScalar *)rt_args->d_abs_max_D; // abs_max_D.device_data();
     }
 
     arguments.scheduler.raster_order = RasterOrder;
@@ -185,44 +197,3 @@ private:
 };
 
 } // namespace ctlop
-
-
-///////////////////////////////////////////////////////////////////////////
-// // template
-// template <class ElementA, class ElementB, class ElementC。。。>
-// class GemmPureV2Impl : public GemmBase  {
-
-//   using EpilogueOp = cutlass::epilogue::thread::LinearCombination<。。。>;
-//   using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<。。。>;
-
-// public:
-//   void initialize(RtArguments &rt_args, void *stream = nullptr) {
-//     gemm_dev_ = DeviceGemmBasic();
-//     // Using the arguments, query for extra workspace required for matrix multiplication computation
-//     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args.m, rt_args.n, rt_args.k);
-//     。。。
-//     auto arguments = args_from_options(rt_args);
-//     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
-  
-//     void *workspace_ptr = GlobalBuffer::instance().ResizeBufferIfNeeded(workspace_size);
-//     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
-  
-//     auto cu_stream = static_cast<cudaStream_t>(stream);
-//     CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_ptr, cu_stream));
-//   }
-
-//   void run(void *stream = nullptr) {
-//     auto cu_stream = static_cast<cudaStream_t>(stream);
-//     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
-//   }
-
-// private:
-//   typename DeviceGemmBasic::Arguments args_from_options(const RtArguments &rt_args) {
-//     return typename DeviceGemmBasic::Arguments(
-//       ...
-//     )}
-//   }
-
-// private:
-//   DeviceGemmBasic gemm_dev_;
-// };

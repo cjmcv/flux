@@ -36,16 +36,16 @@ class GemmPureV2Impl : public GemmBase  {
       128 / cutlass::sizeof_bits<ElementB>::value>; // AlignmentB
 
 public:
-  void initialize(RtArguments &args, void *stream = nullptr) {
-    RtArgumentsV2& rt_args = dynamic_cast<RtArgumentsV2&>(args);
+  void initialize(RtArguments *args, void *stream = nullptr) {
+    RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
     gemm_dev_ = DeviceGemmBasic();
     // Using the arguments, query for extra workspace required for matrix multiplication computation
-    ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args.m, rt_args.n, rt_args.k);
-    rt_args.stride_a = helper.get_stride_a();
-    rt_args.stride_b = helper.get_stride_b();
-    rt_args.stride_c = helper.get_stride_c();
-    rt_args.stride_d = helper.get_stride_c();
+    ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args->m, rt_args->n, rt_args->k);
+    rt_args->stride_a = helper.get_stride_a();
+    rt_args->stride_b = helper.get_stride_b();
+    rt_args->stride_c = helper.get_stride_c();
+    rt_args->stride_d = helper.get_stride_c();
     auto arguments = args_from_options(rt_args);
     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
 
@@ -69,29 +69,29 @@ private:
   // avail_sms: Number of device SMs to use is unlimited
   //         1: Set loadbalancing width to 1 SM (no load balancing)
   //        -1: Reset loadbalancing width to unspecified SMs (i.e., the number of device SMs)
-  typename DeviceGemmBasic::Arguments args_from_options(const RtArgumentsV2 &rt_args) {
-    cutlass::gemm::GemmCoord problem_size = {rt_args.m, rt_args.n, rt_args.k};
+  typename DeviceGemmBasic::Arguments args_from_options(const RtArgumentsV2 *rt_args) {
+    cutlass::gemm::GemmCoord problem_size = {rt_args->m, rt_args->n, rt_args->k};
     if constexpr (cute::is_same_v<ThreadBlockSwizzle, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>>) {  
       return typename DeviceGemmBasic::Arguments(
         cutlass::gemm::GemmUniversalMode::kGemm,  // universal mode
         problem_size,                     // problem_size
         SplitKFactor,                   // batch count / splitk slices
         {                                         // epilogue parameters
-          ElementAccumulator(rt_args.alpha),
-          ElementAccumulator(rt_args.beta)
+          ElementAccumulator(rt_args->alpha),
+          ElementAccumulator(rt_args->beta)
         },
-        rt_args.ptr_A,                   // ptr_A
-        rt_args.ptr_B,                   // ptr_B
-        rt_args.ptr_C,                   // ptr_C
-        rt_args.ptr_D,                   // ptr_D
+        rt_args->ptr_A,                   // ptr_A
+        rt_args->ptr_B,                   // ptr_B
+        rt_args->ptr_C,                   // ptr_C
+        rt_args->ptr_D,                   // ptr_D
         problem_size.mk().product(),      // batch_stride_A
         problem_size.nk().product(),      // batch_stride_B
         problem_size.mn().product(),      // batch_stride_C
         problem_size.mn().product(),      // batch_stride_D
-        rt_args.stride_a,              // stride_a
-        rt_args.stride_b,              // stride_b
-        rt_args.stride_c,              // stride_c
-        rt_args.stride_d);             // stride_d    
+        rt_args->stride_a,              // stride_a
+        rt_args->stride_b,              // stride_b
+        rt_args->stride_c,              // stride_c
+        rt_args->stride_d);             // stride_d    
     }
     else {
       return typename DeviceGemmBasic::Arguments(
@@ -99,21 +99,21 @@ private:
         problem_size,                     // problem_size
         SplitKFactor,                   // batch count / splitk slices
         {                                         // epilogue parameters
-          ElementAccumulator(rt_args.alpha),
-          ElementAccumulator(rt_args.beta)
+          ElementAccumulator(rt_args->alpha),
+          ElementAccumulator(rt_args->beta)
         },
-        rt_args.ptr_A,                   // ptr_A
-        rt_args.ptr_B,                   // ptr_B
-        rt_args.ptr_C,                   // ptr_C
-        rt_args.ptr_D,                   // ptr_D
+        rt_args->ptr_A,                   // ptr_A
+        rt_args->ptr_B,                   // ptr_B
+        rt_args->ptr_C,                   // ptr_C
+        rt_args->ptr_D,                   // ptr_D
         problem_size.mk().product(),      // batch_stride_A
         problem_size.nk().product(),      // batch_stride_B
         problem_size.mn().product(),      // batch_stride_C
         problem_size.mn().product(),      // batch_stride_D
-        rt_args.stride_a,              // stride_a
-        rt_args.stride_b,              // stride_b
-        rt_args.stride_c,              // stride_c
-        rt_args.stride_d,              // stride_d
+        rt_args->stride_a,              // stride_a
+        rt_args->stride_b,              // stride_b
+        rt_args->stride_c,              // stride_c
+        rt_args->stride_d,              // stride_d
         AvailSms);                                // avail_sms
     }
   }
@@ -134,10 +134,11 @@ private:
 //   using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<。。。>;
 
 // public:
-//   void initialize(RtArguments &rt_args, void *stream = nullptr) {
+//   void initialize(RtArguments *args, void *stream = nullptr) {
+//     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 //     gemm_dev_ = DeviceGemmBasic();
 //     // Using the arguments, query for extra workspace required for matrix multiplication computation
-//     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args.m, rt_args.n, rt_args.k);
+//     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args->m, rt_args->n, rt_args->k);
 //     。。。
 //     auto arguments = args_from_options(rt_args);
 //     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
@@ -155,7 +156,7 @@ private:
 //   }
 
 // private:
-//   typename DeviceGemmBasic::Arguments args_from_options(const RtArguments &rt_args) {
+//   typename DeviceGemmBasic::Arguments args_from_options(const RtArguments *rt_args) {
 //     return typename DeviceGemmBasic::Arguments(
 //       ...
 //     )}

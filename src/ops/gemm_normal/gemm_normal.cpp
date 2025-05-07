@@ -60,7 +60,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    RtArgumentsV2 rt_args;
+    RtArguments *rt_args = new RtArgumentsV2();
     torch::Tensor output = get_rt_conf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
     std::vector<int8_t> id_meta = MakeMeta();     // id + meta
 
@@ -75,7 +75,7 @@ public:
       is_tuning = true;
     }
     else {
-      std::vector<int32_t> shape_meta = {rt_args.m, rt_args.n, rt_args.k};       // mnk + meta
+      std::vector<int32_t> shape_meta = {rt_args->m, rt_args->n, rt_args->k};       // mnk + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
       tins.GetSelectedConfig(shape_meta, &selected_id, &selected_schema);      
     }
@@ -97,6 +97,7 @@ public:
         data[i+1] = id_meta[i];
       }
     }
+    delete rt_args;
     return output;
   }
 
@@ -125,7 +126,7 @@ private:
       c10::optional<torch::Tensor> output_buf,
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
-      RtArgumentsV2 &rt_args) {
+      RtArguments *rt_args) {
     CHECK_INPUT(input, this->input_dtype);
     CHECK_INPUT(weight, this->input_dtype);
     TORCH_CHECK(input.dim() == 2, "input shape is not 2");
@@ -154,15 +155,16 @@ private:
     int32_t wk = transpose_weight ? weight.size(0) : weight.size(1);
     CTLOP_CHECK_EQ(wk, k) << "weight k-dim mismatch";
 
-    rt_args.m = m;
-    rt_args.n = n;
-    rt_args.k = k;
-    rt_args.ptr_A = input.data_ptr();
-    rt_args.ptr_B = weight.data_ptr();
-    rt_args.ptr_C = nullptr;
-    rt_args.ptr_D = output.data_ptr();
-    rt_args.alpha = 1.0f;
-    rt_args.beta = 0.0f;
+    rt_args->m = m;
+    rt_args->n = n;
+    rt_args->k = k;
+    rt_args->l = 1;
+    rt_args->ptr_A = input.data_ptr();
+    rt_args->ptr_B = weight.data_ptr();
+    rt_args->ptr_C = nullptr;
+    rt_args->ptr_D = output.data_ptr();
+    rt_args->alpha = 1.0f;
+    rt_args->beta = 0.0f;
 
     return output;
   }

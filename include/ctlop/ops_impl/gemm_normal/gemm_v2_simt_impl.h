@@ -32,39 +32,39 @@ class GemmPureV2SimtImpl : public GemmBase {
     2>;
 
 public:
-  typename DeviceGemmSimt::Arguments args_from_options(RtArgumentsV2 &rt_args) {
-    cutlass::gemm::GemmCoord problem_size = {rt_args.m, rt_args.n, rt_args.k};
+  typename DeviceGemmSimt::Arguments args_from_options(RtArgumentsV2 *rt_args) {
+    cutlass::gemm::GemmCoord problem_size = {rt_args->m, rt_args->n, rt_args->k};
     return typename DeviceGemmSimt::Arguments(
       cutlass::gemm::GemmUniversalMode::kGemm,  // universal mode
       problem_size,                     // problem_size
       SplitKFactor,                             // batch count / splitk slices
       {                                         // epilogue parameters
-        ElementAccumulator(rt_args.alpha),
-        ElementAccumulator(rt_args.beta)
+        ElementAccumulator(rt_args->alpha),
+        ElementAccumulator(rt_args->beta)
       },
-      rt_args.ptr_A,                   // ptr_A
-      rt_args.ptr_B,                   // ptr_B
-      rt_args.ptr_C,                   // ptr_C
-      rt_args.ptr_D,                   // ptr_D
+      rt_args->ptr_A,                   // ptr_A
+      rt_args->ptr_B,                   // ptr_B
+      rt_args->ptr_C,                   // ptr_C
+      rt_args->ptr_D,                   // ptr_D
       problem_size.mk().product(),      // batch_stride_A
       problem_size.nk().product(),      // batch_stride_B
       problem_size.mn().product(),      // batch_stride_C
       problem_size.mn().product(),      // batch_stride_D
-      rt_args.stride_a,              // stride_a
-      rt_args.stride_b,              // stride_b
-      rt_args.stride_c,              // stride_c
-      rt_args.stride_d);             // stride_d
+      rt_args->stride_a,              // stride_a
+      rt_args->stride_b,              // stride_b
+      rt_args->stride_c,              // stride_c
+      rt_args->stride_d);             // stride_d
   }
 
-  void initialize(RtArguments &args, void *stream = nullptr) {
-    RtArgumentsV2& rt_args = dynamic_cast<RtArgumentsV2&>(args);
+  void initialize(RtArguments *args, void *stream = nullptr) {
+    RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
     gemm_dev_ = DeviceGemmSimt();
 
-    ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args.m, rt_args.n, rt_args.k);
-    rt_args.stride_a = helper.get_stride_a();
-    rt_args.stride_b = helper.get_stride_b();
-    rt_args.stride_c = helper.get_stride_c();
-    rt_args.stride_d = helper.get_stride_c();
+    ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args->m, rt_args->n, rt_args->k);
+    rt_args->stride_a = helper.get_stride_a();
+    rt_args->stride_b = helper.get_stride_b();
+    rt_args->stride_c = helper.get_stride_c();
+    rt_args->stride_d = helper.get_stride_c();
 
     // Using the arguments, query for extra workspace required for matrix multiplication computation
     auto arguments = args_from_options(rt_args);
