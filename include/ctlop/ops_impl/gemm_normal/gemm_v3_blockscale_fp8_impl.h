@@ -12,13 +12,13 @@
 #include "cutlass/epilogue/dispatch_policy.hpp"
 #include "cutlass/epilogue/collective/collective_builder.hpp"
 #include "cutlass/util/packed_stride.hpp"
-
 namespace ctlop {
 
+#define BLOCKSCALE_FP8_FUSED_COMPLEX 0
 using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
-          class ArchTag, class ClusterShape, 
+          class ArchTag, class TileShape,  class ClusterShape, 
           RasterOrderOptions RasterOrder, int Swizzle>
 class GemmBlockScaleFp8Impl : public GemmBase {
 public:
@@ -36,16 +36,21 @@ public:
   using ElementCompute      = float;                                          // Element type for epilogue computation
   // using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
-  using TileShape           = cute::Shape<cute::_128, cute::_128, cute::_128>;                           // Threadblock-level tile size
+  // using TileShape           = cute::Shape<cute::_128, cute::_128, cute::_128>;                           // Threadblock-level tile size
   ////
 
-  using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<>;
+  using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<1, 128>; // scale_A[m, k//128], scale_B[n//128, k//128]
   using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
   
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
+
+#ifdef BLOCKSCALE_FP8_FUSED_COMPLEX
   using FusionOperation     = cutlass::epilogue::fusion::ScaledLinCombPerRowBiasEltActAmaxAux<
-      LayoutAux, cutlass::epilogue::thread::ReLU, ElementD, ElementCompute, ElementAux, ElementAmax, ElementBias, ElementC>;
-  
+      LayoutAux, cutlass::epilogue::thread::Identity, ElementD, ElementCompute, ElementAux, ElementAmax, ElementBias, ElementC>; // cutlass::epilogue::thread::ReLU
+#else  
+  using FusionOperation     = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementCompute>;
+#endif
+
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
       ArchTag, OperatorClass,
       TileShape, ClusterShape,  // Shape of the threadblocks in a cluster
@@ -151,6 +156,7 @@ private:
       }
     };
 
+    #ifdef BLOCKSCALE_FP8_FUSED_COMPLEX
     auto &fusion_args = arguments.epilogue.thread;
     fusion_args.alpha = rt_args->alpha;
     fusion_args.beta = rt_args->beta;
@@ -183,6 +189,7 @@ private:
     if (rt_args->save_amax) {
       fusion_args.amax_D_ptr = (ElementScalar *)rt_args->d_abs_max_D; // abs_max_D.device_data();
     }
+    #endif
 
     arguments.scheduler.raster_order = RasterOrder;
     // The tile scheduler will swizzle up to 8 and with the nearest multiple of 2 (i.e., 1, 2, 4, and 8)

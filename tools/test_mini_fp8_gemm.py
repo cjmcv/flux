@@ -137,8 +137,8 @@ def calculate_diff(m: int, n: int, k: int):
     x = torch.randn((m, k), device="cuda", dtype=torch.bfloat16)
     y = torch.randn((n, k), device="cuda", dtype=torch.bfloat16)
 
-    x_fp8, x_scale = per_token_cast_to_fp8(x.clone())
-    y_fp8, y_scale = per_block_cast_to_fp8(y.clone())
+    x_fp8, x_scale = per_token_cast_to_fp8(x.clone()) # x_fp8[m,k], x_scale[m，k//128]     => cutlass x_scale[m,k]
+    y_fp8, y_scale = per_block_cast_to_fp8(y.clone()) # y_fp8[n,k], y_scale[n//128,k//128] =>
 
 
     tilelang_func = tl_gemm(m, n, k, "e4m3_float8", "bfloat16", "float32")
@@ -157,21 +157,22 @@ def calculate_diff(m: int, n: int, k: int):
         transpose_weight=False
     )
     out_ctlop = ctlop_gemm.forward(
-            x_fp8.clone(),
-            y_fp8.clone(),
-            bias=None,
-            output_buf=None,
-            input_scale=x_scale.clone(),
-            weight_scale=y_scale.clone(),
-            output_scale=None,
-            tuning = None,
-            fast_accum=False,
-        )
+        x_fp8.clone(),
+        y_fp8.clone(),
+        bias=None,
+        output_buf=None,
+        input_scale=x_scale.clone().t().contiguous(),
+        weight_scale=y_scale.clone().t().contiguous(),
+        output_scale=None,
+        tuning = None,
+        fast_accum=False,
+    )
     diff_tilelang_sglang = torch.abs(out_ctlop - out_tilelang).mean().item()
 
     print(f"Shape m={m}, n={n}, k={k}:")
     print(f"CtlOp output: {out_ctlop[0, 0:5]}")
     print(f"TileLang output: {out_tilelang[0, 0:5]}")
+    print(f"Torch output: {torch.nn.functional.linear(x, y)}")
     print(f"Mean absolute difference (TileLang-SGLang): {diff_tilelang_sglang}")
 
     ctlop_sglang_match = torch.allclose(

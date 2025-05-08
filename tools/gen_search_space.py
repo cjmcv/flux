@@ -179,15 +179,16 @@ class GemmBolckScaleFp8Schema:
         return res
 
     def get_hparam_space(self, w):
+        tile_shapes = [(128, 128, 128), (64, 128, 128)]
         cluster_shapes = [(1, 2, 1), (2, 1, 1)]
         raster_orders = ["Heuristic", "AlongM", "AlongN"]
-        swizzles = [2] # 1,2,4,8
+        swizzles = [2,4,8] # 1,2,4,8
 
         res = []
-        for cluster_shape, raster_order, swizzle in itertools.product(
-            cluster_shapes, raster_orders, swizzles):
-            hparam_str = '{0},{1},{2}'.format(
-                w.cstw(cluster_shape,3), w.ctlop_to_cutlasstype(raster_order), str(swizzle))
+        for tile_shape, cluster_shape, raster_order, swizzle in itertools.product(
+            tile_shapes, cluster_shapes, raster_orders, swizzles):
+            hparam_str = '{0},{1},{2},{3}'.format(
+                w.cstw(tile_shape,3), w.cstw(cluster_shape,3), w.ctlop_to_cutlasstype(raster_order), str(swizzle))
             res.append(hparam_str)
         return res
     

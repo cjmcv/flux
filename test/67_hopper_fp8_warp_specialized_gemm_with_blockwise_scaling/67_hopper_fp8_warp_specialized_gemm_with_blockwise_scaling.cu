@@ -110,6 +110,7 @@ using ElementAccumulator  = float;
 using         ElementAux   = ElementC;
 using         LayoutAux    = LayoutC;
 
+using         TileShape    = cute::Shape<cute::_128, cute::_128, cute::_128>;
 /// Initialization
 #endif // defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
 
@@ -153,7 +154,6 @@ constexpr bool IsAuxFp8 =
 template <class GemmImpl>
 struct Buffer {
   using ElementBlockScale = typename GemmImpl::ElementBlockScale;
-  using TileShape         = typename GemmImpl::TileShape;
   using ElementScalar     = typename GemmImpl::ElementScalar;
   using ElementAmax       = typename GemmImpl::ElementAmax;
 
@@ -379,7 +379,6 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
   //
   // Compute reference output
   //
-  using TileShape         = typename GemmImpl::TileShape;
   using ElementCompute    = typename GemmImpl::ElementCompute;
   using Gemm              = typename GemmImpl::Gemm;
   using ElementScalar     = typename GemmImpl::ElementScalar;
@@ -533,7 +532,7 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
 /// Execute a given example GEMM computation
 int run(Options &options)
 {  
-  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
+  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, TileShape, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
   //
   using ME = UnifiedMetaEnum;
   GemmConfigRegister& ins = GemmConfigRegister::instance();
