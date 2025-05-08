@@ -179,7 +179,7 @@ class GemmBolckScaleFp8Schema:
         return res
 
     def get_hparam_space(self, w):
-        tile_shapes = [(128, 128, 128), (64, 128, 128)]
+        tile_shapes = [(128, 128, 128)]
         cluster_shapes = [(1, 2, 1), (2, 1, 1)]
         raster_orders = ["Heuristic", "AlongM", "AlongN"]
         swizzles = [2,4,8] # 1,2,4,8
