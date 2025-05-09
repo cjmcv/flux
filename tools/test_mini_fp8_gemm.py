@@ -9,7 +9,9 @@ import tilelang.language as T
 import deep_gemm
 from deep_gemm import get_col_major_tma_aligned_tensor
 
-from sglang.srt.layers.quantization.fp8_kernel import w8a8_block_fp8_matmul
+enable_sglang = True
+if enable_sglang:
+    from sglang.srt.layers.quantization.fp8_kernel import w8a8_block_fp8_matmul
 import ctlop 
 
 import math
@@ -143,14 +145,17 @@ def fp8_gemm_sglang(
     n: int,
     k: int,
 ):
-    """SGLang implementation of FP8 GEMM"""
-    block_size = [128, 128]  # Matches the block size in per_block_cast_to_fp8
+    if enable_sglang:
+        """SGLang implementation of FP8 GEMM"""
+        block_size = [128, 128]  # Matches the block size in per_block_cast_to_fp8
 
-    # Run SGLang kernel
-    out = w8a8_block_fp8_matmul(
-        x_fp8, y_fp8, x_scale, y_scale, block_size, torch.bfloat16
-    )
-    return out
+        # Run SGLang kernel
+        out = w8a8_block_fp8_matmul(
+            x_fp8, y_fp8, x_scale, y_scale, block_size, torch.bfloat16
+        )
+        return out
+    else:
+        return torch.zeros((m, n), device="cuda", dtype=torch.bfloat16)
 
 
 def calculate_diff(m: int, n: int, k: int):
