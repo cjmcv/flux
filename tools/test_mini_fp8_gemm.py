@@ -6,6 +6,7 @@ import triton
 import tilelang
 import tilelang.language as T
 
+import deep_gemm
 from deep_gemm import get_col_major_tma_aligned_tensor
 
 from sglang.srt.layers.quantization.fp8_kernel import w8a8_block_fp8_matmul
@@ -309,7 +310,7 @@ def get_benchmark(tp_size):
         x_fp8, x_scale = per_token_cast_to_fp8(x)
         y_fp8, y_scale = per_block_cast_to_fp8(y)
         x_scale_col_major = get_col_major_tma_aligned_tensor(x_scale.clone())
-        
+
         quantiles = [0.5, 0.2, 0.8]
 
         if provider == "ctlop": 

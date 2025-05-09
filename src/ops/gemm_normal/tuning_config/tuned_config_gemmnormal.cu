@@ -1,5 +1,5 @@
-#include "ctlop/ops_impl/gemm_normal/gemm_v2_impl.h"
-#include "ctlop/ops_impl/gemm_normal/gemm_v2_simt_impl.h"
+#include "ctlop/ctlop.h"
+#include "ctlop/ops_impl/global_resource.h"
 
 namespace ctlop {
 using namespace cutlass;

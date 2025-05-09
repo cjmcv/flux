@@ -37,16 +37,20 @@ class TypeWarpper:
             "Sm80": "arch::Sm80",
             "Sm89": "arch::Sm89",
             "Sm90": "arch::Sm90",
+            #
             "RRR": "layout::RowMajor, layout::RowMajor, layout::RowMajor",
             "RCR": "layout::RowMajor, layout::ColumnMajor, layout::RowMajor",
             "RCC": "layout::RowMajor, layout::ColumnMajor, layout::ColumnMajor",
             #
-            "Identity": "gemm::threadblock::GemmIdentityThreadblockSwizzle<>",
-            "StreamK": "gemm::threadblock::ThreadblockSwizzleStreamK",
+            "SwizzleIdentity": "gemm::threadblock::GemmIdentityThreadblockSwizzle<>",
+            "SwizzleStreamK": "gemm::threadblock::ThreadblockSwizzleStreamK",
             #
             "Heuristic": "gemm::kernel::detail::RasterOrderOptions::Heuristic",
             "AlongM": "gemm::kernel::detail::RasterOrderOptions::AlongM",
             "AlongN": "gemm::kernel::detail::RasterOrderOptions::AlongN",
+            # 
+            "TSPersistent": "cutlass::gemm::PersistentScheduler",
+            "TSStreamK": "cutlass::gemm::StreamKScheduler"
         }
         # 返回对应的字符串，如果没有匹配的值，则返回"Unknown"
         return string_to_string.get(ctlop_type, "Unknown")
@@ -81,12 +85,20 @@ class GemmNormalSchema:
         # block_shapes = [(128, 128, 32), (64, 256, 32)]
         # warp_shapes = [(64, 64, 32)]
         # instruction_shapes = [(16, 8, 16), (16, 8, 8)]
-        bwi_shapes = [((128, 128, 32), (64, 64, 32), (16, 8, 16)),
+        bwi_shapes = [((128, 256, 32), (64, 64, 32), (16, 8, 16)),
+                      ((128, 128, 64), (64, 64, 32), (16, 8, 16)),
+                      ((128, 128, 32), (64, 64, 32), (16, 8, 16)),
+                      ((64, 256, 64), (64, 64, 32), (16, 8, 16)),
                       ((64, 256, 32), (64, 64, 32), (16, 8, 16)),
+                      ((64, 128, 64), (64, 64, 32), (16, 8, 16)),
+                      ((64, 128, 32), (64, 64, 32), (16, 8, 16)),
                       ((64, 128, 32), (32, 64, 32), (16, 8, 16)),
-                      ((64, 64, 32), (32, 32, 32), (16, 8, 8))]
-
-        swizzles = ['Identity', 'StreamK']
+                      ((32, 128, 64), (16, 64, 64), (16, 8, 16)),
+                      ((32, 128, 64), (16, 64, 32), (16, 8, 16)),
+                      ((16, 128, 64), (16, 64, 64), (16, 8, 16)),
+                      ((16, 128, 64), (16, 64, 32), (16, 8, 16)),
+                      ((16, 128, 64), (16, 64, 32), (16, 8, 8))]
+        swizzles = ['SwizzleIdentity', 'SwizzleStreamK']
         stages = [3, 4]
         splitk_factors = [1, 2]
         avail_smss = [-1, 1]
@@ -179,16 +191,18 @@ class GemmBolckScaleFp8Schema:
         return res
 
     def get_hparam_space(self, w):
+        tile_schedulers = ["TSPersistent", "TSStreamK"]
         tile_shapes = [(128, 128, 128)]
         cluster_shapes = [(1, 2, 1), (2, 1, 1)]
         raster_orders = ["Heuristic", "AlongM", "AlongN"]
         swizzles = [2,4,8] # 1,2,4,8
 
         res = []
-        for tile_shape, cluster_shape, raster_order, swizzle in itertools.product(
-            tile_shapes, cluster_shapes, raster_orders, swizzles):
-            hparam_str = '{0},{1},{2},{3}'.format(
-                w.cstw(tile_shape,3), w.cstw(cluster_shape,3), w.ctlop_to_cutlasstype(raster_order), str(swizzle))
+        for tile_scheduler, tile_shape, cluster_shape, raster_order, swizzle in itertools.product(
+            tile_schedulers, tile_shapes, cluster_shapes, raster_orders, swizzles):
+            hparam_str = '{0},{1},{2},{3},{4}'.format(
+                w.ctlop_to_cutlasstype(tile_scheduler), w.cstw(tile_shape,3), w.cstw(cluster_shape,3),
+                w.ctlop_to_cutlasstype(raster_order), str(swizzle))
             res.append(hparam_str)
         return res
     
@@ -234,7 +248,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python tools/gen_search_space.py --schema=GemmNormal (GemmNormal/GemmNormalSimt/GemmBolckScaleFp8)")
+        print("usage: python tools/gen_search_space.py --schema=GemmBolckScaleFp8 (GemmNormal/GemmNormalSimt/GemmBolckScaleFp8)")
         exit()
     generator = SearchSpaceGenerator()
     generator.run(args.schema) 

@@ -5,13 +5,13 @@ import itertools
 import os
 from functools import partial
 from typing import List
-from enum import IntEnum, auto
 import numpy as np
+
 import time
 import torch
 
 import ctlop
-from tune_common import Meta
+from tune_common import Meta, per_token_cast_to_fp8, per_block_cast_to_fp8
 
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 torch.use_deterministic_algorithms(True, warn_only=True)
@@ -30,31 +30,63 @@ class TuningConfig:
     N: int
     K: int
     transpose_weight: bool
-    dtype: str
+    dtypeA: str
+    dtypeB: str
+    dtypeC: str
     has_bias: bool
 
-def gen_tuning_space():
+class GemmNormalSchema:
+    name = "GemmNormal"
+    default_choice = [0, Meta.GemmNormal]
+    sub_schema = [Meta.GemmNormal, Meta.GemmNormalSimt]
+    space_dtype = [(torch.bfloat16,torch.bfloat16,torch.bfloat16)]
+    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
+        return input, None, weight, None
+    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
+                       input_scale: torch.Tensor, weight_scale: torch.Tensor):
+        output = torch.matmul(input, weight.t())
+        return output.cpu()
+class GemmBolckScaleFp8Schema:
+    impl = "GemmBolckScaleFp8"
+    default_choice = [0, Meta.GemmBolckScaleFp8]
+    sub_schema = [Meta.GemmBolckScaleFp8]
+    space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
+    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
+        return per_token_cast_to_fp8(input), per_block_cast_to_fp8(weight)
+    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
+                       input_scale: torch.Tensor, weight_scale: torch.Tensor):
+        # output = torch.matmul(input, weight.t())
+        # return output.cpu()
+        return None
+    
+def str2schema(schema_name):
+    string_to_schema = {
+        "GemmNormal": GemmNormalSchema(),
+        "GemmBolckScaleFp8": GemmBolckScaleFp8Schema(),
+    }
+    return string_to_schema.get(schema_name, None)
+
+def gen_tuning_space(schema):
     space: List[TuningConfig] = []
     space_M = list(range(1, 31)) #  [1024, 2048, 4096, 8192] # , 16384
     space_NK = [(512,256)] # (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     space_transpose_weight = [False] # , True
-    space_dtype = [torch.bfloat16] # , torch.bfloat16
+    space_dtype = schema.space_dtype
     space_has_bias = [False]
     for NK, M, transpose_weight, dtype, has_bias in itertools.product(
         space_NK, space_M, space_transpose_weight, space_dtype, space_has_bias
     ):
         config = TuningConfig(
-            M=M, N=NK[0], K=NK[1], transpose_weight=transpose_weight, dtype=dtype, has_bias=has_bias
+            M=M, N=NK[0], K=NK[1], transpose_weight=transpose_weight, 
+            dtypeA=dtype[0], dtypeB=dtype[1], dtypeC=dtype[2], has_bias=has_bias
         )
         space.append(config)
     return space
 
 
-def get_torch_output(input: torch.Tensor, weight: torch.Tensor):
-    output = torch.matmul(input, weight.t())
-    return output.cpu()
-
-def run_ctlop_profiling(input: torch.Tensor, weight: torch.Tensor, config: TuningConfig, fp):
+def run_ctlop_profiling(schema, input: torch.Tensor, weight: torch.Tensor, 
+                        input_scale: torch.Tensor, weight_scale: torch.Tensor,
+                        config: TuningConfig, fp):
     m = input.size(0)
     k = input.size(1)
     if config.transpose_weight:
@@ -63,22 +95,22 @@ def run_ctlop_profiling(input: torch.Tensor, weight: torch.Tensor, config: Tunin
     else:
         n = weight.size(0)
 
-    bias = None
-    if config.has_bias:
-        bias = torch.zeros([m, n], dtype=input.dtype, device=input.device, requires_grad=False)
+    # bias = None
+    # if config.has_bias:
+    #     bias = torch.zeros([m, n], dtype=input.dtype, device=input.device, requires_grad=False)
 
     tuning = torch.zeros(100, dtype=torch.int8, device='cpu')
-    output = torch.empty([m, n], dtype=input.dtype, device=input.device, requires_grad=False)
-    op = ctlop.GemmNormal(input_dtype=input.dtype, output_dtype=input.dtype, transpose_weight=config.transpose_weight)
+    output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
+    op = ctlop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
 
     fastest_time = 99999
-    fastest_config = [0, Meta.GemmNormal]
-    for schema in [Meta.GemmNormal, Meta.GemmNormalSimt]:
+    fastest_config = schema.default_choice
+    for sub_schema in schema.sub_schema:
         for id in range(100):
             # warmup and check if exist.
-            tuning[0], tuning[1], tuning[2] = 1, id, schema
+            tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
             output = op.forward(input, weight, bias=None, output_buf=None, 
-                                input_scale=None, weight_scale=None, output_scale=None, 
+                                input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
                                 tuning = tuning, fast_accum=False)
             if (output is None):
                 break
@@ -89,20 +121,20 @@ def run_ctlop_profiling(input: torch.Tensor, weight: torch.Tensor, config: Tunin
                 if (i == warmup_iters):
                     torch.cuda.synchronize()
                     start = time.time()
-                tuning[0], tuning[1], tuning[2] = 1, id, schema
+                tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
                 output = op.forward(input, weight, bias=None, output_buf=None, 
-                                    input_scale=None, weight_scale=None, output_scale=None, 
+                                    input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
                                     tuning = tuning, fast_accum=False)
             torch.cuda.synchronize()
             elapsed_time = time.time() - start
             if (fastest_time > elapsed_time):
                 fastest_time = elapsed_time
-                fastest_config = [id, schema]
+                fastest_config = [id, sub_schema]
 
     tuning[0], tuning[1], tuning[2] = 1, fastest_config[0], fastest_config[1]
     # fp.write("fastest: {0}ms, {1}".format(str(fastest_time * 1000 / iters), str(fastest_id)))
     output = op.forward(input, weight, bias=None, output_buf=None, 
-                        input_scale=None, weight_scale=None, output_scale=None, 
+                        input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
                         tuning = tuning, fast_accum=False)
 
     # tuning: 0:meta_len, 1:id, 2:schema, 3:~meta
@@ -122,36 +154,41 @@ def run_ctlop_profiling(input: torch.Tensor, weight: torch.Tensor, config: Tunin
     print(message)
     return output.cpu()
 
-def tune_one_config(config: TuningConfig, fp):
-    input = torch.rand((config.M, config.K), dtype=config.dtype).cuda()
-    weight = torch.rand((config.N, config.K), dtype=config.dtype).cuda()
+def tune_one_config(schema, config: TuningConfig, fp):
+    input = torch.rand((config.M, config.K), dtype=torch.bfloat16).cuda()
+    weight = torch.rand((config.N, config.K), dtype=torch.bfloat16).cuda()
     # start_time = time.time()
-    torch_output = get_torch_output(input, weight)
+    x, x_scale, y, y_scale = schema.gen_scale(input.clone(), weight.clone())
+    ref_output = schema.get_ref_output(x, y, x_scale, y_scale)
     # print(f"torch compute time: {(time.time() - start_time) * 1000} ms")
-    ctlop_output = run_ctlop_profiling(input, weight, config, fp)
+    ctlop_output = run_ctlop_profiling(schema, input, weight, x_scale, y_scale, config, fp)
 
-    if config.dtype == torch.bfloat16:
-        atol, rtol = 0.02, 0.02
-    else:
-        atol, rtol = 0.01, 0.01
-    ctlop.torch_allclose(ctlop_output, torch_output, atol=atol, rtol=rtol)
+    if ref_output is not None:
+        if config.dtypeC == torch.bfloat16:
+            atol, rtol = 0.02, 0.02
+        else:
+            atol, rtol = 0.01, 0.01
+        ctlop.torch_allclose(ctlop_output, ref_output, atol=atol, rtol=rtol)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--output_dir", default="./tools/", type=str, help="Directory to store generated files"
-    )
+    parser.add_argument("--schema", type=str, default="None")
+    parser.add_argument("--output_dir", default="./tools/", type=str, help="Directory to store generated files")
     args = parser.parse_args()
+
+    if (args.schema == "None"):
+        print("usage: python tools/tuning/tune_gemm_normal.py --schema=GemmBolckScaleFp8 (GemmNormal(GemmNormalSimt) / GemmBolckScaleFp8)")
+        exit()
 
     if args.output_dir and not os.path.isdir(args.output_dir):
         raise Exception(f"{args.output_dir} not exist")
 
-    tag = "GemmNormal"
+    tag = args.schema
     fp = {}
     fp[tag] = open("tuned_config_{0}.cu".format(tag.lower()), "w")
 
-    fp[tag].write('#include "ctlop/ops_impl/gemm_normal/gemm_v2_impl.h"\n')
-    fp[tag].write('#include "ctlop/ops_impl/gemm_normal/gemm_v2_simt_impl.h"\n\n')
+    fp[tag].write('#include "ctlop/ctlop.h"\n')
+    fp[tag].write('#include "ctlop/ops_impl/global_resource.h"\n\n')
     fp[tag].write('namespace ctlop {\n')
     fp[tag].write('using namespace cutlass;\n')
     fp[tag].write('using ME = UnifiedMetaEnum;\n\n')
@@ -159,12 +196,11 @@ if __name__ == "__main__":
     
     fp[tag].write('  TunedConfigRegister& tins = TunedConfigRegister::instance();\n')
     
-    arch: int = ctlop.get_arch()
-    name: str = f"config_single_gemm_sm{arch}"
-    config_space = gen_tuning_space()
+    schema = str2schema(args.schema)
+    config_space = gen_tuning_space(schema)
     for i, config in enumerate(config_space):
         print(f"==== #{i + 1}/{len(config_space)} Tuning for {config}")
-        tune_one_config(config=config, fp=fp[tag])
+        tune_one_config(schema, config=config, fp=fp[tag])
 
     fp[tag].write('  return 0;\n}();\n}')
     fp[tag].write('// clang-format on')

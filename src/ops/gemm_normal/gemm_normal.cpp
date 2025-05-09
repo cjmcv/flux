@@ -81,11 +81,11 @@ public:
       }
       id_meta[IdMetaEnum::Schema] = (int8_t)UnifiedMetaEnum::GemmBolckScaleFp8;
       id_meta[IdMetaEnum::Arch] = (int8_t)UnifiedMetaEnum::Sm90;
-      printf("id_meta: \n");
-      for (int i=0; i<id_meta.size(); i++) {
-        printf("%d, ", id_meta[i]);
-      }
-      printf("\n");
+      // printf("id_meta: \n");
+      // for (int i=0; i<id_meta.size(); i++) {
+      //   printf("%d, ", id_meta[i]);
+      // }
+      // printf("\n");
     }
     else {
       id_meta[IdMetaEnum::Schema] = (int8_t)UnifiedMetaEnum::GemmNormal;
@@ -107,7 +107,7 @@ public:
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
     }
-    printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+    // printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
     GemmBase *op = ins.GetOp(id_meta, is_tuning);
     if (op == nullptr)
       return torch::Tensor();

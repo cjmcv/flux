@@ -346,11 +346,13 @@ if __name__ == "__main__":
 
     ctlop_perf = []
     torch_perf = []
-    for m in range(1, args.M, args.step):
+    print(f"M: {1}, N: {args.N}, K: {args.K}")
+    run(1, args, ctlop_perf, torch_perf)
+    for m in range(2, args.M, args.step):
         print(f"M: {m}, N: {args.N}, K: {args.K}")
         run(m, args, ctlop_perf, torch_perf)
 
-    plot_x = list(range(1, args.M, args.step))
+    plot_x = [1] + list(range(2, args.M, args.step))
     plt.plot(plot_x, ctlop_perf, label='ctlop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
 

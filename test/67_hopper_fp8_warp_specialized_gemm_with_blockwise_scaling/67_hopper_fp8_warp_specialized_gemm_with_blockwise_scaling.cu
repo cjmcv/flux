@@ -532,7 +532,7 @@ bool verify(const Options &options, Buffer<GemmImpl> &buffer) {
 /// Execute a given example GEMM computation
 int run(Options &options)
 {  
-  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, TileShape, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
+  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, cutlass::gemm::PersistentScheduler, TileShape, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
   //
   using ME = UnifiedMetaEnum;
   GemmConfigRegister& ins = GemmConfigRegister::instance();

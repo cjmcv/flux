@@ -18,14 +18,14 @@ namespace ctlop {
 using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
-          class ArchTag, class TileShape,  class ClusterShape, 
+          class ArchTag, class TileScheduler, class TileShape,  class ClusterShape, 
           RasterOrderOptions RasterOrder, int Swizzle>
 class GemmBlockScaleFp8Impl : public GemmBase {
 public:
   ////
   using         ElementD    = ElementC;
   using         LayoutD     = LayoutC;
-  // Auxiliary matrix configuration and other fusion types
+  // Auxiliary matrix configuration and other fusion types 
   using         ElementAux   = ElementC;
   using         LayoutAux    = LayoutC;
   using         ElementAmax  = float;
@@ -77,7 +77,8 @@ public:
   using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
       cute::Shape<int,int,int,int>, // Indicates ProblemShape
       CollectiveMainloopWithBlockWiseScaling,
-      CollectiveEpilogue
+      CollectiveEpilogue,
+      TileScheduler // cutlass::gemm::PersistentScheduler cutlass::gemm::StreamKScheduler
   >;
   
   // CORE
