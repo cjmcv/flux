@@ -11,7 +11,7 @@ import itertools
 class TypeWarpper:
     # ctlop type warp
     def xtw(self, type):
-        return "(int8_t)ME::" + type
+        return "(int16_t)ME::" + type
     # cutlass type warp
     def ctw(self, type):
         return "cutlass::" + type
@@ -84,11 +84,12 @@ class GemmNormalSchema:
     def get_hparam_space(self, w):
         # block_shapes = [(128, 128, 32), (64, 256, 32)]
         # warp_shapes = [(64, 64, 32)]
-        # instruction_shapes = [(16, 8, 16), (16, 8, 8)]
-        bwi_shapes = [((128, 256, 32), (64, 64, 32), (16, 8, 16)),
-                      ((128, 128, 64), (64, 64, 32), (16, 8, 16)),
-                      ((128, 128, 32), (64, 64, 32), (16, 8, 16)),
-                      ((64, 256, 64), (64, 64, 32), (16, 8, 16)),
+        # instruction_shapes = [(16, 8, 16), (16, 8, 8)] 
+        # 这些shape某些情况下can_implement会失败，猜测与资源限制有关，bloc8ktile都超过warptile的4倍。
+        # ((128, 256, 32), (64, 64, 32), (16, 8, 16)), 
+        # ((128, 128, 64), (64, 64, 32), (16, 8, 16)),
+        # ((64, 256, 64), (64, 64, 32), (16, 8, 16)),
+        bwi_shapes = [((128, 128, 32), (64, 64, 32), (16, 8, 16)),
                       ((64, 256, 32), (64, 64, 32), (16, 8, 16)),
                       ((64, 128, 64), (64, 64, 32), (16, 8, 16)),
                       ((64, 128, 32), (64, 64, 32), (16, 8, 16)),
@@ -110,7 +111,7 @@ class GemmNormalSchema:
             wshape = bwi_shape[1]
             ishape = bwi_shape[2]
             # Ignore special case.
-            if (swizzle == 'Identity' and avail_sm != 1):
+            if (swizzle == 'SwizzleIdentity' and avail_sm == 1):
                 continue
             hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
                 w.cstw(bshape), w.cstw(wshape), w.cstw(ishape), w.ctlop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
@@ -149,7 +150,7 @@ class GemmNormalSimtSchema:
         bw_shapes = [((64, 64, 4), (32, 16, 4)),
                      ((32, 32, 4), (16, 16, 4)),
                      ((16, 32, 4), (8, 16, 4))]
-        swizzles = ['Identity', 'StreamK']
+        swizzles = ['SwizzleIdentity', 'SwizzleStreamK']
         stages = [3, 4]
         splitk_factors = [1, 2]
 

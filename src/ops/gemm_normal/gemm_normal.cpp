@@ -71,7 +71,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    std::vector<int8_t> id_meta = MakeDefaultMeta();     // id + meta
+    std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
     RtArguments *rt_args;
     if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
       rt_args = new RtBlockScaleFp8ArgumentsV3();
@@ -79,8 +79,8 @@ public:
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args)->d_blockscale_A = input_scale.value().data_ptr();
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args)->d_blockscale_B = weight_scale.value().data_ptr();
       }
-      id_meta[IdMetaEnum::Schema] = (int8_t)UnifiedMetaEnum::GemmBolckScaleFp8;
-      id_meta[IdMetaEnum::Arch] = (int8_t)UnifiedMetaEnum::Sm90;
+      id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmBolckScaleFp8;
+      id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
       // printf("id_meta: \n");
       // for (int i=0; i<id_meta.size(); i++) {
       //   printf("%d, ", id_meta[i]);
@@ -88,7 +88,7 @@ public:
       // printf("\n");
     }
     else {
-      id_meta[IdMetaEnum::Schema] = (int8_t)UnifiedMetaEnum::GemmNormal;
+      id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmNormal;
       rt_args = new RtArgumentsV2();
     }
     torch::Tensor output = GetBaseRtConf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
@@ -96,7 +96,7 @@ public:
 
     bool is_tuning = false;
     if (tuning.has_value()) {
-      int8_t *data = (int8_t *)tuning.value().data_ptr();
+      int16_t *data = (int16_t *)tuning.value().data_ptr();
       CTLOP_CHECK_EQ(data[0], 1);
       id_meta[IdMetaEnum::Id] = data[1];
       id_meta[IdMetaEnum::Schema] = data[2];
@@ -107,7 +107,7 @@ public:
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
     }
-    // printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+    printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
     GemmBase *op = ins.GetOp(id_meta, is_tuning);
     if (op == nullptr)
       return torch::Tensor();
@@ -117,7 +117,7 @@ public:
     op->run(stream);
 
     if (tuning.has_value()) {
-      int8_t *data = (int8_t *)tuning.value().data_ptr();
+      int16_t *data = (int16_t *)tuning.value().data_ptr();
       data[0] = id_meta.size();
       for (int i=0; i<id_meta.size(); i++) {
         data[i+1] = id_meta[i];
@@ -128,21 +128,21 @@ public:
   }
 
 private:
-  std::vector<int8_t> MakeDefaultMeta(int8_t id = 0) {
-    std::vector<int8_t> meta;
+  std::vector<int16_t> MakeDefaultMeta(int16_t id = 0) {
+    std::vector<int16_t> meta;
     meta.resize(8);
     meta[IdMetaEnum::Id] = id;                                  // id
-    meta[IdMetaEnum::Schema] = (int8_t)UnifiedMetaEnum::GemmNormal; // schema type (GemmNormal / GemmNormalSimt / GemmBolckScaleFp8)
+    meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmNormal; // schema type (GemmNormal / GemmNormalSimt / GemmBolckScaleFp8)
 
     meta[IdMetaEnum::TypeA] = from_torch_dtype(this->input_dtype);  // type A
     meta[IdMetaEnum::TypeB] = from_torch_dtype(this->input_dtype);  // type B
     meta[IdMetaEnum::TypeCD] = from_torch_dtype(this->output_dtype); // type C/D
-    meta[IdMetaEnum::TypeAcc] = (int8_t)UnifiedMetaEnum::FP32;        // type acc
+    meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP32;        // type acc
     if (transpose_weight)                           // layout
-      meta[IdMetaEnum::Layout] = (int8_t)UnifiedMetaEnum::RRR; 
+      meta[IdMetaEnum::Layout] = (int16_t)UnifiedMetaEnum::RRR; 
     else
-      meta[IdMetaEnum::Layout] = (int8_t)UnifiedMetaEnum::RCR;
-    meta[IdMetaEnum::Arch] = (int8_t)UnifiedMetaEnum::Sm80;        // arch
+      meta[IdMetaEnum::Layout] = (int16_t)UnifiedMetaEnum::RCR;
+    meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm80;        // arch
 
     return meta;
   }
@@ -202,7 +202,7 @@ private:
   const c10::ScalarType output_dtype;
   const bool transpose_weight;
 
-  int8_t default_schema;
+  int16_t default_schema;
 };
 
 GemmNormal::GemmNormal(

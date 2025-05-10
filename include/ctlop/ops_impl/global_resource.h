@@ -54,8 +54,8 @@ using GemmFactory = std::function<GemmBase*()>;
 // 单例类来管理 gemm_map
 class GemmConfigRegister {
 private:
-  std::map<std::vector<int8_t>, GemmFactory> gemm_map;
-  std::map<std::vector<int8_t>, GemmBase*> created_instances;
+  std::map<std::vector<int16_t>, GemmFactory> gemm_map;
+  std::map<std::vector<int16_t>, GemmBase*> created_instances;
 
   // 私有构造函数，防止外部实例化
   GemmConfigRegister() = default;
@@ -83,11 +83,11 @@ public:
   }
 
   // 注册函数
-  void add(const std::vector<int8_t> &key, GemmFactory factory) {
+  void add(const std::vector<int16_t> &key, GemmFactory factory) {
     gemm_map[key] = factory;
   }
 
-  GemmBase* CreateOp(const std::vector<int8_t> &key, bool is_tuning = false) {
+  GemmBase* CreateOp(const std::vector<int16_t> &key, bool is_tuning = false) {
     // printf("name: %s.\n", name.c_str());
     // std::cout << key << std::endl;
     auto it = gemm_map.find(key);
@@ -109,7 +109,7 @@ public:
   }
 
   // 获取 Gemm 实例，如果已存在则直接返回，不存在则创建
-  GemmBase* GetOp(const std::vector<int8_t> &key, bool is_tuning = false) {
+  GemmBase* GetOp(const std::vector<int16_t> &key, bool is_tuning = false) {
     auto it = created_instances.find(key);
     if (it != created_instances.end()) {
         return it->second;
@@ -127,7 +127,7 @@ public:
 
 class TunedConfigRegister {
 private:
-  std::map<std::vector<int32_t>, std::vector<int8_t>> tuned_map;
+  std::map<std::vector<int32_t>, std::vector<int16_t>> tuned_map;
 
   TunedConfigRegister() = default;
 
@@ -141,11 +141,11 @@ public:
       return instance;
   }
 
-  void add(const std::vector<int32_t> &key, const std::vector<int8_t> &select_config) {
+  void add(const std::vector<int32_t> &key, const std::vector<int16_t> &select_config) {
     tuned_map[key] = select_config;
   }
 
-  void GetSelectedConfig(const std::vector<int32_t> &key, int8_t *selected_id, int8_t *schema_id) {
+  void GetSelectedConfig(const std::vector<int32_t> &key, int16_t *selected_id, int16_t *schema_id) {
     auto it = tuned_map.find(key);
     if (it != tuned_map.end()) {
       *selected_id = it->second[0];

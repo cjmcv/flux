@@ -24,6 +24,9 @@ torch.backends.cuda.matmul.allow_tf32 = False
 np.random.seed(3)
 print = partial(print, flush=True)
 
+warmup_iters = 10
+pref_iters = 20
+
 @dataclasses.dataclass
 class TuningConfig:
     M: int
@@ -34,6 +37,7 @@ class TuningConfig:
     dtypeB: str
     dtypeC: str
     has_bias: bool
+
 
 class GemmNormalSchema:
     name = "GemmNormal"
@@ -70,8 +74,8 @@ def str2schema(schema_name):
 
 def gen_tuning_space(schema):
     space: List[TuningConfig] = []
-    space_M = [8,16,32,64,128,512,1024, 2048, 4096] # list(range(1, 31))  # , 16384
-    space_NK = [(576, 7168)] # (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
+    space_M = list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_NK = [(27648, 5120)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     space_transpose_weight = [False] # , True
     space_dtype = schema.space_dtype
     space_has_bias = [False]
@@ -101,26 +105,23 @@ def run_ctlop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
     # if config.has_bias:
     #     bias = torch.zeros([m, n], dtype=input.dtype, device=input.device, requires_grad=False)
 
-    tuning = torch.zeros(100, dtype=torch.int8, device='cpu')
+    tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
     output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
     op = ctlop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
 
-    fastest_time = 99999
-    fastest_config = schema.default_choice
     tuning_data = []
     for sub_schema in schema.sub_schema:
-        for id in range(100):
+        for id in range(500):
             # warmup and check if exist.
             tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
+            print(1, id, sub_schema)
             output = op.forward(input, weight, bias=None, output_buf=None, 
                                 input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
                                 tuning=tuning, fast_accum=False)
             if (output is None):
                 break
 
-            warmup_iters = 100
-            iters = 200
-            for i in range(warmup_iters + iters):
+            for i in range(warmup_iters + pref_iters):
                 if (i == warmup_iters):
                     torch.cuda.synchronize()
                     start = time.time()
@@ -134,7 +135,6 @@ def run_ctlop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
 
     tuning_data.sort()
     tuning[0], tuning[1], tuning[2] = 1, tuning_data[0][1], tuning_data[0][2]
-    # fp.write("fastest: {0}ms, {1}".format(str(fastest_time * 1000 / iters), str(fastest_id)))
     output = op.forward(input, weight, bias=None, output_buf=None, 
                         input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
                         tuning=tuning, fast_accum=False)
@@ -143,14 +143,14 @@ def run_ctlop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
     meta_len = tuning[0]       # len
     meta_str = ''              #
     for i in range(3, meta_len):
-        meta_str += "(int8_t)ME::" + str(Meta(tuning[i].item())) + ','
-    meta_str += "(int8_t)ME::" + str(Meta(tuning[meta_len].item()))
+        meta_str += "(int16_t)ME::" + str(Meta(tuning[i].item())) + ','
+    meta_str += "(int16_t)ME::" + str(Meta(tuning[meta_len].item()))
 
     for sid in range(3):
         prefix = ''
         if sid != 0:
             prefix = '// '
-        message = "  {0}tins.add({{{1}, {2}, {3}, {4}}}, /*config*/{{{5}, {6}}}); // {7}ms\n".format(prefix, m, n, k, meta_str, str(tuning_data[sid][1]), "(int8_t)ME::"+str(tuning_data[sid][2]), str(round(tuning_data[sid][0] * 1000 / iters, 3)))
+        message = "  {0}tins.add({{{1}, {2}, {3}, {4}}}, /*config*/{{{5}, {6}}}); // {7}ms\n".format(prefix, m, n, k, meta_str, str(tuning_data[sid][1]), "(int16_t)ME::"+str(tuning_data[sid][2]), str(round(tuning_data[sid][0] * 1000 / pref_iters, 3)))
         fp.write(message)
         fp.flush()
         print(message)

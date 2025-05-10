@@ -536,7 +536,7 @@ int run(Options &options)
   //
   using ME = UnifiedMetaEnum;
   GemmConfigRegister& ins = GemmConfigRegister::instance();
-  std::vector<int8_t> id_meta = {0,(int8_t)ME::GemmBolckScaleFp8,(int8_t)ME::E4M3, (int8_t)ME::E4M3, (int8_t)ME::BF16, (int8_t)ME::FP32, (int8_t)ME::RCR, (int8_t)ME::Sm90};
+  std::vector<int16_t> id_meta = {0,(int16_t)ME::GemmBolckScaleFp8,(int16_t)ME::E4M3, (int16_t)ME::E4M3, (int16_t)ME::BF16, (int16_t)ME::FP32, (int16_t)ME::RCR, (int16_t)ME::Sm90};
   ins.add(id_meta, /*op*/[]() { return new GemmFp8Impl();});
   //
 
