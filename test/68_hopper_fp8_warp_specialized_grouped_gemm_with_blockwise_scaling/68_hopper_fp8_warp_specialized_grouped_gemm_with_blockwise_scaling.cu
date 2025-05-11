@@ -88,7 +88,6 @@
 #include "cutlass/util/reference/host/tensor_norm.h"
 #include "cutlass/util/reference/device/tensor_fill.h"
 
-// Includes from examples directory
 // #include "helper.h"
 #include "ctlop/common_cuda.h"
 #include "hopper_fp8_commandline.hpp"
@@ -116,8 +115,8 @@ using         LayoutB     = cutlass::layout::ColumnMajor;                   // L
 constexpr int AlignmentB  = 128 / cutlass::sizeof_bits<ElementB>::value;    // Memory access granularity/alignment of B matrix in units of elements (up to 16 bytes)
 
 // C matrix configuration
-using         ElementC    = cutlass::float_e4m3_t;                          // Element type for C and D matrix operands
-using         LayoutC     = cutlass::layout::ColumnMajor;                   // Layout type for C and D matrix operands
+using         ElementC    = cutlass::bfloat16_t;                          // Element type for C and D matrix operands
+using         LayoutC     = cutlass::layout::RowMajor;                   // Layout type for C and D matrix operands
 constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 
 // D matrix configuration
@@ -155,6 +154,8 @@ struct GroupScaleConfig {
   static_assert(size<1>(TileShape{}) == ScaleGranularityN * ScaleNsPerTile,
               "FP8 scaling granularity must evenly divide tile shape along N.");
 
+  // KernelPtrArrayTmaWarpSpecializedPingpongFP8FastAccum
+  // PtrArrayTmaWarpSpecializedCooperative
   using KernelSchedule    = cutlass::gemm::KernelPtrArrayTmaWarpSpecializedCooperativeFP8BlockScaledAccum<ScaleGranularityM_, ScaleGranularityN_>;
   using EpilogueSchedule  = cutlass::epilogue::PtrArrayTmaWarpSpecializedCooperative;
   using EpilogueTileType  = cutlass::epilogue::collective::EpilogueTileAuto;
