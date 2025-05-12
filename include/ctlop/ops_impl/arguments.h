@@ -1,5 +1,5 @@
 #pragma once
-
+#include <vector>
 namespace ctlop {
 
 struct RtArguments {
@@ -27,6 +27,9 @@ struct RtArgumentsV2 : public RtArguments {
 };
 
 struct RtBlockScaleFp8ArgumentsV3 : public RtArguments {
+  std::vector<int32_t> problem_sizes; // mnk,mnk,mnk...
+  int groups;
+  
   float scale_a = 1.f, scale_b = 1.f, scale_c = 1.f, scale_d = 1.f, scale_aux = 1.f;
 
   void *d_blockscale_A;
@@ -40,5 +43,17 @@ struct RtBlockScaleFp8ArgumentsV3 : public RtArguments {
   void *d_abs_max_D;
 };
 
+struct RtGroupedBlockScaleFp8ArgumentsV3 : public RtArguments {
+  int groups;
+  std::vector<int32_t> problem_sizes; // mnk,mnk,mnk...
+
+  void const **ptr_A;
+  void const **ptr_B;
+  void const **ptr_C;
+  void **tr_D;  
+
+  void const **d_blockscale_A;
+  void const **d_blockscale_B;
+};
 
 } // namespace ctlop

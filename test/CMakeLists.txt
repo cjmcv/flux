@@ -44,6 +44,9 @@ include_directories(${COMMON_HEADER_DIRS})
 
 add_executable(68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling 68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling/68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling.cu)
 target_link_libraries(68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling PUBLIC ctlop)
+
+# add_executable(68_mini_test 68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling/68_mini_test.cu)
+# target_link_libraries(68_mini_test PUBLIC ctlop)
 # #
 # add_executable(37_gemm_layernorm_gemm_fusion 37_gemm_layernorm_gemm_fusion/gemm_layernorm.cu)
 # target_link_libraries(37_gemm_layernorm_gemm_fusion PUBLIC ctlop)

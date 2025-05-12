@@ -92,6 +92,7 @@
 #include "ctlop/common_cuda.h"
 #include "hopper_fp8_commandline.hpp"
 #include "reference/host/gemm_with_groupwise_scaling.h"
+#include "ctlop/ops_impl/gemm_normal/gemm_v3_grouped_blockscale_fp8_impl.h"
 
 using namespace ctlop;
 using namespace cute;
@@ -768,6 +769,101 @@ int run(OptionType &options, bool host_problem_shapes_available = true)
   return 0;
 }
 
+/// Execute a given example GEMM computation
+template <typename OptionType>
+int run2(OptionType &options, bool host_problem_shapes_available = true)
+{
+  using TileShape = typename OptionType::GroupScaleConfig::TileShape;
+  const int ScaleGranularityM = OptionType::GroupScaleConfig::ScaleGranularityM;
+  const int ScaleGranularityN = OptionType::GroupScaleConfig::ScaleGranularityN;
+  const int ScaleMsPerTile    = OptionType::GroupScaleConfig::ScaleMsPerTile;
+  const int ScaleNsPerTile    = OptionType::GroupScaleConfig::ScaleNsPerTile;
+
+  allocate(options);
+  initialize(options);
+
+  // Instantiate CUTLASS kernel depending on templates
+  using GemmGroupedFp8Impl = GemmGroupedBlockScaleFp8Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, cutlass::gemm::PersistentScheduler, TileShape, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
+  using ProblemShape = typename GemmGroupedFp8Impl::ProblemShape;
+  RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
+  {
+    // int m = options.m, n = options.n, k = options.k;
+    rt_args->groups = options.groups;
+    for (int i=0; i <rt_args->groups; i++) {
+      auto problem = options.problem_sizes_host.at(i);
+      auto M = get<0>(problem);
+      auto N = get<1>(problem);
+      auto K = get<2>(problem);
+      rt_args->problem_sizes.push_back(M);
+      rt_args->problem_sizes.push_back(N);
+      rt_args->problem_sizes.push_back(K);
+    }
+    rt_args->alpha = 1.0;
+    rt_args->beta = 0.0;
+    rt_args->ptr_A = (const void **)ptr_A.get();
+    rt_args->ptr_B = (const void **)ptr_B.get();
+    rt_args->ptr_C = (const void **)ptr_C.get();
+    rt_args->ptr_D = (void **)ptr_D.get();
+    rt_args->d_blockscale_A = (const void **)ptr_blockscale_A.get();
+    rt_args->d_blockscale_B = (const void **)ptr_blockscale_B.get();
+  }
+  GemmBase *gemm = new GemmGroupedFp8Impl();
+  gemm->initialize((RtArguments *)rt_args);
+  gemm->run();
+
+  // Check if output from CUTLASS kernel and reference kernel are equal or not
+  Result result;
+  result.passed = verify(options);
+
+  std::cout << "  Disposition: " << (result.passed ? "Passed" : "Failed") << std::endl;
+
+  if (!result.passed) {
+   exit(-1);
+  }
+
+  // Run profiling loop
+  if (options.iterations > 0)
+  {
+    GpuTimer timer;
+    timer.start();
+    for (int iter = 0; iter < options.iterations; ++iter) {
+      gemm->initialize((RtArguments *)rt_args);
+      gemm->run();
+    }
+    timer.stop();
+
+    // Compute average runtime and GFLOPs.
+    float elapsed_ms = timer.elapsed_millis();
+    result.avg_runtime_ms = double(elapsed_ms) / double(options.iterations);
+    result.gflops = options.gflops(result.avg_runtime_ms / 1000.0);
+
+    std::string raster = "Heuristic";
+
+    if (options.raster == RasterOrderOptions::AlongN) {
+      raster = "Along N";
+    }
+    else if (options.raster == RasterOrderOptions::AlongM) {
+      raster = "Along M";
+    }
+
+    std::cout << "  Problem Sizes, Alpha, Beta " << std::endl;
+    for (int32_t i = 0; i < options.groups; ++i) {
+      std::cout << "    " << options.problem_sizes_host.at(i);
+      std::cout << ", " << alpha_host.at(i) << ", " << beta_host.at(i) << std::endl;
+    }
+    std::cout << "  Groups      : " << options.groups  << std::endl;
+    std::cout << "  Tile shape (M, N, K): " << size<0>(TileShape{}) << ", " << size<1>(TileShape{}) << ", " << size<2>(TileShape{}) << std::endl;
+    std::cout << "  ScaleGranularityM: " << ScaleGranularityM << " (ScaleMsPerTile: " << ScaleMsPerTile << ")" << std::endl;
+    std::cout << "  ScaleGranularityN: " << ScaleGranularityN << " (ScaleNsPerTile: " << ScaleNsPerTile << ")" << std::endl;
+    std::cout << "  Rasterization: " << raster << " with a maximum CTA swizzle of " << options.swizzle << std::endl;
+    std::cout << "  Avg runtime: " << result.avg_runtime_ms << " ms" << std::endl;
+    std::cout << "  GFLOPS: " << result.gflops << std::endl;
+    fflush(stdout);
+  }
+
+  return 0;
+}
+
 #endif // defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED) && defined(CUTLASS_ARCH_MMA_MODIFIABLE_TMA_SM90_SUPPORTED)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -824,6 +920,8 @@ int main(int argc, char const **args) {
     run<GroupScale1D1DGemm::Gemm>(options_1d1d, host_problem_shapes_available);
     std::cout << "Grouped GEMM kernel with 1D2D group scale" << std::endl;
     run<GroupScale1D2DGemm::Gemm>(options_1d2d, host_problem_shapes_available);
+    std::cout << "Inner Grouped GEMM kernel with 1D2D group scale" << std::endl;
+    run2(options_1d2d, host_problem_shapes_available);
     std::cout << "Grouped GEMM kernel with 2D1D group scale" << std::endl;
     run<GroupScale2D1DGemm::Gemm>(options_2d1d, host_problem_shapes_available);
     std::cout << "Grouped GEMM kernel with 2D2D group scale" << std::endl;

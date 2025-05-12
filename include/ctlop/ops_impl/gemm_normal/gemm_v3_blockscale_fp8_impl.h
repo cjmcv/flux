@@ -34,9 +34,7 @@ public:
   // Core kernel configurations
   using ElementBlockScale   = float;                                          // Element type for blockscaling during accumulation
   using ElementCompute      = float;                                          // Element type for epilogue computation
-  // using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
-  using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
-  // using TileShape           = cute::Shape<cute::_128, cute::_128, cute::_128>;                           // Threadblock-level tile size
+  using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag                          // Threadblock-level tile size
   ////
 
   using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<1, 128>; // scale_A[m, k//128], scale_B[n//128, k//128]
