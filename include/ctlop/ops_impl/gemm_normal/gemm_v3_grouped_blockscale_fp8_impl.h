@@ -132,46 +132,41 @@ private:
     cutlass::KernelHardwareInfo kernel_hw_info = cutlass::KernelHardwareInfo::make_kernel_hardware_info<typename Gemm::GemmKernel>(device_id);
   
     /// 
-    std::vector<typename ProblemShape::UnderlyingProblemShape> problem_sizes_host;
-    problem_sizes_host.reserve(rt_args->groups);
-    for (int i=0; i<rt_args->problem_sizes.size(); i++) {
-      auto m = rt_args->problem_sizes[i*3+0];
-      auto n = rt_args->problem_sizes[i*3+1];
-      auto k = rt_args->problem_sizes[i*3+2];
-      problem_sizes_host.push_back({m,n,k});
-    }
-    cutlass::DeviceAllocation<typename ProblemShape::UnderlyingProblemShape> problem_sizes;
-    problem_sizes.reset(rt_args->groups);
-    problem_sizes.copy_from_host(problem_sizes_host.data());
+    static bool is_inited = false;
+    if (!is_inited) {
+      is_inited = true;
+      problem_sizes_host.reserve(rt_args->groups);
+      for (int i=0; i<rt_args->problem_sizes.size(); i++) {
+        auto m = rt_args->problem_sizes[i*3+0];
+        auto n = rt_args->problem_sizes[i*3+1];
+        auto k = rt_args->problem_sizes[i*3+2];
+        problem_sizes_host.push_back({m,n,k});
+      }
+      
+      problem_sizes.reset(rt_args->groups);
+      problem_sizes.copy_from_host(problem_sizes_host.data());
 
-    cutlass::DeviceAllocation<StrideA> stride_A;
-    cutlass::DeviceAllocation<StrideB> stride_B;
-    cutlass::DeviceAllocation<StrideC> stride_C;
-    cutlass::DeviceAllocation<StrideD> stride_D;
-
-    std::vector<StrideA> stride_A_host;
-    std::vector<StrideB> stride_B_host;
-    std::vector<StrideC> stride_C_host;
-    std::vector<StrideD> stride_D_host;
-    for (int32_t i = 0; i < rt_args->groups; ++i) {
-      auto problem = problem_sizes_host.at(i);
-      auto M = cute::get<0>(problem);
-      auto N = cute::get<1>(problem);
-      auto K = cute::get<2>(problem);
-      stride_A_host.push_back(cutlass::make_cute_packed_stride(StrideA{}, {M, K, 1}));
-      stride_B_host.push_back(cutlass::make_cute_packed_stride(StrideB{}, {N, K, 1}));
-      stride_C_host.push_back(cutlass::make_cute_packed_stride(StrideC{}, {M, N, 1}));
-      stride_D_host.push_back(cutlass::make_cute_packed_stride(StrideD{}, {M, N, 1}));      
+      for (int32_t i = 0; i < rt_args->groups; ++i) {
+        auto problem = problem_sizes_host.at(i);
+        auto M = cute::get<0>(problem);
+        auto N = cute::get<1>(problem);
+        auto K = cute::get<2>(problem);
+        stride_A_host.push_back(cutlass::make_cute_packed_stride(StrideA{}, {M, K, 1}));
+        stride_B_host.push_back(cutlass::make_cute_packed_stride(StrideB{}, {N, K, 1}));
+        stride_C_host.push_back(cutlass::make_cute_packed_stride(StrideC{}, {M, N, 1}));
+        stride_D_host.push_back(cutlass::make_cute_packed_stride(StrideD{}, {M, N, 1}));      
+      }
+      stride_A.reset(rt_args->groups);
+      stride_A.copy_from_host(stride_A_host.data());
+      stride_B.reset(rt_args->groups);
+      stride_B.copy_from_host(stride_B_host.data());
+      stride_C.reset(rt_args->groups);
+      stride_C.copy_from_host(stride_C_host.data());
+      stride_D.reset(rt_args->groups);
+      stride_D.copy_from_host(stride_D_host.data());
+      ///
     }
-    stride_A.reset(rt_args->groups);
-    stride_A.copy_from_host(stride_A_host.data());
-    stride_B.reset(rt_args->groups);
-    stride_B.copy_from_host(stride_B_host.data());
-    stride_C.reset(rt_args->groups);
-    stride_C.copy_from_host(stride_C_host.data());
-    stride_D.reset(rt_args->groups);
-    stride_D.copy_from_host(stride_D_host.data());
-    ///
+    
 
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGrouped,
@@ -223,6 +218,19 @@ private:
 
 private:
   Gemm gemm_dev_;
+
+  cutlass::DeviceAllocation<typename ProblemShape::UnderlyingProblemShape> problem_sizes;
+  std::vector<typename ProblemShape::UnderlyingProblemShape> problem_sizes_host;
+
+  cutlass::DeviceAllocation<StrideA> stride_A;
+  cutlass::DeviceAllocation<StrideB> stride_B;
+  cutlass::DeviceAllocation<StrideC> stride_C;
+  cutlass::DeviceAllocation<StrideD> stride_D;
+
+  std::vector<StrideA> stride_A_host;
+  std::vector<StrideB> stride_B_host;
+  std::vector<StrideC> stride_C_host;
+  std::vector<StrideD> stride_D_host;
 };
 
 } // namespace ctlop
