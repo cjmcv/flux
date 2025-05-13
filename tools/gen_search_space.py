@@ -45,16 +45,34 @@ class TypeWarpper:
             "SwizzleIdentity": "gemm::threadblock::GemmIdentityThreadblockSwizzle<>",
             "SwizzleStreamK": "gemm::threadblock::ThreadblockSwizzleStreamK",
             #
-            "Heuristic": "gemm::kernel::detail::RasterOrderOptions::Heuristic",
-            "AlongM": "gemm::kernel::detail::RasterOrderOptions::AlongM",
-            "AlongN": "gemm::kernel::detail::RasterOrderOptions::AlongN",
+            "Heuristic": "ctlop::RasterOrderOptions::Heuristic",
+            "AlongM": "ctlop::RasterOrderOptions::AlongM",
+            "AlongN": "ctlop::RasterOrderOptions::AlongN",
             # 
             "TSPersistent": "cutlass::gemm::PersistentScheduler",
             "TSStreamK": "cutlass::gemm::StreamKScheduler"
         }
         # 返回对应的字符串，如果没有匹配的值，则返回"Unknown"
         return string_to_string.get(ctlop_type, "Unknown")
-    
+
+def make_meta_space(w, data_type, layout, arch):
+    res = []
+    for t, l, a in itertools.product(data_type, layout, arch):
+        meta_ctlop_str = ''
+        meta_cutlass_str = ''
+        for ti in t:
+            meta_ctlop_str += w.xtw(ti) + ', '
+            meta_cutlass_str += w.ctlop_to_cutlasstype(ti) + ', '
+
+        meta_ctlop_str += w.xtw(l) + ', '
+        meta_cutlass_str += w.ctlop_to_cutlasstype(l) + ', '
+
+        meta_ctlop_str += w.xtw(a)
+        meta_cutlass_str += w.ctlop_to_cutlasstype(a)
+
+        res.append((meta_ctlop_str, meta_cutlass_str))
+    return res
+
 class GemmNormalSchema:
     impl = "GemmPureV2Impl"
     impl_header = "gemm_normal/gemm_v2_impl.h"
@@ -64,21 +82,7 @@ class GemmNormalSchema:
         layout = ['RCR'] # , 'RRR'
         arch = ['Sm80'] # , 'Sm89'
 
-        res = []
-        for t, l, a in itertools.product(data_type, layout, arch):
-            meta_ctlop_str = ''
-            meta_cutlass_str = ''
-            for ti in t:
-                meta_ctlop_str += w.xtw(ti) + ', '
-                meta_cutlass_str += w.ctlop_to_cutlasstype(ti) + ', '
-
-            meta_ctlop_str += w.xtw(l) + ', '
-            meta_cutlass_str += w.ctlop_to_cutlasstype(l) + ', '
-
-            meta_ctlop_str += w.xtw(a)
-            meta_cutlass_str += w.ctlop_to_cutlasstype(a)
-
-            res.append((meta_ctlop_str, meta_cutlass_str))
+        res = make_meta_space(w, data_type, layout, arch)
         return res
 
     def get_hparam_space(self, w):
@@ -127,21 +131,7 @@ class GemmNormalSimtSchema:
         layout = ['RCR'] # , 'RRR'
         arch = ['Sm80'] # , 'Sm89'
 
-        res = []
-        for t, l, a in itertools.product(data_type, layout, arch):
-            meta_ctlop_str = ''
-            meta_cutlass_str = ''
-            for ti in t:
-                meta_ctlop_str += w.xtw(ti) + ', '
-                meta_cutlass_str += w.ctlop_to_cutlasstype(ti) + ', '
-
-            meta_ctlop_str += w.xtw(l) + ', '
-            meta_cutlass_str += w.ctlop_to_cutlasstype(l) + ', '
-
-            meta_ctlop_str += w.xtw(a)
-            meta_cutlass_str += w.ctlop_to_cutlasstype(a)
-
-            res.append((meta_ctlop_str, meta_cutlass_str))
+        res = make_meta_space(w, data_type, layout, arch)
         return res
 
     def get_hparam_space(self, w):
@@ -173,22 +163,7 @@ class GemmBolckScaleFp8Schema:
         data_type = [('E4M3', 'E4M3', 'BF16', 'FP32')] # a,b,cd,acc
         layout = ['RCR'] # , 'RRR'
         arch = ['Sm90']
-
-        res = []
-        for t, l, a in itertools.product(data_type, layout, arch):
-            meta_ctlop_str = ''
-            meta_cutlass_str = ''
-            for ti in t:
-                meta_ctlop_str += w.xtw(ti) + ', '
-                meta_cutlass_str += w.ctlop_to_cutlasstype(ti) + ', '
-
-            meta_ctlop_str += w.xtw(l) + ', '
-            meta_cutlass_str += w.ctlop_to_cutlasstype(l) + ', '
-
-            meta_ctlop_str += w.xtw(a)
-            meta_cutlass_str += w.ctlop_to_cutlasstype(a)
-
-            res.append((meta_ctlop_str, meta_cutlass_str))
+        res = make_meta_space(w, data_type, layout, arch)
         return res
 
     def get_hparam_space(self, w):
@@ -206,12 +181,40 @@ class GemmBolckScaleFp8Schema:
                 w.ctlop_to_cutlasstype(raster_order), str(swizzle))
             res.append(hparam_str)
         return res
+
+class GemmGroupedBolckScaleFp8Schema:
+    impl = "GemmGroupedBlockScaleFp8Impl"
+    impl_header = "gemm_normal/gemm_v3_grouped_blockscale_fp8_impl.h"
     
+    def get_meta_space(self, w):
+        data_type = [('E4M3', 'E4M3', 'BF16', 'FP32')] # a,b,cd,acc
+        layout = ['RCR'] # , 'RRR'
+        arch = ['Sm90']
+        res = make_meta_space(w, data_type, layout, arch)
+        return res
+
+    def get_hparam_space(self, w):
+        tile_schedulers = ["TSPersistent", "TSStreamK"]
+        tile_shapes = [(128, 128, 128)]
+        cluster_shapes = [(1, 2, 1), (2, 1, 1)]
+        raster_orders = ["Heuristic", "AlongM", "AlongN"]
+        swizzles = [2,4,8] # 1,2,4,8
+
+        res = []
+        for tile_scheduler, tile_shape, cluster_shape, raster_order, swizzle in itertools.product(
+            tile_schedulers, tile_shapes, cluster_shapes, raster_orders, swizzles):
+            hparam_str = '{0},{1},{2},{3},{4}'.format(
+                w.ctlop_to_cutlasstype(tile_scheduler), w.cstw(tile_shape,3), w.cstw(cluster_shape,3),
+                w.ctlop_to_cutlasstype(raster_order), str(swizzle))
+            res.append(hparam_str)
+        return res
+        
 def str2schema(schema_name):
     string_to_schema = {
         "GemmNormal": GemmNormalSchema(),
         "GemmNormalSimt": GemmNormalSimtSchema(),
         "GemmBolckScaleFp8": GemmBolckScaleFp8Schema(),
+        "GemmGroupedBlockScaleFp8": GemmGroupedBolckScaleFp8Schema(),
     }
     return string_to_schema.get(schema_name, None)
 
@@ -249,7 +252,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python tools/gen_search_space.py --schema=GemmBolckScaleFp8 (GemmNormal/GemmNormalSimt/GemmBolckScaleFp8)")
+        print("usage: python tools/gen_search_space.py --schema=GemmBolckScaleFp8 (GemmNormal/GemmNormalSimt/GemmBolckScaleFp8/GemmGroupedBlockScaleFp8)")
         exit()
     generator = SearchSpaceGenerator()
     generator.run(args.schema) 

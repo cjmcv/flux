@@ -35,7 +35,16 @@ static int _register_single_gemm_ops [[maybe_unused]] = []() {
             py::arg("weight_scale") = py::none(),
             py::arg("output_scale") = py::none(),
             py::arg("tuning") = py::none(),
-            py::arg("fast_accum") = false);
+            py::arg("fast_accum") = false)
+        .def(
+            "grouped_forward",
+            &GemmNormalCls::grouped_forward,
+            py::arg("inputs"),
+            py::arg("weights"),
+            py::arg("outputs"),
+            py::arg("inputs_scale") = py::none(),
+            py::arg("weights_scale") = py::none(),
+            py::arg("tuning") = py::none());
   });
   return 0;
 }();

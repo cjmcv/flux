@@ -23,6 +23,14 @@ public:
       c10::optional<torch::Tensor> tuning,
       bool fast_accum);
 
+  void grouped_forward(
+      std::vector<torch::Tensor> inputs,
+      std::vector<torch::Tensor> weights,
+      std::vector<torch::Tensor> outputs,
+      c10::optional<std::vector<torch::Tensor>> inputs_scale,
+      c10::optional<std::vector<torch::Tensor>> weights_scale,
+      c10::optional<torch::Tensor> tuning);
+
 private:
   class GemmNormalImpl;
   GemmNormalImpl *impl_ = nullptr;

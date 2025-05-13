@@ -127,12 +127,85 @@ public:
     return output;
   }
 
+  void grouped_forward(
+    std::vector<torch::Tensor> inputs,
+    std::vector<torch::Tensor> weights,
+    std::vector<torch::Tensor> outputs,
+    c10::optional<std::vector<torch::Tensor>> inputs_scale,
+    c10::optional<std::vector<torch::Tensor>> weights_scale,
+    c10::optional<torch::Tensor> tuning
+  ) {
+
+    GemmConfigRegister& ins = GemmConfigRegister::instance();
+    TunedConfigRegister& tins = TunedConfigRegister::instance();
+
+    std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
+    RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
+
+    printf("size: %d, %d, %d, %d, %d.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
+    // if (inputs_scale.has_value() && weights_scale.has_value()) {
+    //   rt_args->d_blockscale_A = inputs_scale.value().data_ptr();
+    //   rt_args->d_blockscale_B = weights_scale.value().data_ptr();
+    // }
+    id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmGroupedBlockScaleFp8;
+    id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
+    
+    // printf("id_meta: \n");
+    // for (int i=0; i<id_meta.size(); i++) {
+    //   printf("%d, ", id_meta[i]);
+    // }
+    // printf("\n");
+
+    // rt_args->ptr_A = input.data_ptr();
+    // rt_args->ptr_B = weight.data_ptr();
+    // rt_args->ptr_C = nullptr;
+    // rt_args->ptr_D = output.data_ptr();
+    // rt_args->alpha = 1.0f;
+    // rt_args->beta = 0.0f;
+
+    // torch::Tensor output = GetBaseRtConf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
+    
+
+    // bool is_tuning = false;
+    // if (tuning.has_value()) {
+    //   int16_t *data = (int16_t *)tuning.value().data_ptr();
+    //   CTLOP_CHECK_EQ(data[0], 1);
+    //   id_meta[IdMetaEnum::Id] = data[1];
+    //   id_meta[IdMetaEnum::Schema] = data[2];
+    //   is_tuning = true;
+    // }
+    // else {
+    //   std::vector<int32_t> shape_meta = {rt_args->m, rt_args->n, rt_args->k};       // mnk + meta
+    //   shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
+    //   tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
+    // }
+    // printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+    // GemmBase *op = ins.GetOp(id_meta, is_tuning);
+    // if (op == nullptr)
+    //   return torch::Tensor();
+
+    // cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
+    // op->initialize(rt_args);
+    // op->run(stream);
+
+    // if (tuning.has_value()) {
+    //   int16_t *data = (int16_t *)tuning.value().data_ptr();
+    //   data[0] = id_meta.size();
+    //   for (int i=0; i<id_meta.size(); i++) {
+    //     data[i+1] = id_meta[i];
+    //   }
+    // }
+    // delete rt_args;
+    // return output;
+  }
+
 private:
   std::vector<int16_t> MakeDefaultMeta(int16_t id = 0) {
     std::vector<int16_t> meta;
     meta.resize(8);
     meta[IdMetaEnum::Id] = id;                                  // id
-    meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmNormal; // schema type (GemmNormal / GemmNormalSimt / GemmBolckScaleFp8)
+    // (GemmNormal / GemmNormalSimt / GemmBolckScaleFp8 / GemmGroupedBlockScaleFp8)
+    meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmNormal; // schema type 
 
     meta[IdMetaEnum::TypeA] = from_torch_dtype(this->input_dtype);  // type A
     meta[IdMetaEnum::TypeB] = from_torch_dtype(this->input_dtype);  // type B
@@ -235,5 +308,23 @@ torch::Tensor GemmNormal::forward(
       std::move(tuning),
       fast_accum);
 }
+
+void GemmNormal::grouped_forward(
+  std::vector<torch::Tensor> inputs,
+  std::vector<torch::Tensor> weights,
+  std::vector<torch::Tensor> outputs,
+  c10::optional<std::vector<torch::Tensor>> input_scale,
+  c10::optional<std::vector<torch::Tensor>> weight_scale,
+  c10::optional<torch::Tensor> tuning) {
+// CTLOP_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
+return impl_->grouped_forward(
+    std::move(inputs),
+    std::move(weights),
+    std::move(outputs),
+    std::move(input_scale),
+    std::move(weight_scale),
+    std::move(tuning));
+}
+
 
 }  // namespace ctlop

@@ -31,7 +31,6 @@ class NotCompiled:
 def _get_ctlop_member(member):
     return getattr(ctlop_mod, member, NotCompiled())
 
-SingleGemm = _get_ctlop_member("SingleGemm")
 GemmNormal = _get_ctlop_member("GemmNormal")
 
 __all__ = [

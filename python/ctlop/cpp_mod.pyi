@@ -1,5 +1,5 @@
 
-from typing import Optional
+from typing import Optional, List
 import torch
 
 class GemmNormal:
@@ -18,6 +18,15 @@ class GemmNormal:
         input_scale: Optional[torch.Tensor] = None,
         weight_scale: Optional[torch.Tensor] = None,
         output_scale: Optional[torch.Tensor] = None,
+        tuning: Optional[torch.Tensor] = None,
         fast_accum: bool = False,
-        tuning_id: int = -1,
     ) -> torch.Tensor: ...
+    def grouped_forward(
+        self,
+        inputs: List[torch.Tensor],
+        weights: List[torch.Tensor],
+        outputs: List[torch.Tensor],
+        inputs_scale: Optional[torch.Tensor] = None,
+        weights_scale: Optional[torch.Tensor] = None,
+        tuning: Optional[torch.Tensor] = None,
+    ): ...

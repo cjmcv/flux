@@ -50,7 +50,7 @@ struct RtGroupedBlockScaleFp8ArgumentsV3 : public RtArguments {
   void const **ptr_A;
   void const **ptr_B;
   void const **ptr_C;
-  void **tr_D;  
+  void **ptr_D;  
 
   void const **d_blockscale_A;
   void const **d_blockscale_B;
