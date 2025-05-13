@@ -166,20 +166,38 @@ private:
       stride_D.reset(rt_args->groups);
       stride_D.copy_from_host(stride_D_host.data());
       ///
+
+      ptr_A.reset(rt_args->groups);
+      ptr_A.copy_from_host((const ElementA **)rt_args->ptr_A.data());
+
+      ptr_B.reset(rt_args->groups);
+      ptr_B.copy_from_host((const ElementB **)rt_args->ptr_B.data());
+    
+      ptr_C.reset(rt_args->groups);
+      ptr_C.copy_from_host((const ElementC **)rt_args->ptr_C.data());
+    
+      ptr_D.reset(rt_args->groups);
+      ptr_D.copy_from_host((ElementD **)rt_args->ptr_D.data());
+    
+      ptr_blockscale_A.reset(rt_args->groups);
+      ptr_blockscale_A.copy_from_host((const float **)rt_args->ptr_blockscale_A.data());
+    
+      ptr_blockscale_B.reset(rt_args->groups);
+      ptr_blockscale_B.copy_from_host((const float **)rt_args->ptr_blockscale_B.data());
     }
     
 
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGrouped,
       {rt_args->groups, problem_sizes.get(), problem_sizes_host.data()},
-      {(const ElementA **)rt_args->ptr_A, stride_A.get(), (const ElementB **)rt_args->ptr_B, stride_B.get(),
-        (const float **)rt_args->d_blockscale_A, // blockscale_tensor_A.device_data(),
-        (const float **)rt_args->d_blockscale_B, // blockscale_tensor_B.device_data()
+      {ptr_A.get(), stride_A.get(), ptr_B.get(), stride_B.get(),
+       ptr_blockscale_A.get(), // blockscale_tensor_A.device_data(),
+       ptr_blockscale_B.get(), // blockscale_tensor_B.device_data()
       },
       {
         {}, // epilogue.thread
-        (const ElementC **)rt_args->ptr_C, stride_C.get(),
-        (ElementD **)rt_args->ptr_D, stride_D.get()
+        ptr_C.get(), stride_C.get(),
+        ptr_D.get(), stride_D.get()
       },
       kernel_hw_info
     };
@@ -232,6 +250,13 @@ private:
   std::vector<StrideB> stride_B_host;
   std::vector<StrideC> stride_C_host;
   std::vector<StrideD> stride_D_host;
+
+  cutlass::DeviceAllocation<const ElementA *> ptr_A;
+  cutlass::DeviceAllocation<const ElementB *> ptr_B;
+  cutlass::DeviceAllocation<const ElementC *> ptr_C;
+  cutlass::DeviceAllocation<ElementD *> ptr_D;
+  cutlass::DeviceAllocation<const ElementBlockScale *> ptr_blockscale_A;
+  cutlass::DeviceAllocation<const ElementBlockScale *> ptr_blockscale_B;
 };
 
 } // namespace ctlop

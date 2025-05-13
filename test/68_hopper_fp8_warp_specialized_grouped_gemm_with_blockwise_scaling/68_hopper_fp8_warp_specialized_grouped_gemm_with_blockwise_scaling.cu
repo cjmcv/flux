@@ -419,6 +419,13 @@ void allocate(const OptionType &options) {
   blockscale_block_B.reset(total_elements_blockscale_B);
 }
 
+std::vector<ElementA *> ptr_A_host;
+std::vector<ElementB *> ptr_B_host;
+std::vector<ElementC *> ptr_C_host;
+std::vector<ElementD *> ptr_D_host;
+std::vector<ElementBlockScale *> ptr_blockscale_A_host;
+std::vector<ElementBlockScale *> ptr_blockscale_B_host;
+
 /// Initialize operands to be used in the GEMM and reference GEMM
 template <typename OptionType>
 void initialize(const OptionType &options) {
@@ -426,14 +433,15 @@ void initialize(const OptionType &options) {
   problem_sizes.reset(options.groups);
   problem_sizes.copy_from_host(options.problem_sizes_host.data());
 
-  std::vector<ElementA *> ptr_A_host(options.groups);
-  std::vector<ElementB *> ptr_B_host(options.groups);
-  std::vector<ElementC *> ptr_C_host(options.groups);
-  std::vector<ElementD *> ptr_D_host(options.groups);
+  ptr_A_host.resize(options.groups);
+  ptr_B_host.resize(options.groups);
+  ptr_C_host.resize(options.groups);
+  ptr_D_host.resize(options.groups);
+  ptr_blockscale_A_host.resize(options.groups);
+  ptr_blockscale_B_host.resize(options.groups);
   std::vector<ElementAccumulator *> ptr_alpha_host(options.groups);
   std::vector<ElementAccumulator *> ptr_beta_host(options.groups);
-  std::vector<ElementBlockScale *> ptr_blockscale_A_host(options.groups);
-  std::vector<ElementBlockScale *> ptr_blockscale_B_host(options.groups);
+
 
   alpha_host.clear();
   beta_host.clear();
@@ -800,12 +808,19 @@ int run2(OptionType &options, bool host_problem_shapes_available = true)
     }
     rt_args->alpha = 1.0;
     rt_args->beta = 0.0;
-    rt_args->ptr_A = (const void **)ptr_A.get();
-    rt_args->ptr_B = (const void **)ptr_B.get();
-    rt_args->ptr_C = (const void **)ptr_C.get();
-    rt_args->ptr_D = (void **)ptr_D.get();
-    rt_args->d_blockscale_A = (const void **)ptr_blockscale_A.get();
-    rt_args->d_blockscale_B = (const void **)ptr_blockscale_B.get();
+    rt_args->ptr_A.assign(ptr_A_host.data(), ptr_A_host.data() + ptr_A_host.size());
+    rt_args->ptr_B.assign(ptr_B_host.data(), ptr_B_host.data() + ptr_B_host.size());
+    rt_args->ptr_C.assign(ptr_C_host.data(), ptr_C_host.data() + ptr_C_host.size());
+    rt_args->ptr_D.assign(ptr_D_host.data(), ptr_D_host.data() + ptr_D_host.size());
+    rt_args->ptr_blockscale_A.assign(ptr_blockscale_A_host.data(), ptr_blockscale_A_host.data() + ptr_blockscale_A_host.size());
+    rt_args->ptr_blockscale_B.assign(ptr_blockscale_B_host.data(), ptr_blockscale_B_host.data() + ptr_blockscale_B_host.size());
+
+    // rt_args->ptr_A = (const void **)ptr_A.get();
+    // rt_args->ptr_B = (const void **)ptr_B.get();
+    // rt_args->ptr_C = (const void **)ptr_C.get();
+    // rt_args->ptr_D = (void **)ptr_D.get();
+    // rt_args->d_blockscale_A = (const void **)ptr_blockscale_A.get();
+    // rt_args->d_blockscale_B = (const void **)ptr_blockscale_B.get();
   }
   GemmBase *gemm = new GemmGroupedFp8Impl();
   gemm->initialize((RtArguments *)rt_args);
@@ -916,12 +931,12 @@ int main(int argc, char const **args) {
   //
 
   auto run_tests = [&] (bool host_problem_shapes_available = true) {
+    std::cout << "Inner Grouped GEMM kernel with 1D2D group scale" << std::endl;
+    run2(options_1d2d, host_problem_shapes_available);
     std::cout << "Grouped GEMM kernel with 1D1D group scale" << std::endl;
     run<GroupScale1D1DGemm::Gemm>(options_1d1d, host_problem_shapes_available);
     std::cout << "Grouped GEMM kernel with 1D2D group scale" << std::endl;
     run<GroupScale1D2DGemm::Gemm>(options_1d2d, host_problem_shapes_available);
-    std::cout << "Inner Grouped GEMM kernel with 1D2D group scale" << std::endl;
-    run2(options_1d2d, host_problem_shapes_available);
     std::cout << "Grouped GEMM kernel with 2D1D group scale" << std::endl;
     run<GroupScale2D1DGemm::Gemm>(options_2d1d, host_problem_shapes_available);
     std::cout << "Grouped GEMM kernel with 2D2D group scale" << std::endl;
