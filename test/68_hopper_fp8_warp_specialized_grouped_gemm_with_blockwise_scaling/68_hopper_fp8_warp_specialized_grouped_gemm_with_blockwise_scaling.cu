@@ -800,19 +800,12 @@ int run2(OptionType &options, bool host_problem_shapes_available = true)
     }
     rt_args->alpha = 1.0;
     rt_args->beta = 0.0;
-    rt_args->ptr_A.assign(ptr_A.get(), ptr_A.get() + ptr_A.size());
-    rt_args->ptr_B.assign(ptr_B.get(), ptr_B.get() + ptr_B.size());
-    rt_args->ptr_C.assign(ptr_C.get(), ptr_C.get() + ptr_C.size());
-    rt_args->ptr_D.assign(ptr_D.get(), ptr_D.get() + ptr_D.size());
-    rt_args->ptr_blockscale_A.assign(ptr_blockscale_A.get(), ptr_blockscale_A.get() + ptr_blockscale_A.size());
-    rt_args->ptr_blockscale_B.assign(ptr_blockscale_B.get(), ptr_blockscale_B.get() + ptr_blockscale_B.size());
-
-    // rt_args->ptr_A = (const void **)ptr_A.get();
-    // rt_args->ptr_B = (const void **)ptr_B.get();
-    // rt_args->ptr_C = (const void **)ptr_C.get();
-    // rt_args->ptr_D = (void **)ptr_D.get();
-    // rt_args->d_blockscale_A = (const void **)ptr_blockscale_A.get();
-    // rt_args->d_blockscale_B = (const void **)ptr_blockscale_B.get();
+    rt_args->ptr_A = (const void **)ptr_A.get();
+    rt_args->ptr_B = (const void **)ptr_B.get();
+    rt_args->ptr_C = (const void **)ptr_C.get();
+    rt_args->ptr_D = (void **)ptr_D.get();
+    rt_args->d_blockscale_A = (const void **)ptr_blockscale_A.get();
+    rt_args->d_blockscale_B = (const void **)ptr_blockscale_B.get();
   }
   GemmBase *gemm = new GemmGroupedFp8Impl();
   gemm->initialize((RtArguments *)rt_args);

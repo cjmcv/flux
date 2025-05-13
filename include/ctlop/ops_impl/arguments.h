@@ -47,13 +47,13 @@ struct RtGroupedBlockScaleFp8ArgumentsV3 : public RtArguments {
   int groups;
   std::vector<int32_t> problem_sizes; // mnk,mnk,mnk...
 
-  std::vector<void const *> ptr_A;
-  std::vector<void const *> ptr_B;
-  std::vector<void const *> ptr_C;
-  std::vector<void *> ptr_D;  
+  void const **ptr_A;
+  void const **ptr_B;
+  void const **ptr_C;
+  void **ptr_D;  
 
-  std::vector<void const *> ptr_blockscale_A;
-  std::vector<void const *> ptr_blockscale_B;
+  void const **d_blockscale_A;
+  void const **d_blockscale_B;
 };
 
 } // namespace ctlop

@@ -140,15 +140,28 @@ public:
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
     std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
-    RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
-
-    printf("size: %d, %d, %d, %d, %d.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
-    // if (inputs_scale.has_value() && weights_scale.has_value()) {
-    //   rt_args->d_blockscale_A = inputs_scale.value().data_ptr();
-    //   rt_args->d_blockscale_B = weights_scale.value().data_ptr();
-    // }
     id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmGroupedBlockScaleFp8;
     id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
+
+    RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
+    printf("size: %d, %d, %d, %d, %d.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
+    rt_args->groups = inputs.size();
+    if (inputs_scale.has_value() && weights_scale.has_value()) {
+      // for (int i=0; i < inputs_scale.value().size(); i++) {
+      //   rt_args->ptr_blockscale_A.push_back(inputs_scale.value()[i].data_ptr());
+      //   rt_args->ptr_blockscale_B.push_back(weights_scale.value()[i].data_ptr());
+      // }
+    }
+    for (int i=0; i < inputs.size(); i++) {
+      rt_args->problem_sizes.push_back(inputs[i].size(0));  // m
+      rt_args->problem_sizes.push_back(outputs[i].size(1)); // n
+      rt_args->problem_sizes.push_back(inputs[i].size(1));  // k
+
+      // rt_args->ptr_A.push_back(inputs[i].data_ptr());
+      // rt_args->ptr_B.push_back(weights[i].data_ptr());
+      // rt_args->ptr_C.push_back(nullptr);
+      // rt_args->ptr_D.push_back(outputs[i].data_ptr());
+    }
     
     // printf("id_meta: \n");
     // for (int i=0; i<id_meta.size(); i++) {
@@ -166,7 +179,7 @@ public:
     // torch::Tensor output = GetBaseRtConf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
     
 
-    // bool is_tuning = false;
+    bool is_tuning = false;
     // if (tuning.has_value()) {
     //   int16_t *data = (int16_t *)tuning.value().data_ptr();
     //   CTLOP_CHECK_EQ(data[0], 1);
@@ -180,13 +193,13 @@ public:
     //   tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
     // }
     // printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
-    // GemmBase *op = ins.GetOp(id_meta, is_tuning);
-    // if (op == nullptr)
-    //   return torch::Tensor();
+    GemmBase *op = ins.GetOp(id_meta, is_tuning);
+    if (op == nullptr)
+      return ;
 
-    // cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-    // op->initialize(rt_args);
-    // op->run(stream);
+    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
+    op->initialize(rt_args);
+    op->run(stream);
 
     // if (tuning.has_value()) {
     //   int16_t *data = (int16_t *)tuning.value().data_ptr();
@@ -195,8 +208,8 @@ public:
     //     data[i+1] = id_meta[i];
     //   }
     // }
-    // delete rt_args;
-    // return output;
+
+    delete rt_args;
   }
 
 private:
