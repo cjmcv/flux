@@ -1,4 +1,5 @@
 #pragma once
+#include <cfloat>
 #include "ctlop/ops_impl/global_resource.h"
 #include "ctlop/ops_impl/args_util.h"
 
@@ -171,14 +172,14 @@ private:
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGrouped,
       {rt_args->groups, problem_sizes.get(), problem_sizes_host.data()},
-      {(const ElementA **)rt_args->ptr_A, stride_A.get(), (const ElementB **)rt_args->ptr_B, stride_B.get(),
-        (const float **)rt_args->d_blockscale_A, // blockscale_tensor_A.device_data(),
-        (const float **)rt_args->d_blockscale_B, // blockscale_tensor_B.device_data()
+      {(const ElementA **)rt_args->ptr_A.data(), stride_A.get(), (const ElementB **)rt_args->ptr_B.data(), stride_B.get(),
+        (const float **)rt_args->ptr_blockscale_A.data(), // blockscale_tensor_A.device_data(),
+        (const float **)rt_args->ptr_blockscale_B.data(), // blockscale_tensor_B.device_data()
       },
       {
         {}, // epilogue.thread
-        (const ElementC **)rt_args->ptr_C, stride_C.get(),
-        (ElementD **)rt_args->ptr_D, stride_D.get()
+        (const ElementC **)rt_args->ptr_C.data(), stride_C.get(),
+        (ElementD **)rt_args->ptr_D.data(), stride_D.get()
       },
       kernel_hw_info
     };
