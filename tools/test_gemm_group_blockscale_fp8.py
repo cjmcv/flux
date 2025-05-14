@@ -6,8 +6,10 @@ import triton
 import triton.language as tl
 from deep_gemm import calc_diff, get_col_major_tma_aligned_tensor
 
+import ctlop
+
 # Import shared functionality from the regular GEMM benchmark
-from test_mini_fp8_gemm import (
+from tools.test_gemm_blockscale_fp8 import (
     per_block_cast_to_fp8,
     per_token_cast_to_fp8,
 )
@@ -248,6 +250,23 @@ def fp8_gemm_group_deepgemm(x_fp8_grouped, y_fp8_grouped, out, m_indices):
     )
     return out
 
+def ctlop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out):
+    out_ctlop = out.clone()
+    out_ctlop_list = list(torch.chunk(out_ctlop, chunks=num_groups, dim=0))
+
+    x_fp8_grouped_list = list(torch.chunk(x_fp8_grouped[0], chunks=num_groups, dim=0))
+    x_fp8_grouped_scale_list = list(torch.chunk(x_fp8_grouped[1], chunks=num_groups, dim=0))
+
+    y_fp8_grouped_list = torch.split(y_fp8_grouped[0], 1, dim=0) # 使用 torch.split 沿着第一个维度切分
+    y_fp8_grouped_list = [t.squeeze(0) for t in y_fp8_grouped_list] # 将每个子张量的形状从 [1, m, k] 调整为 [m, k]
+    y_fp8_grouped_scale_list = torch.split(y_fp8_grouped[1], 1, dim=0) # 使用 torch.split 沿着第一个维度切分
+    y_fp8_grouped_scale_list = [t.squeeze(0) for t in y_fp8_grouped_scale_list]
+
+    x_fp8_grouped_scale_t_list = [xs.t().contiguous() for xs in x_fp8_grouped_scale_list]
+    y_fp8_grouped_scale_t_list = [ys.t().contiguous() for ys in y_fp8_grouped_scale_list]
+
+    return x_fp8_grouped_list, y_fp8_grouped_list, x_fp8_grouped_scale_t_list, y_fp8_grouped_scale_t_list, out_ctlop_list
+
 
 def calculate_diff(m: int, n: int, k: int, num_groups: int):
     print(f"Shape (m={m}, n={n}, k={k}")
@@ -262,6 +281,27 @@ def calculate_diff(m: int, n: int, k: int, num_groups: int):
     m_indices = (
         m_indices.unsqueeze(-1).expand(num_groups, m_per_group).contiguous().view(-1)
     )
+
+    #####################################################
+    #
+    ctlop_gemm = ctlop.GemmNormal(
+        input_dtype=torch.float8_e4m3fn,
+        output_dtype=torch.bfloat16,
+        transpose_weight=False
+    )
+    x_list, y_list, x_scale_t_list, y_scale_t_list, out_ctlop_list = ctlop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out)
+
+    ctlop_gemm.grouped_forward(
+        x_list,
+        y_list,
+        outputs=out_ctlop_list,
+        inputs_scale=x_scale_t_list,
+        weights_scale=y_scale_t_list,
+        tuning = None,
+    )
+    out_ctlop = torch.cat(out_ctlop_list, dim=0)
+    #
+    #####################################################
 
     fp8_gemm_group_deepgemm(
         x_fp8_grouped,
@@ -298,12 +338,14 @@ def calculate_diff(m: int, n: int, k: int, num_groups: int):
     deepgemm_torch_diff = calc_diff(out_deepgemm, out_torch)
     triton_torch_diff = calc_diff(out_triton, out_torch)
     deepgemm_triton_diff = calc_diff(out_deepgemm, out_triton)
+    ctlop_triton_diff = calc_diff(out_ctlop, out_triton)
 
     DIFF_THRESHOLD = 0.001
     all_match = (
         deepgemm_torch_diff < DIFF_THRESHOLD
         and triton_torch_diff < DIFF_THRESHOLD
         and deepgemm_triton_diff < DIFF_THRESHOLD
+        and ctlop_triton_diff < DIFF_THRESHOLD
     )
     if all_match:
         print("✅ All implementations match\n")
@@ -313,6 +355,7 @@ def calculate_diff(m: int, n: int, k: int, num_groups: int):
             f"  - Torch vs DeepGEMM: {'✅' if deepgemm_torch_diff < DIFF_THRESHOLD else '❌'}"
             f"  - Torch vs Triton: {'✅' if triton_torch_diff < DIFF_THRESHOLD else '❌'}"
             f"  - DeepGEMM vs Triton: {'✅' if deepgemm_triton_diff < DIFF_THRESHOLD else '❌'}"
+            f"  - Ctlop vs Triton: {'✅' if ctlop_triton_diff < DIFF_THRESHOLD else '❌'}"
         )
 
 
@@ -370,9 +413,9 @@ def get_benchmark(tp_size):
             x_names=["m", "n", "k", "num_groups", "tp_size"],
             x_vals=[config for config in all_configs],
             line_arg="provider",
-            line_vals=["deepgemm", "triton"],
-            line_names=["DeepGEMM", "Triton"],
-            styles=[("blue", "-"), ("red", "-")],
+            line_vals=["ctlop", "deepgemm", "triton"],
+            line_names=["Ctlop", "DeepGEMM", "Triton"],
+            styles=[("blue", "-"), ("red", "-"), ("green", "-")],
             ylabel="ms",
             plot_name=f"fp8-group-gemm-performance-comparison-tp{tp_size}",
             args={},
@@ -397,8 +440,27 @@ def get_benchmark(tp_size):
         )
 
         quantiles = [0.5, 0.2, 0.8]
+        if provider == "ctlop":
 
-        if provider == "deepgemm":
+            ctlop_gemm = ctlop.GemmNormal(
+                input_dtype=torch.float8_e4m3fn,
+                output_dtype=torch.bfloat16,
+                transpose_weight=False
+            )
+            x_list, y_list, x_scale_t_list, y_scale_t_list, out_ctlop_list = ctlop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out)
+            
+            ms, min_ms, max_ms = triton.testing.do_bench(
+                lambda: ctlop_gemm.grouped_forward(
+                    x_list,
+                    y_list,
+                    outputs=out_ctlop_list,
+                    inputs_scale=x_scale_t_list,
+                    weights_scale=y_scale_t_list,
+                    tuning = None,
+                ),
+                quantiles=quantiles,
+            )
+        elif provider == "deepgemm":
             ms, min_ms, max_ms = triton.testing.do_bench(
                 lambda: fp8_gemm_group_deepgemm(
                     x_fp8_grouped,

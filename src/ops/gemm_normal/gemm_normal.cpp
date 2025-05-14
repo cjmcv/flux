@@ -147,38 +147,24 @@ public:
     printf("size: %d, %d, %d, %d, %d.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
     rt_args->groups = inputs.size();
     if (inputs_scale.has_value() && weights_scale.has_value()) {
-      // for (int i=0; i < inputs_scale.value().size(); i++) {
-      //   rt_args->ptr_blockscale_A.push_back(inputs_scale.value()[i].data_ptr());
-      //   rt_args->ptr_blockscale_B.push_back(weights_scale.value()[i].data_ptr());
-      // }
+      for (int i=0; i < inputs_scale.value().size(); i++) {
+        rt_args->ptr_blockscale_A.push_back(inputs_scale.value()[i].data_ptr());
+        rt_args->ptr_blockscale_B.push_back(weights_scale.value()[i].data_ptr());
+      }
     }
     for (int i=0; i < inputs.size(); i++) {
       rt_args->problem_sizes.push_back(inputs[i].size(0));  // m
       rt_args->problem_sizes.push_back(outputs[i].size(1)); // n
       rt_args->problem_sizes.push_back(inputs[i].size(1));  // k
 
-      // rt_args->ptr_A.push_back(inputs[i].data_ptr());
-      // rt_args->ptr_B.push_back(weights[i].data_ptr());
-      // rt_args->ptr_C.push_back(nullptr);
-      // rt_args->ptr_D.push_back(outputs[i].data_ptr());
+      rt_args->ptr_A.push_back(inputs[i].data_ptr());
+      rt_args->ptr_B.push_back(weights[i].data_ptr());
+      rt_args->ptr_C.push_back(nullptr);
+      rt_args->ptr_D.push_back(outputs[i].data_ptr());
     }
+    rt_args->alpha = 1.0f;
+    rt_args->beta = 0.0f;
     
-    // printf("id_meta: \n");
-    // for (int i=0; i<id_meta.size(); i++) {
-    //   printf("%d, ", id_meta[i]);
-    // }
-    // printf("\n");
-
-    // rt_args->ptr_A = input.data_ptr();
-    // rt_args->ptr_B = weight.data_ptr();
-    // rt_args->ptr_C = nullptr;
-    // rt_args->ptr_D = output.data_ptr();
-    // rt_args->alpha = 1.0f;
-    // rt_args->beta = 0.0f;
-
-    // torch::Tensor output = GetBaseRtConf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
-    
-
     bool is_tuning = false;
     // if (tuning.has_value()) {
     //   int16_t *data = (int16_t *)tuning.value().data_ptr();
@@ -201,13 +187,13 @@ public:
     op->initialize(rt_args);
     op->run(stream);
 
-    // if (tuning.has_value()) {
-    //   int16_t *data = (int16_t *)tuning.value().data_ptr();
-    //   data[0] = id_meta.size();
-    //   for (int i=0; i<id_meta.size(); i++) {
-    //     data[i+1] = id_meta[i];
-    //   }
-    // }
+    if (tuning.has_value()) {
+      int16_t *data = (int16_t *)tuning.value().data_ptr();
+      data[0] = id_meta.size();
+      for (int i=0; i<id_meta.size(); i++) {
+        data[i+1] = id_meta[i];
+      }
+    }
 
     delete rt_args;
   }
