@@ -50,7 +50,7 @@ public:
     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
 
     // Allocate workspace memory
-    void *workspace_ptr = GlobalBuffer::instance().ResizeBufferIfNeeded(workspace_size);
+    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size);
 
     // Check the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
@@ -143,7 +143,7 @@ private:
 //     auto arguments = args_from_options(rt_args);
 //     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
   
-//     void *workspace_ptr = GlobalBuffer::instance().ResizeBufferIfNeeded(workspace_size);
+//     void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size);
 //     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
   
 //     auto cu_stream = static_cast<cudaStream_t>(stream);

@@ -108,7 +108,7 @@ public:
 
     // Allocate workspace memory
     // cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
-    void *workspace_ptr = GlobalBuffer::instance().ResizeBufferIfNeeded(workspace_size);
+    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size);
 
     // Check if the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));

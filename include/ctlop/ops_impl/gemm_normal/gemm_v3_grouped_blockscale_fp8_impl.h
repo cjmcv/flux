@@ -91,6 +91,7 @@ public:
   using StrideC = typename Gemm::GemmKernel::InternalStrideC;
   using StrideD = typename Gemm::GemmKernel::InternalStrideD;
   using ProblemShape = cutlass::gemm::GroupProblemShape<cute::Shape<int,int,int>>; // <M,N,K> per group
+  using UlyProblemShape = typename ProblemShape::UnderlyingProblemShape;
 
 public:
   void initialize(RtArguments *args, void *stream = nullptr) {
@@ -102,15 +103,16 @@ public:
     // Instantiate CUTLASS kernel depending on templates
     gemm_dev_ = Gemm();
 
+    
     // Create a structure of gemm kernel arguments suitable for invoking an instance of Gemm
-    auto arguments = args_from_options(rt_args);
+    auto arguments = args_from_options(rt_args, stream);
 
     // Using the arguments, query for extra workspace required for matrix multiplication computation
     size_t workspace_size = Gemm::get_workspace_size(arguments);
 
     // Allocate workspace memory
     // cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
-    void *workspace_ptr = GlobalBuffer::instance().ResizeBufferIfNeeded(workspace_size);
+    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size);
 
     // Check if the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
@@ -125,7 +127,7 @@ public:
   }
 
 private:
-  typename Gemm::Arguments args_from_options(const RtGroupedBlockScaleFp8ArgumentsV3 *rt_args)
+  typename Gemm::Arguments args_from_options(const RtGroupedBlockScaleFp8ArgumentsV3 *rt_args, void *stream)
   {
     // Change device_id to another value if you are running on a machine with multiple GPUs and wish
     // to use a GPU other than that with device ID 0.
@@ -133,74 +135,115 @@ private:
     cutlass::KernelHardwareInfo kernel_hw_info = cutlass::KernelHardwareInfo::make_kernel_hardware_info<typename Gemm::GemmKernel>(device_id);
   
     /// 
-    static bool is_inited = false;
-    if (!is_inited) {
-      is_inited = true;
-      problem_sizes_host.reserve(rt_args->groups);
-      for (int i=0; i<rt_args->problem_sizes.size(); i++) {
-        auto m = rt_args->problem_sizes[i*3+0];
-        auto n = rt_args->problem_sizes[i*3+1];
-        auto k = rt_args->problem_sizes[i*3+2];
-        problem_sizes_host.push_back({m,n,k});
-      }
-      
-      problem_sizes.reset(rt_args->groups);
-      problem_sizes.copy_from_host(problem_sizes_host.data());
+    std::vector<int> sizes;
+    std::vector<int> offsets;
+    int total_size;
+    get_buffer_info(rt_args, sizes, offsets, total_size);
+    uint8_t *host_buffer = GlobalBuffer::instance().ResizeHostBufferIfNeeded(total_size);
+    uint8_t *device_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(total_size);
 
-      for (int32_t i = 0; i < rt_args->groups; ++i) {
-        auto problem = problem_sizes_host.at(i);
-        auto M = cute::get<0>(problem);
-        auto N = cute::get<1>(problem);
-        auto K = cute::get<2>(problem);
-        stride_A_host.push_back(cutlass::make_cute_packed_stride(StrideA{}, {M, K, 1}));
-        stride_B_host.push_back(cutlass::make_cute_packed_stride(StrideB{}, {N, K, 1}));
-        stride_C_host.push_back(cutlass::make_cute_packed_stride(StrideC{}, {M, N, 1}));
-        stride_D_host.push_back(cutlass::make_cute_packed_stride(StrideD{}, {M, N, 1}));      
-      }
-      stride_A.reset(rt_args->groups);
-      stride_A.copy_from_host(stride_A_host.data());
-      stride_B.reset(rt_args->groups);
-      stride_B.copy_from_host(stride_B_host.data());
-      stride_C.reset(rt_args->groups);
-      stride_C.copy_from_host(stride_C_host.data());
-      stride_D.reset(rt_args->groups);
-      stride_D.copy_from_host(stride_D_host.data());
-      ///
+    cpy_args2host_buffer(rt_args, sizes, offsets, host_buffer);
 
-      ptr_A.reset(rt_args->groups);
-      ptr_A.copy_from_host((const ElementA **)rt_args->ptr_A.data());
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    CUDA_CHECK(cudaMemcpyAsync(device_buffer, host_buffer, total_size, cudaMemcpyHostToDevice, cu_stream));
 
-      ptr_B.reset(rt_args->groups);
-      ptr_B.copy_from_host((const ElementB **)rt_args->ptr_B.data());
-    
-      ptr_C.reset(rt_args->groups);
-      ptr_C.copy_from_host((const ElementC **)rt_args->ptr_C.data());
-    
-      ptr_D.reset(rt_args->groups);
-      ptr_D.copy_from_host((ElementD **)rt_args->ptr_D.data());
-    
-      ptr_blockscale_A.reset(rt_args->groups);
-      ptr_blockscale_A.copy_from_host((const float **)rt_args->ptr_blockscale_A.data());
-    
-      ptr_blockscale_B.reset(rt_args->groups);
-      ptr_blockscale_B.copy_from_host((const float **)rt_args->ptr_blockscale_B.data());
-    }
-    
+    UlyProblemShape *problem_sizes = (UlyProblemShape *)(device_buffer + offsets[0]);
+
+    StrideA *stride_A = (StrideA *)(device_buffer + offsets[1]);
+    StrideB *stride_B = (StrideB *)(device_buffer + offsets[2]);
+    StrideC *stride_C = (StrideC *)(device_buffer + offsets[3]);
+    StrideD *stride_D = (StrideD *)(device_buffer + offsets[4]);
+
+    const ElementA **ptr_A = (const ElementA **)(device_buffer + offsets[5]);
+    const ElementB **ptr_B = (const ElementB **)(device_buffer + offsets[6]);
+    const ElementC **ptr_C = (const ElementC **)(device_buffer + offsets[7]);
+    ElementD **ptr_D = (ElementD **)(device_buffer + offsets[8]);
+    const ElementBlockScale **ptr_blockscale_A = (const ElementBlockScale **)(device_buffer + offsets[9]);
+    const ElementBlockScale **ptr_blockscale_B = (const ElementBlockScale **)(device_buffer + offsets[10]);
 
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGrouped,
-      {rt_args->groups, problem_sizes.get(), problem_sizes_host.data()},
-      {ptr_A.get(), stride_A.get(), ptr_B.get(), stride_B.get(),
-       ptr_blockscale_A.get(), // blockscale_tensor_A.device_data(),
-       ptr_blockscale_B.get(), // blockscale_tensor_B.device_data()
+      {rt_args->groups, problem_sizes, problem_sizes_host.data()},
+      {ptr_A, stride_A, ptr_B, stride_B,
+       ptr_blockscale_A, // blockscale_tensor_A.device_data(),
+       ptr_blockscale_B, // blockscale_tensor_B.device_data()
       },
       {
         {}, // epilogue.thread
-        ptr_C.get(), stride_C.get(),
-        ptr_D.get(), stride_D.get()
+        ptr_C, stride_C,
+        ptr_D, stride_D
       },
       kernel_hw_info
     };
+
+    CUDA_CHECK(cudaStreamSynchronize(cu_stream));
+    printf("hello.\n");
+    // static bool is_inited = false;
+    // if (!is_inited) {
+    //   is_inited = true;  
+    //   problem_sizes_host.reserve(rt_args->groups);
+    //   for (int i=0; i<rt_args->problem_sizes.size(); i++) {
+    //     auto m = rt_args->problem_sizes[i*3+0];
+    //     auto n = rt_args->problem_sizes[i*3+1];
+    //     auto k = rt_args->problem_sizes[i*3+2];
+    //     problem_sizes_host.push_back({m,n,k});
+    //   }
+      
+    //   problem_sizes.reset(rt_args->groups);
+    //   problem_sizes.copy_from_host(problem_sizes_host.data());
+
+    //   std::vector<StrideA> stride_A_host;
+    //   std::vector<StrideB> stride_B_host;
+    //   std::vector<StrideC> stride_C_host;
+    //   std::vector<StrideD> stride_D_host;
+    //   for (int32_t i = 0; i < rt_args->groups; ++i) {
+    //     auto problem = problem_sizes_host.at(i);
+    //     auto M = cute::get<0>(problem);
+    //     auto N = cute::get<1>(problem);
+    //     auto K = cute::get<2>(problem);
+    //     stride_A_host.push_back(cutlass::make_cute_packed_stride(StrideA{}, {M, K, 1}));
+    //     stride_B_host.push_back(cutlass::make_cute_packed_stride(StrideB{}, {N, K, 1}));
+    //     stride_C_host.push_back(cutlass::make_cute_packed_stride(StrideC{}, {M, N, 1}));
+    //     stride_D_host.push_back(cutlass::make_cute_packed_stride(StrideD{}, {M, N, 1}));      
+    //   }
+    //   stride_A.reset(rt_args->groups);
+    //   stride_A.copy_from_host(stride_A_host.data());
+    //   stride_B.reset(rt_args->groups);
+    //   stride_B.copy_from_host(stride_B_host.data());
+    //   stride_C.reset(rt_args->groups);
+    //   stride_C.copy_from_host(stride_C_host.data());
+    //   stride_D.reset(rt_args->groups);
+    //   stride_D.copy_from_host(stride_D_host.data());
+    //   ///
+    //   ptr_A.reset(rt_args->groups);
+    //   ptr_A.copy_from_host((const ElementA **)rt_args->ptr_A.data());
+    //   ptr_B.reset(rt_args->groups);
+    //   ptr_B.copy_from_host((const ElementB **)rt_args->ptr_B.data());
+    //   ptr_C.reset(rt_args->groups);
+    //   ptr_C.copy_from_host((const ElementC **)rt_args->ptr_C.data());
+    //   ptr_D.reset(rt_args->groups);
+    //   ptr_D.copy_from_host((ElementD **)rt_args->ptr_D.data());
+    //   ptr_blockscale_A.reset(rt_args->groups);
+    //   ptr_blockscale_A.copy_from_host((const float **)rt_args->ptr_blockscale_A.data());
+    //   ptr_blockscale_B.reset(rt_args->groups);
+    //   ptr_blockscale_B.copy_from_host((const float **)rt_args->ptr_blockscale_B.data());
+    // }
+    
+
+    // typename Gemm::Arguments arguments{
+    //   cutlass::gemm::GemmUniversalMode::kGrouped,
+    //   {rt_args->groups, problem_sizes.get(), problem_sizes_host.data()},
+    //   {ptr_A.get(), stride_A.get(), ptr_B.get(), stride_B.get(),
+    //    ptr_blockscale_A.get(), // blockscale_tensor_A.device_data(),
+    //    ptr_blockscale_B.get(), // blockscale_tensor_B.device_data()
+    //   },
+    //   {
+    //     {}, // epilogue.thread
+    //     ptr_C.get(), stride_C.get(),
+    //     ptr_D.get(), stride_D.get()
+    //   },
+    //   kernel_hw_info
+    // };
 
     auto &fusion_args = arguments.epilogue.thread;
     if (rt_args->alpha != FLT_MAX && rt_args->beta != FLT_MAX) {
@@ -235,28 +278,114 @@ private:
     return arguments;
   }
 
+  void get_buffer_info(const RtGroupedBlockScaleFp8ArgumentsV3 *rt_args, std::vector<int> &sizes, std::vector<int> &offsets, int &total_size) {
+    int groups = rt_args->groups;
+    int problem_size_size = groups * 3 * sizeof(int);
+    int problem_size_offset = 0;
+
+    int stride_a_size = groups * sizeof(StrideA);
+    int stride_b_size = groups * sizeof(StrideB);
+    int stride_c_size = groups * sizeof(StrideC);
+    int stride_d_size = groups * sizeof(StrideD);
+
+    int stride_a_offset = problem_size_offset + problem_size_size;
+    int stride_b_offset = stride_a_offset + stride_a_size;
+    int stride_c_offset = stride_b_offset + stride_b_size;
+    int stride_d_offset = stride_c_offset + stride_c_size;
+    
+    int ptr_a_size = groups * sizeof(ElementA *);
+    int ptr_b_size = groups * sizeof(ElementB *);
+    int ptr_c_size = groups * sizeof(ElementC *);
+    int ptr_d_size = groups * sizeof(ElementD *);
+    int ptr_scale_a_size = groups * sizeof(ElementBlockScale *);
+    int ptr_scale_b_size = groups * sizeof(ElementBlockScale *);
+
+    int ptr_a_offset = stride_d_offset + stride_d_size;
+    int ptr_b_offset = ptr_a_offset + ptr_a_size;
+    int ptr_c_offset = ptr_b_offset + ptr_b_size;
+    int ptr_d_offset = ptr_c_offset + ptr_c_size;
+    int ptr_scale_a_offset = ptr_d_offset + ptr_d_size;
+    int ptr_scale_b_offset = ptr_scale_a_offset + ptr_scale_a_size;
+
+    sizes.resize(11);
+    sizes[0] = problem_size_size;
+    sizes[1] = stride_a_size;      sizes[2] = stride_b_size;
+    sizes[3] = stride_c_size;      sizes[4] = stride_d_size;
+
+    sizes[5] = ptr_a_size;         sizes[6] = ptr_b_size;
+    sizes[7] = ptr_c_size;         sizes[8] = ptr_d_size;
+    sizes[9] = ptr_scale_a_size;   sizes[10] = ptr_scale_b_size;
+
+    offsets.resize(11);
+    offsets[0] = 0;
+    offsets[1] = stride_a_offset;      offsets[2] = stride_b_offset;
+    offsets[3] = stride_c_offset;      offsets[4] = stride_d_offset;
+
+    offsets[5] = ptr_a_offset;         offsets[6] = ptr_b_offset;
+    offsets[7] = ptr_c_offset;         offsets[8] = ptr_d_offset;
+    offsets[9] = ptr_scale_a_offset;   offsets[10] = ptr_scale_b_offset;  
+
+    total_size = 0;
+    for (int i=0; i<11; i++)
+      total_size += sizes[i];
+  }
+
+  void cpy_args2host_buffer(const RtGroupedBlockScaleFp8ArgumentsV3 *rt_args, std::vector<int> &sizes, std::vector<int> &offsets, uint8_t *host_buffer) {
+    std::vector<StrideA> stride_A_host;
+    std::vector<StrideB> stride_B_host;
+    std::vector<StrideC> stride_C_host;
+    std::vector<StrideD> stride_D_host;
+    problem_sizes_host.reserve(rt_args->groups);
+    for (int i=0; i<rt_args->groups; i++) {
+      auto m = rt_args->problem_sizes[i*3+0];
+      auto n = rt_args->problem_sizes[i*3+1];
+      auto k = rt_args->problem_sizes[i*3+2];
+      problem_sizes_host.push_back({m,n,k});
+
+      stride_A_host.push_back(cutlass::make_cute_packed_stride(StrideA{}, {m, k, 1}));
+      stride_B_host.push_back(cutlass::make_cute_packed_stride(StrideB{}, {n, k, 1}));
+      stride_C_host.push_back(cutlass::make_cute_packed_stride(StrideC{}, {m, n, 1}));
+      stride_D_host.push_back(cutlass::make_cute_packed_stride(StrideD{}, {m, n, 1}));      
+    }
+
+    memcpy(host_buffer + offsets[0], problem_sizes_host.data(), sizes[0]);
+    memcpy(host_buffer + offsets[1], stride_A_host.data(), sizes[1]);
+    memcpy(host_buffer + offsets[2], stride_B_host.data(), sizes[2]);
+    memcpy(host_buffer + offsets[3], stride_C_host.data(), sizes[3]);
+    memcpy(host_buffer + offsets[4], stride_D_host.data(), sizes[4]);
+
+    memcpy(host_buffer + offsets[5], rt_args->ptr_A.data(), sizes[5]);
+    memcpy(host_buffer + offsets[6], rt_args->ptr_B.data(), sizes[6]);
+    memcpy(host_buffer + offsets[7], rt_args->ptr_C.data(), sizes[7]);
+    memcpy(host_buffer + offsets[8], rt_args->ptr_D.data(), sizes[8]);
+    memcpy(host_buffer + offsets[9], rt_args->ptr_blockscale_A.data(), sizes[9]);
+    memcpy(host_buffer + offsets[10], rt_args->ptr_blockscale_B.data(), sizes[10]);
+  }
+
+  // void SyncHost2DeviceBuffer(uint8_t *host_buffer, uint8_t *device_buffer, int total_size, void *stream) {
+  //   // CUDA_CHECK(cudaMemcpyAsync(device_buffer, host_buffer, total_size, cudaMemcpyHostToDevice, stream));
+  //   CUDA_CHECK(cudaMemcpy(device_buffer, host_buffer, total_size, cudaMemcpyHostToDevice));
+
+  //   const ElementA **stride_A = device_buffer + 
+  // }
+
 private:
   Gemm gemm_dev_;
 
-  cutlass::DeviceAllocation<typename ProblemShape::UnderlyingProblemShape> problem_sizes;
   std::vector<typename ProblemShape::UnderlyingProblemShape> problem_sizes_host;
+  // cutlass::DeviceAllocation<typename ProblemShape::UnderlyingProblemShape> problem_sizes;
 
-  cutlass::DeviceAllocation<StrideA> stride_A;
-  cutlass::DeviceAllocation<StrideB> stride_B;
-  cutlass::DeviceAllocation<StrideC> stride_C;
-  cutlass::DeviceAllocation<StrideD> stride_D;
+  // cutlass::DeviceAllocation<StrideA> stride_A;
+  // cutlass::DeviceAllocation<StrideB> stride_B;
+  // cutlass::DeviceAllocation<StrideC> stride_C;
+  // cutlass::DeviceAllocation<StrideD> stride_D;
 
-  std::vector<StrideA> stride_A_host;
-  std::vector<StrideB> stride_B_host;
-  std::vector<StrideC> stride_C_host;
-  std::vector<StrideD> stride_D_host;
-
-  cutlass::DeviceAllocation<const ElementA *> ptr_A;
-  cutlass::DeviceAllocation<const ElementB *> ptr_B;
-  cutlass::DeviceAllocation<const ElementC *> ptr_C;
-  cutlass::DeviceAllocation<ElementD *> ptr_D;
-  cutlass::DeviceAllocation<const ElementBlockScale *> ptr_blockscale_A;
-  cutlass::DeviceAllocation<const ElementBlockScale *> ptr_blockscale_B;
+  // cutlass::DeviceAllocation<const ElementA *> ptr_A;
+  // cutlass::DeviceAllocation<const ElementB *> ptr_B;
+  // cutlass::DeviceAllocation<const ElementC *> ptr_C;
+  // cutlass::DeviceAllocation<ElementD *> ptr_D;
+  // cutlass::DeviceAllocation<const ElementBlockScale *> ptr_blockscale_A;
+  // cutlass::DeviceAllocation<const ElementBlockScale *> ptr_blockscale_B;
 };
 
 } // namespace ctlop

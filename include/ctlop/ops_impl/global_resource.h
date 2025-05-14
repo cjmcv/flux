@@ -31,7 +31,9 @@ private:
   GlobalBuffer(const GlobalBuffer&) = delete;
   GlobalBuffer& operator=(const GlobalBuffer&) = delete;
 
-  cutlass::device_memory::allocation<uint8_t> workspace_;
+  cutlass::device_memory::allocation<uint8_t> device_buffer_;
+  cutlass::device_memory::allocation<uint8_t> device_buffer2_;
+  std::vector<uint8_t> host_buffer_;
 
 public:
   static GlobalBuffer& instance() {
@@ -39,12 +41,28 @@ public:
     return instance;
   }
 
-  void* ResizeBufferIfNeeded(size_t workspace_size) {
+  uint8_t* ResizeDeviceBufferIfNeeded(size_t workspace_size) {
     workspace_size = (workspace_size + 127) / 128 * 128;
-    if (workspace_.size() < workspace_size) {
-      workspace_.reset(workspace_size);
+    if (device_buffer_.size() < workspace_size) {
+      device_buffer_.reset(workspace_size);
     }
-    return workspace_.get();
+    return device_buffer_.get();
+  }
+
+  uint8_t* ResizeDeviceBuffer2IfNeeded(size_t size) {
+    size = (size + 127) / 128 * 128;
+    if (device_buffer2_.size() < size) {
+      device_buffer2_.reset(size);
+    }
+    return device_buffer2_.get();
+  }
+
+  uint8_t* ResizeHostBufferIfNeeded(size_t size) {
+    size = (size + 127) / 128 * 128;
+    if (host_buffer_.size() < size) {
+      host_buffer_.resize(size);
+    }
+    return host_buffer_.data();
   }
 };
 

@@ -71,7 +71,7 @@ public:
     size_t workspace_size = DeviceGemmSimt::get_workspace_size(arguments);
   
     // Allocate workspace memory
-    void *workspace_ptr = GlobalBuffer::instance().ResizeBufferIfNeeded(workspace_size);
+    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size);
   
     // Check the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
