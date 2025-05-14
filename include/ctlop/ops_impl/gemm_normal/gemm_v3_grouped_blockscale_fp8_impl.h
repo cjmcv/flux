@@ -176,8 +176,8 @@ private:
       kernel_hw_info
     };
 
-    CUDA_CHECK(cudaStreamSynchronize(cu_stream));
-    printf("hello.\n");
+    // CUDA_CHECK(cudaStreamSynchronize(cu_stream));
+    // printf("hello.\n");
     // static bool is_inited = false;
     // if (!is_inited) {
     //   is_inited = true;  
@@ -361,13 +361,6 @@ private:
     memcpy(host_buffer + offsets[9], rt_args->ptr_blockscale_A.data(), sizes[9]);
     memcpy(host_buffer + offsets[10], rt_args->ptr_blockscale_B.data(), sizes[10]);
   }
-
-  // void SyncHost2DeviceBuffer(uint8_t *host_buffer, uint8_t *device_buffer, int total_size, void *stream) {
-  //   // CUDA_CHECK(cudaMemcpyAsync(device_buffer, host_buffer, total_size, cudaMemcpyHostToDevice, stream));
-  //   CUDA_CHECK(cudaMemcpy(device_buffer, host_buffer, total_size, cudaMemcpyHostToDevice));
-
-  //   const ElementA **stride_A = device_buffer + 
-  // }
 
 private:
   Gemm gemm_dev_;
