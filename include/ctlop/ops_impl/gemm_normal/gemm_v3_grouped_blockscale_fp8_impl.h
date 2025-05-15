@@ -151,7 +151,6 @@ private:
     CUDA_CHECK(cudaMemcpyAsync(device_buffer, host_buffer, total_size, cudaMemcpyHostToDevice, cu_stream));
 
     UlyProblemShape *problem_sizes = (UlyProblemShape *)(device_buffer + offsets[0]);
-
     StrideA *stride_A = (StrideA *)(device_buffer + offsets[1]);
     StrideB *stride_B = (StrideB *)(device_buffer + offsets[2]);
     StrideC *stride_C = (StrideC *)(device_buffer + offsets[3]);
@@ -343,13 +342,13 @@ private:
   }
 
   void cpy_args2host_buffer(const RtGroupedBlockScaleFp8ArgumentsV3 *rt_args, std::vector<int> &sizes, std::vector<int> &offsets, uint8_t *host_buffer) {
-    std::vector<StrideA> stride_A_host;
-    std::vector<StrideB> stride_B_host;
-    std::vector<StrideC> stride_C_host;
-    std::vector<StrideD> stride_D_host;
-    std::vector<LayoutSFA> layout_SFA_host;
-    std::vector<LayoutSFB> layout_SFB_host;
-    problem_sizes_host.reserve(rt_args->groups);
+    problem_sizes_host.clear();
+    stride_A_host.clear();
+    stride_B_host.clear();
+    stride_C_host.clear();
+    stride_D_host.clear();
+    layout_SFA_host.clear();
+    layout_SFB_host.clear();
     for (int i=0; i<rt_args->groups; i++) {
       auto m = rt_args->problem_sizes[i*3+0];
       auto n = rt_args->problem_sizes[i*3+1];
@@ -385,6 +384,14 @@ private:
   Gemm gemm_dev_;
 
   std::vector<typename ProblemShape::UnderlyingProblemShape> problem_sizes_host;
+
+  std::vector<StrideA> stride_A_host;
+  std::vector<StrideB> stride_B_host;
+  std::vector<StrideC> stride_C_host;
+  std::vector<StrideD> stride_D_host;
+  std::vector<LayoutSFA> layout_SFA_host;
+  std::vector<LayoutSFB> layout_SFB_host;
+
   // cutlass::DeviceAllocation<typename ProblemShape::UnderlyingProblemShape> problem_sizes;
 
   // cutlass::DeviceAllocation<StrideA> stride_A;

@@ -873,6 +873,7 @@ int main(int argc, char const **args) {
 #if defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
   bool passed = true;
   passed = run(options);
+  std::cout << "Running tests ctlop" << std::endl;
   passed = run2(options);
   if (!passed)
     return -1;

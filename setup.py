@@ -66,7 +66,8 @@ def setup_pytorch_extension() -> setuptools.Extension:
     # Compiler flags
     # too much warning from CUDA /usr/local/cuda/include/cusparse.h: "-Wdeprecated-declarations"
     cxx_flags = [
-        "-O3",
+        #"-g",
+        "-O3", #"-O0"
         "-DTORCH_CUDA=1",
         "-fvisibility=hidden",
         "-Wno-deprecated-declarations",

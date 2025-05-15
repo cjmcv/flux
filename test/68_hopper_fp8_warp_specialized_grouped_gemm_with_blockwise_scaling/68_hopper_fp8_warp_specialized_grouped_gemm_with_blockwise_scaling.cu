@@ -871,7 +871,8 @@ int main(int argc, char const **args) {
   run(options, true);
   std::cout << "Running tests without host problem shapes:" << std::endl;
   run(options, false);
-
+  std::cout << "Running tests ctlop" << std::endl;
+  run2(options, true);
 #endif
 
   return 0;
