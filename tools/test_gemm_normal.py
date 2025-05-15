@@ -172,17 +172,18 @@ def perf_ctlop(
     )
     def fn(iter_id):
         problem_idx = iter_id % problem_cnt
-        return op.forward(
+        op.forward(
             inputs[problem_idx],
             weights[problem_idx],
+            output=output,
             bias=bias,
-            output_buf=output,
             input_scale=input_scale,
             weight_scale=weight_scale,
             output_scale=None,
             tuning = None,
             fast_accum=False,
         )
+        return output
     return perf_gemm(warmup_iters, iters, "ctlop", fn)
 
 

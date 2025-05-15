@@ -558,13 +558,13 @@ if __name__ == "__main__":
     torch.backends.cudnn.allow_tf32 = True
 
     # Run correctness tests on a few examples
-    if args.run_correctness:
-        print("Running correctness tests...")
-        calculate_diff(8192, 7168, 4096, 4)
-        calculate_diff(8192, 2048, 7168, 4)
-        calculate_diff(4096, 7168, 4096, 8)
-        calculate_diff(4096, 2048, 7168, 8)
-        calculate_diff(4096, 576, 7168, 8)
+    # if args.run_correctness:
+    print("Running correctness tests...")
+    calculate_diff(8192, 7168, 4096, 4)
+    calculate_diff(8192, 2048, 7168, 4)
+    calculate_diff(4096, 7168, 4096, 8)
+    calculate_diff(4096, 2048, 7168, 8)
+    calculate_diff(4096, 576, 7168, 8)
 
     # Get the benchmark function with the specified tp_size
     benchmark = get_benchmark(args.tp_size)

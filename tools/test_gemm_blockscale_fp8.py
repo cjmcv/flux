@@ -194,11 +194,13 @@ def calculate_diff(m: int, n: int, k: int):
         output_dtype=torch.bfloat16,
         transpose_weight=False
     )
+    out = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
+
     out_ctlop = ctlop_gemm.forward(
         x_fp8.clone(),
         y_fp8.clone(),
+        output=out,
         bias=None,
-        output_buf=None,
         input_scale=xt_scale.clone(),
         weight_scale=yt_scale.clone(),
         output_scale=None,
@@ -326,12 +328,13 @@ def get_benchmark(tp_size):
             )
             xt_scale = x_scale.clone().t().contiguous()
             yt_scale = y_scale.clone().t().contiguous()
+            out = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
             ms, min_ms, max_ms = triton.testing.do_bench(
                 lambda: ctlop_gemm.forward(
                     x_fp8.clone(),
                     y_fp8.clone(),
+                    output=out,
                     bias=None,
-                    output_buf=None,
                     input_scale=xt_scale.clone(),
                     weight_scale=yt_scale.clone(),
                     output_scale=None,

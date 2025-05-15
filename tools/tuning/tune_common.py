@@ -8,7 +8,8 @@ import math
 class Meta(IntEnum):
     GemmNormal = 0           # meta type
     GemmNormalSimt = auto()
-    GemmBolckScaleFp8 = auto()
+    GemmBlockScaleFp8 = auto()
+    GemmGroupedBlockScaleFp8 = auto()
     Void = 10                # data type
     FP16 = auto()   
     BF16 = auto()
@@ -27,7 +28,8 @@ class Meta(IntEnum):
         return {
             Meta.GemmNormal: "GemmNormal",
             Meta.GemmNormalSimt: "GemmNormalSimt",
-            Meta.GemmBolckScaleFp8: "GemmBolckScaleFp8",
+            Meta.GemmBlockScaleFp8: "GemmBlockScaleFp8",
+            Meta.GemmGroupedBlockScaleFp8: "GemmGroupedBlockScaleFp8",
             Meta.Void: "Void",
             Meta.FP16: "FP16",
             Meta.BF16: "BF16",

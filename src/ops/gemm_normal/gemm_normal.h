@@ -12,18 +12,18 @@ public:
       bool transpose_weight);
   ~GemmNormal();
 
-  torch::Tensor forward(
+  int forward(
       torch::Tensor lhs,
       torch::Tensor rhs,
+      torch::Tensor output,
       c10::optional<torch::Tensor> bias,
-      c10::optional<torch::Tensor> output_buf,
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
       c10::optional<torch::Tensor> output_scale,
       c10::optional<torch::Tensor> tuning,
       bool fast_accum);
 
-  void grouped_forward(
+  int grouped_forward(
       std::vector<torch::Tensor> inputs,
       std::vector<torch::Tensor> weights,
       std::vector<torch::Tensor> outputs,

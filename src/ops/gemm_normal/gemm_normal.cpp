@@ -56,11 +56,11 @@ public:
   //       op注册表：按第一次生成的流程再走一遍，同时检索序号+meta的字符串, 匹配者留下，不匹配的不生成。
   //       tuning注册表：key是shape+meta，value是序号，test时输入tensor，构建meta，结合shape，获取序号。组成序号+meta，充当op注册表的key，检索搜索op。
   // python1生成搜索空间op注册表，编译，python2执行tuning脚本，生成tuned表，python1生成top1的op注册表以及tuning注册表。
-  torch::Tensor forward(
+  int forward(
       torch::Tensor input,
       torch::Tensor weight,
+      torch::Tensor output,
       c10::optional<torch::Tensor> bias,
-      c10::optional<torch::Tensor> output_buf,
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
       c10::optional<torch::Tensor> output_scale,
@@ -91,7 +91,7 @@ public:
       id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmNormal;
       rt_args = new RtArgumentsV2();
     }
-    torch::Tensor output = GetBaseRtConf(input, weight, bias, output_buf, input_scale, weight_scale, rt_args);
+    GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, rt_args);
     
 
     bool is_tuning = false;
@@ -103,14 +103,14 @@ public:
       is_tuning = true;
     }
     else {
-      std::vector<int32_t> shape_meta = {rt_args->m, rt_args->n, rt_args->k};       // mnk + meta
-      shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
+      std::vector<int32_t> shape_meta = {rt_args->m, rt_args->n, rt_args->k, 1};       // mnkl + meta
+      shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
     }
     printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
     GemmBase *op = ins.GetOp(id_meta, is_tuning);
     if (op == nullptr)
-      return torch::Tensor();
+      return -1;
 
     cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
     op->initialize(rt_args);
@@ -124,10 +124,10 @@ public:
       }
     }
     delete rt_args;
-    return output;
+    return 0;
   }
 
-  void grouped_forward(
+  int grouped_forward(
     std::vector<torch::Tensor> inputs,
     std::vector<torch::Tensor> weights,
     std::vector<torch::Tensor> outputs,
@@ -144,7 +144,7 @@ public:
     id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
 
     RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
-    printf("size: %ld, %ld, %ld, %ld, %ld.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
+    // printf("size: %ld, %ld, %ld, %ld, %ld.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
     rt_args->groups = inputs.size();
     if (inputs_scale.has_value() && weights_scale.has_value()) {
       for (int i=0; i < inputs_scale.value().size(); i++) {
@@ -166,22 +166,28 @@ public:
     rt_args->beta = 0.0f;
     
     bool is_tuning = false;
-    // if (tuning.has_value()) {
-    //   int16_t *data = (int16_t *)tuning.value().data_ptr();
-    //   CTLOP_CHECK_EQ(data[0], 1);
-    //   id_meta[IdMetaEnum::Id] = data[1];
-    //   id_meta[IdMetaEnum::Schema] = data[2];
-    //   is_tuning = true;
-    // }
-    // else {
-    //   std::vector<int32_t> shape_meta = {rt_args->m, rt_args->n, rt_args->k};       // mnk + meta
-    //   shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
-    //   tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
-    // }
-    // printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+    if (tuning.has_value()) {
+      int16_t *data = (int16_t *)tuning.value().data_ptr();
+      CTLOP_CHECK_EQ(data[0], 1);
+      id_meta[IdMetaEnum::Id] = data[1];
+      id_meta[IdMetaEnum::Schema] = data[2];
+      is_tuning = true;
+    }
+    else {
+      int32_t m = 0;
+      for (int i=0; i<inputs.size(); i++) {
+        m += inputs[i].size(0);
+      }
+      int32_t k = inputs[0].size(1); // By default, each group has the same k/n.
+      int32_t n = weights[0].size(0);
+      std::vector<int32_t> shape_meta = {m, n, k, rt_args->groups};       // mnkg + meta
+      shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
+      tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
+    }
+    printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
     GemmBase *op = ins.GetOp(id_meta, is_tuning);
     if (op == nullptr)
-      return ;
+      return -1;
 
     cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
     op->initialize(rt_args);
@@ -196,6 +202,7 @@ public:
     }
 
     delete rt_args;
+    return 0;
   }
 
 private:
@@ -219,11 +226,11 @@ private:
     return meta;
   }
 
-  torch::Tensor GetBaseRtConf(
+  void GetBaseRtConf(
       torch::Tensor input,
       torch::Tensor weight,
+      torch::Tensor output,
       c10::optional<torch::Tensor> bias,
-      c10::optional<torch::Tensor> output_buf,
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
       RtArguments *rt_args) {
@@ -241,17 +248,6 @@ private:
       CTLOP_CHECK_EQ(m, bias->size(0));
       CTLOP_CHECK_EQ(n, bias->size(1));
     }
-    torch::Tensor output;
-    if (output_buf.has_value()) {
-      CHECK_INPUT(output_buf.value(), this->output_dtype);
-      CTLOP_CHECK_EQ(output_buf->dim(), 2);
-      CTLOP_CHECK_EQ(m, output_buf->size(0));
-      CTLOP_CHECK_EQ(n, output_buf->size(1));
-      output = output_buf.value();
-    }
-    else {
-      output = torch::empty({m, n}, weight.options().dtype(output_dtype));
-    }
     int32_t wk = transpose_weight ? weight.size(0) : weight.size(1);
     CTLOP_CHECK_EQ(wk, k) << "weight k-dim mismatch";
 
@@ -265,8 +261,6 @@ private:
     rt_args->ptr_D = output.data_ptr();
     rt_args->alpha = 1.0f;
     rt_args->beta = 0.0f;
-
-    return output;
   }
   
 private:
@@ -285,11 +279,11 @@ GemmNormal::GemmNormal(
 
 GemmNormal::~GemmNormal() { delete impl_; }
 
-torch::Tensor GemmNormal::forward(
+int GemmNormal::forward(
     torch::Tensor input,
     torch::Tensor weight,
+    torch::Tensor output,
     c10::optional<torch::Tensor> bias,
-    c10::optional<torch::Tensor> output_buf,
     c10::optional<torch::Tensor> input_scale,
     c10::optional<torch::Tensor> weight_scale,
     c10::optional<torch::Tensor> output_scale,
@@ -299,8 +293,8 @@ torch::Tensor GemmNormal::forward(
   return impl_->forward(
       std::move(input),
       std::move(weight),
+      std::move(output),
       std::move(bias),
-      std::move(output_buf),
       std::move(input_scale),
       std::move(weight_scale),
       std::move(output_scale),
@@ -308,7 +302,7 @@ torch::Tensor GemmNormal::forward(
       fast_accum);
 }
 
-void GemmNormal::grouped_forward(
+int GemmNormal::grouped_forward(
   std::vector<torch::Tensor> inputs,
   std::vector<torch::Tensor> weights,
   std::vector<torch::Tensor> outputs,

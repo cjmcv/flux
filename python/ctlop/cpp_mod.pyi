@@ -13,14 +13,14 @@ class GemmNormal:
         self,
         input: torch.Tensor,
         weight: torch.Tensor,
+        output: torch.Tensor,
         bias: Optional[torch.Tensor] = None,
-        output_buf: Optional[torch.Tensor] = None,
         input_scale: Optional[torch.Tensor] = None,
         weight_scale: Optional[torch.Tensor] = None,
         output_scale: Optional[torch.Tensor] = None,
         tuning: Optional[torch.Tensor] = None,
         fast_accum: bool = False,
-    ) -> torch.Tensor: ...
+    ) -> int: ...
     def grouped_forward(
         self,
         inputs: List[torch.Tensor],
@@ -29,4 +29,4 @@ class GemmNormal:
         inputs_scale: Optional[torch.Tensor] = None,
         weights_scale: Optional[torch.Tensor] = None,
         tuning: Optional[torch.Tensor] = None,
-    ): ...
+    ) -> int: ...
