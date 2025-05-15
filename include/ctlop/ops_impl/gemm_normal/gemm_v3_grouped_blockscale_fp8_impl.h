@@ -39,11 +39,15 @@ public:
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag                        // Threadblock-level tile size
   ////
 
-  using KernelSchedule    = cutlass::gemm::KernelPtrArrayTmaWarpSpecializedCooperativeFP8BlockScaledAccum<1, 128>;
+  using ScaleConfig   = cutlass::detail::Sm90BlockwiseScaleConfig<1, 128, 128>;
+  using LayoutSFA     = decltype(ScaleConfig::deduce_layoutSFA());    // Layout type for SFA matrix operand
+  using LayoutSFB     = decltype(ScaleConfig::deduce_layoutSFB());    // Layout type for SFB matrix operand
+
+  using KernelSchedule    = cutlass::gemm::KernelPtrArrayTmaWarpSpecializedCooperativeFP8BlockScaledAccum;
   using EpilogueSchedule  = cutlass::epilogue::PtrArrayTmaWarpSpecializedCooperative;
   
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
-  using FusionOperation   = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementAccumulator>;
+  using FusionOperation   = cutlass::epilogue::fusion::LinearCombination<ElementC, ElementAccumulator>;
 
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
       ArchTag, OperatorClass,
@@ -55,11 +59,10 @@ public:
       EpilogueSchedule,
       FusionOperation
     >::CollectiveOp;
-  
-  using CollectiveMainloopWithBlockWiseScaling = typename cutlass::gemm::collective::CollectiveBuilder<
+  using CollectiveMainloopWithGroupWiseScaling = typename cutlass::gemm::collective::CollectiveBuilder<
       ArchTag, OperatorClass,
-      ElementA, LayoutA *, 128 / cutlass::sizeof_bits<ElementA>::value,
-      ElementB, LayoutB *, 128 / cutlass::sizeof_bits<ElementB>::value,
+      ElementA, cute::tuple<LayoutA *, LayoutSFA *>, 128 / cutlass::sizeof_bits<ElementA>::value,
+      ElementB, cute::tuple<LayoutB *, LayoutSFB *>, 128 / cutlass::sizeof_bits<ElementB>::value,
       ElementAccumulator,
       TileShape, ClusterShape,
       cutlass::gemm::collective::StageCountAutoCarveout<
@@ -70,7 +73,7 @@ public:
 
   using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
       cutlass::gemm::GroupProblemShape<cute::Shape<int,int,int>>, // <M,N,K> per group
-      CollectiveMainloopWithBlockWiseScaling,
+      CollectiveMainloopWithGroupWiseScaling,
       CollectiveEpilogue
   >;
 
@@ -153,20 +156,22 @@ private:
     StrideB *stride_B = (StrideB *)(device_buffer + offsets[2]);
     StrideC *stride_C = (StrideC *)(device_buffer + offsets[3]);
     StrideD *stride_D = (StrideD *)(device_buffer + offsets[4]);
+    LayoutSFA *layout_SFA = (LayoutSFA *)(device_buffer + offsets[5]);
+    LayoutSFB *layout_SFB = (LayoutSFB *)(device_buffer + offsets[6]);
 
-    const ElementA **ptr_A = (const ElementA **)(device_buffer + offsets[5]);
-    const ElementB **ptr_B = (const ElementB **)(device_buffer + offsets[6]);
-    const ElementC **ptr_C = (const ElementC **)(device_buffer + offsets[7]);
-    ElementD **ptr_D = (ElementD **)(device_buffer + offsets[8]);
-    const ElementBlockScale **ptr_blockscale_A = (const ElementBlockScale **)(device_buffer + offsets[9]);
-    const ElementBlockScale **ptr_blockscale_B = (const ElementBlockScale **)(device_buffer + offsets[10]);
+    const ElementA **ptr_A = (const ElementA **)(device_buffer + offsets[7]);
+    const ElementB **ptr_B = (const ElementB **)(device_buffer + offsets[8]);
+    const ElementC **ptr_C = (const ElementC **)(device_buffer + offsets[9]);
+    ElementD **ptr_D = (ElementD **)(device_buffer + offsets[10]);
+    const ElementBlockScale **ptr_blockscale_A = (const ElementBlockScale **)(device_buffer + offsets[11]);
+    const ElementBlockScale **ptr_blockscale_B = (const ElementBlockScale **)(device_buffer + offsets[12]);
 
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGrouped,
       {rt_args->groups, problem_sizes, problem_sizes_host.data()},
       {ptr_A, stride_A, ptr_B, stride_B,
-       ptr_blockscale_A, // blockscale_tensor_A.device_data(),
-       ptr_blockscale_B, // blockscale_tensor_B.device_data()
+       ptr_blockscale_A, layout_SFA,
+       ptr_blockscale_B, layout_SFB 
       },
       {
         {}, // epilogue.thread
@@ -287,12 +292,16 @@ private:
     int stride_b_size = groups * sizeof(StrideB);
     int stride_c_size = groups * sizeof(StrideC);
     int stride_d_size = groups * sizeof(StrideD);
+    int layout_SFA_size = groups * sizeof(LayoutSFA);
+    int layout_SFB_size = groups * sizeof(LayoutSFB);
 
     int stride_a_offset = problem_size_offset + problem_size_size;
     int stride_b_offset = stride_a_offset + stride_a_size;
     int stride_c_offset = stride_b_offset + stride_b_size;
     int stride_d_offset = stride_c_offset + stride_c_size;
-    
+    int layout_SFA_offset = stride_d_offset + stride_d_size;
+    int layout_SFB_offset = layout_SFA_offset + layout_SFA_size;
+
     int ptr_a_size = groups * sizeof(ElementA *);
     int ptr_b_size = groups * sizeof(ElementB *);
     int ptr_c_size = groups * sizeof(ElementC *);
@@ -300,33 +309,36 @@ private:
     int ptr_scale_a_size = groups * sizeof(ElementBlockScale *);
     int ptr_scale_b_size = groups * sizeof(ElementBlockScale *);
 
-    int ptr_a_offset = stride_d_offset + stride_d_size;
+    int ptr_a_offset = layout_SFB_offset + layout_SFB_size;
     int ptr_b_offset = ptr_a_offset + ptr_a_size;
     int ptr_c_offset = ptr_b_offset + ptr_b_size;
     int ptr_d_offset = ptr_c_offset + ptr_c_size;
     int ptr_scale_a_offset = ptr_d_offset + ptr_d_size;
     int ptr_scale_b_offset = ptr_scale_a_offset + ptr_scale_a_size;
 
-    sizes.resize(11);
+    int len = 13;
+    sizes.resize(len);
     sizes[0] = problem_size_size;
-    sizes[1] = stride_a_size;      sizes[2] = stride_b_size;
-    sizes[3] = stride_c_size;      sizes[4] = stride_d_size;
+    sizes[1] = stride_a_size;       sizes[2] = stride_b_size;
+    sizes[3] = stride_c_size;       sizes[4] = stride_d_size;
+    sizes[5] = layout_SFA_size;     sizes[6] = layout_SFB_size;
 
-    sizes[5] = ptr_a_size;         sizes[6] = ptr_b_size;
-    sizes[7] = ptr_c_size;         sizes[8] = ptr_d_size;
-    sizes[9] = ptr_scale_a_size;   sizes[10] = ptr_scale_b_size;
+    sizes[7] = ptr_a_size;          sizes[8] = ptr_b_size;
+    sizes[9] = ptr_c_size;          sizes[10] = ptr_d_size;
+    sizes[11] = ptr_scale_a_size;   sizes[12] = ptr_scale_b_size;
 
-    offsets.resize(11);
+    offsets.resize(len);
     offsets[0] = 0;
     offsets[1] = stride_a_offset;      offsets[2] = stride_b_offset;
     offsets[3] = stride_c_offset;      offsets[4] = stride_d_offset;
+    offsets[5] = layout_SFA_offset;    offsets[6] = layout_SFB_offset;
 
-    offsets[5] = ptr_a_offset;         offsets[6] = ptr_b_offset;
-    offsets[7] = ptr_c_offset;         offsets[8] = ptr_d_offset;
-    offsets[9] = ptr_scale_a_offset;   offsets[10] = ptr_scale_b_offset;  
+    offsets[7] = ptr_a_offset;         offsets[8] = ptr_b_offset;
+    offsets[9] = ptr_c_offset;         offsets[10] = ptr_d_offset;
+    offsets[11] = ptr_scale_a_offset;  offsets[12] = ptr_scale_b_offset;  
 
     total_size = 0;
-    for (int i=0; i<11; i++)
+    for (int i=0; i<len; i++)
       total_size += sizes[i];
   }
 
@@ -335,6 +347,8 @@ private:
     std::vector<StrideB> stride_B_host;
     std::vector<StrideC> stride_C_host;
     std::vector<StrideD> stride_D_host;
+    std::vector<LayoutSFA> layout_SFA_host;
+    std::vector<LayoutSFB> layout_SFB_host;
     problem_sizes_host.reserve(rt_args->groups);
     for (int i=0; i<rt_args->groups; i++) {
       auto m = rt_args->problem_sizes[i*3+0];
@@ -345,7 +359,10 @@ private:
       stride_A_host.push_back(cutlass::make_cute_packed_stride(StrideA{}, {m, k, 1}));
       stride_B_host.push_back(cutlass::make_cute_packed_stride(StrideB{}, {n, k, 1}));
       stride_C_host.push_back(cutlass::make_cute_packed_stride(StrideC{}, {m, n, 1}));
-      stride_D_host.push_back(cutlass::make_cute_packed_stride(StrideD{}, {m, n, 1}));      
+      stride_D_host.push_back(cutlass::make_cute_packed_stride(StrideD{}, {m, n, 1}));    
+      
+      layout_SFA_host.push_back(ScaleConfig::tile_atom_to_shape_SFA(cute::make_shape(m, n, k, 1)));
+      layout_SFB_host.push_back(ScaleConfig::tile_atom_to_shape_SFB(cute::make_shape(m, n, k, 1)));
     }
 
     memcpy(host_buffer + offsets[0], problem_sizes_host.data(), sizes[0]);
@@ -353,13 +370,15 @@ private:
     memcpy(host_buffer + offsets[2], stride_B_host.data(), sizes[2]);
     memcpy(host_buffer + offsets[3], stride_C_host.data(), sizes[3]);
     memcpy(host_buffer + offsets[4], stride_D_host.data(), sizes[4]);
+    memcpy(host_buffer + offsets[5], layout_SFA_host.data(), sizes[5]); //
+    memcpy(host_buffer + offsets[6], layout_SFB_host.data(), sizes[6]);
 
-    memcpy(host_buffer + offsets[5], rt_args->ptr_A.data(), sizes[5]);
-    memcpy(host_buffer + offsets[6], rt_args->ptr_B.data(), sizes[6]);
-    memcpy(host_buffer + offsets[7], rt_args->ptr_C.data(), sizes[7]);
-    memcpy(host_buffer + offsets[8], rt_args->ptr_D.data(), sizes[8]);
-    memcpy(host_buffer + offsets[9], rt_args->ptr_blockscale_A.data(), sizes[9]);
-    memcpy(host_buffer + offsets[10], rt_args->ptr_blockscale_B.data(), sizes[10]);
+    memcpy(host_buffer + offsets[7], rt_args->ptr_A.data(), sizes[7]);
+    memcpy(host_buffer + offsets[8], rt_args->ptr_B.data(), sizes[8]);
+    memcpy(host_buffer + offsets[9], rt_args->ptr_C.data(), sizes[9]);
+    memcpy(host_buffer + offsets[10], rt_args->ptr_D.data(), sizes[10]);
+    memcpy(host_buffer + offsets[11], rt_args->ptr_blockscale_A.data(), sizes[11]);
+    memcpy(host_buffer + offsets[12], rt_args->ptr_blockscale_B.data(), sizes[12]);
   }
 
 private:

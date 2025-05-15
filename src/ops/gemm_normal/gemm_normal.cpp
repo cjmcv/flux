@@ -144,7 +144,7 @@ public:
     id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
 
     RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
-    printf("size: %d, %d, %d, %d, %d.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
+    printf("size: %ld, %ld, %ld, %ld, %ld.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
     rt_args->groups = inputs.size();
     if (inputs_scale.has_value() && weights_scale.has_value()) {
       for (int i=0; i < inputs_scale.value().size(); i++) {

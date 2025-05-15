@@ -37,16 +37,19 @@ public:
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag                          // Threadblock-level tile size
   ////
 
-  using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<1, 128>; // scale_A[m, k//128], scale_B[n//128, k//128]
+  using ScaleConfig   = cutlass::detail::Sm90BlockwiseScaleConfig<1, 128, 128>;
+
+  using LayoutSFA     = decltype(ScaleConfig::deduce_layoutSFA());    // Layout type for SFA matrix operand
+  using LayoutSFB     = decltype(ScaleConfig::deduce_layoutSFB());    // Layout type for SFB matrix operand
+  using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum;
   using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
-  
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
 
 #ifdef BLOCKSCALE_FP8_FUSED_COMPLEX
   using FusionOperation     = cutlass::epilogue::fusion::ScaledLinCombPerRowBiasEltActAmaxAux<
       LayoutAux, cutlass::epilogue::thread::Identity, ElementD, ElementCompute, ElementAux, ElementAmax, ElementBias, ElementC>; // cutlass::epilogue::thread::ReLU
 #else  
-  using FusionOperation     = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementCompute>;
+  using FusionOperation     = cutlass::epilogue::fusion::LinearCombination<ElementC, ElementCompute>;
 #endif
 
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
@@ -60,25 +63,24 @@ public:
       FusionOperation
     >::CollectiveOp;
   
-  using CollectiveMainloopWithBlockWiseScaling = typename cutlass::gemm::collective::CollectiveBuilder<
-      ArchTag, OperatorClass,
-      ElementA, LayoutA, 128 / cutlass::sizeof_bits<ElementA>::value,
-      ElementB, LayoutB, 128 / cutlass::sizeof_bits<ElementB>::value,
-      ElementAccumulator,
-      TileShape, ClusterShape,
-      cutlass::gemm::collective::StageCountAutoCarveout<
-        static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))
-      >,
-      KernelSchedule
-    >::CollectiveOp;
-  
+  using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
+    ArchTag, OperatorClass,
+    ElementA, cute::tuple<LayoutA, LayoutSFA>, 128 / cutlass::sizeof_bits<ElementA>::value,
+    ElementB, cute::tuple<LayoutB, LayoutSFB>, 128 / cutlass::sizeof_bits<ElementB>::value,
+    ElementAccumulator,
+    TileShape, ClusterShape,
+    cutlass::gemm::collective::StageCountAutoCarveout<
+      static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))
+    >,
+    KernelSchedule
+  >::CollectiveOp;
+
   using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
-      cute::Shape<int,int,int,int>, // Indicates ProblemShape
-      CollectiveMainloopWithBlockWiseScaling,
-      CollectiveEpilogue,
-      TileScheduler // cutlass::gemm::PersistentScheduler cutlass::gemm::StreamKScheduler
+    cute::Shape<int,int,int,int>,
+    CollectiveMainloop,
+    CollectiveEpilogue,
+    TileScheduler
   >;
-  
   // CORE
   using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
 
@@ -130,13 +132,9 @@ private:
     StrideC stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(rt_args->m, rt_args->n, rt_args->l));
     StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(rt_args->m, rt_args->n, rt_args->l));
     StrideAux stride_aux = stride_D;
-
-    // Note : This value has to match the KernelSchedule::ScalePromotionInterval
-    // Else kernel will fail can_implement() check
-    // Deprecation Notice : We plan to remove this params member in an upcoming release
-    // Users can safely delete this line from their code, since the default is already 4
-    unsigned int mma_promotion_interval = 4;
-
+    LayoutSFA layout_SFA = ScaleConfig::tile_atom_to_shape_SFA(cute::make_shape(rt_args->m, rt_args->n, rt_args->k, rt_args->l));
+    LayoutSFB layout_SFB = ScaleConfig::tile_atom_to_shape_SFB(cute::make_shape(rt_args->m, rt_args->n, rt_args->k, rt_args->l));
+    
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGemm,
       {rt_args->m, rt_args->n, rt_args->k, rt_args->l},
@@ -144,9 +142,10 @@ private:
       stride_A,
       (ElementB *)rt_args->ptr_B,
       stride_B,
-      mma_promotion_interval,
       (ElementBlockScale *)rt_args->d_blockscale_A, // blockscale_tensor_A.device_data(),
+      layout_SFA,
       (ElementBlockScale *)rt_args->d_blockscale_B, // blockscale_tensor_B.device_data()
+      layout_SFB,
       },
       {
         {}, // epilogue.thread
