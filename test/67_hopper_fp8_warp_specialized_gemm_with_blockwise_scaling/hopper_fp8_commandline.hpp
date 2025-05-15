@@ -30,6 +30,7 @@
  **************************************************************************************************/
 
 // Command line options parsing
+template<typename RasterOrderOptions>
 struct Options {
 
   bool help = false;
@@ -43,6 +44,8 @@ struct Options {
   int iterations = 1000;
   int warmup = 1000;
   int m = 1024, n = 512, k = 1024, l = 1;
+  RasterOrderOptions raster;
+  int swizzle;
   float epsilon = 0.02f;
   float non_zero_floor = 1.f;
 
@@ -75,20 +78,20 @@ struct Options {
     cmd.get_cmd_line_argument("epsilon", epsilon);
     cmd.get_cmd_line_argument("non-zero-floor", non_zero_floor);
 
-    // char raster_char;
-    // cmd.get_cmd_line_argument("raster", raster_char);
+    char raster_char;
+    cmd.get_cmd_line_argument("raster", raster_char);
 
-    // if (raster_char == 'N' || raster_char == 'n') {
-    //   raster = RasterOrderOptions::AlongN;
-    // }
-    // else if (raster_char == 'M' || raster_char == 'm') {
-    //   raster = RasterOrderOptions::AlongM;
-    // }
-    // else if (raster_char == 'H' || raster_char == 'h') {
-    //   raster = RasterOrderOptions::Heuristic;
-    // }
+    if (raster_char == 'N' || raster_char == 'n') {
+      raster = RasterOrderOptions::AlongN;
+    }
+    else if (raster_char == 'M' || raster_char == 'm') {
+      raster = RasterOrderOptions::AlongM;
+    }
+    else if (raster_char == 'H' || raster_char == 'h') {
+      raster = RasterOrderOptions::Heuristic;
+    }
 
-    // cmd.get_cmd_line_argument("swizzle", swizzle, 1);
+    cmd.get_cmd_line_argument("swizzle", swizzle, 1);
   }
 
   /// Prints the usage statement.
