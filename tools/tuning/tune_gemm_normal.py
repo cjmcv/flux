@@ -68,19 +68,21 @@ class GemmGroupedBlockScaleFp8Schema:
     impl = "GemmGroupedBlockScaleFp8Impl"
     sub_schema = [Meta.GemmGroupedBlockScaleFp8]
     space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
-    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
+    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor, config: TuningConfig):
         x_list = []
         x_scale_list = []
         y_list = []
         y_scale_list = []
 
-        x, x_scale = per_token_cast_to_fp8(input)
-        y, y_scale = per_block_cast_to_fp8(weight)
+        for i in range(config.G):
+            x, x_scale = per_token_cast_to_fp8(input)
+            y, y_scale = per_block_cast_to_fp8(weight)
 
-        x_list.append(x)
-        x_scale_list.append(x_scale.t().contiguous())
-        y_list.append(y)
-        y_scale_list.append(y_scale.t().contiguous())
+            x_list.append(x)
+            x_scale_list.append(x_scale.t().contiguous())
+            y_list.append(y)
+            y_scale_list.append(y_scale.t().contiguous())
+
         return x_list, x_scale_list, y_list, y_scale_list
         
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
@@ -99,9 +101,14 @@ def str2schema(schema_name):
 
 def gen_tuning_space(schema):
     space: List[TuningConfig] = []
-    space_G = [1]
-    space_M = list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
-    space_NK = [(27648, 5120)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
+    # space_G = [1]
+    # space_M = list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    # space_NK = [(27648, 5120)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
+    
+    space_G = [4, 8]
+    space_M = [2048, 4096] # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_NK = [(576, 7168)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
+    
     space_transpose_weight = [False] # , True
     space_dtype = schema.space_dtype
     space_has_bias = [False]
@@ -207,7 +214,7 @@ def run_ctlop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: Lis
     k = inputs[0].size(1)
     n = weights[0].size(0)
     g = len(inputs)
-
+    # print("groups: ", g)
     outputs = []
     for i in range(0, g):
         outputs.append(torch.empty([m, n], dtype=config.dtypeC, device=inputs[0].device, requires_grad=False))
@@ -227,12 +234,15 @@ def tune_one_config(schema, config: TuningConfig, fp):
     input = torch.rand((config.M, config.K), dtype=torch.bfloat16).cuda()
     weight = torch.rand((config.N, config.K), dtype=torch.bfloat16).cuda()
     # start_time = time.time()
-    x, x_scale, y, y_scale = schema.gen_scale(input.clone(), weight.clone())
-    ref_output = schema.get_ref_output(x, y, x_scale, y_scale)
+
     # print(f"torch compute time: {(time.time() - start_time) * 1000} ms")
     if (isinstance(schema, GemmGroupedBlockScaleFp8Schema)):
+        x, x_scale, y, y_scale = schema.gen_scale(input.clone(), weight.clone(), config)
+        ref_output = schema.get_ref_output(x, y, x_scale, y_scale)
         ctlop_output = run_ctlop_grouped_profiling(schema, x, y, x_scale, y_scale, config, fp)
     else:
+        x, x_scale, y, y_scale = schema.gen_scale(input.clone(), weight.clone())
+        ref_output = schema.get_ref_output(x, y, x_scale, y_scale)
         ctlop_output = run_ctlop_profiling(schema, x, y, x_scale, y_scale, config, fp)
 
     if ref_output is not None:
