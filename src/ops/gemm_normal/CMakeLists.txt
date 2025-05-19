@@ -7,12 +7,6 @@ set(CU_FILES
   ${TUNING_CONFIGS}
 )
 
-# set(LIB_NAME "ctlop_normal_gemm")
-# ctlop_add_op_cu_obj_lib(${LIB_NAME} )
-# set(CTLOP_CUDA_OP_TARGETS ${CTLOP_CUDA_OP_TARGETS})
-# list(APPEND CTLOP_CUDA_OP_TARGETS ${LIB_NAME})
-# set(CTLOP_CUDA_OP_TARGETS ${CTLOP_CUDA_OP_TARGETS} PARENT_SCOPE)
-
 #########################
 file(GLOB THS_FILES ./*.cpp)
 set(CTLOP_THS_OP_FILES ${CTLOP_THS_OP_FILES})
