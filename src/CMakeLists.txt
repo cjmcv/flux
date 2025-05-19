@@ -22,7 +22,7 @@ set(CTLOP_CUDA_OP_TARGETS "") # cu op targets of subdirectory
 set(CTLOP_THS_OP_FILES "") # ths op source files of subdirectory
 
 add_subdirectory(ops/gemm_normal)
-# add_subdirectory(ops/single_gemm)
+add_subdirectory(ops/allreduce_normal)
 message(STATUS "op_targets: ${CTLOP_CUDA_OP_TARGETS}")
 
 set(CTLOP_THS_FILES ${CTLOP_THS_OP_FILES})

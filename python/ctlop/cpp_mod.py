@@ -32,7 +32,16 @@ def _get_ctlop_member(member):
     return getattr(ctlop_mod, member, NotCompiled())
 
 GemmNormal = _get_ctlop_member("GemmNormal")
+helloABC = _get_ctlop_member("helloABC")
+init_custom_ar = _get_ctlop_member("init_custom_ar")
+all_reduce = _get_ctlop_member("all_reduce")
+dispose = _get_ctlop_member("dispose")
+meta_size = _get_ctlop_member("meta_size")
+register_buffer = _get_ctlop_member("register_buffer")
+get_graph_buffer_ipc_meta = _get_ctlop_member("get_graph_buffer_ipc_meta")
+register_graph_buffers = _get_ctlop_member("register_graph_buffers")
 
-__all__ = [
-    "GemmNormal",
-]
+# __all__ = [
+#     "GemmNormal",
+#     "helloABC",
+# ]
