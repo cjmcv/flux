@@ -12,7 +12,7 @@ endfunction()
 #######################################################
 set(CTLOP_THS_OP_FILES "") # ths op source files of subdirectory
 
-# add_subdirectory(ops/gemm_normal)
+add_subdirectory(ops/gemm_normal)
 add_subdirectory(ops/allreduce_normal)
 
 set(CTLOP_THS_FILES ${CTLOP_THS_OP_FILES})

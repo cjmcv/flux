@@ -5,7 +5,7 @@ import socket
 import unittest
 from typing import Any, List, Optional
 
-
+import time
 import torch
 import torch.distributed as dist
 from torch.distributed import ProcessGroup
@@ -23,6 +23,7 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
         init_method=distributed_init_method,
         rank=rank,
         world_size=world_size,
+        timeout=10,
     )
     group = dist.group.WORLD
 
@@ -47,11 +48,14 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
                     inp1_ref = inp1.clone()
                     out1 = torch.empty_like(inp1)
 
-                    ctlop.all_reduce(
-                        custom_ptr, inp1, out1, buffer_ptrs[rank], max_size
-                    )
-
+                    ctlop.all_reduce(custom_ptr, inp1, out1, buffer_ptrs[rank], max_size)
+                    
+                    start_time = time.time()
                     dist.all_reduce(inp1_ref, group=group)
+                    end_time = time.time()
+
+                    communication_time = end_time - start_time
+                    print(f"Communication time: {communication_time:.6f} seconds")
 
                     torch.testing.assert_close(out1, inp1_ref)
 
@@ -66,7 +70,6 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
 
         dist.destroy_process_group(group=group)
 
-
 def get_open_port() -> int:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -76,7 +79,6 @@ def get_open_port() -> int:
         with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
             s.bind(("::1", 0))
             return s.getsockname()[1]
-
 
 def multi_process_parallel(
     world_size: int, test_target: Any, target_args: tuple = ()
@@ -111,7 +113,7 @@ class TestCustomAllReduce(unittest.TestCase):
         1048576,
         2097152,
     ]
-    world_sizes = [1] # [2, 4, 8]
+    world_sizes = [2] # [2, 4, 8]
 
     @staticmethod
     def create_shared_buffer(
