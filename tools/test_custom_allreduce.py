@@ -23,7 +23,6 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
         init_method=distributed_init_method,
         rank=rank,
         world_size=world_size,
-        timeout=10,
     )
     group = dist.group.WORLD
 
@@ -40,6 +39,11 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
         custom_ptr = ctlop.init_custom_ar(meta_ptrs, rank_data, rank, True)
         ctlop.register_buffer(custom_ptr, buffer_ptrs)
 
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        custom_kernel_time = 0
+        nccl_kernel_time = 0
+
         test_loop = 10
         for sz in test_sizes:
             for dtype in [torch.float32, torch.float16, torch.bfloat16]:
@@ -48,16 +52,22 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
                     inp1_ref = inp1.clone()
                     out1 = torch.empty_like(inp1)
 
+                    start_event.record()
                     ctlop.all_reduce(custom_ptr, inp1, out1, buffer_ptrs[rank], max_size)
-                    
-                    start_time = time.time()
-                    dist.all_reduce(inp1_ref, group=group)
-                    end_time = time.time()
+                    end_event.record()
+                    torch.cuda.synchronize()
+                    custom_kernel_time += start_event.elapsed_time(end_event)
 
-                    communication_time = end_time - start_time
-                    print(f"Communication time: {communication_time:.6f} seconds")
+                    start_event.record()
+                    dist.all_reduce(inp1_ref, group=group)
+                    end_event.record()
+                    torch.cuda.synchronize()
+                    nccl_kernel_time += start_event.elapsed_time(end_event)
 
                     torch.testing.assert_close(out1, inp1_ref)
+
+            print(f"custom_kernel_time: {custom_kernel_time:.6f} ms, {sz}")
+            print(f"nccl_kernel_time: {nccl_kernel_time:.6f} ms, {sz}")
 
     finally:
         dist.barrier(group=group)
@@ -90,6 +100,7 @@ def multi_process_parallel(
     for i in range(world_size):
         proc_args = (world_size, i, distributed_init_port) + target_args
         proc = mp.Process(target=test_target, args=proc_args, name=f"Worker-{i}")
+        proc.daemon = True
         proc.start()
         procs.append(proc)
 

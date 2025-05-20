@@ -71,14 +71,14 @@ static int _register_single_gemm_ops [[maybe_unused]] = []() {
           &register_buffer,
           py::arg("_fa"),
           py::arg("fake_ipc_ptrs"));
-    // m.def("get_graph_buffer_ipc_meta",
-    //       &get_graph_buffer_ipc_meta,
-    //       py::arg("_fa"));
-    // m.def("register_graph_buffers",
-    //       &register_graph_buffers,
-    //       py::arg("_fa"),
-    //       py::arg("handles"),
-    //       py::arg("offsets"));
+    m.def("get_graph_buffer_ipc_meta",
+          &get_graph_buffer_ipc_meta,
+          py::arg("_fa"));
+    m.def("register_graph_buffers",
+          &register_graph_buffers,
+          py::arg("_fa"),
+          py::arg("handles"),
+          py::arg("offsets"));
   });
   return 0;
 }();
