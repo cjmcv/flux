@@ -44,25 +44,29 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
         custom_kernel_time = 0
         nccl_kernel_time = 0
 
-        test_loop = 10
+        test_loop = 20
         for sz in test_sizes:
             for dtype in [torch.float32, torch.float16, torch.bfloat16]:
-                for _ in range(test_loop):
+                for loop in range(test_loop):
                     inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
                     inp1_ref = inp1.clone()
                     out1 = torch.empty_like(inp1)
 
-                    start_event.record()
-                    ctlop.all_reduce(custom_ptr, inp1, out1, buffer_ptrs[rank], max_size)
-                    end_event.record()
-                    torch.cuda.synchronize()
-                    custom_kernel_time += start_event.elapsed_time(end_event)
+                    if loop <= 10:
+                        ctlop.all_reduce(custom_ptr, inp1, out1, buffer_ptrs[rank], max_size)
+                        dist.all_reduce(inp1_ref, group=group)
+                    else:
+                        start_event.record()
+                        ctlop.all_reduce(custom_ptr, inp1, out1, buffer_ptrs[rank], max_size)
+                        end_event.record()
+                        torch.cuda.synchronize()
+                        custom_kernel_time += start_event.elapsed_time(end_event)
 
-                    start_event.record()
-                    dist.all_reduce(inp1_ref, group=group)
-                    end_event.record()
-                    torch.cuda.synchronize()
-                    nccl_kernel_time += start_event.elapsed_time(end_event)
+                        start_event.record()
+                        dist.all_reduce(inp1_ref, group=group)
+                        end_event.record()
+                        torch.cuda.synchronize()
+                        nccl_kernel_time += start_event.elapsed_time(end_event)
 
                     torch.testing.assert_close(out1, inp1_ref)
 
@@ -123,6 +127,7 @@ class TestCustomAllReduce(unittest.TestCase):
         524288,
         1048576,
         2097152,
+        58720256,
     ]
     world_sizes = [2] # [2, 4, 8]
 
