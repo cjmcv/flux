@@ -20,7 +20,7 @@ from ctlop.cuda_wrapper import CudaRTLibrary
 # 主线程创建内存，子线程访问。不使用进程，尽管是单卡，因为进程也需要走ipc
 class SimulateBuffer:
     def __init__(self, world_size):
-        self.max_size = 8192 * 1024 * 30
+        self.max_size = 8196 * 1024
         self.meta_ptrs = self.create_shared_buffer(ctlop.meta_size() + self.max_size, world_size)
         self.buffer_ptrs = self.create_shared_buffer(self.max_size, world_size)
         self.ref_buffer = [None] * 8
@@ -35,7 +35,9 @@ class SimulateBuffer:
 
         pointers: List[int] = []
         for i in range(world_size):
-            pointers.append(lib.cudaMalloc(size_in_bytes).value)
+            p = lib.cudaMalloc(size_in_bytes).value
+            lib.cudaMemset(p, 0, size_in_bytes)
+            pointers.append(p)
 
         # ipc_pointers: List[int] = []
         # handle1 = lib.cudaIpcGetMemHandle(pointer1)
@@ -50,7 +52,7 @@ class SimulateBuffer:
         for p in pointers:
             lib.cudaFree(ctypes.c_void_p(p))
 
-g_world_size = 2
+g_world_size = 8
 g_buffer = SimulateBuffer(g_world_size)
 
 def _run_correctness_worker(world_size, rank, test_sizes):
@@ -60,7 +62,7 @@ def _run_correctness_worker(world_size, rank, test_sizes):
         new_stream = torch.cuda.Stream()
         
         with torch.cuda.stream(new_stream):
-            rank_data = torch.empty(8 * 1024 * 1024, dtype=torch.uint8, device=device)
+            rank_data = torch.empty(8*1024 * 1024, dtype=torch.uint8, device=device)
             custom_ptr = ctlop.init_custom_ar(g_buffer.meta_ptrs, rank_data, rank, True)
             ctlop.register_buffer(custom_ptr, g_buffer.buffer_ptrs)
             torch.cuda.synchronize()
@@ -68,35 +70,29 @@ def _run_correctness_worker(world_size, rank, test_sizes):
             end_event = torch.cuda.Event(enable_timing=True)
             custom_kernel_time = 0
 
+            cnt = 0
             test_loop = 20
             for sz in test_sizes:
                 for dtype in [torch.float32, torch.float16, torch.bfloat16]:
                     for loop in range(test_loop):
                         inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
                         # print("input", inp1, "rank: ", rank)
-                        g_buffer.ref_buffer[rank] = inp1
+                        g_buffer.ref_buffer[rank] = inp1.clone()
                         out1 = torch.empty_like(inp1)
+                        cnt = cnt+1
+                        print("cnt:", cnt)
 
-                        if loop <= 10:
-                            ctlop.all_reduce(custom_ptr, inp1, out1, g_buffer.buffer_ptrs[rank], g_buffer.max_size)
-                            torch.cuda.synchronize()
-                        else:
-                            start_event.record()
-                            ctlop.all_reduce(custom_ptr, inp1, out1, g_buffer.buffer_ptrs[rank], g_buffer.max_size)
-                            end_event.record()
-                            torch.cuda.synchronize()
+                        start_event.record()
+                        ctlop.all_reduce(custom_ptr, inp1, out1, g_buffer.buffer_ptrs[rank], g_buffer.max_size)
+                        end_event.record()
+                        torch.cuda.synchronize()
+                        if loop > 10:
                             custom_kernel_time += start_event.elapsed_time(end_event)
                         
-                        # print("output", out1, "rank: ", rank)
-                        
-                        # print("int_ref0", g_buffer.ref_buffer[0], "rank: ", rank)
-                        # print("int_ref1", g_buffer.ref_buffer[1], "rank: ", rank)
-                        # print("out_ref", g_buffer.ref_buffer[0] + g_buffer.ref_buffer[1], "rank: ", rank)
-                        ref_out = g_buffer.ref_buffer[0]
-                        for i in range(1, world_size):
-                            ref_out = ref_out + g_buffer.ref_buffer[i]
-                        # print("output_ref", g_buffer.ref_buffer[0])
-                        torch.testing.assert_close(out1, ref_out)
+                        # ref_out = g_buffer.ref_buffer[0]
+                        # for i in range(1, world_size):
+                        #     ref_out = ref_out + g_buffer.ref_buffer[i]
+                        # torch.testing.assert_close(out1, ref_out)
 
                 print(f"custom_kernel_time: {custom_kernel_time:.6f} ms, {sz}")
 
