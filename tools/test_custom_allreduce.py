@@ -28,7 +28,7 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
 
     try:
         device = torch.device(f"cuda:{rank}")
-        max_size = 8192 * 1024
+        max_size = 8192 * 1024 * 30
         meta_ptrs = TestCustomAllReduce.create_shared_buffer(
             ctlop.meta_size() + max_size, group=group
         )
@@ -85,6 +85,7 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
         dist.destroy_process_group(group=group)
 
 def get_open_port() -> int:
+    # return 12345
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("127.0.0.1", 0))

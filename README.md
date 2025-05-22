@@ -13,6 +13,8 @@ git clone
 ./build.sh --arch 89 --jobs 6
 # For Hopper(sm90) GPU
 ./build.sh --arch 90 --jobs 6
+
+compute-sanitizer --tool memcheck python tools/test*.py
 ```
 
 #### Dependencies

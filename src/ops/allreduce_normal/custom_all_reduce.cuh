@@ -16,7 +16,6 @@ typedef __hip_bfloat16 nv_bfloat16;
 #include <map>
 #include <unordered_map>
 #include <vector>
-
 namespace vllm {
 #define CUDACHECK(cmd)                                              \
   do {                                                              \
@@ -199,12 +198,23 @@ template <int ngpus>
 DINLINE void barrier_at_start(const RankSignals& sg, Signal* self_sg,
                               int rank) {
   uint32_t flag = self_sg->_flag[blockIdx.x] + 1;
+  // printf("self_sg: %p - (%p, %p), rank %d: block: %d, flag: %d\n", self_sg, sg.signals[0], sg.signals[1], rank, blockIdx.x, flag);
   if (threadIdx.x < ngpus) {
     auto peer_counter_ptr = &sg.signals[threadIdx.x]->start[blockIdx.x][rank];
     auto self_counter_ptr = &self_sg->start[blockIdx.x][threadIdx.x];
+    // printf("a<%d> sg.signals: [%d][%d], [%d][%d] => [%p][%p], [%p][%p]\n", rank, sg.signals[0]->start[blockIdx.x][0], sg.signals[1]->start[blockIdx.x][0], sg.signals[0]->start[blockIdx.x][1], sg.signals[1]->start[blockIdx.x][1],
+    //                                                                             &sg.signals[0]->start[blockIdx.x][0], &sg.signals[1]->start[blockIdx.x][0], &sg.signals[0]->start[blockIdx.x][1], &sg.signals[1]->start[blockIdx.x][1]);
+    // printf("a<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[blockIdx.x][0], self_sg->start[blockIdx.x][1], &self_sg->start[blockIdx.x][0], &self_sg->start[blockIdx.x][1]);
+    // printf("flag: %d. (%d[tid%d][bid%d][rank%d], %d[bid%d][tid%d])", flag, *peer_counter_ptr, threadIdx.x, blockIdx.x, rank, *self_counter_ptr, blockIdx.x, threadIdx.x);
     // Write the expected counter value to peer and wait for correct value
     // from peer.
+    // printf("a(%d vs %d)\n", *peer_counter_ptr, flag);
     st_flag_volatile(peer_counter_ptr, flag);
+    // printf("b(%d vs %d)\n", *peer_counter_ptr, flag);
+    // printf("b<%d> sg.signals: [%d][%d], [%d][%d] => [%p][%p], [%p][%p]\n", rank, sg.signals[0]->start[blockIdx.x][0], sg.signals[1]->start[blockIdx.x][0], sg.signals[0]->start[blockIdx.x][1], sg.signals[1]->start[blockIdx.x][1],
+    //   &sg.signals[0]->start[blockIdx.x][0], &sg.signals[1]->start[blockIdx.x][0], &sg.signals[0]->start[blockIdx.x][1], &sg.signals[1]->start[blockIdx.x][1]);
+    // printf("b<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[blockIdx.x][0], self_sg->start[blockIdx.x][1], &self_sg->start[blockIdx.x][0], &self_sg->start[blockIdx.x][1]);
+
     while (ld_flag_volatile(self_counter_ptr) != flag);
   }
   __syncthreads();
@@ -536,7 +546,7 @@ class CustomAllreduce {
       throw std::runtime_error("max supported block limit is " +
                                std::to_string(kMaxBlocks) + ". Got " +
                                std::to_string(block_limit));
-
+    // printf("stream: %p\n", stream);
     RankData* ptrs;
     cudaStreamCaptureStatus status;
     CUDACHECK(cudaStreamIsCapturing(stream, &status));
@@ -552,7 +562,6 @@ class CustomAllreduce {
             " is not registered!");
       ptrs = it->second;
     }
-
     size /= d;
     auto bytes = size * sizeof(typename packed_t<T>::P);
     int blocks = std::min(block_limit, (size + threads - 1) / threads);
