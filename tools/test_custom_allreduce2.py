@@ -15,7 +15,7 @@ import torch.distributed as dist
 from ctlop.ops.custom_all_reduce import CustomAllreduce
 # from ctlop.cuda_wrapper import CudaRTLibrary
 
-
+TEST_CUDA_GRAPH = 1
 def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes):
     device = torch.device(f"cuda:{rank}")
     torch.cuda.set_device(device)
@@ -43,46 +43,58 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
             nccl_kernel_time = 0
             for dtype in [torch.bfloat16]: # torch.float32, torch.float16, 
                 for loop in range(test_loop):
-                    inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
-                    inp1_ref = inp1.clone()
-
-                    if loop <= 10:
-                        out1 = cop.custom_all_reduce(inp1)
-                        dist.all_reduce(inp1_ref, group=group)
+                    if TEST_CUDA_GRAPH:
+                        stream = torch.cuda.Stream()
+                        g = torch.cuda.CUDAGraph()
+                        with torch.cuda.stream(stream):
+                            with torch.cuda.graph(g):
+                                inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
+                                inp1_ref = inp1.clone()
+                                out1 = cop.custom_all_reduce(inp1)
+                        torch.cuda.synchronize(stream)
+                        g.replay()
+                        torch.testing.assert_close(out1, inp1_ref)
                     else:
-                        start_event.record()
-                        out1 = cop.custom_all_reduce(inp1)
-                        end_event.record()
-                        torch.cuda.synchronize()
-                        custom_kernel_time += start_event.elapsed_time(end_event)
+                        inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
+                        inp1_ref = inp1.clone()
 
-                        start_event.record()
-                        dist.all_reduce(inp1_ref, group=group)
-                        end_event.record()
-                        torch.cuda.synchronize()
-                        nccl_kernel_time += start_event.elapsed_time(end_event)
+                        if loop <= 10:
+                            out1 = cop.custom_all_reduce(inp1)
+                            dist.all_reduce(inp1_ref, group=group)
+                        else:
+                            start_event.record()
+                            out1 = cop.custom_all_reduce(inp1)
+                            end_event.record()
+                            torch.cuda.synchronize()
+                            custom_kernel_time += start_event.elapsed_time(end_event)
 
-                    torch.testing.assert_close(out1, inp1_ref)
+                            start_event.record()
+                            dist.all_reduce(inp1_ref, group=group)
+                            end_event.record()
+                            torch.cuda.synchronize()
+                            nccl_kernel_time += start_event.elapsed_time(end_event)
+
+                        torch.testing.assert_close(out1, inp1_ref)
 
             custom_perf.append(custom_kernel_time)
             nccl_perf.append(nccl_kernel_time)
             print(f"custom_kernel_time: {custom_kernel_time:.6f} ms, {sz}")
             print(f"nccl_kernel_time: {nccl_kernel_time:.6f} ms, {sz}")
 
-            # plot
-            x_ticks = range(len(test_sizes))
-            plt.plot(x_ticks, custom_perf, label='custom', marker='o', markersize=3)
-            plt.plot(x_ticks, nccl_perf, label='nccl', marker='s', markersize=3)
-            plt.xticks(x_ticks, test_sizes)
+        # plot
+        x_ticks = range(len(test_sizes))
+        plt.plot(x_ticks, custom_perf, label='custom', marker='o', markersize=3)
+        plt.plot(x_ticks, nccl_perf, label='nccl', marker='s', markersize=3)
+        plt.xticks(x_ticks, test_sizes)
 
-            plt.title(f'allreduce-WS-{world_size}-rank-{rank}.png')
-            plt.xlabel('size')
-            plt.ylabel('ms')
+        plt.title(f'allreduce-WS-{world_size}-rank-{rank}.png')
+        plt.xlabel('size')
+        plt.ylabel('ms')
 
-            plt.legend()
-            plt.grid(True)
+        plt.legend()
+        plt.grid(True)
 
-            plt.savefig('allreduce-WS-{0}-rank-{1}.png'.format(world_size, rank))
+        plt.savefig('allreduce-WS-{0}-rank-{1}.png'.format(world_size, rank))
 
     finally:
         dist.barrier(group=group)
