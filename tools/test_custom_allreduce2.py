@@ -45,25 +45,19 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
             for dtype in [torch.bfloat16]: # torch.float32, torch.float16, 
                 for loop in range(test_loop):
                     if TEST_CUDA_GRAPH:
-                        stream = torch.cuda.Stream()
-                        g = torch.cuda.CUDAGraph()
-
-
                         inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
                         inp1_ref = inp1.clone()
                         torch.cuda.synchronize()
+                        
+                        stream = torch.cuda.Stream()
                         graph = torch.cuda.CUDAGraph()
                         with torch.cuda.graph(
                             graph, stream=stream
                         ):
-                        with torch.cuda.stream(stream):
-                            with torch.cuda.graph(g):
-                                
-                                
-                                out1 = cop.custom_all_reduce(inp1)
-                                dist.all_reduce(inp1_ref, group=group)
-                        torch.cuda.synchronize(stream)
-                        g.replay()
+                            out1 = cop.custom_all_reduce(inp1)
+                            dist.all_reduce(inp1_ref, group=group)
+
+                        graph.replay()
                         torch.testing.assert_close(out1, inp1_ref)
                     else:
                         inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
