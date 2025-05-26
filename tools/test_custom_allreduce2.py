@@ -43,23 +43,40 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
             custom_kernel_time = 0
             nccl_kernel_time = 0
             for dtype in [torch.bfloat16]: # torch.float32, torch.float16, 
-                for loop in range(test_loop):
-                    if TEST_CUDA_GRAPH:
-                        inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
-                        inp1_ref = inp1.clone()
-                        torch.cuda.synchronize()
-                        
-                        stream = torch.cuda.Stream()
-                        graph = torch.cuda.CUDAGraph()
-                        with torch.cuda.graph(
-                            graph, stream=stream
-                        ):
-                            out1 = cop.custom_all_reduce(inp1)
-                            dist.all_reduce(inp1_ref, group=group)
+                if TEST_CUDA_GRAPH:
+                    
+                    inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
+                    torch.cuda.synchronize()
 
-                        graph.replay()
+                    stream = torch.cuda.Stream()
+                    graph = torch.cuda.CUDAGraph()
+                    with torch.cuda.stream(stream), cop.capture():
+                        with torch.cuda.graph(graph):
+                            out1 = cop.custom_all_reduce(inp1)
+
+                    for loop in range(test_loop):
+                        if loop <= 10:
+                            graph.replay()
+                            inp1_ref = inp1.clone() 
+                            dist.all_reduce(inp1_ref, group=group)
+                        else:
+                            start_event.record()
+                            graph.replay()
+                            end_event.record()
+                            torch.cuda.synchronize()
+                            custom_kernel_time += start_event.elapsed_time(end_event)
+
+                            inp1_ref = inp1.clone()
+                            
+                            start_event.record()
+                            dist.all_reduce(inp1_ref, group=group)
+                            end_event.record()
+                            torch.cuda.synchronize()
+                            nccl_kernel_time += start_event.elapsed_time(end_event)
+                        
                         torch.testing.assert_close(out1, inp1_ref)
-                    else:
+                else:
+                    for loop in range(test_loop):
                         inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
                         inp1_ref = inp1.clone()
 
