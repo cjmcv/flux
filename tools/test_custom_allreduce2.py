@@ -16,6 +16,7 @@ from ctlop.ops.custom_all_reduce import CustomAllreduce
 # from ctlop.cuda_wrapper import CudaRTLibrary
 
 TEST_CUDA_GRAPH = 1
+
 def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes):
     device = torch.device(f"cuda:{rank}")
     torch.cuda.set_device(device)
@@ -46,11 +47,21 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
                     if TEST_CUDA_GRAPH:
                         stream = torch.cuda.Stream()
                         g = torch.cuda.CUDAGraph()
+
+
+                        inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
+                        inp1_ref = inp1.clone()
+                        torch.cuda.synchronize()
+                        graph = torch.cuda.CUDAGraph()
+                        with torch.cuda.graph(
+                            graph, stream=stream
+                        ):
                         with torch.cuda.stream(stream):
                             with torch.cuda.graph(g):
-                                inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
-                                inp1_ref = inp1.clone()
+                                
+                                
                                 out1 = cop.custom_all_reduce(inp1)
+                                dist.all_reduce(inp1_ref, group=group)
                         torch.cuda.synchronize(stream)
                         g.replay()
                         torch.testing.assert_close(out1, inp1_ref)
