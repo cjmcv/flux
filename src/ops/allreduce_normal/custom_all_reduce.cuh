@@ -215,10 +215,10 @@ DINLINE void barrier_at_start(const RankSignals& sg, Signal* self_sg,
     //   &sg.signals[0]->start[blockIdx.x][0], &sg.signals[1]->start[blockIdx.x][0], &sg.signals[0]->start[blockIdx.x][1], &sg.signals[1]->start[blockIdx.x][1]);
     // printf("b<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[blockIdx.x][0], self_sg->start[blockIdx.x][1], &self_sg->start[blockIdx.x][0], &self_sg->start[blockIdx.x][1]);
 
-    // while (ld_flag_volatile(self_counter_ptr) != flag);
-    while (ld_flag_volatile(self_counter_ptr) != flag) {
-      printf(".");
-    }
+    while (ld_flag_volatile(self_counter_ptr) != flag);
+    // while (ld_flag_volatile(self_counter_ptr) != flag) {
+    //   printf(".");
+    // }
   }
   __syncthreads();
   // use one thread to update flag

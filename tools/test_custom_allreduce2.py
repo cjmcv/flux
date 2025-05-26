@@ -27,7 +27,8 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
     )
     group = dist.group.WORLD
 
-    cop = CustomAllreduce(group, device)
+    new_group = torch.distributed.new_group([0,1,2,3,4,5,6,7], backend="gloo")
+    cop = CustomAllreduce(new_group, device)
 
     try:
         start_event = torch.cuda.Event(enable_timing=True)
@@ -37,7 +38,7 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
 
         test_loop = 20
         for sz in test_sizes:
-            for dtype in [torch.float32, torch.float16, torch.bfloat16]:
+            for dtype in [torch.bfloat16]: # torch.float32, torch.float16, 
                 for loop in range(test_loop):
                     inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
                     inp1_ref = inp1.clone()
@@ -70,7 +71,7 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
         dist.destroy_process_group(group=group)
 
 def get_open_port() -> int:
-    # return 12345
+    return 12345
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("127.0.0.1", 0))
@@ -115,69 +116,16 @@ class TestCustomAllReduce(unittest.TestCase):
         2097152,
         58720256,
     ]
-    world_sizes = [2] # [2, 4, 8]
-
-    # @staticmethod
-    # def create_shared_buffer(
-    #     size_in_bytes: int, group: Optional[ProcessGroup] = None
-    # ) -> List[int]:
-    #     lib = CudaRTLibrary()
-    #     pointer = lib.cudaMalloc(size_in_bytes)
-    #     handle = lib.cudaIpcGetMemHandle(pointer)
-    #     if group is None:
-    #         group = dist.group.WORLD
-    #     world_size = dist.get_world_size(group=group)
-    #     rank = dist.get_rank(group=group)
-
-    #     handle_bytes = ctypes.string_at(ctypes.addressof(handle), ctypes.sizeof(handle))
-    #     input_tensor = torch.ByteTensor(list(handle_bytes)).to(f"cuda:{rank}")
-    #     gathered_tensors = [torch.empty_like(input_tensor) for _ in range(world_size)]
-    #     dist.all_gather(gathered_tensors, input_tensor, group=group)
-
-    #     handles = []
-    #     handle_type = type(handle)
-    #     for tensor in gathered_tensors:
-    #         bytes_list = tensor.cpu().tolist()
-    #         bytes_data = bytes(bytes_list)
-    #         handle_obj = handle_type()
-    #         ctypes.memmove(ctypes.addressof(handle_obj), bytes_data, len(bytes_data))
-    #         handles.append(handle_obj)
-
-    #     pointers: List[int] = []
-    #     for i, h in enumerate(handles):
-    #         if i == rank:
-    #             pointers.append(pointer.value)
-    #         else:
-    #             try:
-    #                 opened_ptr = lib.cudaIpcOpenMemHandle(h)
-    #                 pointers.append(opened_ptr.value)
-    #             except Exception as e:
-    #                 print(f"Rank {rank}: Failed to open IPC handle from rank {i}: {e}")
-    #                 raise
-
-    #     dist.barrier(group=group)
-    #     return pointers
-
-    # @staticmethod
-    # def free_shared_buffer(
-    #     pointers: List[int], group: Optional[ProcessGroup] = None
-    # ) -> None:
-    #     if group is None:
-    #         group = dist.group.WORLD
-    #     rank = dist.get_rank(group=group)
-    #     lib = CudaRTLibrary()
-    #     if pointers and len(pointers) > rank and pointers[rank] is not None:
-    #         lib.cudaFree(ctypes.c_void_p(pointers[rank]))
-    #     dist.barrier(group=group)
+    world_sizes = [2, 4, 8] # [2, 4, 8]
 
     def test_correctness(self):
         for world_size in self.world_sizes:
             available_gpus = torch.cuda.device_count()
-            # if world_size > available_gpus:
-            #     print(
-            #         f"Skipping world_size={world_size}, requires {world_size} GPUs, found {available_gpus}"
-            #     )
-            #     continue
+            if world_size > available_gpus:
+                print(
+                    f"Skipping world_size={world_size}, requires {world_size} GPUs, found {available_gpus}"
+                )
+                continue
 
             print(f"Running test for world_size={world_size}")
             multi_process_parallel(

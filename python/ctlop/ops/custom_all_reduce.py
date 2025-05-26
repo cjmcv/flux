@@ -13,6 +13,7 @@ from torch.distributed import ProcessGroup
 from typing_extensions import ParamSpec
 
 import ctlop
+from ctlop.cuda_wrapper import CudaRTLibrary
 logger = logging.getLogger(__name__)
 
 try:
@@ -85,7 +86,7 @@ def is_weak_contiguous(inp: torch.Tensor):
 
 class CustomAllreduce:
     _SUPPORTED_WORLD_SIZES = [2, 4, 6, 8]
-    _MAX_CAR_SIZE = 8192 * 1024
+    _MAX_CAR_SIZE = 1024 * 1024 * 115
 
     # max_size: max supported allreduce size
     def __init__(
@@ -222,7 +223,7 @@ class CustomAllreduce:
         representing the buffer on all processes in the group.
         """
         # <NT> 申请显存，并使用cudaIpcGetMemHandle将该显存设置为多GPU共享，得到操作这块共享内存的句柄handle
-        lib = ctlop.CudaRTLibrary()
+        lib = CudaRTLibrary()
         pointer = lib.cudaMalloc(size_in_bytes)
         handle = lib.cudaIpcGetMemHandle(pointer)
         world_size = dist.get_world_size(group=group)
@@ -248,7 +249,7 @@ class CustomAllreduce:
         pointers: List[int], group: Optional[ProcessGroup] = None
     ) -> None:
         rank = dist.get_rank(group=group)
-        lib = ctlop.CudaRTLibrary()
+        lib = CudaRTLibrary()
         lib.cudaFree(ctypes.c_void_p(pointers[rank]))
 
     @contextmanager
