@@ -52,7 +52,7 @@ class SimulateBuffer:
         for p in pointers:
             lib.cudaFree(ctypes.c_void_p(p))
 
-g_world_size = 8
+g_world_size = 4
 g_buffer = SimulateBuffer(g_world_size)
 
 def _run_correctness_worker(world_size, rank, test_sizes):
@@ -80,7 +80,7 @@ def _run_correctness_worker(world_size, rank, test_sizes):
                         g_buffer.ref_buffer[rank] = inp1.clone()
                         out1 = torch.empty_like(inp1)
                         cnt = cnt+1
-                        print("cnt:", cnt)
+                        print(">>", end='')
 
                         start_event.record()
                         ctlop.all_reduce(custom_ptr, inp1, out1, g_buffer.buffer_ptrs[rank], g_buffer.max_size)

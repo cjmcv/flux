@@ -101,8 +101,8 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes,
 
             custom_perf.append(custom_kernel_time)
             nccl_perf.append(nccl_kernel_time)
-            print(f"custom_kernel_time: {custom_kernel_time:.6f} ms, {sz}")
-            print(f"nccl_kernel_time: {nccl_kernel_time:.6f} ms, {sz}")
+            print(f"custom_kernel_time: {custom_kernel_time:.6f} ms, {sz}, rank{rank}")
+            print(f"nccl_kernel_time: {nccl_kernel_time:.6f} ms, {sz}, rank{rank}")
 
         # plot
         x_ticks = range(len(test_sizes))

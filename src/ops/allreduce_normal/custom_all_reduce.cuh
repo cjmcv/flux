@@ -302,12 +302,18 @@ DINLINE void barrier_at_end(const RankSignals& sg, Signal* self_sg, int rank) {
 
 template <typename P, int ngpus, typename A>
 DINLINE P packed_reduce(const P* ptrs[], int idx) {
-  A tmp = upcast(ptrs[0][idx]);
+//   A tmp = upcast(ptrs[0][idx]);
+// #pragma unroll
+//   for (int i = 1; i < ngpus; i++) {
+    // packed_assign_add(tmp, upcast(ptrs[i][idx]));
+//   }
+//   return downcast<P>(tmp);
+  P tmp = ptrs[0][idx];
 #pragma unroll
   for (int i = 1; i < ngpus; i++) {
-    packed_assign_add(tmp, upcast(ptrs[i][idx]));
+    packed_assign_add(tmp, ptrs[i][idx]);
   }
-  return downcast<P>(tmp);
+  return tmp;
 }
 
 template <typename T, int ngpus>
