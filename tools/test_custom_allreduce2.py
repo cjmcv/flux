@@ -17,7 +17,7 @@ from ctlop.ops.custom_all_reduce import CustomAllreduce
 
 TEST_CUDA_GRAPH = 1
 
-def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes):
+def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes, param_size):
     device = torch.device(f"cuda:{rank}")
     torch.cuda.set_device(device)
     distributed_init_method = f"tcp://localhost:{distributed_init_port}"
@@ -38,7 +38,8 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
 
         custom_perf = []
         nccl_perf = []
-        test_loop = 20
+        test_loop = 200
+        warmup_loop = 50
         for sz in test_sizes:
             custom_kernel_time = 0
             nccl_kernel_time = 0
@@ -55,7 +56,7 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
                             out1 = cop.custom_all_reduce(inp1)
 
                     for loop in range(test_loop):
-                        if loop <= 10:
+                        if loop <= warmup_loop:
                             graph.replay()
                             inp1_ref = inp1.clone() 
                             dist.all_reduce(inp1_ref, group=group)
@@ -67,7 +68,7 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
                             custom_kernel_time += start_event.elapsed_time(end_event)
 
                             inp1_ref = inp1.clone()
-                            
+
                             start_event.record()
                             dist.all_reduce(inp1_ref, group=group)
                             end_event.record()
@@ -80,7 +81,7 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
                         inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
                         inp1_ref = inp1.clone()
 
-                        if loop <= 10:
+                        if loop <= warmup_loop:
                             out1 = cop.custom_all_reduce(inp1)
                             dist.all_reduce(inp1_ref, group=group)
                         else:
@@ -107,16 +108,18 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes)
         x_ticks = range(len(test_sizes))
         plt.plot(x_ticks, custom_perf, label='custom', marker='o', markersize=3)
         plt.plot(x_ticks, nccl_perf, label='nccl', marker='s', markersize=3)
-        plt.xticks(x_ticks, test_sizes)
 
-        plt.title(f'allreduce-WS-{world_size}-rank-{rank}.png')
-        plt.xlabel('size')
+        norm_test_sizes = [x // param_size for x in test_sizes]
+        plt.xticks(x_ticks, norm_test_sizes)
+
+        plt.title(f'allreduce-WS-{world_size}-rank-{rank}-graph-{TEST_CUDA_GRAPH}.png')
+        plt.xlabel(f'size*{param_size}')
         plt.ylabel('ms')
 
         plt.legend()
         plt.grid(True)
 
-        plt.savefig('allreduce-WS-{0}-rank-{1}.png'.format(world_size, rank))
+        plt.savefig('allreduce-WS-{0}-rank-{1}-graph-{2}.png'.format(world_size, rank, TEST_CUDA_GRAPH))
 
     finally:
         dist.barrier(group=group)
@@ -157,18 +160,30 @@ def multi_process_parallel(
 
 
 class TestCustomAllReduce(unittest.TestCase):
+    param_size = 7168
     test_sizes = [
-        512,
-        2560,
-        4096,
-        5120,
-        7680,
-        32768,
-        262144,
-        524288,
-        1048576,
-        2097152,
-        58720256,
+        1 * param_size,
+        10 * param_size,
+        20 * param_size,
+        40 * param_size,
+        80 * param_size,
+        160 * param_size,
+        500 * param_size,
+        1000 * param_size,
+        2000 * param_size,
+        4000 * param_size,
+        8192 * param_size,
+        # 512,
+        # 2560,
+        # 4096,
+        # 5120,
+        # 7680,
+        # 32768,
+        # 262144,
+        # 524288,
+        # 1048576,
+        # 2097152,
+        # 58720256,
     ]
     world_sizes = [2, 4, 8]
 
@@ -183,7 +198,7 @@ class TestCustomAllReduce(unittest.TestCase):
 
             print(f"Running test for world_size={world_size}")
             multi_process_parallel(
-                world_size, _run_correctness_worker, target_args=(self.test_sizes,)
+                world_size, _run_correctness_worker, target_args=(self.test_sizes, self.param_size)
             )
             print(f"custom allreduce tp = {world_size}: OK")
 

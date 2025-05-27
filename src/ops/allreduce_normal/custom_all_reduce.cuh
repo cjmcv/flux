@@ -1,4 +1,7 @@
 // Adapted from https://github.com/vllm-project/vllm/blob/v0.8.2/csrc/custom_all_reduce.cuh
+// 1) cross_device_reduce_1stage -> barrier_at_end
+// 2) kMaxBlocks + defaultBlockLimit
+// 3) 
 #pragma once
 
 #include <cuda.h>
