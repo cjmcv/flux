@@ -340,60 +340,60 @@ DINLINE P* get_tmp_buf(Signal* sg) {
 }
 
 
-__global__ void __launch_bounds__(512, 1)
-  cross_device_reduce_2stage_t8_bf16(RankData* _dp, RankSignals sg, Signal* self_sg,
-                                     nv_bfloat16* __restrict__ result, int rank, int size) {
-  const int ngpus = 8;
-  int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  int stride = gridDim.x * blockDim.x;
-  using P = array_t<nv_bfloat16, 8>;
-  int part = size / ngpus;
-  int start = rank * part;
-  int end = rank == ngpus - 1 ? size : start + part;
-  int largest_part = part + size % ngpus;
-  const P* ptrs[ngpus];
-  P* tmps[ngpus];
-#pragma unroll
-  for (int i = 0; i < ngpus; i++) {
-    int target = (rank + i) % ngpus;
-    ptrs[i] = (const P*)_dp->ptrs[target];
-    tmps[i] = get_tmp_buf<P>(sg.signals[target]);
-  }
-  auto tmp_out = tmps[0];
-  barrier_at_start<ngpus>(sg, self_sg, rank);
+// __global__ void __launch_bounds__(512, 1)
+//   cross_device_reduce_2stage_t8_bf16(RankData* _dp, RankSignals sg, Signal* self_sg,
+//                                      nv_bfloat16* __restrict__ result, int rank, int size) {
+//   const int ngpus = 8;
+//   int tid = blockIdx.x * blockDim.x + threadIdx.x;
+//   int stride = gridDim.x * blockDim.x;
+//   using P = array_t<nv_bfloat16, 8>;
+//   int part = size / ngpus;
+//   int start = rank * part;
+//   int end = rank == ngpus - 1 ? size : start + part;
+//   int largest_part = part + size % ngpus;
+//   const P* ptrs[ngpus];
+//   P* tmps[ngpus];
+// #pragma unroll
+//   for (int i = 0; i < ngpus; i++) {
+//     int target = (rank + i) % ngpus;
+//     ptrs[i] = (const P*)_dp->ptrs[target];
+//     tmps[i] = get_tmp_buf<P>(sg.signals[target]);
+//   }
+//   auto tmp_out = tmps[0];
+//   barrier_at_start<ngpus>(sg, self_sg, rank);
 
-  // stage 1: reduce scatter
-  for (int idx = start + tid; idx < end; idx += stride) {
-    array_t<nv_bfloat16, 8> tmp0, tmp1, tmp2, tmp3;
-    for (int i = 0; i < 8; i++) {
-      tmp0.data[i] = __hadd(ptrs[0][idx].data[i], ptrs[1][idx].data[i]);
-      tmp1.data[i] = __hadd(ptrs[2][idx].data[i], ptrs[3][idx].data[i]);
-      tmp2.data[i] = __hadd(ptrs[4][idx].data[i], ptrs[5][idx].data[i]);
-      tmp3.data[i] = __hadd(ptrs[6][idx].data[i], ptrs[7][idx].data[i]);
-    }
-    for (int i = 0; i < 8; i++) {
-      tmp_out[idx - start].data[i] = __hadd(__hadd(tmp0.data[i], tmp1.data[i]), __hadd(tmp2.data[i], tmp3.data[i]));
-    }
-  }
-  barrier_at_end<ngpus>(sg, self_sg, rank);
+//   // stage 1: reduce scatter
+//   for (int idx = start + tid; idx < end; idx += stride) {
+//     array_t<nv_bfloat16, 8> tmp0, tmp1, tmp2, tmp3;
+//     for (int i = 0; i < 8; i++) {
+//       tmp0.data[i] = __hadd(ptrs[0][idx].data[i], ptrs[1][idx].data[i]);
+//       tmp1.data[i] = __hadd(ptrs[2][idx].data[i], ptrs[3][idx].data[i]);
+//       tmp2.data[i] = __hadd(ptrs[4][idx].data[i], ptrs[5][idx].data[i]);
+//       tmp3.data[i] = __hadd(ptrs[6][idx].data[i], ptrs[7][idx].data[i]);
+//     }
+//     for (int i = 0; i < 8; i++) {
+//       tmp_out[idx - start].data[i] = __hadd(__hadd(tmp0.data[i], tmp1.data[i]), __hadd(tmp2.data[i], tmp3.data[i]));
+//     }
+//   }
+//   barrier_at_end<ngpus>(sg, self_sg, rank);
 
-  // stage 2: allgather. Note: it's important to match the tid between
-  // the two stages, because visibility across devices is only guaranteed
-  // between threads that have the same tid. If thread i computes the sum of
-  // start + i in the first stage, then thread i also gathers start + i from
-  // all ranks.
+//   // stage 2: allgather. Note: it's important to match the tid between
+//   // the two stages, because visibility across devices is only guaranteed
+//   // between threads that have the same tid. If thread i computes the sum of
+//   // start + i in the first stage, then thread i also gathers start + i from
+//   // all ranks.
 
-  for (int idx = tid; idx < largest_part; idx += stride) {
-#pragma unroll
-    for (int i = 0; i < ngpus; i++) {
-      int gather_from_rank = ((rank + i) % ngpus);
-      if (gather_from_rank == ngpus - 1 || idx < part) {
-        int dst_idx = gather_from_rank * part + idx;
-        ((P*)result)[dst_idx] = tmps[i][idx];
-      }
-    }
-  }
-}
+//   for (int idx = tid; idx < largest_part; idx += stride) {
+// #pragma unroll
+//     for (int i = 0; i < ngpus; i++) {
+//       int gather_from_rank = ((rank + i) % ngpus);
+//       if (gather_from_rank == ngpus - 1 || idx < part) {
+//         int dst_idx = gather_from_rank * part + idx;
+//         ((P*)result)[dst_idx] = tmps[i][idx];
+//       }
+//     }
+//   }
+// }
 
 template <typename T, int ngpus>
 __global__ void __launch_bounds__(512, 1)
@@ -633,13 +633,13 @@ class CustomAllreduce {
     size /= d;
     auto bytes = size * sizeof(typename packed_t<T>::P);
     int blocks = std::min(block_limit, (size + threads - 1) / threads);
-    if (world_size_ == 8) {
-      nv_bfloat16 *out = (nv_bfloat16 *)output;
-      cross_device_reduce_2stage_t8_bf16<<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, out, rank_, size);
+    // if (world_size_ == 8) {
+    //   nv_bfloat16 *out = (nv_bfloat16 *)output;
+    //   cross_device_reduce_2stage_t8_bf16<<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, out, rank_, size);
 
-      // cross_device_reduce_2stage<T, 8><<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, output, rank_, size);
-      return;
-    }
+    //   // cross_device_reduce_2stage<T, 8><<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, output, rank_, size);
+    //   return;
+    // }
 
 
 #define KL(ngpus, name)                                                       \

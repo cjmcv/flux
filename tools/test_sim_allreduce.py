@@ -52,7 +52,7 @@ class SimulateBuffer:
         for p in pointers:
             lib.cudaFree(ctypes.c_void_p(p))
 
-g_world_size = 4
+g_world_size = 2
 g_buffer = SimulateBuffer(g_world_size)
 
 def _run_correctness_worker(world_size, rank, test_sizes):
@@ -71,22 +71,23 @@ def _run_correctness_worker(world_size, rank, test_sizes):
             custom_kernel_time = 0
 
             cnt = 0
-            test_loop = 20
+            warmup_loop = 100
+            test_loop = 20000
             for sz in test_sizes:
-                for dtype in [torch.float32, torch.float16, torch.bfloat16]:
+                for dtype in [torch.bfloat16]: # torch.float32, torch.float16, 
                     for loop in range(test_loop):
                         inp1 = torch.randint(1, 16, (sz,), dtype=dtype, device=device)
                         # print("input", inp1, "rank: ", rank)
                         g_buffer.ref_buffer[rank] = inp1.clone()
                         out1 = torch.empty_like(inp1)
                         cnt = cnt+1
-                        print(">>", end='')
-
+                        # print(">>", end='')
+                        
                         start_event.record()
                         ctlop.all_reduce(custom_ptr, inp1, out1, g_buffer.buffer_ptrs[rank], g_buffer.max_size)
                         end_event.record()
                         torch.cuda.synchronize()
-                        if loop > 10:
+                        if loop > warmup_loop:
                             custom_kernel_time += start_event.elapsed_time(end_event)
                         
                         # ref_out = g_buffer.ref_buffer[0]
@@ -94,7 +95,7 @@ def _run_correctness_worker(world_size, rank, test_sizes):
                         #     ref_out = ref_out + g_buffer.ref_buffer[i]
                         # torch.testing.assert_close(out1, ref_out)
 
-                print(f"custom_kernel_time: {custom_kernel_time:.6f} ms, {sz}")
+                print(f"custom_kernel_time: {custom_kernel_time/(test_loop-warmup_loop):.6f} ms, {sz}")
 
     finally:
         if custom_ptr is not None:
@@ -135,16 +136,16 @@ def multi_process_parallel(
 
 if __name__ == "__main__":
     test_sizes = [
-        512,
-        2560,
-        4096,
-        5120,
-        7680,
+        # 512,
+        # 2560,
+        # 4096,
+        # 5120,
+        # 7680,
         # 32768,
         # 262144,
         # 524288,
         # 1048576,
-        # 2097152,
+        4097152,
         # 58720256,
     ]
 
