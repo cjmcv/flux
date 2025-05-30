@@ -39,7 +39,7 @@ public:
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag                        // Threadblock-level tile size
   ////
 
-  using ScaleConfig   = cutlass::detail::Sm90BlockwiseScaleConfig<1, 128, 128>;
+  using ScaleConfig   = cutlass::detail::Sm90BlockwiseScaleConfig<1, 128, 128>; // <m,n,k> => scaleA[m, (k+127)//128], scaleB[(n+127)//128, (k+127)//128]
   using LayoutSFA     = decltype(ScaleConfig::deduce_layoutSFA());    // Layout type for SFA matrix operand
   using LayoutSFB     = decltype(ScaleConfig::deduce_layoutSFB());    // Layout type for SFB matrix operand
 

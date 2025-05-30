@@ -99,11 +99,16 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes,
 
                         torch.testing.assert_close(out1, inp1_ref)
 
+            custom_kernel_time = custom_kernel_time / (test_loop - warmup_loop)
+            nccl_kernel_time = nccl_kernel_time / (test_loop - warmup_loop)
+
             custom_perf.append(custom_kernel_time)
             nccl_perf.append(nccl_kernel_time)
             print(f"custom_kernel_time: {custom_kernel_time:.6f} ms, {sz}, rank{rank}")
             print(f"nccl_kernel_time: {nccl_kernel_time:.6f} ms, {sz}, rank{rank}")
 
+        print("custom_perf: ", custom_perf)
+        print("nccl_perf: ", nccl_perf)
         # plot
         x_ticks = range(len(test_sizes))
         plt.plot(x_ticks, custom_perf, label='custom', marker='o', markersize=3)
@@ -163,15 +168,17 @@ class TestCustomAllReduce(unittest.TestCase):
     param_size = 7168
     test_sizes = [
         1 * param_size,
-        10 * param_size,
-        20 * param_size,
-        40 * param_size,
-        80 * param_size,
-        160 * param_size,
-        500 * param_size,
+        50 * param_size,
+        100 * param_size,
+        200 * param_size,
+        400 * param_size,
+        600 * param_size,
+        800 * param_size,
         1000 * param_size,
         2000 * param_size,
+        3000 * param_size,
         4000 * param_size,
+        6000 * param_size,
         8192 * param_size,
         # 512,
         # 2560,
