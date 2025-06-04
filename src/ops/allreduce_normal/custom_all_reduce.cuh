@@ -1,17 +1,11 @@
 // Adapted from https://github.com/vllm-project/vllm/blob/v0.8.2/csrc/custom_all_reduce.cuh
-// 1) cross_device_reduce_1stage -> barrier_at_end
-// 2) kMaxBlocks + defaultBlockLimit
-// 3) 
+
 #pragma once
 
 #include <cuda.h>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
-
-#if defined(USE_ROCM)
-typedef __hip_bfloat16 nv_bfloat16;
-#endif
 
 #include <iostream>
 #include <array>
@@ -34,14 +28,8 @@ namespace vllm {
 constexpr int kMaxBlocks = 48;
 
 // Default number of blocks in allreduce kernel.
-#ifndef USE_ROCM
 const int defaultBlockLimit = 48;
 CUpointer_attribute rangeStartAddrAttr = CU_POINTER_ATTRIBUTE_RANGE_START_ADDR;
-#else
-const int defaultBlockLimit = 16;
-hipPointer_attribute rangeStartAddrAttr =
-    HIP_POINTER_ATTRIBUTE_RANGE_START_ADDR;
-#endif
 
 // Counter may overflow, but it's fine since unsigned int overflow is
 // well-defined behavior.
@@ -155,8 +143,6 @@ DINLINE O downcast(array_t<float, O::size> val) {
   }
 }
 
-#if !defined(USE_ROCM)
-
 static DINLINE void st_flag_release(FlagType* flag_addr, FlagType flag) {
   #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
   asm volatile("st.release.sys.global.u32 [%1], %0;" ::"r"(flag),
@@ -198,13 +184,12 @@ static DINLINE FlagType ld_flag_volatile(FlagType* flag_addr) {
 // prior memory accesses. Note: volatile writes will not be reordered against
 // other volatile writes.
 template <int ngpus>
-DINLINE void barrier_at_start(const RankSignals& sg, Signal* self_sg,
-                              int rank) {
+DINLINE void barrier_at_start(const RankSignals& sg, Signal* self_sg, int rank, int bias=0) {
   uint32_t flag = self_sg->_flag[blockIdx.x] + 1;
   // printf("self_sg: %p - (%p, %p), rank %d: block: %d, flag: %d\n", self_sg, sg.signals[0], sg.signals[1], rank, blockIdx.x, flag);
   if (threadIdx.x < ngpus) {
-    auto peer_counter_ptr = &sg.signals[threadIdx.x]->start[blockIdx.x][rank];
-    auto self_counter_ptr = &self_sg->start[blockIdx.x][threadIdx.x];
+    auto peer_counter_ptr = &sg.signals[threadIdx.x+bias]->start[blockIdx.x][rank+bias];
+    auto self_counter_ptr = &self_sg->start[blockIdx.x][threadIdx.x+bias];
     // printf("a<%d> sg.signals: [%d][%d], [%d][%d] => [%p][%p], [%p][%p]\n", rank, sg.signals[0]->start[blockIdx.x][0], sg.signals[1]->start[blockIdx.x][0], sg.signals[0]->start[blockIdx.x][1], sg.signals[1]->start[blockIdx.x][1],
     //                                                                             &sg.signals[0]->start[blockIdx.x][0], &sg.signals[1]->start[blockIdx.x][0], &sg.signals[0]->start[blockIdx.x][1], &sg.signals[1]->start[blockIdx.x][1]);
     // printf("a<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[blockIdx.x][0], self_sg->start[blockIdx.x][1], &self_sg->start[blockIdx.x][0], &self_sg->start[blockIdx.x][1]);
@@ -233,12 +218,12 @@ DINLINE void barrier_at_start(const RankSignals& sg, Signal* self_sg,
 // synchronization barrier, we don't need to make any visibility guarantees
 // for prior memory accesses.
 template <int ngpus, bool final_sync = false>
-DINLINE void barrier_at_end(const RankSignals& sg, Signal* self_sg, int rank) {
+DINLINE void barrier_at_end(const RankSignals& sg, Signal* self_sg, int rank, int bias=0) {
   __syncthreads();
   uint32_t flag = self_sg->_flag[blockIdx.x] + 1;
   if (threadIdx.x < ngpus) {
-    auto peer_counter_ptr = &sg.signals[threadIdx.x]->end[blockIdx.x][rank];
-    auto self_counter_ptr = &self_sg->end[blockIdx.x][threadIdx.x];
+    auto peer_counter_ptr = &sg.signals[threadIdx.x+bias]->end[blockIdx.x][rank+bias];
+    auto self_counter_ptr = &self_sg->end[blockIdx.x][threadIdx.x+bias];
     // Write the expected counter value to peer and wait for correct value from
     // peer.
     if constexpr (!final_sync) {
@@ -254,51 +239,6 @@ DINLINE void barrier_at_end(const RankSignals& sg, Signal* self_sg, int rank) {
   // use one thread to update flag
   if (threadIdx.x == 0) self_sg->_flag[blockIdx.x] = flag;
 }
-
-#else
-
-template <int ngpus>
-DINLINE void barrier_at_start(const RankSignals& sg, Signal* self_sg,
-                              int rank) {
-  uint32_t flag = self_sg->_flag[blockIdx.x] + 1;
-  if (threadIdx.x < ngpus) {
-    // simultaneously write to the corresponding flag of all ranks.
-    // Latency = 1 p2p write
-    __scoped_atomic_store_n(&sg.signals[threadIdx.x]->start[blockIdx.x][rank],
-                            flag, __ATOMIC_RELAXED, __MEMORY_SCOPE_SYSTEM);
-    // wait until we got true from all ranks
-    while (__scoped_atomic_load_n(&self_sg->start[blockIdx.x][threadIdx.x],
-                                  __ATOMIC_RELAXED,
-                                  __MEMORY_SCOPE_DEVICE) < flag);
-  }
-  __syncthreads();
-  // use one thread to update flag
-  if (threadIdx.x == 0) self_sg->_flag[blockIdx.x] = flag;
-}
-
-template <int ngpus, bool final_sync = false>
-DINLINE void barrier_at_end(const RankSignals& sg, Signal* self_sg, int rank) {
-  __syncthreads();
-  uint32_t flag = self_sg->_flag[blockIdx.x] + 1;
-  if (threadIdx.x < ngpus) {
-    // simultaneously write to the corresponding flag of all ranks.
-    // Latency = 1 p2p write
-    __scoped_atomic_store_n(&sg.signals[threadIdx.x]->end[blockIdx.x][rank],
-                            flag,
-                            final_sync ? __ATOMIC_RELAXED : __ATOMIC_RELEASE,
-                            __MEMORY_SCOPE_SYSTEM);
-    // wait until we got true from all ranks
-    while (
-        __scoped_atomic_load_n(&self_sg->end[blockIdx.x][threadIdx.x],
-                               final_sync ? __ATOMIC_RELAXED : __ATOMIC_ACQUIRE,
-                               __MEMORY_SCOPE_DEVICE) < flag);
-  }
-  if constexpr (!final_sync) __syncthreads();
-  // use one thread to update flag
-  if (threadIdx.x == 0) self_sg->_flag[blockIdx.x] = flag;
-}
-
-#endif
 
 template <typename P, int ngpus, typename A>
 DINLINE P packed_reduce(const P* ptrs[], int idx) {
@@ -381,6 +321,92 @@ __global__ void __launch_bounds__(1024, 1)
       if (gather_from_rank == ngpus - 1 || idx < part) {
         int dst_idx = gather_from_rank * part + idx;
         ((P*)result)[dst_idx] = tmps[i][idx];
+      }
+    }
+  }
+}
+
+template <typename T, int ngpus>
+__global__ void __launch_bounds__(1024, 1)
+    cross_device_reduce_3stage(RankData* _dp, RankSignals sg, Signal* self_sg,
+                               T* __restrict__ result, int rank, int size) {
+  const int ggpus = 4;
+  int grank = rank;
+  int group = 0;
+  if (grank >= 4) {
+    grank -= 4;
+    group = 1;
+  }
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride = gridDim.x * blockDim.x;
+  using P = typename packed_t<T>::P;
+  using A = typename packed_t<T>::A;
+  int part = size / ggpus;
+  int start = grank * part;
+  int end = grank == ggpus - 1 ? size : start + part;
+  int largest_part = part + size % ggpus;
+  const P* ptrs[ngpus];
+  P* tmps[ngpus];
+
+  // 01234567 -> rank3: 34567012, rank6: 67012345  original 2stage
+  // 01234567 -> rank3: 30127456, rank6: 67452301  3stage£¬spilt to 2 groups
+  // stage1: reduce scatter 4 + 4
+  if (rank < 4) {
+#pragma unroll
+    for (int i = 0; i < ggpus; i++) {
+      int target = (grank + i) % ggpus;
+      ptrs[i] = (const P*)_dp->ptrs[target];
+      tmps[i] = get_tmp_buf<P>(sg.signals[target]);
+
+      ptrs[i+4] = (const P*)_dp->ptrs[target+4];
+      tmps[i+4] = get_tmp_buf<P>(sg.signals[target+4]);
+    }
+    
+    auto tmp_out = tmps[0];
+    barrier_at_start<ggpus>(sg, self_sg, grank);
+
+    for (int idx = start + tid; idx < end; idx += stride) {
+      tmp_out[idx - start] = packed_reduce<P, ggpus, A>(ptrs, idx);
+    }
+    barrier_at_end<ggpus>(sg, self_sg, grank);
+  }
+  else {
+#pragma unroll
+    for (int i = 0; i < ggpus; i++) {
+      int target = (grank + i) % ggpus;
+      ptrs[i] = (const P*)_dp->ptrs[target+4];
+      tmps[i] = get_tmp_buf<P>(sg.signals[target+4]);
+
+      ptrs[i+4] = (const P*)_dp->ptrs[target];
+      tmps[i+4] = get_tmp_buf<P>(sg.signals[target]);
+    }
+    
+    auto tmp_out = tmps[0];
+    barrier_at_start<ggpus>(sg, self_sg, grank, 4);
+
+    for (int idx = start + tid; idx < end; idx += stride) {
+      tmp_out[idx - start] = packed_reduce<P, ggpus, A>(ptrs, idx);
+    }
+    barrier_at_end<ggpus>(sg, self_sg, grank, 4);
+  }
+
+  // stage2: combine 2 group£¬ rank3: 3012 7456 => 3+7 0+4 1+5 2+6
+  //                                               7+3 4+0 5+1 6+2
+  barrier_at_start<ngpus>(sg, self_sg, rank);
+  for (int idx = tid; idx < largest_part; idx += stride) {
+    tmps[0][idx+largest_part] = tmps[4][idx];
+    packed_assign_add(tmps[0][idx+largest_part], tmps[0][idx]);
+  }
+  barrier_at_end<ngpus>(sg, self_sg, rank);
+
+  // stage3: allgather
+  for (int idx = tid; idx < largest_part; idx += stride) {
+#pragma unroll
+    for (int i = 0; i < ggpus; i++) {
+      int gather_from_rank = ((grank + i) % ggpus);
+      if (gather_from_rank == ggpus - 1 || idx < part) {
+        int dst_idx = gather_from_rank * part + idx;
+        ((P*)result)[dst_idx] = tmps[i][idx+largest_part]; 
       }
     }
   }
@@ -550,7 +576,7 @@ class CustomAllreduce {
                  int threads = 1024, int block_limit = defaultBlockLimit) {
     if (world_size_ == 8) {
       threads = 1024;
-      block_limit = 36;
+      block_limit = 48;
     }
     auto d = packed_t<T>::P::size;
     if (size % d != 0)
@@ -582,6 +608,10 @@ class CustomAllreduce {
     auto bytes = size * sizeof(typename packed_t<T>::P);
     int blocks = std::min(block_limit, (size + threads - 1) / threads);
 
+    if (world_size_ == 8) {
+      cross_device_reduce_3stage<T, 8><<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, output, rank_, size);
+      return;
+    }
 #define KL(ngpus, name)                                                       \
   name<T, ngpus><<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, output, \
                                                  rank_, size);
