@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.17)
 
 # file(GLOB CU_FILES instantiations/*.cu *.cu)
-file(GLOB CU_FILES instantiations/flash_fwd_hdim64_256_bf16_packgqa_sm90.cu *.cu)
+# file(GLOB CU_FILES instantiations/flash_fwd_hdim64_256_bf16_packgqa_sm90.cu *.cu)
+file(GLOB CU_FILES instantiations/flash_fwd_hdim64_bf16_sm80.cu *.cu)
+
 message(STATUS "CU_FILES: ${CU_FILES}")
 
 #########################

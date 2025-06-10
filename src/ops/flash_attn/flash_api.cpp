@@ -228,99 +228,102 @@ void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream) {
                     // Always enable PackGQA for Sm8x or PagedKVNonTMA or Split to reduce compilation
                     static constexpr bool PackGQA = PackGQA_ || Arch < 90 || PagedKVNonTMA || Split;
                     SOFTCAP_SWITCH(params.softcap > 0.0, Has_softcap, [&] {
-                        if (!params.is_e4m3) {
-                            if (params.is_bf16) {
-                                #ifndef FLASHATTENTION_DISABLE_HDIM64
-                                if (params.d <= 64) {
-                                    if (params.dv > 256 && Arch == 90) {
-                                        return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    } else if (params.dv > 64 && Arch == 90) {
-                                        return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    } else {
-                                        return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    }
-                                }
-                                #endif
-                                #ifndef FLASHATTENTION_DISABLE_HDIM96
-                                if (params.d <= 96) { return run_mha_fwd_<Arch, cutlass::bfloat16_t, 96, 96, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                                #endif
-                                #ifndef FLASHATTENTION_DISABLE_HDIM128
-                                if (params.d <= 128) { return run_mha_fwd_<Arch, cutlass::bfloat16_t, 128, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                                #endif
-                                #ifndef FLASHATTENTION_DISABLE_HDIM192
-                                if (params.d <= 192) {
-                                    if (params.dv <= 128 && Arch == 90) {
-                                        return run_mha_fwd_<Arch, cutlass::bfloat16_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    } else {
-                                        return run_mha_fwd_<Arch, cutlass::bfloat16_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    }
-                                }
-                                #endif
-                                #ifndef FLASHATTENTION_DISABLE_HDIM256
-                                if (params.d <= 256) { return run_mha_fwd_<Arch, cutlass::bfloat16_t, 256, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                                #endif
-                            } else {
-                                #ifndef FLASHATTENTION_DISABLE_FP16
-                                #ifndef FLASHATTENTION_DISABLE_HDIM64
-                                if (params.d <= 64) {
-                                    if (params.dv > 256 && Arch == 90) {
-                                        return run_mha_fwd_<Arch, cutlass::half_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    } else if (params.dv > 64 && Arch == 90) {
-                                        return run_mha_fwd_<Arch, cutlass::half_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    } else {
-                                        return run_mha_fwd_<Arch, cutlass::half_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    }
-                                }
-                                #endif
-                                #ifndef FLASHATTENTION_DISABLE_HDIM96
-                                if (params.d <= 96) { return run_mha_fwd_<Arch, cutlass::half_t, 96, 96, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                                #endif
-                                #ifndef FLASHATTENTION_DISABLE_HDIM128
-                                if (params.d <= 128) { return run_mha_fwd_<Arch, cutlass::half_t, 128, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                                #endif
-                                #ifndef FLASHATTENTION_DISABLE_HDIM192
-                                if (params.d <= 192) {
-                                    if (params.dv <= 128 && Arch == 90) {
-                                        return run_mha_fwd_<Arch, cutlass::half_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    } else {
-                                        return run_mha_fwd_<Arch, cutlass::half_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                    }
-                                }
-                                #endif
-                                #ifndef FLASHATTENTION_DISABLE_HDIM256
-                                if (params.d <= 256) { return run_mha_fwd_<Arch, cutlass::half_t, 256, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                                #endif
-                                #else
-                                TORCH_CHECK(false, "This flash attention build does not support FP16.");
-                                #endif
-                            }
-                        } else {
-                            #ifndef FLASHATTENTION_DISABLE_FP8
-                            #ifndef FLASHATTENTION_DISABLE_HDIM64
-                            if (params.d <= 64) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                            #endif
-                            #ifndef FLASHATTENTION_DISABLE_HDIM96
-                            if (params.d <= 96) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 96, 96, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                            #endif
-                            #ifndef FLASHATTENTION_DISABLE_HDIM128
-                            if (params.d <= 128) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 128, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                            #endif
-                            #ifndef FLASHATTENTION_DISABLE_HDIM192
-                            if (params.d <= 192) {
-                                if (params.dv <= 128 && Arch == 90) {
-                                    return run_mha_fwd_<90, cutlass::float_e4m3_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                } else {
-                                    return run_mha_fwd_<90, cutlass::float_e4m3_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                                }
-                            }
-                            #endif
-                            #ifndef FLASHATTENTION_DISABLE_HDIM256
-                            if (params.d <= 256) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 256, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
-                            #endif
-                            #else
-                            TORCH_CHECK(false, "This flash attention build does not support FP8.");
-                            #endif
-                        }
+                        // return run_mha_fwd_<90, cutlass::bfloat16_t, 64, 256, false, false, false, true>(Flash_fwd_params &params, cudaStream_t stream);
+                        return run_mha_fwd_<80, cutlass::bfloat16_t, 64, 64, false, false, false, true>(params, stream);
+
+                        // if (!params.is_e4m3) {
+                        //     if (params.is_bf16) {
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM64
+                        //         if (params.d <= 64) {
+                        //             if (params.dv > 256 && Arch == 90) {
+                        //                 return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             } else if (params.dv > 64 && Arch == 90) {
+                        //                 return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             } else {
+                        //                 return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             }
+                        //         }
+                        //         #endif
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM96
+                        //         if (params.d <= 96) { return run_mha_fwd_<Arch, cutlass::bfloat16_t, 96, 96, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //         #endif
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM128
+                        //         if (params.d <= 128) { return run_mha_fwd_<Arch, cutlass::bfloat16_t, 128, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //         #endif
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM192
+                        //         if (params.d <= 192) {
+                        //             if (params.dv <= 128 && Arch == 90) {
+                        //                 return run_mha_fwd_<Arch, cutlass::bfloat16_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             } else {
+                        //                 return run_mha_fwd_<Arch, cutlass::bfloat16_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             }
+                        //         }
+                        //         #endif
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM256
+                        //         if (params.d <= 256) { return run_mha_fwd_<Arch, cutlass::bfloat16_t, 256, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //         #endif
+                        //     } else {
+                        //         #ifndef FLASHATTENTION_DISABLE_FP16
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM64
+                        //         if (params.d <= 64) {
+                        //             if (params.dv > 256 && Arch == 90) {
+                        //                 return run_mha_fwd_<Arch, cutlass::half_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             } else if (params.dv > 64 && Arch == 90) {
+                        //                 return run_mha_fwd_<Arch, cutlass::half_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             } else {
+                        //                 return run_mha_fwd_<Arch, cutlass::half_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             }
+                        //         }
+                        //         #endif
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM96
+                        //         if (params.d <= 96) { return run_mha_fwd_<Arch, cutlass::half_t, 96, 96, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //         #endif
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM128
+                        //         if (params.d <= 128) { return run_mha_fwd_<Arch, cutlass::half_t, 128, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //         #endif
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM192
+                        //         if (params.d <= 192) {
+                        //             if (params.dv <= 128 && Arch == 90) {
+                        //                 return run_mha_fwd_<Arch, cutlass::half_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             } else {
+                        //                 return run_mha_fwd_<Arch, cutlass::half_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //             }
+                        //         }
+                        //         #endif
+                        //         #ifndef FLASHATTENTION_DISABLE_HDIM256
+                        //         if (params.d <= 256) { return run_mha_fwd_<Arch, cutlass::half_t, 256, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //         #endif
+                        //         #else
+                        //         TORCH_CHECK(false, "This flash attention build does not support FP16.");
+                        //         #endif
+                        //     }
+                        // } else {
+                        //     #ifndef FLASHATTENTION_DISABLE_FP8
+                        //     #ifndef FLASHATTENTION_DISABLE_HDIM64
+                        //     if (params.d <= 64) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //     #endif
+                        //     #ifndef FLASHATTENTION_DISABLE_HDIM96
+                        //     if (params.d <= 96) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 96, 96, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //     #endif
+                        //     #ifndef FLASHATTENTION_DISABLE_HDIM128
+                        //     if (params.d <= 128) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 128, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //     #endif
+                        //     #ifndef FLASHATTENTION_DISABLE_HDIM192
+                        //     if (params.d <= 192) {
+                        //         if (params.dv <= 128 && Arch == 90) {
+                        //             return run_mha_fwd_<90, cutlass::float_e4m3_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //         } else {
+                        //             return run_mha_fwd_<90, cutlass::float_e4m3_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                        //         }
+                        //     }
+                        //     #endif
+                        //     #ifndef FLASHATTENTION_DISABLE_HDIM256
+                        //     if (params.d <= 256) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 256, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                        //     #endif
+                        //     #else
+                        //     TORCH_CHECK(false, "This flash attention build does not support FP8.");
+                        //     #endif
+                        // }
                     });
                 });
             });

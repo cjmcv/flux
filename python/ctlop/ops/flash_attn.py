@@ -205,7 +205,6 @@ def flash_attn_with_kvcache(
     # return (out, softmax_lse) if return_softmax_lse else out
     return (out, softmax_lse, *rest) if return_softmax_lse else out
 
-
 def flash_attn_varlen_func(
     q,
     k,
@@ -239,6 +238,7 @@ def flash_attn_varlen_func(
             -0.5
         )
 
+    # breakpoint()
     out, softmax_lse, *rest = ctlop.mha_fwd(
         q,
         k,
@@ -274,5 +274,4 @@ def flash_attn_varlen_func(
         pack_gqa=pack_gqa,
         sm_margin=sm_margin,
     )
-
     return (out, softmax_lse, *rest) if return_softmax_lse else out
