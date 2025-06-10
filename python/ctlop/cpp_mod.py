@@ -32,6 +32,8 @@ def _get_ctlop_member(member):
     return getattr(ctlop_mod, member, NotCompiled())
 
 GemmNormal = _get_ctlop_member("GemmNormal")
+
+# allreduce_normal
 helloABC = _get_ctlop_member("helloABC")
 init_custom_ar = _get_ctlop_member("init_custom_ar")
 all_reduce = _get_ctlop_member("all_reduce")
@@ -40,6 +42,9 @@ meta_size = _get_ctlop_member("meta_size")
 register_buffer = _get_ctlop_member("register_buffer")
 get_graph_buffer_ipc_meta = _get_ctlop_member("get_graph_buffer_ipc_meta")
 register_graph_buffers = _get_ctlop_member("register_graph_buffers")
+
+# flash_attn
+mha_fwd = _get_ctlop_member("mha_fwd")
 
 # __all__ = [
 #     "GemmNormal",
