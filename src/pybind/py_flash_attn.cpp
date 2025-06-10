@@ -1,5 +1,5 @@
 
-#include "ops/allreduce_normal/flash_api.h"
+#include "ops/flash_attn/flash_api.h"
 #include "ths_op.h"
 
 using namespace ctlop;

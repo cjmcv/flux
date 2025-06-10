@@ -590,6 +590,9 @@ mha_fwd_get_scheduler_metadata(
 // h: num_heads
 // h_k: num_heads_k
 // d: head_size
+
+namespace ctlop {
+
 std::vector<at::Tensor>
 mha_fwd(at::Tensor &q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seqlens_q
         const at::Tensor &k,  // (b_k, s_k, h_k, d) or (total_k, h_k, d) if there is cu_seqlens_k or (num_pages, page_size, h_k, d) if there is page_table.
@@ -1098,6 +1101,8 @@ mha_fwd(at::Tensor &q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seq
     // return {out, softmax_lse};
     return {out, softmax_lse, out_accum, softmax_lse_accum};
 }
+
+} // namespace ctlop
 
 std::vector<at::Tensor>
 mha_combine(const at::Tensor &out_partial,         // num_splits x batch_size x seqlen x num_heads x head_size
