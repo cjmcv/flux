@@ -1,8 +1,5 @@
 # Cutlass Operators
 
-## Getting started
-Install CtlOp either from source or from PyPI.
-
 ### Install from Source
 ```bash
 git clone 
@@ -23,11 +20,14 @@ compute-sanitizer --tool memcheck python tools/test*.py
 ## Quick Start
 
 ```bash
-# gemm only
+# Generate search_space_gemmnormal.cu 
+# Move it to src/ops/gemm_normal/tuning_config, and compile the library again.
+python3 tools/gen_search_space.py --schema=GemmNormal
+
+# Generate tuned_config_gemmnormal.cu
+# Move it to src/ops/gemm_normal/tuning_config, and compile the library again.
+python3 tools/tuning/tune_gemm_normal.py --schema=GemmNormal
+
+# Now you can test it.
 python3 tools/test_gemm_normal.py 100 12288 6144 --dtype=float16
-
-python3 tools/gen_search_space.py
-
-python3 tools/tune_gemm_normal.py
-
 ```

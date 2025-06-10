@@ -390,7 +390,7 @@ __global__ void __launch_bounds__(1024, 1)
     barrier_at_end<ggpus>(sg, self_sg, grank, 4);
   }
 
-  // stage2: combine 2 group£¬ rank3: 3012 7456 => 3+7 0+4 1+5 2+6
+  // stage2: combine 2 group, rank3: 3012 7456 => 3+7 0+4 1+5 2+6
   //                                               7+3 4+0 5+1 6+2
   barrier_at_start<ngpus>(sg, self_sg, rank);
   for (int idx = tid; idx < largest_part; idx += stride) {
@@ -574,10 +574,10 @@ class CustomAllreduce {
   template <typename T>
   void allreduce(cudaStream_t stream, T* input, T* output, int size,
                  int threads = 1024, int block_limit = defaultBlockLimit) {
-    if (world_size_ == 8) {
-      threads = 1024;
-      block_limit = 48;
-    }
+    // if (world_size_ == 8) {
+    //   threads = 1024;
+    //   block_limit = 48;
+    // }
     auto d = packed_t<T>::P::size;
     if (size % d != 0)
       throw std::runtime_error(
@@ -608,10 +608,10 @@ class CustomAllreduce {
     auto bytes = size * sizeof(typename packed_t<T>::P);
     int blocks = std::min(block_limit, (size + threads - 1) / threads);
 
-    if (world_size_ == 8) {
-      cross_device_reduce_3stage<T, 8><<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, output, rank_, size);
-      return;
-    }
+    // if (world_size_ == 8) {
+    //   cross_device_reduce_3stage<T, 8><<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, output, rank_, size);
+    //   return;
+    // }
 #define KL(ngpus, name)                                                       \
   name<T, ngpus><<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, output, \
                                                  rank_, size);
