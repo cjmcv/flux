@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
 
-file(GLOB CU_FILES instantiations/*.cu)
+file(GLOB CU_FILES instantiations/*.cu *.cu)
 message(STATUS "CU_FILES: ${CU_FILES}")
 
 #########################
