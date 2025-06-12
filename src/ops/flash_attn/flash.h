@@ -7,6 +7,9 @@
 #include <cuda.h>
 #include <vector>
 
+#define FLASHATTENTION_DISABLE_SM8x
+#define FLASHATTENTION_DISABLE_FP16
+#define FLASHATTENTION_DISABLE_FP8
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Qkv_params {
