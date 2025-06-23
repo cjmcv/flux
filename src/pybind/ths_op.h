@@ -7,6 +7,10 @@
 #include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
 #include <torch/csrc/utils/pybind.h>
 
+#define ENABLE_GEMM_NORMAL 1
+// #define ENABLE_FLASH_ATTEN 1
+// #define ENABLE_ALLREDUCE_CUSTOM 1
+
 #define CTLOP_TORCH_EXTENSION_NAME ctlop_pybind
 
 namespace ctlop {

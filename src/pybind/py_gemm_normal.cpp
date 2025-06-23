@@ -2,8 +2,8 @@
 #include "ops/gemm_normal/gemm_normal.h"
 #include "ths_op.h"
 
-using namespace ctlop;
 
+#ifdef ENABLE_GEMM_NORMAL
 namespace ctlop {
 
 namespace py = pybind11;
@@ -50,3 +50,4 @@ static int _register_single_gemm_ops [[maybe_unused]] = []() {
   return 0;
 }();
 }  // namespace ctlop
+#endif // ENABLE_GEMM_NORMAL

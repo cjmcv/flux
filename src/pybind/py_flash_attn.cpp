@@ -2,8 +2,7 @@
 #include "ops/flash_attn/flash_api.h"
 #include "ths_op.h"
 
-using namespace ctlop;
-
+#ifdef ENABLE_FLASH_ATTEN
 namespace ctlop {
 
 namespace py = pybind11;
@@ -86,3 +85,4 @@ static int _register_flash_attn_ops [[maybe_unused]] = []() {
   return 0;
 }();
 }  // namespace ctlop
+#endif // ENABLE_FLASH_ATTEN
