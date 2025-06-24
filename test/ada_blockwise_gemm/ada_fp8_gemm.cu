@@ -147,14 +147,15 @@ int main(int argc, char const** argv) {
     return -1;
   }
 
-  int height_a = 2048, width_a = 4096;
-  int height_b = 4096, width_b = 2048;
+  // A*Bt=C
+  int M = 2048, K = 1920;
+  int N = 4096;
 
-  const int mem_size_a = sizeof(cutlass::float_e4m3_t) * height_a * width_a;
-  const int mem_size_b = sizeof(cutlass::float_e4m3_t) * height_b * width_b;
-  const int mem_size_c = sizeof(cutlass::bfloat16_t) * height_a * width_b;
-  const int mem_size_scale_a = sizeof(float) * height_a * width_b/128;
-  const int mem_size_scale_b = sizeof(float) * height_b/128 * width_b/128;
+  const int mem_size_a = sizeof(cutlass::float_e4m3_t) * M * K;
+  const int mem_size_b = sizeof(cutlass::float_e4m3_t) * N * K;
+  const int mem_size_c = sizeof(cutlass::bfloat16_t) * M * N;
+  const int mem_size_scale_a = sizeof(float) * M * K/128;
+  const int mem_size_scale_b = sizeof(float) * N/128 * K/128;
 
   cutlass::float_e4m3_t *h_a = (cutlass::float_e4m3_t *)malloc(mem_size_a);
   cutlass::float_e4m3_t *h_b = (cutlass::float_e4m3_t *)malloc(mem_size_b);
@@ -164,16 +165,16 @@ int main(int argc, char const** argv) {
 
   // Initialize 
   srand(time(NULL));
-  GenFp8Matrix(height_a, width_a, h_a);
-  GenFp8Matrix(height_b, width_b, h_b);
-  for (int i=0; i<height_a; i++) {
-    for (int j=0; j<width_b/128; j++) {
-      h_scale_a[i*width_b/128 + j] = 1.0f;
+  GenFp8Matrix(M, K, h_a);
+  GenFp8Matrix(N, K, h_b);
+  for (int i=0; i<M; i++) {
+    for (int j=0; j<K/128; j++) {
+      h_scale_a[i*K/128 + j] = 1.0f;
     }
   }
-  for (int i=0; i<height_b/128; i++) {
-    for (int j=0; j<width_b/128; j++) {
-      h_scale_b[i*width_b/128 + j] = 1.0f;
+  for (int i=0; i<N/128; i++) {
+    for (int j=0; j<K/128; j++) {
+      h_scale_b[i*K/128 + j] = 1.0f;
     }
   }
   cutlass::float_e4m3_t *d_a, *d_b;
@@ -198,7 +199,7 @@ int main(int argc, char const** argv) {
     
     gpu_timer.Start();
     cudaStream_t default_stream = cudaStreamDefault;
-    gemm_dispatch_sm89(d_a, d_b, d_c, d_scale_a, d_scale_b, height_a, width_b, height_b, default_stream);
+    gemm_dispatch_sm89(d_a, d_b, d_c, d_scale_a, d_scale_b, M, N, K, default_stream);
     gpu_timer.Stop();
     total_ms += gpu_timer.ElapsedMillis();
 
@@ -207,11 +208,11 @@ int main(int argc, char const** argv) {
   printf("total_ms: %f.\n", total_ms);
 
   cutlass::NumericConverter<float, cutlass::bfloat16_t> converter;
-  for (int i=0; i<height_a; i++) {
-    for (int j=0; j<width_b; j++) {
-      // printf("%f, ", converter(h_c[i*width_b+j]));
-      // if(converter(h_c[i*width_b+j]) != 2048) {
-      //   printf("e: %f, ", converter(h_c[i*width_b+j]));
+  for (int i=0; i<M; i++) {
+    for (int j=0; j<N; j++) {
+      printf("%f, ", converter(h_c[i*N+j]));
+      // if(converter(h_c[i*K+j]) != 2048) {
+      //   printf("e: %f, ", converter(h_c[i*K+j]));
       // }
     }
   }
