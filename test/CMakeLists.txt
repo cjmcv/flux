@@ -40,8 +40,8 @@ include_directories(${COMMON_HEADER_DIRS})
 
 # ##
 
-add_executable(58_ada_fp8_gemm 58_ada_fp8_gemm/ada_fp8_gemm.cu)
-target_link_libraries(58_ada_fp8_gemm PUBLIC xop)
+add_executable(ada_blockwise_gemm ada_blockwise_gemm/ada_fp8_gemm.cu)
+target_link_libraries(ada_blockwise_gemm PUBLIC xop)
 
 # add_executable(65_distributed_gemm 65_distributed_gemm/65_distributed_gemm.cu)
 # target_link_libraries(65_distributed_gemm PUBLIC xop)

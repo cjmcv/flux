@@ -80,12 +80,33 @@
 #include "cutlass/matrix_coord.h"
 #include "cutlass/gemm/device/gemm_universal_adapter.h"
 
+// TEST(SM89_Device_Gemm_fe4m3t_fe4m3n_f16t_tensor_op_f16, 128x256x64_64x64x64) {
+//   using ElementA = cutlass::float_e4m3_t;
+//   using ElementB = cutlass::float_e4m3_t;
+//   using ElementOutput = cutlass::half_t;
+//   using ElementAccumulator = cutlass::half_t;
+//   using LayoutA = cutlass::layout::RowMajor;
+//   using LayoutB = cutlass::layout::ColumnMajor;
+//   using LayoutC = cutlass::layout::RowMajor;
+//   static int const kStages = 3;
+
+//   using Gemm = cutlass::gemm::device::Gemm<
+//       ElementA, LayoutA, ElementB, LayoutB, ElementOutput, LayoutC,
+//       ElementAccumulator, cutlass::arch::OpClassTensorOp, cutlass::arch::Sm89,
+//       cutlass::gemm::GemmShape<128, 256, 64>, cutlass::gemm::GemmShape<64, 64, 64>, cutlass::gemm::GemmShape<16, 8, 32>,
+//       cutlass::epilogue::thread::LinearCombination<
+//           ElementOutput, 128 / cutlass::sizeof_bits<ElementOutput>::value,
+//           ElementAccumulator, ElementAccumulator>,
+//       cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, kStages>;
+
+//   EXPECT_TRUE(test::gemm::device::TestAllGemm<Gemm>());
+// }
 
 using ElementA = cutlass::float_e4m3_t;
 using ElementB = cutlass::float_e4m3_t;
 using ElementOutput = cutlass::float_e4m3_t;
 using ElementAuxOutput = ElementOutput;
-using ElementAccumulator = float; // cutlass::half_t; // float; // cutlass::half_t(__float2half_rn(options.beta));
+using ElementAccumulator = float; //float; // cutlass::half_t; // float; // cutlass::half_t(__float2half_rn(options.beta));
 using LayoutA = cutlass::layout::RowMajor;
 using LayoutB = cutlass::layout::ColumnMajor;
 using LayoutC = cutlass::layout::RowMajor;
