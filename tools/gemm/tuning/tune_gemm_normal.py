@@ -255,19 +255,19 @@ def tune_one_config(schema, config: TuningConfig, fp):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--schema", type=str, default="None")
-    parser.add_argument("--output_dir", default="./tools/", type=str, help="Directory to store generated files")
+    parser.add_argument("--output_path", default="./tools/", type=str, help="Directory to store generated files")
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python tools/tuning/tune_gemm_normal.py --schema=GemmGroupedBlockScaleFp8 (GemmNormal(GemmNormalSimt) / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
+        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmNormal (GemmNormal(GemmNormalSimt) / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
         exit()
 
-    if args.output_dir and not os.path.isdir(args.output_dir):
-        raise Exception(f"{args.output_dir} not exist")
+    if args.output_path and not os.path.isdir(args.output_path):
+        raise Exception(f"{args.output_path} not exist")
 
     tag = args.schema
     fp = {}
-    fp[tag] = open("tuned_config_{0}.cu".format(tag.lower()), "w")
+    fp[tag] = open(args.output_path+"/tuned_config_{0}.cu".format(tag.lower()), "w")
 
     fp[tag].write('#include "xop/xop.h"\n')
     fp[tag].write('#include "xop/ops_impl/global_resource.h"\n\n')

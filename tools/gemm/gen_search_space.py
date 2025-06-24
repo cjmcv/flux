@@ -219,11 +219,11 @@ def str2schema(schema_name):
     return string_to_schema.get(schema_name, None)
 
 class SearchSpaceGenerator:
-    def run(self, tag):
+    def run(self, tag, output_path):
         schema = str2schema(tag)
 
         fp = {}
-        fp[tag] = open("search_space_{0}.cu".format(tag.lower()), "w")
+        fp[tag] = open(output_path + "/search_space_{0}.cu".format(tag.lower()), "w")
         fp[tag].write('// clang-format off\n')
         fp[tag].write('#include "xop/ops_impl/{0}"\n\n'.format(schema.impl_header))
         fp[tag].write('namespace xop {\n')
@@ -248,11 +248,11 @@ class SearchSpaceGenerator:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='manual to this script')
     parser.add_argument("--schema", type=str, default="None")
-    parser.add_argument("--output_path", type=str, default="./")
+    parser.add_argument("--output_path", type=str, default="./tools/") # ./src/ops/gemm_normal/tuning_config/
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python tools/gen_search_space.py --schema=GemmBolckScaleFp8 (GemmNormal/GemmNormalSimt/GemmBolckScaleFp8/GemmGroupedBlockScaleFp8)")
+        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmNormal (GemmNormal/GemmNormalSimt/GemmBolckScaleFp8/GemmGroupedBlockScaleFp8)")
         exit()
     generator = SearchSpaceGenerator()
-    generator.run(args.schema) 
+    generator.run(args.schema, args.output_path) 
