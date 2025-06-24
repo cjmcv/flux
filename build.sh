@@ -12,10 +12,10 @@ BDIST_WHEEL="OFF"
 
 function clean_py() {
     rm -rf build/lib.*
-    rm -rf python/ctlop/lib
+    rm -rf python/xop/lib
     rm -rf .eggs/
-    rm -rf python/ctlop.egg-info
-    rm -rf python/ctlop_pybind.*
+    rm -rf python/xop.egg-info
+    rm -rf python/xop_pybind.*
 }
 
 function clean_all() {
@@ -77,17 +77,17 @@ if [[ -z $JOBS ]]; then
     JOBS=$(nproc --ignore 2)
 fi
 
-##### build ctlop_cuda #####
-function build_ctlop_cuda() {
+##### build xop_cuda #####
+function build_xop_cuda() {
     mkdir -p build
     pushd build
-    export LIBCTLOP_PREFIX=${PROJECT_ROOT}/python/ctlop
-    if [ ! -f CMakeCache.txt ] || [ -z ${CTLOP_BUILD_SKIP_CMAKE} ]; then
+    export LIBXOP_PREFIX=${PROJECT_ROOT}/python/xop
+    if [ ! -f CMakeCache.txt ] || [ -z ${XOP_BUILD_SKIP_CMAKE} ]; then
         CMAKE_ARGS=(
             -DCUDAARCHS=${ARCH}
             -DCMAKE_EXPORT_COMPILE_COMMANDS=1
             -DBUILD_TEST=${BUILD_TEST}
-            -DCMAKE_INSTALL_PREFIX=${LIBCTLOP_PREFIX}
+            -DCMAKE_INSTALL_PREFIX=${LIBXOP_PREFIX}
         )
         ${CMAKE} .. ${CMAKE_ARGS[@]}
     fi
@@ -96,19 +96,19 @@ function build_ctlop_cuda() {
     popd
 }
 
-function build_ctlop_py {
-    LIBDIR=${PROJECT_ROOT}/python/ctlop/lib
+function build_xop_py {
+    LIBDIR=${PROJECT_ROOT}/python/xop/lib
     mkdir -p ${LIBDIR}
 
     pushd ${LIBDIR}
 
     popd
-    ##### build ctlop torch bindings #####
+    ##### build xop torch bindings #####
     MAX_JOBS=${JOBS} python3 setup.py develop --user
     if [ $BDIST_WHEEL == "ON" ]; then
         MAX_JOBS=${JOBS} python3 setup.py bdist_wheel
     fi
 }
 
-build_ctlop_cuda
-build_ctlop_py
+build_xop_cuda
+build_xop_py

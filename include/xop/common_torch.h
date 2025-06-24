@@ -1,13 +1,13 @@
 
 #pragma once
 #include "c10/util/Optional.h"
-#include "ctlop/ctlop.h"
+#include "xop/xop.h"
 #include <torch/torch.h>
 #include <ATen/core/ivalue.h>
 #include <c10/core/ScalarType.h>
 #include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
 
-namespace ctlop {
+namespace xop {
 
 inline int8_t from_torch_dtype(at::ScalarType torch_dtype) {
   switch (torch_dtype) {
@@ -69,4 +69,4 @@ inline at::ScalarType to_torch_dtype(UnifiedMetaEnum dtype) {
   return at::ScalarType::Undefined;
 }
 
-}  // namespace ctlop
+}  // namespace xop

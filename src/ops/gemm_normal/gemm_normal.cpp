@@ -1,7 +1,7 @@
 
 #include "gemm_normal.h"
-#include "ctlop/ops_impl/global_resource.h"
-#include "ctlop/common_torch.h"
+#include "xop/ops_impl/global_resource.h"
+#include "xop/common_torch.h"
 
 #include <ATen/core/jit_type.h>
 #include <ATen/core/List.h>
@@ -17,16 +17,16 @@
 #include <utility>
 
 /////////////////////////////
-#include "ctlop/ctlop.h"
-#define CHECK_TYPE(x, st) CTLOP_CHECK_EQ(x.scalar_type(), st) << "Inconsistency type of Tensor " #x
-#define CHECK_CUDA(x) CTLOP_CHECK(x.is_cuda()) << #x << " must be a CUDA tensor"
-#define CHECK_CONTIGUOUS(x) CTLOP_CHECK(x.is_contiguous()) << #x << " must be contiguous"
+#include "xop/xop.h"
+#define CHECK_TYPE(x, st) XOP_CHECK_EQ(x.scalar_type(), st) << "Inconsistency type of Tensor " #x
+#define CHECK_CUDA(x) XOP_CHECK(x.is_cuda()) << #x << " must be a CUDA tensor"
+#define CHECK_CONTIGUOUS(x) XOP_CHECK(x.is_contiguous()) << #x << " must be contiguous"
 #define CHECK_INPUT(x, st) \
   CHECK_CUDA(x);           \
   CHECK_CONTIGUOUS(x);     \
   CHECK_TYPE(x, st)
 //////////////////////////////
-namespace ctlop {
+namespace xop {
 using torch::Tensor;
 
 enum IdMetaEnum {
@@ -97,7 +97,7 @@ public:
     bool is_tuning = false;
     if (tuning.has_value()) {
       int16_t *data = (int16_t *)tuning.value().data_ptr();
-      CTLOP_CHECK_EQ(data[0], 1);
+      XOP_CHECK_EQ(data[0], 1);
       id_meta[IdMetaEnum::Id] = data[1];
       id_meta[IdMetaEnum::Schema] = data[2];
       is_tuning = true;
@@ -168,7 +168,7 @@ public:
     bool is_tuning = false;
     if (tuning.has_value()) {
       int16_t *data = (int16_t *)tuning.value().data_ptr();
-      CTLOP_CHECK_EQ(data[0], 1);
+      XOP_CHECK_EQ(data[0], 1);
       id_meta[IdMetaEnum::Id] = data[1];
       id_meta[IdMetaEnum::Schema] = data[2];
       is_tuning = true;
@@ -244,12 +244,12 @@ private:
 
     if (bias.has_value()) {
       CHECK_INPUT(bias.value(), this->output_dtype);
-      CTLOP_CHECK_EQ(bias->dim(), 2);
-      CTLOP_CHECK_EQ(m, bias->size(0));
-      CTLOP_CHECK_EQ(n, bias->size(1));
+      XOP_CHECK_EQ(bias->dim(), 2);
+      XOP_CHECK_EQ(m, bias->size(0));
+      XOP_CHECK_EQ(n, bias->size(1));
     }
     int32_t wk = transpose_weight ? weight.size(0) : weight.size(1);
-    CTLOP_CHECK_EQ(wk, k) << "weight k-dim mismatch";
+    XOP_CHECK_EQ(wk, k) << "weight k-dim mismatch";
 
     rt_args->m = m;
     rt_args->n = n;
@@ -289,7 +289,7 @@ int GemmNormal::forward(
     c10::optional<torch::Tensor> output_scale,
     c10::optional<torch::Tensor> tuning,
     bool fast_accum) {
-  // CTLOP_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
+  // XOP_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
   return impl_->forward(
       std::move(input),
       std::move(weight),
@@ -309,7 +309,7 @@ int GemmNormal::grouped_forward(
   c10::optional<std::vector<torch::Tensor>> input_scale,
   c10::optional<std::vector<torch::Tensor>> weight_scale,
   c10::optional<torch::Tensor> tuning) {
-// CTLOP_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
+// XOP_CHECK(impl_ != nullptr) << "GemmNormal is not initialized";
 return impl_->grouped_forward(
     std::move(inputs),
     std::move(weights),
@@ -320,4 +320,4 @@ return impl_->grouped_forward(
 }
 
 
-}  // namespace ctlop
+}  // namespace xop

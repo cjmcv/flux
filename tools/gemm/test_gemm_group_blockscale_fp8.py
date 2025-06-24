@@ -6,7 +6,7 @@ import triton
 import triton.language as tl
 from deep_gemm import calc_diff, get_col_major_tma_aligned_tensor
 
-import ctlop
+import xop
 
 import math
 
@@ -272,9 +272,9 @@ def fp8_gemm_group_deepgemm(x_fp8_grouped, y_fp8_grouped, out, m_indices):
     )
     return out
 
-def ctlop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out):
-    out_ctlop = out.clone()
-    out_ctlop_list = list(torch.chunk(out_ctlop, chunks=num_groups, dim=0))
+def xop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out):
+    out_xop = out.clone()
+    out_xop_list = list(torch.chunk(out_xop, chunks=num_groups, dim=0))
 
     x_fp8_grouped_list = list(torch.chunk(x_fp8_grouped[0], chunks=num_groups, dim=0))
     x_fp8_grouped_scale_list = list(torch.chunk(x_fp8_grouped[1], chunks=num_groups, dim=0))
@@ -287,7 +287,7 @@ def ctlop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out):
     x_fp8_grouped_scale_t_list = [xs.t().contiguous() for xs in x_fp8_grouped_scale_list]
     y_fp8_grouped_scale_t_list = [ys.t().contiguous() for ys in y_fp8_grouped_scale_list]
 
-    return x_fp8_grouped_list, y_fp8_grouped_list, x_fp8_grouped_scale_t_list, y_fp8_grouped_scale_t_list, out_ctlop_list
+    return x_fp8_grouped_list, y_fp8_grouped_list, x_fp8_grouped_scale_t_list, y_fp8_grouped_scale_t_list, out_xop_list
 
 
 def calculate_diff(m: int, n: int, k: int, num_groups: int):
@@ -306,22 +306,22 @@ def calculate_diff(m: int, n: int, k: int, num_groups: int):
 
     #####################################################
     #
-    ctlop_gemm = ctlop.GemmNormal(
+    xop_gemm = xop.GemmNormal(
         input_dtype=torch.float8_e4m3fn,
         output_dtype=torch.bfloat16,
         transpose_weight=False
     )
-    x_list, y_list, x_scale_t_list, y_scale_t_list, out_ctlop_list = ctlop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out)
+    x_list, y_list, x_scale_t_list, y_scale_t_list, out_xop_list = xop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out)
 
-    ctlop_gemm.grouped_forward(
+    xop_gemm.grouped_forward(
         x_list,
         y_list,
-        outputs=out_ctlop_list,
+        outputs=out_xop_list,
         inputs_scale=x_scale_t_list,
         weights_scale=y_scale_t_list,
         tuning = None,
     )
-    out_ctlop = torch.cat(out_ctlop_list, dim=0)
+    out_xop = torch.cat(out_xop_list, dim=0)
     #
     #####################################################
 
@@ -348,29 +348,29 @@ def calculate_diff(m: int, n: int, k: int, num_groups: int):
     diff_torch_deepgemm = torch.abs(out_torch - out_deepgemm).mean().item()
     diff_torch_triton = torch.abs(out_torch - out_triton).mean().item()
     diff_deepgemm_triton = torch.abs(out_deepgemm - out_triton).mean().item()
-    diff_ctlop_triton = torch.abs(out_ctlop - out_triton).mean().item()
+    diff_xop_triton = torch.abs(out_xop - out_triton).mean().item()
 
     print(f"Shape m={m}, n={n}, k={k}:")
     print(f"Torch output: {out_torch[0, 0:5]}")
     print(f"DeepGEMM output: {out_deepgemm[0, 0:5]}")
     print(f"Triton output: {out_triton[0, 0:5]}")
-    print(f"Ctlop output: {out_ctlop[0, 0:5]}")
+    print(f"XOP output: {out_xop[0, 0:5]}")
     print(f"Mean absolute difference (Torch-DeepGEMM): {diff_torch_deepgemm}")
     print(f"Mean absolute difference (Torch-Triton): {diff_torch_triton}")
     print(f"Mean absolute difference (DeepGEMM-Triton): {diff_deepgemm_triton}")
-    print(f"Mean absolute difference (Ctlop-Triton): {diff_ctlop_triton}")
+    print(f"Mean absolute difference (XOP-Triton): {diff_xop_triton}")
 
     deepgemm_torch_diff = calc_diff(out_deepgemm, out_torch)
     triton_torch_diff = calc_diff(out_triton, out_torch)
     deepgemm_triton_diff = calc_diff(out_deepgemm, out_triton)
-    ctlop_triton_diff = calc_diff(out_ctlop, out_triton)
+    xop_triton_diff = calc_diff(out_xop, out_triton)
 
     DIFF_THRESHOLD = 0.001
     all_match = (
         deepgemm_torch_diff < DIFF_THRESHOLD
         and triton_torch_diff < DIFF_THRESHOLD
         and deepgemm_triton_diff < DIFF_THRESHOLD
-        and ctlop_triton_diff < DIFF_THRESHOLD
+        and xop_triton_diff < DIFF_THRESHOLD
     )
     if all_match:
         print("✅ All implementations match\n")
@@ -380,7 +380,7 @@ def calculate_diff(m: int, n: int, k: int, num_groups: int):
             f"  - Torch vs DeepGEMM: {'✅' if deepgemm_torch_diff < DIFF_THRESHOLD else '❌'}"
             f"  - Torch vs Triton: {'✅' if triton_torch_diff < DIFF_THRESHOLD else '❌'}"
             f"  - DeepGEMM vs Triton: {'✅' if deepgemm_triton_diff < DIFF_THRESHOLD else '❌'}"
-            f"  - Ctlop vs Triton: {'✅' if ctlop_triton_diff < DIFF_THRESHOLD else '❌'}"
+            f"  - XOP vs Triton: {'✅' if cxoptriton_diff < DIFF_THRESHOLD else '❌'}"
         )
 
 
@@ -438,8 +438,8 @@ def get_benchmark(tp_size):
             x_names=["m", "n", "k", "num_groups", "tp_size"],
             x_vals=[config for config in all_configs],
             line_arg="provider",
-            line_vals=["ctlop", "deepgemm", "triton"],
-            line_names=["Ctlop", "DeepGEMM", "Triton"],
+            line_vals=["xop", "deepgemm", "triton"],
+            line_names=["XOP", "DeepGEMM", "Triton"],
             styles=[("blue", "-"), ("red", "-"), ("green", "-")],
             ylabel="ms",
             plot_name=f"fp8-group-gemm-performance-comparison-tp{tp_size}",
@@ -465,20 +465,20 @@ def get_benchmark(tp_size):
         )
 
         quantiles = [0.5, 0.2, 0.8]
-        if provider == "ctlop":
+        if provider == "xop":
 
-            ctlop_gemm = ctlop.GemmNormal(
+            xop_gemm = xop.GemmNormal(
                 input_dtype=torch.float8_e4m3fn,
                 output_dtype=torch.bfloat16,
                 transpose_weight=False
             )
-            x_list, y_list, x_scale_t_list, y_scale_t_list, out_ctlop_list = ctlop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out)
+            x_list, y_list, x_scale_t_list, y_scale_t_list, out_xop_list = xop_data_prepare(num_groups, x_fp8_grouped, y_fp8_grouped, out)
 
             ms, min_ms, max_ms = triton.testing.do_bench(
-                lambda: ctlop_gemm.grouped_forward(
+                lambda: xop_gemm.grouped_forward(
                     x_list,
                     y_list,
-                    outputs=out_ctlop_list,
+                    outputs=out_xop_list,
                     inputs_scale=x_scale_t_list,
                     weights_scale=y_scale_t_list,
                     tuning = None,

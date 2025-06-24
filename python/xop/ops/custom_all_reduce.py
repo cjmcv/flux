@@ -12,8 +12,8 @@ import torch.distributed as dist
 from torch.distributed import ProcessGroup
 from typing_extensions import ParamSpec
 
-import ctlop
-from ctlop.cuda_wrapper import CudaRTLibrary
+import xop
+from xop.cuda_wrapper import CudaRTLibrary
 logger = logging.getLogger(__name__)
 
 try:
@@ -193,7 +193,7 @@ class CustomAllreduce:
         # temporary buffer for storing intermediate allreduce results.
         # <NT> meta_sizeÊÇSignalµÄsize£¬
         self.meta_ptrs = self.create_shared_buffer(
-            ctlop.meta_size() + max_size, group=group
+            xop.meta_size() + max_size, group=group
         )
         # This is a pre-registered IPC buffer. In eager mode, input tensors
         # are first copied into this buffer before allreduce is performed
@@ -206,10 +206,10 @@ class CustomAllreduce:
         self.rank_data = torch.empty(
             8 * 1024 * 1024, dtype=torch.uint8, device=self.device
         )
-        self._ptr = ctlop.init_custom_ar(
+        self._ptr = xop.init_custom_ar(
             self.meta_ptrs, self.rank_data, rank, self.full_nvlink
         )
-        ctlop.register_buffer(self._ptr, self.buffer_ptrs)
+        xop.register_buffer(self._ptr, self.buffer_ptrs)
         
 
         self.disabled = False
@@ -270,7 +270,7 @@ class CustomAllreduce:
     def _get_ipc_meta(self, inp: torch.Tensor):
         # _share_cuda_() doesn't accept meta buffer not allocated from
         # PyTorch cache allocator, use direct HIP call to get IPC handle
-        handle = ctlop.get_meta_buffer_ipc_handle(inp)
+        handle = xop.get_meta_buffer_ipc_handle(inp)
         shard_data = (
             bytes(handle),  # ipc handle to base ptr
             0,  # offset of base ptr
@@ -303,10 +303,10 @@ class CustomAllreduce:
 
     def register_buffer(self, inp: torch.Tensor):
         handles, offsets = self._get_ipc_meta(inp)
-        ctlop.register_buffer(self._ptr, inp, handles, offsets)
+        xop.register_buffer(self._ptr, inp, handles, offsets)
 
     def register_graph_buffers(self):
-        handle, offset = ctlop.get_graph_buffer_ipc_meta(self._ptr)
+        handle, offset = xop.get_graph_buffer_ipc_meta(self._ptr)
         logger.info("Registering %d cuda graph addresses", len(offset))
         # We cannot directly use `dist.all_gather_object` here
         # because it is incompatible with `gloo` backend under inference mode.
@@ -323,7 +323,7 @@ class CustomAllreduce:
         # Unpack list of tuples to tuple of lists.
         handles = [d[0] for d in all_data]  # type: ignore
         offsets = [d[1] for d in all_data]  # type: ignore
-        ctlop.register_graph_buffers(self._ptr, handles, offsets)
+        xop.register_graph_buffers(self._ptr, handles, offsets)
 
     def should_custom_ar(self, inp: torch.Tensor):
         if self.disabled:
@@ -357,9 +357,9 @@ class CustomAllreduce:
         if out is None:
             out = torch.empty_like(inp)
         if registered:
-            ctlop.all_reduce(self._ptr, inp, out, 0, 0)
+            xop.all_reduce(self._ptr, inp, out, 0, 0)
         else:
-            ctlop.all_reduce(
+            xop.all_reduce(
                 self._ptr, inp, out, self.buffer_ptrs[self.rank], self.max_size
             )
         return out
@@ -382,7 +382,7 @@ class CustomAllreduce:
 
     def close(self):
         if not self.disabled and self._ptr:
-            ctlop.dispose(self._ptr)
+            xop.dispose(self._ptr)
             self.free_shared_buffer(self.meta_ptrs)
             self.free_shared_buffer(self.buffer_ptrs)
             self._ptr = 0

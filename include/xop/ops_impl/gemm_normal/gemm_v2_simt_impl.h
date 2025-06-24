@@ -1,8 +1,8 @@
 #pragma once
-#include "ctlop/ops_impl/global_resource.h"
-#include "ctlop/ops_impl/args_util.h"
+#include "xop/ops_impl/global_resource.h"
+#include "xop/ops_impl/args_util.h"
 
-namespace ctlop {
+namespace xop {
 
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC, 
@@ -90,4 +90,4 @@ private:
   DeviceGemmSimt gemm_dev_;
 };
 
-} // namespace ctlop
+} // namespace xop

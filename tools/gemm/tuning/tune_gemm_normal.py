@@ -10,7 +10,7 @@ import numpy as np
 import time
 import torch
 
-import ctlop
+import xop
 from tune_common import Meta, per_token_cast_to_fp8, per_block_cast_to_fp8
 
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
@@ -180,7 +180,7 @@ def profiling_core(tuning, shape, fn: callable, fp):
         print("fastest_config is not matched: {0},{1} vs {2},{3}".format(str(fastest_id), str(fastest_schema), str(tuning[1].item()), str(tuning[2].item())))
         raise RuntimeError
     
-def run_ctlop_profiling(schema, input: torch.Tensor, weight: torch.Tensor, 
+def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor, 
                         input_scale: torch.Tensor, weight_scale: torch.Tensor,
                         config: TuningConfig, fp):
     m = input.size(0)
@@ -197,7 +197,7 @@ def run_ctlop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
 
     tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
     output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
-    op = ctlop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
+    op = xop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
 
     def fn():
         return op.forward(input, weight, output=output, bias=None, 
@@ -207,7 +207,7 @@ def run_ctlop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
     profiling_core(tuning, [m,n,k,g], fn, fp)
     return output.cpu()
 
-def run_ctlop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[torch.Tensor], 
+def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[torch.Tensor], 
                                 inputs_scale: List[torch.Tensor], weights_scale: List[torch.Tensor],
                                 config: TuningConfig, fp):
     m = inputs[0].size(0)
@@ -220,7 +220,7 @@ def run_ctlop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: Lis
         outputs.append(torch.empty([m, n], dtype=config.dtypeC, device=inputs[0].device, requires_grad=False))
     
     tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
-    op = ctlop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
+    op = xop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
 
     def fn():
         return op.grouped_forward(inputs, weights, outputs=outputs, 
@@ -239,18 +239,18 @@ def tune_one_config(schema, config: TuningConfig, fp):
     if (isinstance(schema, GemmGroupedBlockScaleFp8Schema)):
         x, x_scale, y, y_scale = schema.gen_scale(input.clone(), weight.clone(), config)
         ref_output = schema.get_ref_output(x, y, x_scale, y_scale)
-        ctlop_output = run_ctlop_grouped_profiling(schema, x, y, x_scale, y_scale, config, fp)
+        xop_output = run_xop_grouped_profiling(schema, x, y, x_scale, y_scale, config, fp)
     else:
         x, x_scale, y, y_scale = schema.gen_scale(input.clone(), weight.clone())
         ref_output = schema.get_ref_output(x, y, x_scale, y_scale)
-        ctlop_output = run_ctlop_profiling(schema, x, y, x_scale, y_scale, config, fp)
+        xop_output = run_xop_profiling(schema, x, y, x_scale, y_scale, config, fp)
 
     if ref_output is not None:
         if config.dtypeC == torch.bfloat16:
             atol, rtol = 0.02, 0.02
         else:
             atol, rtol = 0.01, 0.01
-        ctlop.torch_allclose(ctlop_output, ref_output, atol=atol, rtol=rtol)
+        xop.torch_allclose(xop_output, ref_output, atol=atol, rtol=rtol)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -269,9 +269,9 @@ if __name__ == "__main__":
     fp = {}
     fp[tag] = open("tuned_config_{0}.cu".format(tag.lower()), "w")
 
-    fp[tag].write('#include "ctlop/ctlop.h"\n')
-    fp[tag].write('#include "ctlop/ops_impl/global_resource.h"\n\n')
-    fp[tag].write('namespace ctlop {\n')
+    fp[tag].write('#include "xop/xop.h"\n')
+    fp[tag].write('#include "xop/ops_impl/global_resource.h"\n\n')
+    fp[tag].write('namespace xop {\n')
     fp[tag].write('using namespace cutlass;\n')
     fp[tag].write('using ME = UnifiedMetaEnum;\n\n')
     fp[tag].write('static int tuned_config_{0} = []() {{\n'.format(tag.lower()))

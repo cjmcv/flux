@@ -3,7 +3,7 @@
 
 #include <torch/all.h>
   
-namespace ctlop {
+namespace xop {
 
 std::vector<at::Tensor>
 mha_fwd(at::Tensor &q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seqlens_q
@@ -42,4 +42,4 @@ mha_fwd(at::Tensor &q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seq
         int const sm_margin
         );
 
-}  // namespace ctlop
+}  // namespace xop

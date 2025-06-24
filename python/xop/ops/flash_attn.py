@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 
-import ctlop
+import xop
 
 def is_fa3_supported(device=None) -> bool:
     #  There some fa3 FYI
@@ -167,7 +167,7 @@ def flash_attn_with_kvcache(
     rotary_cos, rotary_sin = [maybe_contiguous(x) for x in (rotary_cos, rotary_sin)]
     rotary_seqlens = maybe_contiguous(rotary_seqlens)
 
-    out, softmax_lse, *rest = ctlop.mha_fwd(
+    out, softmax_lse, *rest = xop.mha_fwd(
         q,
         k_cache,
         v_cache,
@@ -239,7 +239,7 @@ def flash_attn_varlen_func(
         )
 
     # breakpoint()
-    out, softmax_lse, *rest = ctlop.mha_fwd(
+    out, softmax_lse, *rest = xop.mha_fwd(
         q,
         k,
         v,

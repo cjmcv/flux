@@ -3,7 +3,7 @@
 
 #include <torch/all.h>
   
-namespace ctlop {
+namespace xop {
 
 // Fake pointer type, must match fptr_t type in ops.h.
 // We use this type alias to indicate when pointers are passed in as int64_t.
@@ -20,4 +20,4 @@ void register_graph_buffers(fptr_t _fa, const std::vector<std::vector<int64_t>>&
 
 void helloABC(int a);
 
-}  // namespace ctlop
+}  // namespace xop

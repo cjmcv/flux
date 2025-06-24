@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-namespace ctlop {
+namespace xop {
 
 struct RtArguments {
   int m;
@@ -56,4 +56,4 @@ struct RtGroupedBlockScaleFp8ArgumentsV3 : public RtArguments {
   std::vector<void const *> ptr_blockscale_B;
 };
 
-} // namespace ctlop
+} // namespace xop

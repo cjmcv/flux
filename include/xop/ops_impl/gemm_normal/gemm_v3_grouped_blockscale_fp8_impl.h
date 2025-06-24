@@ -1,7 +1,7 @@
 #pragma once
 #include <cfloat>
-#include "ctlop/ops_impl/global_resource.h"
-#include "ctlop/ops_impl/args_util.h"
+#include "xop/ops_impl/global_resource.h"
+#include "xop/ops_impl/args_util.h"
 
 #include "cute/tensor.hpp"
 #include "cutlass/tensor_ref.h"
@@ -15,7 +15,7 @@
 #include "cutlass/util/packed_stride.hpp"
 #include "cutlass/util/device_memory.h"
 
-namespace ctlop {
+namespace xop {
 
 using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90GroupParams<cute::Shape<int,int,int>>::RasterOrderOptions;
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
@@ -407,4 +407,4 @@ private:
   // cutlass::DeviceAllocation<const ElementBlockScale *> ptr_blockscale_B;
 };
 
-} // namespace ctlop
+} // namespace xop

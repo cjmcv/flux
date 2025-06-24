@@ -15,7 +15,7 @@
 
 #include "arguments.h"
 
-namespace ctlop {
+namespace xop {
 
 // GemmDeviceBase
 class GemmBase {
@@ -176,4 +176,4 @@ public:
   ~TunedConfigRegister() {}
 };
 
-} // namespace ctlop
+} // namespace xop

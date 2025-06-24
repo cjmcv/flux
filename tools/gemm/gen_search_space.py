@@ -9,7 +9,7 @@ import itertools
 # print(sys.path)
 
 class TypeWarpper:
-    # ctlop type warp
+    # xop type warp
     def xtw(self, type):
         return "(int16_t)ME::" + type
     # cutlass type warp
@@ -22,7 +22,7 @@ class TypeWarpper:
         else:
             return 'cute::Shape<cute::_{0},cute::_{1},cute::_{2}>'.format(str(shape[0]), str(shape[1]), str(shape[2]))
 
-    def ctlop_to_cutlasstype(self, ctlop_type):
+    def xop_to_cutlasstype(self, xop_type):
         string_to_string = {
             "GemmNormal": "Error",
             "GemmNormalSimt": "Error",
@@ -45,32 +45,32 @@ class TypeWarpper:
             "SwizzleIdentity": "gemm::threadblock::GemmIdentityThreadblockSwizzle<>",
             "SwizzleStreamK": "gemm::threadblock::ThreadblockSwizzleStreamK",
             #
-            "Heuristic": "ctlop::RasterOrderOptions::Heuristic",
-            "AlongM": "ctlop::RasterOrderOptions::AlongM",
-            "AlongN": "ctlop::RasterOrderOptions::AlongN",
+            "Heuristic": "xop::RasterOrderOptions::Heuristic",
+            "AlongM": "xop::RasterOrderOptions::AlongM",
+            "AlongN": "xop::RasterOrderOptions::AlongN",
             # 
             "TSPersistent": "cutlass::gemm::PersistentScheduler",
             "TSStreamK": "cutlass::gemm::StreamKScheduler"
         }
         # 返回对应的字符串，如果没有匹配的值，则返回"Unknown"
-        return string_to_string.get(ctlop_type, "Unknown")
+        return string_to_string.get(xop_type, "Unknown")
 
 def make_meta_space(w, data_type, layout, arch):
     res = []
     for t, l, a in itertools.product(data_type, layout, arch):
-        meta_ctlop_str = ''
+        meta_xop_str = ''
         meta_cutlass_str = ''
         for ti in t:
-            meta_ctlop_str += w.xtw(ti) + ', '
-            meta_cutlass_str += w.ctlop_to_cutlasstype(ti) + ', '
+            meta_xop_str += w.xtw(ti) + ', '
+            meta_cutlass_str += w.xop_to_cutlasstype(ti) + ', '
 
-        meta_ctlop_str += w.xtw(l) + ', '
-        meta_cutlass_str += w.ctlop_to_cutlasstype(l) + ', '
+        meta_xop_str += w.xtw(l) + ', '
+        meta_cutlass_str += w.xop_to_cutlasstype(l) + ', '
 
-        meta_ctlop_str += w.xtw(a)
-        meta_cutlass_str += w.ctlop_to_cutlasstype(a)
+        meta_xop_str += w.xtw(a)
+        meta_cutlass_str += w.xop_to_cutlasstype(a)
 
-        res.append((meta_ctlop_str, meta_cutlass_str))
+        res.append((meta_xop_str, meta_cutlass_str))
     return res
 
 class GemmNormalSchema:
@@ -118,7 +118,7 @@ class GemmNormalSchema:
             if (swizzle == 'SwizzleIdentity' and avail_sm == 1):
                 continue
             hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
-                w.cstw(bshape), w.cstw(wshape), w.cstw(ishape), w.ctlop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
+                w.cstw(bshape), w.cstw(wshape), w.cstw(ishape), w.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
             
             res.append(hparam_str)
         return res
@@ -150,7 +150,7 @@ class GemmNormalSimtSchema:
             bshape = bw_shape[0]
             wshape = bw_shape[1]
             hparam_str = '{0},{1},{2},{3},{4}'.format(
-                w.cstw(bshape), w.cstw(wshape), w.ctlop_to_cutlasstype(swizzle), str(stage), str(splitk_factor))
+                w.cstw(bshape), w.cstw(wshape), w.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor))
             
             res.append(hparam_str)
         return res
@@ -177,8 +177,8 @@ class GemmBolckScaleFp8Schema:
         for tile_scheduler, tile_shape, cluster_shape, raster_order, swizzle in itertools.product(
             tile_schedulers, tile_shapes, cluster_shapes, raster_orders, swizzles):
             hparam_str = '{0},{1},{2},{3},{4}'.format(
-                w.ctlop_to_cutlasstype(tile_scheduler), w.cstw(tile_shape,3), w.cstw(cluster_shape,3),
-                w.ctlop_to_cutlasstype(raster_order), str(swizzle))
+                w.xop_to_cutlasstype(tile_scheduler), w.cstw(tile_shape,3), w.cstw(cluster_shape,3),
+                w.xop_to_cutlasstype(raster_order), str(swizzle))
             res.append(hparam_str)
         return res
 
@@ -204,8 +204,8 @@ class GemmGroupedBolckScaleFp8Schema:
         for tile_scheduler, tile_shape, cluster_shape, raster_order, swizzle in itertools.product(
             tile_schedulers, tile_shapes, cluster_shapes, raster_orders, swizzles):
             hparam_str = '{0},{1},{2},{3},{4}'.format(
-                w.ctlop_to_cutlasstype(tile_scheduler), w.cstw(tile_shape,3), w.cstw(cluster_shape,3),
-                w.ctlop_to_cutlasstype(raster_order), str(swizzle))
+                w.xop_to_cutlasstype(tile_scheduler), w.cstw(tile_shape,3), w.cstw(cluster_shape,3),
+                w.xop_to_cutlasstype(raster_order), str(swizzle))
             res.append(hparam_str)
         return res
         
@@ -225,21 +225,21 @@ class SearchSpaceGenerator:
         fp = {}
         fp[tag] = open("search_space_{0}.cu".format(tag.lower()), "w")
         fp[tag].write('// clang-format off\n')
-        fp[tag].write('#include "ctlop/ops_impl/{0}"\n\n'.format(schema.impl_header))
-        fp[tag].write('namespace ctlop {\n')
+        fp[tag].write('#include "xop/ops_impl/{0}"\n\n'.format(schema.impl_header))
+        fp[tag].write('namespace xop {\n')
         fp[tag].write('using namespace cutlass;\n')
         fp[tag].write('using ME = UnifiedMetaEnum;\n\n')
         fp[tag].write('static int search_space_{0} = []() {{\n'.format(tag.lower()))
         fp[tag].write('  GemmConfigRegister& ins = GemmConfigRegister::instance();\n')
 
         type_warpper = TypeWarpper()
-        ctlop_tag = type_warpper.xtw(tag)
+        xop_tag = type_warpper.xtw(tag)
         meta = schema.get_meta_space(type_warpper)
         hparam = schema.get_hparam_space(type_warpper)
         for m in meta:
-            ctlop_meta, cutlass_meta = m
+            xop_meta, cutlass_meta = m
             for id, h in enumerate(hparam):
-                fp[tag].write('  ins.add({{{0},{1},{2}}}, '.format(str(id), ctlop_tag, ctlop_meta))
+                fp[tag].write('  ins.add({{{0},{1},{2}}}, '.format(str(id), xop_tag, xop_meta))
                 fp[tag].write('/*op*/[]() {{ return new {0}</*meta*/{1},/*hparam*/{2}>();}});\n'.format(schema.impl, cutlass_meta, h))
 
         fp[tag].write('  return 0;\n}();\n}')

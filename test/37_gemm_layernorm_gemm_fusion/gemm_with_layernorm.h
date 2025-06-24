@@ -61,8 +61,8 @@
 
 #include "gemm_with_epilogue_visitor.h"
 // #include "helper.h"
-#include "ctlop/common_cuda.h"
-using namespace ctlop;
+#include "xop/common_cuda.h"
+using namespace xop;
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace cutlass {

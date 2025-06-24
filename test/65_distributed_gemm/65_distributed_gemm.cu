@@ -118,8 +118,8 @@
 #include "cutlass/experimental/distributed/schedules/dist_gemm_1d_schedules.hpp"
 
 // #include "helper.h"
-#include "ctlop/common_cuda.h"
-using namespace ctlop;
+#include "xop/common_cuda.h"
+using namespace xop;
 
 // Distributed GEMM helpers
 #include "dist_gemm_helpers.h"

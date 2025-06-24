@@ -594,7 +594,7 @@ mha_fwd_get_scheduler_metadata(
 // h_k: num_heads_k
 // d: head_size
 
-namespace ctlop {
+namespace xop {
 
 std::vector<at::Tensor>
 mha_fwd(at::Tensor &q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seqlens_q
@@ -1105,7 +1105,7 @@ mha_fwd(at::Tensor &q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seq
     return {out, softmax_lse, out_accum, softmax_lse_accum};
 }
 
-} // namespace ctlop
+} // namespace xop
 
 std::vector<at::Tensor>
 mha_combine(const at::Tensor &out_partial,         // num_splits x batch_size x seqlen x num_heads x head_size

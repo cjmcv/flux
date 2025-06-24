@@ -1,7 +1,7 @@
-#include "ctlop/ctlop.h"
-#include "ctlop/ops_impl/global_resource.h"
+#include "xop/xop.h"
+#include "xop/ops_impl/global_resource.h"
 
-namespace ctlop {
+namespace xop {
 using namespace cutlass;
 using ME = UnifiedMetaEnum;
 

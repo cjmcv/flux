@@ -8,10 +8,10 @@ from torch.utils.cpp_extension import BuildExtension
 # Project directory root
 root_path: Path = Path(__file__).resolve().parent
 
-PACKAGE_NAME = "ctlop"
+PACKAGE_NAME = "xop"
 
 def get_package_version():
-    with open(Path(root_path) / "python" / "ctlop" / "__init__.py", "r") as f:
+    with open(Path(root_path) / "python" / "xop" / "__init__.py", "r") as f:
         version_match = re.search(r"^__version__\s*=\s*(.*)$", f.read(), re.MULTILINE)
     public_version = ast.literal_eval(version_match.group(1))
     return public_version
@@ -37,10 +37,10 @@ def cutlass_deps():
     return include_dirs, library_dirs, libraries
 
 @pathlib_wrapper
-def ctlop_deps():
+def xop_deps():
     include_dirs = [root_path / "include", root_path / "src"]
     library_dirs = [root_path / "build" / "lib"]
-    libraries = ["ctlop"]
+    libraries = ["xop"]
     return include_dirs, library_dirs, libraries
 
 
@@ -56,7 +56,7 @@ def setup_pytorch_extension() -> setuptools.Extension:
     """Setup CppExtension for PyTorch support"""
     include_dirs, library_dirs, libraries = [], [], []
 
-    deps = [cutlass_deps(), ctlop_deps(), cuda_deps()]
+    deps = [cutlass_deps(), xop_deps(), cuda_deps()]
 
     for include_dir, library_dir, library in deps:
         include_dirs += include_dir
@@ -74,7 +74,7 @@ def setup_pytorch_extension() -> setuptools.Extension:
         "-fdiagnostics-color=always",
     ]
 
-    ctlop_ths_targets = [
+    xop_ths_targets = [
         str(x.relative_to(root_path))  # relative path for include_package_data
         for x in Path(root_path / "src" / "pybind").glob("*.cpp")
     ]
@@ -82,8 +82,8 @@ def setup_pytorch_extension() -> setuptools.Extension:
     from torch.utils.cpp_extension import CppExtension
 
     return CppExtension(
-        name="ctlop_pybind",
-        sources=ctlop_ths_targets,
+        name="xop_pybind",
+        sources=xop_ths_targets,
         include_dirs=include_dirs,
         library_dirs=library_dirs,
         libraries=libraries,
@@ -92,22 +92,22 @@ def setup_pytorch_extension() -> setuptools.Extension:
     # extra_link_args=ld_flags,
 
 def main():
-    ctlop_version = get_package_version()
+    xop_version = get_package_version()
     packages = setuptools.find_packages(
         where="python",
         include=[
-            "ctlop",
+            "xop",
         ],
     )
-    data_file_list = ["python/ctlop/lib/libctlop.so"]
+    data_file_list = ["python/xop/lib/libxop.so"]
 
     # Configure package
     setuptools.setup(
         name=PACKAGE_NAME,
-        version=ctlop_version,
+        version=xop_version,
         package_dir={"": "python"},
         packages=packages,
-        description="Ctlop library",
+        description="XOP library",
         ext_modules=[setup_pytorch_extension()],
         cmdclass={"build_ext": BuildExtension},
         setup_requires=["torch", "cmake", "packaging"],
@@ -115,9 +115,9 @@ def main():
         extras_require={"test": ["torch", "numpy"]},
         license_files=("LICENSE",),
         package_data={
-            "python/ctlop/lib": ["*.so"],
-            "python/ctlop/include": ["*.h"],
-            "python/ctlop/share": ["*.cmake"],
+            "python/xop/lib": ["*.so"],
+            "python/xop/include": ["*.h"],
+            "python/xop/share": ["*.cmake"],
         },  # only works for bdist_wheel under package
         python_requires=">=3.8",
         include_package_data=True,

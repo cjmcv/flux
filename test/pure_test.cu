@@ -134,11 +134,11 @@
  
 //  #include "helper.h"
 #include <map>
-#include "ctlop/common_cuda.h"
-#include "ctlop/ops_impl/gemm_normal/gemm_v2_impl.h"
-#include "ctlop/ops_impl/gemm_normal/gemm_v2_simt_impl.h"
+#include "xop/common_cuda.h"
+#include "xop/ops_impl/gemm_normal/gemm_v2_impl.h"
+#include "xop/ops_impl/gemm_normal/gemm_v2_simt_impl.h"
 
-using namespace ctlop;
+using namespace xop;
 
 /// Result structure
 struct Result
@@ -196,7 +196,7 @@ Result run(GemmBase *gemm, std::string description, RtArguments &rt_args, int it
   // Run profiling loop
   if (iterations > 0)
   {
-    ctlop::GpuTimer timer;
+    xop::GpuTimer timer;
     timer.start();
     for (int iter = 0; iter < iterations; ++iter) {
     gemm->run();

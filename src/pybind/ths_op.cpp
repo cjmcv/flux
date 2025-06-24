@@ -1,7 +1,7 @@
 
 #include "ths_op.h"
 
-namespace ctlop {
+namespace xop {
 
 ThsOpsInitRegistry &ThsOpsInitRegistry::instance() {
   static ThsOpsInitRegistry inst;
@@ -21,9 +21,9 @@ void ThsOpsInitRegistry::initialize_all(py::module &m) const {
   }
 }
 
-PYBIND11_MODULE(CTLOP_TORCH_EXTENSION_NAME, m) {
+PYBIND11_MODULE(XOP_TORCH_EXTENSION_NAME, m) {
   // Initialize ops in registry
   ThsOpsInitRegistry::instance().initialize_all(m);
 }
 
-}  // namespace ctlop
+}  // namespace xop

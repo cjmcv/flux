@@ -5,59 +5,59 @@ link_libraries(CUDA::cudart CUDA::nvml ${CMAKE_THREAD_LIBS_INIT})
 include_directories(${COMMON_HEADER_DIRS})
 
 # add_executable(test_tuning test_tuning.cc)
-# target_link_libraries(test_tuning PUBLIC ctlop)
+# target_link_libraries(test_tuning PUBLIC xop)
 
 # add_executable(test_single_gemm test_single_gemm.cc)
-# target_link_libraries(test_single_gemm PUBLIC ctlop)
+# target_link_libraries(test_single_gemm PUBLIC xop)
 
 # add_executable(test_gemv_only test_gemv_only.cu)
-# target_link_libraries(test_gemv_only PUBLIC ctlop)
+# target_link_libraries(test_gemv_only PUBLIC xop)
 
 # add_executable(test_gemm_simt test_gemm_simt.cu)
-# target_link_libraries(test_gemm_simt PUBLIC ctlop)
+# target_link_libraries(test_gemm_simt PUBLIC xop)
 
 # add_executable(test_dual_gemm dual_gemm/dual_gemm.cu)
-# target_link_libraries(test_dual_gemm PUBLIC ctlop)
+# target_link_libraries(test_dual_gemm PUBLIC xop)
 
 # ## fused_two_gemms
 # include_directories(${CMAKE_CURRENT_SOURCE_DIR}/two_tensor_op_fusion)
 
 # # add_executable(test_fused_two_gemms_grouped_f16_sm80_rf two_tensor_op_fusion/fused_two_gemms_grouped_f16_sm80_rf.cu)
-# # target_link_libraries(test_fused_two_gemms_grouped_f16_sm80_rf PUBLIC ctlop)
+# # target_link_libraries(test_fused_two_gemms_grouped_f16_sm80_rf PUBLIC xop)
 
 # add_executable(test_fused_two_gemms_f16_sm80_rf two_tensor_op_fusion/fused_two_gemms_f16_sm80_rf.cu)
-# target_link_libraries(test_fused_two_gemms_f16_sm80_rf PUBLIC ctlop)
+# target_link_libraries(test_fused_two_gemms_f16_sm80_rf PUBLIC xop)
 
 # add_executable(test_fused_two_gemms_f16_sm80_shmem two_tensor_op_fusion/fused_two_gemms_f16_sm80_shmem.cu)
-# target_link_libraries(test_fused_two_gemms_f16_sm80_shmem PUBLIC ctlop)
+# target_link_libraries(test_fused_two_gemms_f16_sm80_shmem PUBLIC xop)
 
 # # add_executable(test_fused_two_gemms_s8_sm80_rf two_tensor_op_fusion/fused_two_gemms_s8_sm80_rf.cu)
-# # target_link_libraries(test_fused_two_gemms_s8_sm80_rf PUBLIC ctlop)
+# # target_link_libraries(test_fused_two_gemms_s8_sm80_rf PUBLIC xop)
 
 # # add_executable(test_fused_two_gemms_s8_sm80_shmem two_tensor_op_fusion/fused_two_gemms_s8_sm80_shmem.cu)
-# # target_link_libraries(test_fused_two_gemms_s8_sm80_shmem PUBLIC ctlop)
+# # target_link_libraries(test_fused_two_gemms_s8_sm80_shmem PUBLIC xop)
 # ## 
 
 # ##
 
 add_executable(58_ada_fp8_gemm 58_ada_fp8_gemm/ada_fp8_gemm.cu)
-target_link_libraries(58_ada_fp8_gemm PUBLIC ctlop)
+target_link_libraries(58_ada_fp8_gemm PUBLIC xop)
 
 # add_executable(65_distributed_gemm 65_distributed_gemm/65_distributed_gemm.cu)
-# target_link_libraries(65_distributed_gemm PUBLIC ctlop)
+# target_link_libraries(65_distributed_gemm PUBLIC xop)
 
 # add_executable(67_hopper_fp8_warp_specialized_gemm_with_blockwise_scaling 67_hopper_fp8_warp_specialized_gemm_with_blockwise_scaling/67_hopper_fp8_warp_specialized_gemm_with_groupwise_scaling.cu)
-# target_link_libraries(67_hopper_fp8_warp_specialized_gemm_with_blockwise_scaling PUBLIC ctlop)
+# target_link_libraries(67_hopper_fp8_warp_specialized_gemm_with_blockwise_scaling PUBLIC xop)
 
 # add_executable(68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling 68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling/68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling.cu)
-# target_link_libraries(68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling PUBLIC ctlop)
+# target_link_libraries(68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling PUBLIC xop)
 
 # add_executable(68_mini_test 68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling/68_mini_test.cu)
-# target_link_libraries(68_mini_test PUBLIC ctlop)
+# target_link_libraries(68_mini_test PUBLIC xop)
 # #
 # add_executable(37_gemm_layernorm_gemm_fusion 37_gemm_layernorm_gemm_fusion/gemm_layernorm.cu)
-# target_link_libraries(37_gemm_layernorm_gemm_fusion PUBLIC ctlop)
+# target_link_libraries(37_gemm_layernorm_gemm_fusion PUBLIC xop)
 ##
 
 # add_executable(pure_test pure_test.cu)# config_normal_gemm_sm89.cu
-# target_link_libraries(pure_test PUBLIC ctlop)
+# target_link_libraries(pure_test PUBLIC xop)

@@ -1,7 +1,7 @@
 // clang-format off
-#include "ctlop/ops_impl/gemm_normal/gemm_v2_impl.h"
+#include "xop/ops_impl/gemm_normal/gemm_v2_impl.h"
 
-namespace ctlop {
+namespace xop {
 using namespace cutlass;
 using ME = UnifiedMetaEnum;
 

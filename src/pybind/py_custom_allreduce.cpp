@@ -3,7 +3,7 @@
 #include "ths_op.h"
 
 #ifdef ENABLE_ALLREDUCE_CUSTOM
-namespace ctlop {
+namespace xop {
 
 namespace py = pybind11;
 
@@ -44,5 +44,5 @@ static int _register_allreduce_ops [[maybe_unused]] = []() {
   });
   return 0;
 }();
-}  // namespace ctlop
+}  // namespace xop
 #endif // ENABLE_ALLREDUCE_CUSTOM

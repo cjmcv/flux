@@ -78,9 +78,9 @@
 #include "cutlass/util/reference/host/gett.hpp"
 
 // Includes from examples directory
-#include "ctlop/common_cuda.h"
-#include "ctlop/ops_impl/gemm_normal/gemm_v3_blockscale_fp8_impl.h"
-using namespace ctlop;
+#include "xop/common_cuda.h"
+#include "xop/ops_impl/gemm_normal/gemm_v3_blockscale_fp8_impl.h"
+using namespace xop;
 
 #include "hopper_fp8_commandline.hpp"
 using namespace cute;
@@ -873,7 +873,7 @@ int main(int argc, char const **args) {
 #if defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
   bool passed = true;
   passed = run(options);
-  std::cout << "Running tests ctlop" << std::endl;
+  std::cout << "Running tests xop" << std::endl;
   passed = run2(options);
   if (!passed)
     return -1;

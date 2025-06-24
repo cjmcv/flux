@@ -1,6 +1,6 @@
 
 import torch
 
-import ctlop
+import xop
 
-print(ctlop.__file__)
+print(xop.__file__)

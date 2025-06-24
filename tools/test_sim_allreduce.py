@@ -14,14 +14,14 @@ import torch.distributed as dist
 from torch.distributed import ProcessGroup
 
 import threading
-import ctlop
-from ctlop.cuda_wrapper import CudaRTLibrary
+import xop
+from xop.cuda_wrapper import CudaRTLibrary
 
 # 主线程创建内存，子线程访问。不使用进程，尽管是单卡，因为进程也需要走ipc
 class SimulateBuffer:
     def __init__(self, world_size):
         self.max_size = 8196 * 1024
-        self.meta_ptrs = self.create_shared_buffer(ctlop.meta_size() + self.max_size, world_size)
+        self.meta_ptrs = self.create_shared_buffer(xop.meta_size() + self.max_size, world_size)
         self.buffer_ptrs = self.create_shared_buffer(self.max_size, world_size)
         self.ref_buffer = [None] * 8
     
@@ -63,8 +63,8 @@ def _run_correctness_worker(world_size, rank, test_sizes):
         
         with torch.cuda.stream(new_stream):
             rank_data = torch.empty(8*1024 * 1024, dtype=torch.uint8, device=device)
-            custom_ptr = ctlop.init_custom_ar(g_buffer.meta_ptrs, rank_data, rank, True)
-            ctlop.register_buffer(custom_ptr, g_buffer.buffer_ptrs)
+            custom_ptr = xop.init_custom_ar(g_buffer.meta_ptrs, rank_data, rank, True)
+            xop.register_buffer(custom_ptr, g_buffer.buffer_ptrs)
             torch.cuda.synchronize()
             start_event = torch.cuda.Event(enable_timing=True)
             end_event = torch.cuda.Event(enable_timing=True)
@@ -84,7 +84,7 @@ def _run_correctness_worker(world_size, rank, test_sizes):
                         # print(">>", end='')
                         
                         start_event.record()
-                        ctlop.all_reduce(custom_ptr, inp1, out1, g_buffer.buffer_ptrs[rank], g_buffer.max_size)
+                        xop.all_reduce(custom_ptr, inp1, out1, g_buffer.buffer_ptrs[rank], g_buffer.max_size)
                         end_event.record()
                         torch.cuda.synchronize()
                         if loop > warmup_loop:
@@ -99,7 +99,7 @@ def _run_correctness_worker(world_size, rank, test_sizes):
 
     finally:
         if custom_ptr is not None:
-            ctlop.dispose(custom_ptr)
+            xop.dispose(custom_ptr)
 
 def multi_thread_parallel(
     world_size: int, test_target: Any, target_args: tuple = ()

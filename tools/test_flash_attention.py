@@ -541,7 +541,7 @@ def test_flash_attn_kvcache(
     mha_type,
     dtype,
 ):
-    from ctlop.ops.flash_attn import flash_attn_with_kvcache
+    from xop.ops.flash_attn import flash_attn_with_kvcache
 
     if page_size is not None and seqlen_k % page_size != 0:
         pytest.skip()
@@ -1075,7 +1075,7 @@ def test_flash_attn_varlen_output(
     mha_type,
     dtype,
 ):
-    from ctlop.ops.flash_attn import flash_attn_varlen_func
+    from xop.ops.flash_attn import flash_attn_varlen_func
 
     device = "cuda"
     # set seed

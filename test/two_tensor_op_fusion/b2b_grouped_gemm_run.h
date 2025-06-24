@@ -51,7 +51,7 @@
 
 #include "reference/device/tensor_scale_bias.h"
 // #include "helper.h"
-#include "ctlop/common_cuda.h"
+#include "xop/common_cuda.h"
 
 #define CHECK_GT(val1, val2) \
     if((val1) <= (val2)) \

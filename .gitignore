@@ -14,7 +14,7 @@ __pycache__/
 *.so
 *.so.*
 *~
-python/ctlop/version.py
+python/xop/version.py
 
 # due to using tox and pytest and clangd
 .tox

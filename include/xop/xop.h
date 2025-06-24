@@ -7,15 +7,15 @@
 #include <stdexcept>
 #include <string>
 
-#ifndef CTLOP_LIKELY
-#define CTLOP_LIKELY(x) (__builtin_expect(!!(x), 1))
+#ifndef XOP_LIKELY
+#define XOP_LIKELY(x) (__builtin_expect(!!(x), 1))
 #endif
 
-#ifndef CTLOP_UNLIKELY
-#define CTLOP_UNLIKELY(x) (__builtin_expect(!!(x), 0))
+#ifndef XOP_UNLIKELY
+#define XOP_UNLIKELY(x) (__builtin_expect(!!(x), 0))
 #endif
 
-namespace ctlop {
+namespace xop {
 
 class CheckFail {
  public:
@@ -41,21 +41,21 @@ class CheckFail {
 
 // Macro to check a condition and stream a custom error message if the check fails.
 // Note that this can only be used in host code
-#define CTLOP_CHECK(condition)            \
+#define XOP_CHECK(condition)            \
   if (!(condition))                      \
-  ::ctlop::CheckFail() << __FILE__ << ":" << __LINE__ << " Check failed: " #condition ". "
+  ::xop::CheckFail() << __FILE__ << ":" << __LINE__ << " Check failed: " #condition ". "
 
-#define CTLOP_CHECK_BINOP(lhs, rhs, op)                                                            \
-  if (auto x = (lhs), y = (decltype(x))(rhs); CTLOP_UNLIKELY(!(x op y)))                           \
-  ::ctlop::CheckFail() << __FILE__ << ":" << __LINE__ << " Check failed: " << x \
+#define XOP_CHECK_BINOP(lhs, rhs, op)                                                            \
+  if (auto x = (lhs), y = (decltype(x))(rhs); XOP_UNLIKELY(!(x op y)))                           \
+  ::xop::CheckFail() << __FILE__ << ":" << __LINE__ << " Check failed: " << x \
                        << "(" #lhs ") " #op " " << y << "(" #rhs ")"
 
-#define CTLOP_CHECK_EQ(lhs, rhs) CTLOP_CHECK_BINOP((lhs), (rhs), ==)
-#define CTLOP_CHECK_NE(lhs, rhs) CTLOP_CHECK_BINOP((lhs), (rhs), !=)
-#define CTLOP_CHECK_LT(lhs, rhs) CTLOP_CHECK_BINOP((lhs), (rhs), <)
-#define CTLOP_CHECK_GT(lhs, rhs) CTLOP_CHECK_BINOP((lhs), (rhs), >)
-#define CTLOP_CHECK_LE(lhs, rhs) CTLOP_CHECK_BINOP((lhs), (rhs), <=)
-#define CTLOP_CHECK_GE(lhs, rhs) CTLOP_CHECK_BINOP((lhs), (rhs), >=)
+#define XOP_CHECK_EQ(lhs, rhs) XOP_CHECK_BINOP((lhs), (rhs), ==)
+#define XOP_CHECK_NE(lhs, rhs) XOP_CHECK_BINOP((lhs), (rhs), !=)
+#define XOP_CHECK_LT(lhs, rhs) XOP_CHECK_BINOP((lhs), (rhs), <)
+#define XOP_CHECK_GT(lhs, rhs) XOP_CHECK_BINOP((lhs), (rhs), >)
+#define XOP_CHECK_LE(lhs, rhs) XOP_CHECK_BINOP((lhs), (rhs), <=)
+#define XOP_CHECK_GE(lhs, rhs) XOP_CHECK_BINOP((lhs), (rhs), >=)
 
 
 /////////////////////////////////////////////////////
@@ -114,4 +114,4 @@ enum class UnifiedHParamEnum : int8_t {
   Cooperative, PingPong              // type
 };
 
-}  // namespace ctlop
+}  // namespace xop

@@ -11,9 +11,9 @@ import torch
 import torch.distributed as dist
 # from torch.distributed import ProcessGroup
 
-# import ctlop
-from ctlop.ops.custom_all_reduce import CustomAllreduce
-# from ctlop.cuda_wrapper import CudaRTLibrary
+# import xop
+from xop.ops.custom_all_reduce import CustomAllreduce
+# from xop.cuda_wrapper import CudaRTLibrary
 
 TEST_CUDA_GRAPH = 1
 

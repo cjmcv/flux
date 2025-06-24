@@ -3,7 +3,7 @@
 
 #include "cutlass/detail/dependent_false.hpp"
 #include "cutlass/float8.h"
-#include "ctlop/ctlop.h"
+#include "xop/xop.h"
 #include <cuda_fp8.h>
 #include <cuda_runtime.h>
 #include "cutlass/cutlass.h"
@@ -20,7 +20,7 @@
 #define CUTLASS_CHECK(status)                                            \
   do {                                                                   \
     cutlass::Status error = status;                                      \
-    CTLOP_CHECK(error == cutlass::Status::kSuccess)                       \
+    XOP_CHECK(error == cutlass::Status::kSuccess)                       \
         << "Got cutlass error: " << cutlassGetStatusString(error) << "(" \
         << static_cast<int>(error) << ") at: " << #status << "\n";       \
   } while (0)
@@ -31,11 +31,11 @@
 #define CUDA_CHECK(status)                                                                   \
   do {                                                                                       \
     cudaError_t error = status;                                                              \
-    CTLOP_CHECK(error == cudaSuccess) << "Got bad cuda status: " << cudaGetErrorString(error) \
+    XOP_CHECK(error == cudaSuccess) << "Got bad cuda status: " << cudaGetErrorString(error) \
                                      << "(" << error << ") at: " << #status << "\n";         \
   } while (0)
 
-namespace ctlop {
+namespace xop {
 
 /**
  * GPU timer for recording the elapsed time across kernel(s) launched in GPU
@@ -81,4 +81,4 @@ struct GpuTimer {
   }
 };
 
-}  // namespace ctlop
+}  // namespace xop

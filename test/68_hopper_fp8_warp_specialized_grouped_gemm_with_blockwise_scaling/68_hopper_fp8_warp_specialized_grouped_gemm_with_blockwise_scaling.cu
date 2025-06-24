@@ -90,9 +90,9 @@
 #include "cutlass/util/reference/host/gett.hpp"
 
 // Includes from examples directory
-#include "ctlop/common_cuda.h"
-#include "ctlop/ops_impl/gemm_normal/gemm_v3_grouped_blockscale_fp8_impl.h"
-using namespace ctlop;
+#include "xop/common_cuda.h"
+#include "xop/ops_impl/gemm_normal/gemm_v3_grouped_blockscale_fp8_impl.h"
+using namespace xop;
 
 #include "hopper_fp8_commandline.hpp"
 
@@ -871,7 +871,7 @@ int main(int argc, char const **args) {
   run(options, true);
   std::cout << "Running tests without host problem shapes:" << std::endl;
   run(options, false);
-  std::cout << "Running tests ctlop" << std::endl;
+  std::cout << "Running tests xop" << std::endl;
   run2(options, true);
 #endif
 

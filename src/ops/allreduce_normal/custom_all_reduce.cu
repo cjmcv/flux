@@ -7,7 +7,7 @@
 #include "custom_all_reduce.cuh"
 #include "custom_all_reduce.h"
 
-namespace ctlop {
+namespace xop {
 
 void helloABC(int a) {
   printf("hello ABC a: %d.\n", a);
@@ -143,4 +143,4 @@ void register_graph_buffers(
   fa->register_graph_buffers(bytes, offsets);
 }
 
-}; // namespace ctlop
+}; // namespace xop

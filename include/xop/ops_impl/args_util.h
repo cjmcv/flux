@@ -7,9 +7,9 @@
 #include "cutlass/util/host_tensor.h"
 #include "cutlass/util/reference/device/gemm.h"
 
-#include "ctlop/common_cuda.h"
+#include "xop/common_cuda.h"
 
-namespace ctlop {
+namespace xop {
 
 template <class LayoutA, class LayoutB, class LayoutC>
 class ImplHelper {
@@ -47,4 +47,4 @@ private:
   int k_;
 };
 
-} // namespace ctlop
+} // namespace xop

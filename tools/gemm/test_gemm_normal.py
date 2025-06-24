@@ -5,8 +5,8 @@ from typing import Optional
 
 import torch
 
-import ctlop
-from ctlop.util import is_fp8_dtype
+import xop
+from xop.util import is_fp8_dtype
 
 import os
 import random
@@ -123,7 +123,7 @@ def perf_torch(
     return perf_gemm(warmup_iters, iters, "torch", fn)
 
 
-def perf_ctlop(
+def perf_xop(
     inputs: list[torch.Tensor],
     weights: list[torch.Tensor],
     bias: Optional[torch.Tensor],
@@ -165,7 +165,7 @@ def perf_ctlop(
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
     ## todo: remove below once moe fp8 gemm invoke get fixed
-    op = ctlop.GemmNormal(
+    op = xop.GemmNormal(
         input_dtype=inputs[0].dtype,
         output_dtype=output_dtype,
         transpose_weight=transpose_weight
@@ -184,7 +184,7 @@ def perf_ctlop(
             fast_accum=False,
         )
         return output
-    return perf_gemm(warmup_iters, iters, "ctlop", fn)
+    return perf_gemm(warmup_iters, iters, "xop", fn)
 
 
 def rand_tensor(shape: list[int], dtype: torch.dtype):
@@ -236,7 +236,7 @@ THRESHOLD_MAP = {
     torch.int32: 0,
 }
 
-def run(M, args, ctlop_perf, torch_perf):
+def run(M, args, xop_perf, torch_perf):
     #
     N = args.N
     K = args.K
@@ -271,7 +271,7 @@ def run(M, args, ctlop_perf, torch_perf):
         bias_shape = (1, N) if is_fp8 or is_s8_dequant else (M, N)
         bias = rand_tensor(bias_shape, bias_dtype)
 
-    perf_result_ctlop = perf_ctlop(
+    perf_result_xop = perf_xop(
         inputs,
         weights,
         bias,
@@ -285,7 +285,7 @@ def run(M, args, ctlop_perf, torch_perf):
         problem_count, 
         output_dtype,
     )
-    ctlop_perf.append(perf_result_ctlop.gemm_time_ms)
+    xop_perf.append(perf_result_xop.gemm_time_ms)
 
     perf_result_torch = perf_torch(
         inputs,
@@ -303,16 +303,16 @@ def run(M, args, ctlop_perf, torch_perf):
     torch_perf.append(perf_result_torch.gemm_time_ms)
 
     print(perf_result_torch)
-    print(perf_result_ctlop)
+    print(perf_result_xop)
 
-    ctlop_output = perf_result_ctlop.output
+    xop_output = perf_result_xop.output
     torch_output = perf_result_torch.output
 
-    # is_bitwise_match = ctlop.bitwise_check(ctlop_output, torch_output)
+    # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
-    atol = THRESHOLD_MAP[ctlop_output.dtype]
-    rtol = THRESHOLD_MAP[ctlop_output.dtype]
-    ctlop.torch_allclose(ctlop_output, torch_output, atol=atol, rtol=rtol)
+    atol = THRESHOLD_MAP[xop_output.dtype]
+    rtol = THRESHOLD_MAP[xop_output.dtype]
+    xop.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
 
 if __name__ == "__main__":
     init_seed()
@@ -329,16 +329,16 @@ if __name__ == "__main__":
         if args.transpose_weight:
             raise ValueError("s8 gemm with dequant must in RCR layout")
 
-    ctlop_perf = []
+    xop_perf = []
     torch_perf = []
     print(f"M: {1}, N: {args.N}, K: {args.K}")
-    run(1, args, ctlop_perf, torch_perf)
+    run(1, args, xop_perf, torch_perf)
     for m in range(2, args.M, args.step):
         print(f"M: {m}, N: {args.N}, K: {args.K}")
-        run(m, args, ctlop_perf, torch_perf)
+        run(m, args, xop_perf, torch_perf)
 
     plot_x = [1] + list(range(2, args.M, args.step))
-    plt.plot(plot_x, ctlop_perf, label='ctlop', marker='o', markersize=3)
+    plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
 
     plt.title(f'perf-N{args.N}-K{args.K}')

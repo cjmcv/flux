@@ -12,7 +12,7 @@ from deep_gemm import get_col_major_tma_aligned_tensor
 enable_sglang = True
 if enable_sglang:
     from sglang.srt.layers.quantization.fp8_kernel import w8a8_block_fp8_matmul
-import ctlop 
+import xop 
 
 import math
 
@@ -189,14 +189,14 @@ def calculate_diff(m: int, n: int, k: int):
 
     xt_scale = x_scale.clone().t().contiguous()
     yt_scale = y_scale.clone().t().contiguous()
-    ctlop_gemm = ctlop.GemmNormal(
+    xop_gemm = xop.GemmNormal(
         input_dtype=torch.float8_e4m3fn,
         output_dtype=torch.bfloat16,
         transpose_weight=False
     )
     out = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
 
-    out_ctlop = ctlop_gemm.forward(
+    out_xop = xop_gemm.forward(
         x_fp8.clone(),
         y_fp8.clone(),
         output=out,
@@ -208,23 +208,23 @@ def calculate_diff(m: int, n: int, k: int):
         fast_accum=False,
     )
 
-    diff_tilelang_ctlop = torch.abs(out_tilelang - out_ctlop).mean().item()
+    diff_tilelang_xop = torch.abs(out_tilelang - out_xop).mean().item()
     diff_sglang_deepgemm = torch.abs(out_deepgemm - out_sglang).mean().item()
     diff_tilelang_deepgemm = torch.abs(out_deepgemm - out_tilelang).mean().item()
     diff_tilelang_sglang = torch.abs(out_tilelang - out_sglang).mean().item()
 
     print(f"Shape m={m}, n={n}, k={k}:")
-    print(f"CtlOp output: {out_ctlop[0, 0:5]}")
+    print(f"XOP output: {out_xop[0, 0:5]}")
     print(f"DeepGEMM output: {out_deepgemm[0, 0:5]}")
     print(f"SGLang output: {out_sglang[0, 0:5]}")
     print(f"TileLang output: {out_tilelang[0, 0:5]}")
-    print(f"Mean absolute difference (TileLang-CtlOp): {diff_tilelang_ctlop}")
+    print(f"Mean absolute difference (TileLang-XOP): {diff_tilelang_xop}")
     print(f"Mean absolute difference (SGLang-DeepGEMM): {diff_sglang_deepgemm}")
     print(f"Mean absolute difference (TileLang-DeepGEMM): {diff_tilelang_deepgemm}")
     print(f"Mean absolute difference (TileLang-SGLang): {diff_tilelang_sglang}")
 
-    tilelang_ctlop_match = torch.allclose(
-        out_tilelang, out_ctlop, atol=1e-2, rtol=1e-2
+    tilelang_xop_match = torch.allclose(
+        out_tilelang, out_xop, atol=1e-2, rtol=1e-2
     )
     sglang_deepgemm_match = torch.allclose(
         out_deepgemm, out_sglang, atol=1e-2, rtol=1e-2
@@ -236,11 +236,11 @@ def calculate_diff(m: int, n: int, k: int):
         out_tilelang, out_sglang, atol=1e-2, rtol=1e-2
     )
 
-    if tilelang_ctlop_match and sglang_deepgemm_match and tilelang_deepgemm_match and tilelang_sglang_match:
+    if tilelang_xop_match and sglang_deepgemm_match and tilelang_deepgemm_match and tilelang_sglang_match:
         print("✅ All implementations match\n")
     else:
         print("❌ Some implementations differ:")
-        print(f"  - TileLang vs CtlOp: {'✅' if tilelang_ctlop_match else '❌'}")
+        print(f"  - TileLang vs XOP: {'✅' if tilelang_cxopmatch else '❌'}")
         print(f"  - SGLang vs DeepGEMM: {'✅' if sglang_deepgemm_match else '❌'}")
         print(f"  - TileLang vs DeepGEMM: {'✅' if tilelang_deepgemm_match else '❌'}")
         print(f"  - TileLang vs SGLang: {'✅' if tilelang_sglang_match else '❌'}\n")
@@ -300,8 +300,8 @@ def get_benchmark(tp_size):
             x_names=["m", "n", "k", "tp_size"],
             x_vals=[list(config) for config in all_configs],
             line_arg="provider",
-            line_vals=["ctlop", "deepgemm", "sglang", "tilelang"],
-            line_names=["CtlOp", "DeepGEMM", "SGLang", "TileLang"],
+            line_vals=["xop", "deepgemm", "sglang", "tilelang"],
+            line_names=["XOP", "DeepGEMM", "SGLang", "TileLang"],
             styles=[("blue", "-"), ("red", "-"), ("green", "-")],
             ylabel="ms",
             plot_name=f"fp8-gemm-performance-comparison-tp{tp_size}",
@@ -320,8 +320,8 @@ def get_benchmark(tp_size):
 
         quantiles = [0.5, 0.2, 0.8]
 
-        if provider == "ctlop": 
-            ctlop_gemm = ctlop.GemmNormal(
+        if provider == "xop": 
+            xop_gemm = xop.GemmNormal(
                 input_dtype=torch.float8_e4m3fn,
                 output_dtype=torch.bfloat16,
                 transpose_weight=False
@@ -330,7 +330,7 @@ def get_benchmark(tp_size):
             yt_scale = y_scale.clone().t().contiguous()
             out = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
             ms, min_ms, max_ms = triton.testing.do_bench(
-                lambda: ctlop_gemm.forward(
+                lambda: xop_gemm.forward(
                     x_fp8.clone(),
                     y_fp8.clone(),
                     output=out,

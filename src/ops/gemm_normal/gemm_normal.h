@@ -3,7 +3,7 @@
 
 #include <torch/all.h>
   
-namespace ctlop {
+namespace xop {
 class GemmNormal {
 public:
   GemmNormal(
@@ -36,4 +36,4 @@ private:
   GemmNormalImpl *impl_ = nullptr;
 };
 
-}  // namespace ctlop
+}  // namespace xop

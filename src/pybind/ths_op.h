@@ -11,9 +11,9 @@
 // #define ENABLE_FLASH_ATTEN 1
 // #define ENABLE_ALLREDUCE_CUSTOM 1
 
-#define CTLOP_TORCH_EXTENSION_NAME ctlop_pybind
+#define XOP_TORCH_EXTENSION_NAME xop_pybind
 
-namespace ctlop {
+namespace xop {
 // <NT> torch::CustomClassHolder 是 PyTorch 提供的基类，它能让自定义类在 Python 和 C++ 之间顺利交互。
 // 先自定义类，通过 TorchClassWrapper 模板结构体对其进行包装 如TorchClassWrapper<MyCustomClass>，
 // 然后利用 ThsOpsInitRegistry 将 TorchClassWrapper<MyCustomClass> 注册到 PyTorch 库。
@@ -41,4 +41,4 @@ class ThsOpsInitRegistry {
   ThsOpsInitRegistry &operator=(const ThsOpsInitRegistry &) = delete;
 };
 
-}  // namespace ctlop
+}  // namespace xop

@@ -1,6 +1,6 @@
 #pragma once
-#include "ctlop/ops_impl/global_resource.h"
-#include "ctlop/ops_impl/args_util.h"
+#include "xop/ops_impl/global_resource.h"
+#include "xop/ops_impl/args_util.h"
 
 #include "cute/tensor.hpp"
 #include "cutlass/tensor_ref.h"
@@ -12,7 +12,7 @@
 #include "cutlass/epilogue/dispatch_policy.hpp"
 #include "cutlass/epilogue/collective/collective_builder.hpp"
 #include "cutlass/util/packed_stride.hpp"
-namespace ctlop {
+namespace xop {
 
 #define BLOCKSCALE_FP8_FUSED_COMPLEX 0
 using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
@@ -200,4 +200,4 @@ private:
   Gemm gemm_dev_;
 };
 
-} // namespace ctlop
+} // namespace xop
