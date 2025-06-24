@@ -108,16 +108,15 @@ def perf_torch(
         if is_s8_dequant:
             accum = matmul_int8(inputs[problem_idx], weights[problem_idx].t()).to(torch.float32)
             output = input_scale * weight_scale * accum
+            output = output.to(torch.bfloat16)
+            if bias is not None:
+                output = output + bias
         elif inputs[problem_idx].dtype == torch.int8:
             output = matmul_int8(inputs[problem_idx], weights[problem_idx].t())
+            if bias is not None:
+                output = output + bias
         else:
-            output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx])
-        if is_fp8 or is_s8_dequant:
-            output = output.to(torch.bfloat16)
-        else:
-            output = output.to(output_dtype)
-        if bias is not None:
-            output = output + bias
+            output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)
         return output
 
     return perf_gemm(warmup_iters, iters, "torch", fn)

@@ -257,7 +257,7 @@ private:
     rt_args->l = 1;
     rt_args->ptr_A = input.data_ptr();
     rt_args->ptr_B = weight.data_ptr();
-    rt_args->ptr_C = nullptr;
+    rt_args->ptr_C = bias.has_value() ? bias.value().data_ptr() : nullptr;
     rt_args->ptr_D = output.data_ptr();
     rt_args->alpha = 1.0f;
     rt_args->beta = 0.0f;

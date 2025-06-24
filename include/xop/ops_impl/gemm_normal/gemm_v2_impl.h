@@ -16,7 +16,8 @@ class GemmPureV2Impl : public GemmBase  {
       ElementC,               // Element type for C and D matrix operands
       128 / cutlass::sizeof_bits<ElementC>::value, // Memory access granularity of C and D matrix in units of elements
       ElementAccumulator,     // Element type from internal accumaccumulation
-      ElementAccumulator>;    // Data type used to compute linear combination
+      ElementAccumulator,     // Data type used to compute linear combination
+      cutlass::epilogue::thread::ScaleType::NoBetaScaling>;    // bias 
 
   // Classic data-parallel device GEMM implementation type
   using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<
