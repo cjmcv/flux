@@ -67,26 +67,121 @@
 // #include "cutlass/../../test/unit/reduction/thread/testbed.h"
 #include "testbed.h"
 
+template <typename T>
+void cuda_check(T result, char const *const func, const char *const file, int const line) {
+    if (result) {
+        fprintf(stderr, "CUDA_CHECK error at %s:%d code=%d(%s) \"%s\" \n", file, line,
+            static_cast<unsigned int>(result), cudaGetErrorName(result), func);
+        exit(EXIT_FAILURE);
+    }
+}
+
+#define CUDA_CHECK(val) cuda_check((val), #val, __FILE__, __LINE__)
+
+
+struct GpuTimer {
+  GpuTimer() {
+      CUDA_CHECK(cudaEventCreate(&start_));
+      CUDA_CHECK(cudaEventCreate(&stop_));
+  }
+  ~GpuTimer() {
+      CUDA_CHECK(cudaEventDestroy(start_));
+      CUDA_CHECK(cudaEventDestroy(stop_));
+  }
+  void Start() {
+      CUDA_CHECK(cudaEventRecord(start_, NULL));
+  }
+  void Stop() {
+      CUDA_CHECK(cudaEventRecord(stop_, NULL));
+  }
+  float ElapsedMillis() {
+      float elapsed;
+      CUDA_CHECK(cudaEventSynchronize(stop_));
+      CUDA_CHECK(cudaEventElapsedTime(&elapsed, start_, stop_));
+      return elapsed;
+  }
+
+  cudaEvent_t start_;
+  cudaEvent_t stop_;
+};
+
 int main() {
-  using ElementA = cutlass::float_e4m3_t;
-  using ElementB = cutlass::float_e4m3_t;
-  using ElementOutput = cutlass::half_t;
-  using ElementAccumulator = cutlass::half_t;
-  using LayoutA = cutlass::layout::RowMajor;
-  using LayoutB = cutlass::layout::ColumnMajor;
-  using LayoutC = cutlass::layout::RowMajor;
-  static int const kStages = 3;
+  {
+    // #if (__CUDACC_VER_MAJOR__ > 12) || (__CUDACC_VER_MAJOR__ == 12 && __CUDACC_VER_MINOR__ >= 8)
+    // TEST(SM89_Device_Gemm_fe4m3t_fe4m3n_f16t_tensor_op_f16, 128x256x64_64x64x64)
+    using ElementA = cutlass::float_e4m3_t;
+    using ElementB = cutlass::float_e4m3_t;
+    using ElementOutput = cutlass::half_t;
+    using ElementAccumulator = cutlass::half_t;
+    using LayoutA = cutlass::layout::RowMajor;
+    using LayoutB = cutlass::layout::ColumnMajor;
+    using LayoutC = cutlass::layout::RowMajor;
+    static int const kStages = 3;
 
-  using Gemm = cutlass::gemm::device::Gemm<
-    ElementA, LayoutA, ElementB, LayoutB, ElementOutput, LayoutC,
-    ElementAccumulator, cutlass::arch::OpClassTensorOp, cutlass::arch::Sm89,
-    cutlass::gemm::GemmShape<128, 256, 64>, cutlass::gemm::GemmShape<64, 64, 64>, cutlass::gemm::GemmShape<16, 8, 32>,
-    cutlass::epilogue::thread::LinearCombination<
-        ElementOutput, 128 / cutlass::sizeof_bits<ElementOutput>::value,
-        ElementAccumulator, ElementAccumulator>,
-    cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, kStages>;
+    using Gemm = cutlass::gemm::device::Gemm<
+      ElementA, LayoutA, ElementB, LayoutB, ElementOutput, LayoutC,
+      ElementAccumulator, cutlass::arch::OpClassTensorOp, cutlass::arch::Sm89,
+      cutlass::gemm::GemmShape<128, 256, 64>, cutlass::gemm::GemmShape<64, 64, 64>, cutlass::gemm::GemmShape<16, 8, 32>,
+      cutlass::epilogue::thread::LinearCombination<
+          ElementOutput, 128 / cutlass::sizeof_bits<ElementOutput>::value,
+          ElementAccumulator, ElementAccumulator>,
+      cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, kStages>;
 
-  bool res = test::gemm::device::TestAllGemm<Gemm>();
+    GpuTimer gpu_timer;
+    float total_ms = 0;
+    for (int i=0; i<5; i++) {
+
+      gpu_timer.Start();
+      bool res = test::gemm::device::TestAllGemm<Gemm>();
+      gpu_timer.Stop();
+      if (i!=0)
+        total_ms += gpu_timer.ElapsedMillis();
+
+      if (res == false) {
+        printf("e");
+      }
+    }
+    printf("acc fp16 total_ms: %f.\n", total_ms);    
+  }
+  {
+    // TEST(SM89_Device_Gemm_fe4m3t_fe4m3n_f32t_tensor_op_f32, 128x256x64_64x64x64) {
+    using ElementA = cutlass::float_e4m3_t;
+    using ElementB = cutlass::float_e4m3_t;
+    using ElementOutput = cutlass::half_t; //float;
+    using ElementAccumulator = float;
+    using LayoutA = cutlass::layout::RowMajor;
+    using LayoutB = cutlass::layout::ColumnMajor;
+    using LayoutC = cutlass::layout::RowMajor;
+    static int const kStages = 3;
+  
+    using Gemm = cutlass::gemm::device::Gemm<
+        ElementA, LayoutA, ElementB, LayoutB, ElementOutput, LayoutC,
+        ElementAccumulator, cutlass::arch::OpClassTensorOp, cutlass::arch::Sm89,
+        cutlass::gemm::GemmShape<128, 256, 64>, cutlass::gemm::GemmShape<64, 64, 64>, cutlass::gemm::GemmShape<16, 8, 32>,
+        cutlass::epilogue::thread::LinearCombination<
+            ElementOutput, 128 / cutlass::sizeof_bits<ElementOutput>::value,
+            ElementAccumulator, ElementAccumulator>,
+        cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, kStages>;
+  
+    GpuTimer gpu_timer;
+    float total_ms = 0;
+    for (int i=0; i<5; i++) {
+
+      gpu_timer.Start();
+      bool res = test::gemm::device::TestAllGemm<Gemm>();
+      gpu_timer.Stop();
+      if (i!=0)
+        total_ms += gpu_timer.ElapsedMillis();
+
+      if (res == false) {
+        printf("e");
+      }
+    }
+    printf("acc fp32 total_ms: %f.\n", total_ms);   
+    // }
+  }
+
+  
   return 0;
 }
 

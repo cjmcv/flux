@@ -102,11 +102,17 @@
 //   EXPECT_TRUE(test::gemm::device::TestAllGemm<Gemm>());
 // }
 
+// #define USE_FP16_ACC 1
+
 using ElementA = cutlass::float_e4m3_t;
 using ElementB = cutlass::float_e4m3_t;
 using ElementOutput = cutlass::float_e4m3_t;
 using ElementAuxOutput = ElementOutput;
-using ElementAccumulator = float; //float; // cutlass::half_t; // float; // cutlass::half_t(__float2half_rn(options.beta));
+#ifdef USE_FP16_ACC
+using ElementAccumulator = cutlass::half_t; //float; // cutlass::half_t; // float; // cutlass::half_t(__float2half_rn(options.beta));
+#else
+using ElementAccumulator = float;
+#endif
 using LayoutA = cutlass::layout::RowMajor;
 using LayoutB = cutlass::layout::ColumnMajor;
 using LayoutC = cutlass::layout::RowMajor;
@@ -487,8 +493,12 @@ struct TestbedRunner {
   bool verify(const Options& options) {
 
     cutlass::Coord<2> origin(0);
+    
+#ifdef USE_FP16_ACC
+    ElementCompute scaled_alpha = cutlass::half_t(__float2half_rn(options.alpha));
+#else
     ElementCompute scaled_alpha = options.alpha;
-    // ElementCompute scaled_alpha = cutlass::half_t(__float2half_rn(options.alpha));
+#endif
     if (options.scale_A) {
       scaled_alpha *= scale_A.host_view().at(origin);
     }
@@ -496,8 +506,11 @@ struct TestbedRunner {
       scaled_alpha *= scale_B.host_view().at(origin);
     }
 
+#ifdef USE_FP16_ACC
+    ElementCompute scaled_beta = cutlass::half_t(__float2half_rn(options.beta));
+#else
     ElementCompute scaled_beta = options.beta;
-    // ElementCompute scaled_beta = cutlass::half_t(__float2half_rn(options.beta));
+#endif    
     if (options.scale_C) {
       scaled_beta *= scale_C.host_view().at(origin);
     }
