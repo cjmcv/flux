@@ -43,6 +43,9 @@ class TuningConfig:
 class GemmNormalSchema:
     name = "GemmNormal"
     sub_schema = [Meta.GemmNormal, Meta.GemmNormalSimt]
+    # test_input_dtype = torch.float16
+    # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
+    test_input_dtype = torch.bfloat16
     space_dtype = [(torch.bfloat16,torch.bfloat16,torch.bfloat16)]
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
         return input, None, weight, None
@@ -53,6 +56,7 @@ class GemmNormalSchema:
 class GemmBlockScaleFp8Schema:
     impl = "GemmBlockScaleFp8"
     sub_schema = [Meta.GemmBlockScaleFp8]
+    test_input_dtype = torch.bfloat16
     space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
         x, x_scale = per_token_cast_to_fp8(input)
@@ -67,6 +71,7 @@ class GemmBlockScaleFp8Schema:
 class GemmGroupedBlockScaleFp8Schema:
     impl = "GemmGroupedBlockScaleFp8Impl"
     sub_schema = [Meta.GemmGroupedBlockScaleFp8]
+    test_input_dtype = torch.bfloat16
     space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor, config: TuningConfig):
         x_list = []
@@ -101,13 +106,13 @@ def str2schema(schema_name):
 
 def gen_tuning_space(schema):
     space: List[TuningConfig] = []
-    # space_G = [1]
-    # space_M = list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
-    # space_NK = [(27648, 5120)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
+    space_G = [1]
+    space_M = [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_NK = [(4096, 4096)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     
-    space_G = [4, 8]
-    space_M = [2048, 4096] # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
-    space_NK = [(576, 7168)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
+    # space_G = [4, 8]
+    # space_M = [2048, 4096] # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    # space_NK = [(576, 7168)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     
     space_transpose_weight = [False] # , True
     space_dtype = schema.space_dtype
@@ -231,8 +236,8 @@ def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[
     return torch.cat(outputs, dim=0).cpu()
 
 def tune_one_config(schema, config: TuningConfig, fp):
-    input = torch.rand((config.M, config.K), dtype=torch.bfloat16).cuda()
-    weight = torch.rand((config.N, config.K), dtype=torch.bfloat16).cuda()
+    input = torch.rand((config.M, config.K), dtype=schema.test_input_dtype).cuda() # torch.bfloat16
+    weight = torch.rand((config.N, config.K), dtype=schema.test_input_dtype).cuda()
     # start_time = time.time()
 
     # print(f"torch compute time: {(time.time() - start_time) * 1000} ms")

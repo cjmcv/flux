@@ -107,6 +107,11 @@ public:
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
     }
+    // ins.PrintRegistered("abc");
+    // printf("id_meta: ");
+    // for(int i=0; i<id_meta.size(); i++) {
+    //   printf("%d, ", id_meta[i]);
+    // }
     printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
     GemmBase *op = ins.GetOp(id_meta, is_tuning);
     if (op == nullptr)

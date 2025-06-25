@@ -97,6 +97,7 @@ public:
       for (int i=0; i<pair.first.size(); i++) {
         printf("%d, ", pair.first[i]);
       }
+      printf("\n");
     }
   }
 

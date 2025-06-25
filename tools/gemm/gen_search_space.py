@@ -78,6 +78,7 @@ class GemmNormalSchema:
     impl_header = "gemm_normal/gemm_v2_impl.h"
     
     def get_meta_space(self, w):
+        # ('BF16', 'BF16', 'BF16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP16')
         data_type = [('BF16', 'BF16', 'BF16', 'FP32')] # a,b,cd,acc
         layout = ['RCR'] # , 'RRR'
         arch = ['Sm80'] # , 'Sm89'
