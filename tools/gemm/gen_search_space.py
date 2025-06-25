@@ -52,7 +52,7 @@ class TypeWarpper:
             "TSPersistent": "cutlass::gemm::PersistentScheduler",
             "TSStreamK": "cutlass::gemm::StreamKScheduler"
         }
-        # 返回对应的字符串，如果没有匹配的值，则返回"Unknown"
+        # Return the corresponding string, or return "Unknown" if there is no matching value.
         return string_to_string.get(xop_type, "Unknown")
 
 def make_meta_space(w, data_type, layout, arch):
@@ -90,7 +90,9 @@ class GemmNormalSchema:
         # block_shapes = [(128, 128, 32), (64, 256, 32)]
         # warp_shapes = [(64, 64, 32)]
         # instruction_shapes = [(16, 8, 16), (16, 8, 8)] 
-        # 这些shape某些情况下can_implement会失败，猜测与资源限制有关，bloc8ktile都超过warptile的4倍。
+        # Note: These shapes may fail the can_implement in some cases, 
+        #     which is presumably related to resource limitations, 
+        #     as the block tile exceeds four times the warp tile.
         # ((128, 256, 32), (64, 64, 32), (16, 8, 16)), 
         # ((128, 128, 64), (64, 64, 32), (16, 8, 16)),
         # ((64, 256, 64), (64, 64, 32), (16, 8, 16)),

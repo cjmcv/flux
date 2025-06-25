@@ -72,12 +72,12 @@ public:
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
     std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
-    RtArguments *rt_args;
+    std::unique_ptr<RtArguments> rt_args;
     if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
-      rt_args = new RtBlockScaleFp8ArgumentsV3();
+      rt_args = std::make_unique<RtBlockScaleFp8ArgumentsV3>();
       if (input_scale.has_value() && weight_scale.has_value()) {
-        ((RtBlockScaleFp8ArgumentsV3 *)rt_args)->d_blockscale_A = input_scale.value().data_ptr();
-        ((RtBlockScaleFp8ArgumentsV3 *)rt_args)->d_blockscale_B = weight_scale.value().data_ptr();
+        ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_A = input_scale.value().data_ptr();
+        ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_B = weight_scale.value().data_ptr();
       }
       id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmBolckScaleFp8;
       id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
@@ -89,11 +89,11 @@ public:
     }
     else {
       id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmNormal;
-      rt_args = new RtArgumentsV2();
+      rt_args = std::make_unique<RtArgumentsV2>();
     }
-    GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, rt_args);
+    GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, rt_args.get());
     
-
+    GemmBase *op = nullptr;
     bool is_tuning = false;
     if (tuning.has_value()) {
       int16_t *data = (int16_t *)tuning.value().data_ptr();
@@ -101,24 +101,50 @@ public:
       id_meta[IdMetaEnum::Id] = data[1];
       id_meta[IdMetaEnum::Schema] = data[2];
       is_tuning = true;
+      printf("[tuning] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+      op = ins.GetOp(id_meta, is_tuning);
+      if (op == nullptr) {
+        return -1;        
+      }
     }
     else {
       std::vector<int32_t> shape_meta = {rt_args->m, rt_args->n, rt_args->k, 1};       // mnkl + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)
-      tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
+      tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);
+
+      // If the required configuration is not registered in the tuning config, directly use torch for computation.
+      if (id_meta[IdMetaEnum::Id] == -1) {
+        printf("[runing] torch\n");
+        if (transpose_weight){
+          if (bias.has_value()) {
+            torch::addmm_out(output, bias.value(), input, weight);
+          }
+          else {
+            torch::matmul_out(output, input, weight);
+          }
+        }
+        else {
+          if (bias.has_value()) {
+            torch::addmm_out(output, bias.value(), input, weight.t());
+            // output = torch::nn::functional::linear(input, weight);
+          }
+          else {
+            torch::matmul_out(output, input, weight.t());
+          }         
+        }
+        return 0;
+      }
+      printf("[runing] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+      op = ins.GetOp(id_meta, is_tuning);
     }
     // ins.PrintRegistered("abc");
     // printf("id_meta: ");
     // for(int i=0; i<id_meta.size(); i++) {
     //   printf("%d, ", id_meta[i]);
     // }
-    printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
-    GemmBase *op = ins.GetOp(id_meta, is_tuning);
-    if (op == nullptr)
-      return -1;
-
+    
     cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-    op->initialize(rt_args);
+    op->initialize(rt_args.get());
     op->run(stream);
 
     if (tuning.has_value()) {
@@ -128,7 +154,6 @@ public:
         data[i+1] = id_meta[i];
       }
     }
-    delete rt_args;
     return 0;
   }
 
@@ -211,17 +236,20 @@ public:
   }
 
 private:
-  std::vector<int16_t> MakeDefaultMeta(int16_t id = 0) {
+  std::vector<int16_t> MakeDefaultMeta(bool is_fp32_acc = true) {
     std::vector<int16_t> meta;
     meta.resize(8);
-    meta[IdMetaEnum::Id] = id;                                  // id
+    meta[IdMetaEnum::Id] = -1;                                  // id
     // (GemmNormal / GemmNormalSimt / GemmBolckScaleFp8 / GemmGroupedBlockScaleFp8)
     meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmNormal; // schema type 
 
     meta[IdMetaEnum::TypeA] = from_torch_dtype(this->input_dtype);  // type A
     meta[IdMetaEnum::TypeB] = from_torch_dtype(this->input_dtype);  // type B
     meta[IdMetaEnum::TypeCD] = from_torch_dtype(this->output_dtype); // type C/D
-    meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP32;        // type acc
+    if (is_fp32_acc)
+      meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP32;        // type acc
+    else
+      meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP16;
     if (transpose_weight)                           // layout
       meta[IdMetaEnum::Layout] = (int16_t)UnifiedMetaEnum::RRR; 
     else
