@@ -22,3 +22,4 @@ python/xop/version.py
 *.png
 tools/*.cu
 tools/*.prof.log
+src/ops/flash_attn/instantiations/*

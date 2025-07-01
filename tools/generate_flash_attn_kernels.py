@@ -15,14 +15,14 @@ from typing import List, Optional
 KERNEL_BATCH = namedtuple("Kernel", ["template", "filename"])
 
 DTYPE_MAP = {
-    # "fp16": "cutlass::half_t",
-    "bf16": "cutlass::bfloat16_t",
+    "fp16": "cutlass::half_t",
+    # "bf16": "cutlass::bfloat16_t",
     # "e4m3": "cutlass::float_e4m3_t",
 }
 
 DTYPE_MAP_FWD_SM8x = {
-    # "fp16": "cutlass::half_t",
-    "bf16": "cutlass::bfloat16_t",
+    "fp16": "cutlass::half_t",
+    # "bf16": "cutlass::bfloat16_t",
 }
 
 DTYPE_MAP_BWD = {}
@@ -31,8 +31,8 @@ DTYPE_MAP_BWD = {}
 #     "bf16": "cutlass::bfloat16_t",
 # }
 
-SM = [90] # [80, 90]  # Sm kernels support up to
-HEAD_DIMENSIONS = [64, 96, 128, 192, 256] # [64, 96, 128, 192, 256]
+SM = [80] # [80, 90]  # Sm kernels support up to
+HEAD_DIMENSIONS = [128] # [64, 96, 128, 192, 256]
 PAGEDKV = [False, True]
 SPLIT = [False, True]
 SOFTCAP = [False, True]
@@ -50,7 +50,7 @@ KERNEL_IMPL_TEMPLATE_FWD_SM8x = """#include "../flash_fwd_launch_template.h"
 #ifndef FLASHATTENTION_DISABLE_SM8x
 #ifndef FLASHATTENTION_DISABLE_HDIM{HEAD_DIM}
 template void run_mha_fwd_<80, {DTYPE}, {HEAD_DIM}, {HEAD_DIM_V}, {SPLIT}, {PAGEDKV}, {SOFTCAP}, {PACKGQA}>(Flash_fwd_params &params, cudaStream_t stream);
-template void run_mha_fwd_<86, {DTYPE}, {HEAD_DIM}, {HEAD_DIM_V}, {SPLIT}, {PAGEDKV}, {SOFTCAP}, {PACKGQA}>(Flash_fwd_params &params, cudaStream_t stream);
+//template void run_mha_fwd_<86, {DTYPE}, {HEAD_DIM}, {HEAD_DIM_V}, {SPLIT}, {PAGEDKV}, {SOFTCAP}, {PACKGQA}>(Flash_fwd_params &params, cudaStream_t stream);
 #endif
 #endif
 """
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-o",
         "--output_dir",
-        default="instantiations",
+        default="src/ops/flash_attn/instantiations",
         required=False,
         help="Where to generate the kernels "
         " will default to the current directory ",
