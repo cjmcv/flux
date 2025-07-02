@@ -91,7 +91,6 @@ def _flash_attn_forward(
         causal,
         window_size[0],
         window_size[1],
-        attention_chunk,
         softcap,
         rotary_interleaved,
         scheduler_metadata,
@@ -100,7 +99,7 @@ def _flash_attn_forward(
         sm_margin,
     )
     return out, softmax_lse, *rest
-
+        # attention_chunk,
 
 class FlashAttnQKVPackedFunc(torch.autograd.Function):
     @staticmethod
