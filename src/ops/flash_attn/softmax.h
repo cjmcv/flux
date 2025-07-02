@@ -11,7 +11,7 @@
 #include <cutlass/numeric_types.h>
 
 #include "utils.h"
-
+#include "config.h"
 namespace flash {
 
 using namespace cute;
@@ -161,7 +161,11 @@ struct Softmax {
         #pragma unroll
         for (int mi = 0; mi < size<0>(acc_o_rowcol); ++mi) {
             #pragma unroll
+#ifdef FLASHATTENTION_ENABLE_MMA_FP16ACC
+            for (int ni = 0; ni < size<1>(acc_o_rowcol); ++ni) { acc_o_rowcol(mi, ni) *= cutlass::half_t(scores_scale(mi)); }
+#else
             for (int ni = 0; ni < size<1>(acc_o_rowcol); ++ni) { acc_o_rowcol(mi, ni) *= scores_scale(mi); }
+#endif
         }
     };
 

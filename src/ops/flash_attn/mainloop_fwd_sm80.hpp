@@ -18,6 +18,7 @@
 #include "paged_kv.h"
 #include "rotary.h"
 #include "utils.h"
+#include "config.h"
 
 namespace flash {
 
@@ -57,11 +58,16 @@ struct CollectiveMainloopFwdSm80 {
     using SeqlenInfo_t = flash::SeqlenInfoQKNewK<Varlen, AppendKV>;
     using BlockMN_t = flash::BlockMN<SeqlenInfo_t, kBlockM, kBlockN, Is_causal, Is_local, PackGQA, Split>;
 
+#ifdef FLASHATTENTION_ENABLE_MMA_FP16ACC
+    using MMA_Atom_FP16 =  MMA_Atom<SM80_16x8x16_F16F16F16F16_TN>;
+#else
+    using MMA_Atom_FP16 =  MMA_Atom<SM80_16x8x16_F32F16F16F32_TN>;
+#endif
     using MMA_Atom_Arch = std::conditional_t<
         ArchTag::kMinComputeCapability >= 80,
         std::conditional_t<
             std::is_same_v<Element, cutlass::half_t>,
-            MMA_Atom<SM80_16x8x16_F32F16F16F32_TN>,
+            MMA_Atom_FP16,
             MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>
         >,
         MMA_Atom<SM75_16x8x8_F32F16F16F32_TN>

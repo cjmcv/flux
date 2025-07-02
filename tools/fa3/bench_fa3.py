@@ -1,6 +1,7 @@
 import torch
 from benchmark import benchmark_forward
 from xop.ops.flash_attn import flash_attn_func as flash_attn_func_v3
+from torch.nn.functional import scaled_dot_product_attention
 
 import argparse
 
@@ -29,6 +30,10 @@ for seq_len in {1024, 2048, 4096, 8192, 16384, 32768}:
     _, time = benchmark_forward(flash_attn_func_v3, q, k, v, causal=is_causal, repeats=100, verbose=False, desc='Triton')
     print(f'{seq_len} flops:{flops/time.mean*1e-12}')
 
+    o1 = flash_attn_func_v3(q, k, v, causal=is_causal)
+    o2 = scaled_dot_product_attention(q, k, v, is_causal=is_causal)
+    print(torch.allclose(o1, o2))
+
 is_causal = True
 print(f"is_causal: {is_causal}")
 for seq_len in {1024, 2048, 4096, 8192, 16384, 32768}:
@@ -40,3 +45,7 @@ for seq_len in {1024, 2048, 4096, 8192, 16384, 32768}:
     torch.cuda.synchronize()
     _, time = benchmark_forward(flash_attn_func_v3, q, k, v, causal=is_causal, repeats=100, verbose=False, desc='Triton')
     print(f'{seq_len} flops:{flops/time.mean*1e-12}')
+
+    o1 = flash_attn_func_v3(q, k, v, causal=is_causal)
+    o2 = scaled_dot_product_attention(q, k, v, is_causal=is_causal)
+    print(torch.allclose(o1, o2))

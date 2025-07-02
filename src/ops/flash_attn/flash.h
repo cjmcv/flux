@@ -7,15 +7,7 @@
 #include <cuda.h>
 #include <vector>
 
-// #define FLASHATTENTION_DISABLE_SM8x
-// #define FLASHATTENTION_DISABLE_FP16
-#define FLASHATTENTION_DISABLE_BF16
-#define FLASHATTENTION_DISABLE_FP8
-#define FLASHATTENTION_DISABLE_HDIM64
-#define FLASHATTENTION_DISABLE_HDIM96
-#define FLASHATTENTION_DISABLE_HDIM192
-#define FLASHATTENTION_DISABLE_HDIM256
-////////////////////////////////////////////////////////////////////////////////////////////////////
+#include "config.h"
 
 struct Qkv_params {
     using index_t = int64_t;
