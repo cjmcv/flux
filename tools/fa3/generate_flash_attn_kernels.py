@@ -41,22 +41,12 @@ PACKGQA = [False, True] # Always enable PackGQA for Sm8x to reduce compilation
 # SOFTCAP = [False, True]
 # PACKGQA = [False, True]
 
-KERNEL_IMPL_TEMPLATE_FWD = """#include "../flash_fwd_launch_template.h"
-
+KERNEL_IMPL_TEMPLATE_FWD = \
+"""
 #ifndef FLASHATTENTION_DISABLE_HDIM{HEAD_DIM}
 template void run_mha_fwd_<{ARCH}, {DTYPE}, {HEAD_DIM}, {HEAD_DIM_V}, {SPLIT}, {PAGEDKV}, {SOFTCAP}, {PACKGQA}>(Flash_fwd_params &params, cudaStream_t stream);
 #endif
 """
-
-# KERNEL_IMPL_TEMPLATE_FWD_SM8x = """#include "../flash_fwd_launch_template.h"
-
-# #ifndef FLASHATTENTION_DISABLE_SM8x
-# #ifndef FLASHATTENTION_DISABLE_HDIM{HEAD_DIM}
-# template void run_mha_fwd_<80, {DTYPE}, {HEAD_DIM}, {HEAD_DIM_V}, {SPLIT}, {PAGEDKV}, {SOFTCAP}, {PACKGQA}>(Flash_fwd_params &params, cudaStream_t stream);
-# //template void run_mha_fwd_<86, {DTYPE}, {HEAD_DIM}, {HEAD_DIM_V}, {SPLIT}, {PAGEDKV}, {SOFTCAP}, {PACKGQA}>(Flash_fwd_params &params, cudaStream_t stream);
-# #endif
-# #endif
-# """
 
 @dataclass
 class Kernel:
@@ -83,13 +73,13 @@ class Kernel:
             SOFTCAP=str(self.softcap).lower(), PACKGQA=str(packgqa).lower()
         )
         
-    @property
-    def filename(self) -> str:
-        return f"flash_fwd_hdim{self.head_dim}{f'_{self.head_dim_v}' if self.head_dim_v != self.head_dim else ''}_{self.dtype}{'_paged' if self.paged_kv else ''}{'_split' if self.split else ''}{'_softcap' if self.softcap else ''}{'_packgqa' if self.packgqa else ''}_sm{self.sm}.cu"
+    # @property
+    # def filename(self) -> str:
+    #     return f"flash_fwd_hdim{self.head_dim}{f'_{self.head_dim_v}' if self.head_dim_v != self.head_dim else ''}_{self.dtype}{'_paged' if self.paged_kv else ''}{'_split' if self.split else ''}{'_softcap' if self.softcap else ''}{'_packgqa' if self.packgqa else ''}_sm{self.sm}.cu"
 
 
-def get_all_kernels() -> List[Kernel]:
-    for dtype, head_dim, split, paged_kv, softcap, packgqa, sm in itertools.product(DTYPE_MAP.keys(), HEAD_DIMENSIONS, SPLIT, PAGEDKV, SOFTCAP, PACKGQA, SM):
+def get_all_kernels(sm) -> List[Kernel]:
+    for dtype, head_dim, split, paged_kv, softcap, packgqa in itertools.product(DTYPE_MAP.keys(), HEAD_DIMENSIONS, SPLIT, PAGEDKV, SOFTCAP, PACKGQA):
         # We always enable PackGQA for Sm8x or PagedKV or Split
         # so we should just pass in packgqa=False to avoid the `_packgqa` in the filename.
         if packgqa and (sm < 90 or (sm >= 90 and (paged_kv or split))):
@@ -104,21 +94,22 @@ def get_all_kernels() -> List[Kernel]:
             yield Kernel(sm=sm, dtype=dtype, head_dim=head_dim, head_dim_v=512, split=split, paged_kv=paged_kv, softcap=softcap, packgqa=packgqa)
 
 
-def write_kernel(kernel: Kernel, autogen_dir: Path) -> None:
-    prelude = """// Copyright (c) 2024, Jay Shah, Ganesh Bikshandi, Ying Zhang, Vijay Thakkar, Pradeep Ramani, Tri Dao.
-// Splitting the different template instantiations to different files to speed up compilation.
-// This file is auto-generated. See "generate_kernels.py"\n
-"""
-    (autogen_dir / kernel.filename).write_text(prelude + kernel.template)
-
-
 def main(output_dir: Optional[str]) -> None:
     output_dir = Path(output_dir) if output_dir is not None else Path(__file__).parent
     output_dir.mkdir(parents=True, exist_ok=True)
-    kernels_all = list(get_all_kernels())
-    print("hello,", kernels_all, output_dir)
-    for kernel in kernels_all:
-        write_kernel(kernel, output_dir)
+
+    for sm in SM:
+        kernels_all = list(get_all_kernels(80))
+        print("hello,", output_dir, kernels_all)
+
+        fp = open(str(output_dir) + "/flash_fwd_sm{0}.cu".format(sm), "w")
+        fp.write('#include "../flash_fwd_launch_template.h"\n\n')
+        fp.write('// ARCH, DTYPE, HEAD_DIM, HEAD_DIM_V <==> SPLIT, PAGEDKV, SOFTCAP, PACKGQA\n')
+        
+        for kernel in kernels_all:
+            # fp.write(str(kernel.head_dim))
+            fp.write(kernel.template)
+        fp.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
