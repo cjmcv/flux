@@ -16,13 +16,14 @@ KERNEL_BATCH = namedtuple("Kernel", ["template", "filename"])
 
 DTYPE_MAP = {
     "fp16": "cutlass::half_t",
-    # "bf16": "cutlass::bfloat16_t",
-    # "e4m3": "cutlass::float_e4m3_t",
+    "bf16": "cutlass::bfloat16_t",
+    "e4m3": "cutlass::float_e4m3_t",
 }
 
 DTYPE_MAP_FWD_SM8x = {
-    "fp16": "cutlass::half_t",
+    # "fp16": "cutlass::half_t",
     # "bf16": "cutlass::bfloat16_t",
+    "e4m3": "cutlass::float_e4m3_t",
 }
 
 DTYPE_MAP_BWD = {}

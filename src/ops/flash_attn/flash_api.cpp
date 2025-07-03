@@ -259,6 +259,32 @@ void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream) {
                             #else
                             TORCH_CHECK(false, "This flash attention build does not support BF16.");
                             #endif
+                        } else if (params.is_e4m3) {
+                            #ifndef FLASHATTENTION_DISABLE_FP8
+                            #ifndef FLASHATTENTION_DISABLE_HDIM64
+                            if (params.d <= 64) { return run_mha_fwd_<80, cutlass::float_e4m3_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                            #endif
+                            #ifndef FLASHATTENTION_DISABLE_HDIM96
+                            if (params.d <= 96) { return run_mha_fwd_<80, cutlass::float_e4m3_t, 96, 96, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                            #endif
+                            #ifndef FLASHATTENTION_DISABLE_HDIM128
+                            if (params.d <= 128) { return run_mha_fwd_<80, cutlass::float_e4m3_t, 128, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                            #endif
+                            #ifndef FLASHATTENTION_DISABLE_HDIM192
+                            if (params.d <= 192) {
+                                if (params.dv <= 128 && Arch == 89) {
+                                    return run_mha_fwd_<80, cutlass::float_e4m3_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                                } else {
+                                    return run_mha_fwd_<80, cutlass::float_e4m3_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                                }
+                            }
+                            #endif
+                            #ifndef FLASHATTENTION_DISABLE_HDIM256
+                            if (params.d <= 256) { return run_mha_fwd_<80, cutlass::float_e4m3_t, 256, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+                            #endif
+                            #else
+                            TORCH_CHECK(false, "This flash attention build does not support FP8.");
+                            #endif
                         } else {
                             #ifndef FLASHATTENTION_DISABLE_FP16
                             #ifndef FLASHATTENTION_DISABLE_HDIM64
@@ -715,10 +741,10 @@ mha_fwd(at::Tensor &q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seq
     auto q_type = q.scalar_type();
     TORCH_CHECK(q_type == at::ScalarType::Half || q_type == at::ScalarType::BFloat16 || q_type == at::ScalarType::Float8_e4m3fn,
                 "FlashAttention only supports fp16, bf16, and fp8_e4m3 data type");
-    if (dprops->major < 9) {
-        TORCH_CHECK(q_type == at::ScalarType::Half || q_type == at::ScalarType::BFloat16,
-                    "FlashAttention on Ampere/Ada cards only supports fp16 and bf16 data type");
-    }
+    // if (dprops->major < 9) {
+    //     TORCH_CHECK(q_type == at::ScalarType::Half || q_type == at::ScalarType::BFloat16,
+    //                 "FlashAttention on Ampere/Ada cards only supports fp16 and bf16 data type");
+    // }
     TORCH_CHECK(k.scalar_type() == q_type, "query and key must have the same dtype");
     TORCH_CHECK(v.scalar_type() == q_type, "query and value must have the same dtype");
 

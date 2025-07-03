@@ -162,7 +162,7 @@ CUTLASS_DEVICE auto convert_layout_acc_Aregs(Layout0 acc_layout) {
         static_assert(decltype(size<0>(acc_layout))::value == 4);
         static_assert(decltype(rank(acc_layout))::value == 3);
         constexpr int mma_shape_K = get<2>(typename MMA_Traits::Shape_MNK{});
-        static_assert(mma_shape_K == 8 || mma_shape_K == 16);
+        static_assert(mma_shape_K == 8 || mma_shape_K == 16 || mma_shape_K == 32);
         if constexpr (mma_shape_K == 8) {
             return acc_layout;
         } else {
@@ -349,6 +349,8 @@ CUTLASS_DEVICE void gemm_rs_sm80(Tensor0 &acc, Tensor1 &tCrA, Tensor2 &tCrB, Ten
                                  ThrCopy smem_thr_copy_B) {
     CUTE_STATIC_ASSERT_V(size<1>(tCrA) == size<1>(acc));                     // MMA_M
     CUTE_STATIC_ASSERT_V(size<1>(tCrB) == size<2>(acc));                     // MMA_N
+    // CUTE_STATIC_ASSERT_V(size<2>(tCrA) == Int<16>{});
+    // CUTE_STATIC_ASSERT_V(size<2>(tCrB) == Int<32>{});
     CUTE_STATIC_ASSERT_V(size<2>(tCrA) == size<2>(tCrB));                     // MMA_K
     Tensor tCrB_copy_view = smem_thr_copy_B.retile_D(tCrB);
     CUTE_STATIC_ASSERT_V(size<1>(tCsB) == size<1>(tCrB_copy_view));            // N
@@ -564,7 +566,10 @@ CUTLASS_DEVICE void permute_output_fp8(Fragment &out) {
         for (int j = 0; j < size<0, 1>(frag); ++j) {
             #pragma unroll
             for (int i = 0; i < size<0, 2>(frag) / 2; ++i) {
-                cutlass::swap(frag(make_coord(_1{}, j, 2 * i), mi), frag(make_coord(_0{}, j, 2 * i + 1), mi));
+                auto coord1 = make_coord(_1{}, j, 2 * i);
+                auto coord2 = make_coord(_0{}, j, 2 * i + 1);
+                cutlass::swap(frag(coord1, mi), frag(coord2, mi));
+                // cutlass::swap(frag(make_coord(_1{}, j, 2 * i), mi), frag(make_coord(_0{}, j, 2 * i + 1), mi));
             }
         }
     }
