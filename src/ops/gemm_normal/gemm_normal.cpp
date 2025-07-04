@@ -116,13 +116,14 @@ public:
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);
 
       // If the required configuration is not registered in the tuning config, directly use torch for computation.
-#ifdef ENABLE_RUN_TORCH
       if (id_meta[IdMetaEnum::Id] == -1) {
+#ifdef ENABLE_TORCH_RUN
         return RunTorch(input, weight, output, bias);
-      }
 #else
-      id_meta[IdMetaEnum::Id] = 0;
+        id_meta[IdMetaEnum::Id] = 0;
 #endif
+      }
+
 
       PRINTF("[runing] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
       op = ins.GetOp(id_meta, is_tuning);
