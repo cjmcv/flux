@@ -27,7 +27,7 @@
   CHECK_TYPE(x, st)
 
 #define PRINTF printf
-#define ENABLE_TORCH_RUN 1
+#define NOT_TUNING_SCHEMA "" // "TORCH"
 //////////////////////////////
 namespace xop {
 using torch::Tensor;
@@ -111,20 +111,22 @@ public:
       }
     }
     else {
+      // Misalignment case.
+      if (rt_args->n%8 != 0 || rt_args->k%8 != 0) {
+        return RunTorch(input, weight, output, bias);
+      }
+      
       std::vector<int32_t> shape_meta = {rt_args->m, rt_args->n, rt_args->k, 1};       // mnkl + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);
 
       // If the required configuration is not registered in the tuning config, directly use torch for computation.
       if (id_meta[IdMetaEnum::Id] == -1) {
-#ifdef ENABLE_TORCH_RUN
-        return RunTorch(input, weight, output, bias);
-#else
-        id_meta[IdMetaEnum::Id] = 0;
-#endif
+        if constexpr (NOT_TUNING_SCHEMA == "TORCH")
+          return RunTorch(input, weight, output, bias);
+        else
+          id_meta[IdMetaEnum::Id] = 0;          
       }
-
-
       PRINTF("[runing] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
       op = ins.GetOp(id_meta, is_tuning);
     }
@@ -281,9 +283,6 @@ private:
         rt_args->C_s = 0;
       }
     }
-    int32_t wk = transpose_weight ? weight.size(0) : weight.size(1);
-    XOP_CHECK_EQ(wk, k) << "weight k-dim mismatch";
-
     rt_args->m = m;
     rt_args->n = n;
     rt_args->k = k;
@@ -294,8 +293,16 @@ private:
     rt_args->ptr_D = output.data_ptr();
     rt_args->alpha = 1.0f;
     rt_args->beta = 0.0f;
+
+    // int32_t k_remainder = k % 16;
+    // if (k_remainder != 0) {
+    //   // padded_input_ = torch::nn::functional::pad(input, torch::nn::functional::PadFuncOptions({0, 16-k_remainder, 0, 0}).mode(torch::kConstant).value(0.0)); // [pad_left, pad_right, pad_top, pad_bottom]
+    //   int new_k = k+16-k_remainder;
+    //   padded_input_ = torch::zeros({m, new_k}, input.options());
+    //   padded_input_.slice(0, 0, m).slice(1, 0, k).copy_(input);
+    // }
   }
-  
+
   int RunTorch(torch::Tensor input,
                 torch::Tensor weight,
                 torch::Tensor output,
