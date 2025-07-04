@@ -25,6 +25,9 @@
   CHECK_CUDA(x);           \
   CHECK_CONTIGUOUS(x);     \
   CHECK_TYPE(x, st)
+
+#define PRINTF printf
+#define ENABLE_TORCH_RUN 1
 //////////////////////////////
 namespace xop {
 using torch::Tensor;
@@ -81,11 +84,11 @@ public:
       }
       id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmBolckScaleFp8;
       id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
-      // printf("id_meta: \n");
+      // PRINTF("id_meta: \n");
       // for (int i=0; i<id_meta.size(); i++) {
-      //   printf("%d, ", id_meta[i]);
+      //   PRINTF("%d, ", id_meta[i]);
       // }
-      // printf("\n");
+      // PRINTF("\n");
     }
     else {
       id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmNormal;
@@ -101,7 +104,7 @@ public:
       id_meta[IdMetaEnum::Id] = data[1];
       id_meta[IdMetaEnum::Schema] = data[2];
       is_tuning = true;
-      printf("[tuning] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+      PRINTF("[tuning] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
       op = ins.GetOp(id_meta, is_tuning);
       if (op == nullptr) {
         return -1;        
@@ -113,35 +116,21 @@ public:
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);
 
       // If the required configuration is not registered in the tuning config, directly use torch for computation.
-      // id_meta[IdMetaEnum::Id] = 0;
+#ifdef ENABLE_RUN_TORCH
       if (id_meta[IdMetaEnum::Id] == -1) {
-        printf("[runing] torch\n");
-        if (transpose_weight){
-          if (bias.has_value()) {
-            torch::addmm_out(output, bias.value(), input, weight);
-          }
-          else {
-            torch::matmul_out(output, input, weight);
-          }
-        }
-        else {
-          if (bias.has_value()) {
-            torch::addmm_out(output, bias.value(), input, weight.t());
-            // output = torch::nn::functional::linear(input, weight);
-          }
-          else {
-            torch::matmul_out(output, input, weight.t());
-          }         
-        }
-        return 0;
+        return RunTorch(input, weight, output, bias);
       }
-      printf("[runing] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+#else
+      id_meta[IdMetaEnum::Id] = 0;
+#endif
+
+      PRINTF("[runing] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
       op = ins.GetOp(id_meta, is_tuning);
     }
     // ins.PrintRegistered("abc");
-    // printf("id_meta: ");
+    // PRINTF("id_meta: ");
     // for(int i=0; i<id_meta.size(); i++) {
-    //   printf("%d, ", id_meta[i]);
+    //   PRINTF("%d, ", id_meta[i]);
     // }
     
     cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
@@ -175,7 +164,7 @@ public:
     id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
 
     RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
-    // printf("size: %ld, %ld, %ld, %ld, %ld.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
+    // PRINTF("size: %ld, %ld, %ld, %ld, %ld.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
     rt_args->groups = inputs.size();
     if (inputs_scale.has_value() && weights_scale.has_value()) {
       for (int i=0; i < inputs_scale.value().size(); i++) {
@@ -215,7 +204,7 @@ public:
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
     }
-    printf("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+    PRINTF("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
     GemmBase *op = ins.GetOp(id_meta, is_tuning);
     if (op == nullptr)
       return -1;
@@ -306,6 +295,31 @@ private:
     rt_args->beta = 0.0f;
   }
   
+  int RunTorch(torch::Tensor input,
+                torch::Tensor weight,
+                torch::Tensor output,
+                c10::optional<torch::Tensor> bias) {
+    PRINTF("[runing] torch\n");
+    if (transpose_weight){
+      if (bias.has_value()) {
+        torch::addmm_out(output, bias.value(), input, weight);
+      }
+      else {
+        torch::matmul_out(output, input, weight);
+      }
+    }
+    else {
+      if (bias.has_value()) {
+        torch::addmm_out(output, bias.value(), input, weight.t());
+        // output = torch::nn::functional::linear(input, weight);
+      }
+      else {
+        torch::matmul_out(output, input, weight.t());
+      }         
+    }
+    return 0;
+  }
+
 private:
   const c10::ScalarType input_dtype;
   const c10::ScalarType output_dtype;
