@@ -45,7 +45,8 @@ public:
     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args->m, rt_args->n, rt_args->k);
     rt_args->stride_a = helper.get_stride_a();
     rt_args->stride_b = helper.get_stride_b();
-    rt_args->stride_c = helper.get_stride_c();
+    rt_args->stride_c = rt_args->C_s == -1 ? helper.get_stride_c() : 0;
+    // printf("rt_args->stride_c: %d.\n", rt_args->stride_c);
     rt_args->stride_d = helper.get_stride_c();
     auto arguments = args_from_options(rt_args);
     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
@@ -72,6 +73,7 @@ private:
   //        -1: Reset loadbalancing width to unspecified SMs (i.e., the number of device SMs)
   typename DeviceGemmBasic::Arguments args_from_options(const RtArgumentsV2 *rt_args) {
     cutlass::gemm::GemmCoord problem_size = {rt_args->m, rt_args->n, rt_args->k};
+    int batch_stride_C = rt_args->stride_c == 0 ? rt_args->n : problem_size.mn().product();
     if constexpr (cute::is_same_v<ThreadBlockSwizzle, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>>) {  
       return typename DeviceGemmBasic::Arguments(
         cutlass::gemm::GemmUniversalMode::kGemm,  // universal mode
@@ -87,7 +89,7 @@ private:
         rt_args->ptr_D,                   // ptr_D
         problem_size.mk().product(),      // batch_stride_A
         problem_size.nk().product(),      // batch_stride_B
-        problem_size.mn().product(),      // batch_stride_C
+        batch_stride_C,                   // batch_stride_C
         problem_size.mn().product(),      // batch_stride_D
         rt_args->stride_a,              // stride_a
         rt_args->stride_b,              // stride_b
@@ -109,7 +111,7 @@ private:
         rt_args->ptr_D,                   // ptr_D
         problem_size.mk().product(),      // batch_stride_A
         problem_size.nk().product(),      // batch_stride_B
-        problem_size.mn().product(),      // batch_stride_C
+        batch_stride_C,                   // batch_stride_C
         problem_size.mn().product(),      // batch_stride_D
         rt_args->stride_a,              // stride_a
         rt_args->stride_b,              // stride_b

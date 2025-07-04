@@ -16,6 +16,7 @@ struct RtArguments {
   float alpha;
   float beta;
 
+  int C_s;
   virtual ~RtArguments() {}
 };
 

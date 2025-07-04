@@ -113,6 +113,7 @@ public:
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);
 
       // If the required configuration is not registered in the tuning config, directly use torch for computation.
+      // id_meta[IdMetaEnum::Id] = 0;
       if (id_meta[IdMetaEnum::Id] == -1) {
         printf("[runing] torch\n");
         if (transpose_weight){
@@ -275,11 +276,20 @@ private:
     int32_t k = input.size(1);
     int32_t n = transpose_weight ? weight.size(1) : weight.size(0); // true是RRR，正常使用是false，对应linear层的RCR
 
+    rt_args->C_s = -1;
     if (bias.has_value()) {
       CHECK_INPUT(bias.value(), this->output_dtype);
-      XOP_CHECK_EQ(bias->dim(), 2);
-      XOP_CHECK_EQ(m, bias->size(0));
-      XOP_CHECK_EQ(n, bias->size(1));
+      if (bias->dim() == 2) {
+        XOP_CHECK_EQ(n, bias->size(1));
+        XOP_CHECK((bias->size(0) == m) || (bias->size(0) == 1));
+        if (bias->size(0) == 1) {
+          rt_args->C_s = 0;
+        }
+      }
+      else {
+        XOP_CHECK_EQ(n, bias->size(0));
+        rt_args->C_s = 0;
+      }
     }
     int32_t wk = transpose_weight ? weight.size(0) : weight.size(1);
     XOP_CHECK_EQ(wk, k) << "weight k-dim mismatch";

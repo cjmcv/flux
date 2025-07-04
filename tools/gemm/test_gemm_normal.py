@@ -267,7 +267,8 @@ def run(M, args, xop_perf, torch_perf):
     bias = None
     if args.has_bias:
         bias_dtype = output_dtype
-        bias_shape = (1, N) if is_fp8 or is_s8_dequant else (M, N)
+        # bias_shape = (1, N) if is_fp8 or is_s8_dequant else (M, N)
+        bias_shape = (N)
         bias = rand_tensor(bias_shape, bias_dtype)
 
     perf_result_xop = perf_xop(
