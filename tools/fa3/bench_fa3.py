@@ -32,7 +32,7 @@ for is_causal in [False, True]:
         for i in range(5): flash_attn_func_v3(q, k, v, softmax_scale=scale, causal=is_causal)
         torch.cuda.synchronize()
         _, time = benchmark_forward(flash_attn_func_v3, q, k, v, softmax_scale=scale, causal=is_causal, repeats=100, verbose=False, desc='Triton')
-        print(f'{seq_len} flops:{flops/time.mean*1e-12}')
+        print(f'{seq_len} TFLOPS:{flops/time.mean*1e-12}')
 
         o1,lse = flash_attn_func_v3(q, k, v, softmax_scale=scale, causal=is_causal)
         # [batch_size, seqlen, nheads, headdim] => [batch_size, nheads, seqlen, headdim]

@@ -104,10 +104,11 @@ def str2schema(schema_name):
     }
     return string_to_schema.get(schema_name, None)
 
+# schema 1: [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192]
 def gen_tuning_space(schema):
     space: List[TuningConfig] = []
     space_G = [1]
-    space_M = [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192] # [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
     space_NK = [(4096, 4096)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     
     # space_G = [4, 8]

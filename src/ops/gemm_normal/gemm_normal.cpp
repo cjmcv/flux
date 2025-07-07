@@ -27,7 +27,31 @@
   CHECK_TYPE(x, st)
 
 #define PRINTF printf
-#define NOT_TUNING_SCHEMA "" // "TORCH"
+#define NOT_TUNING_SCHEMA "TORCH" // "TORCH"
+
+int CoarseGrainedTuningM(int actual_m, int schema = 0) {
+  int tuned_m = 0;
+  if (schema == 0) {
+    return actual_m;
+  }
+  else if (schema == 1) {
+    if (actual_m <= 1) {
+      tuned_m = 1;
+    }
+    else if (actual_m >= 8192) {
+      tuned_m = 8192;
+    }
+    else {
+      int exponent = static_cast<int>(std::floor(std::log2(actual_m)));
+      tuned_m = std::pow(2, exponent);
+    }
+  }
+  else {
+    printf("Unsupported CoarseGrainedTuning schema: %d.\n", schema);
+  }
+  return tuned_m;
+}
+
 //////////////////////////////
 namespace xop {
 using torch::Tensor;
@@ -116,7 +140,9 @@ public:
         return RunTorch(input, weight, output, bias);
       }
       
-      std::vector<int32_t> shape_meta = {rt_args->m, rt_args->n, rt_args->k, 1};       // mnkl + meta
+      int tuned_m = CoarseGrainedTuningM(rt_args->m, 1);
+      printf("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
+      std::vector<int32_t> shape_meta = {tuned_m, rt_args->n, rt_args->k, 1};       // mnkl + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);
 
