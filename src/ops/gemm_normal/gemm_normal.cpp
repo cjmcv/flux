@@ -27,7 +27,7 @@
   CHECK_TYPE(x, st)
 
 #define PRINTF printf
-#define NOT_TUNING_SCHEMA "TORCH" // "TORCH"
+#define NOT_TUNING_SCHEMA "" // "TORCH"
 
 int CoarseGrainedTuningM(int actual_m, int schema = 0) {
   int tuned_m = 0;
@@ -75,7 +75,18 @@ public:
       bool transpose_weight)
       : input_dtype(input_dtype),
         output_dtype(output_dtype),
-        transpose_weight(transpose_weight) {} // true对应的是RRR，正常的false是RCR
+        transpose_weight(transpose_weight) { // transpose_weight true对应的是RRR，正常的false是RCR
+          // auto device_properties = torch::cuda::get_device_properties(0);
+          cudaDeviceProp device_properties;
+          cudaGetDeviceProperties(&device_properties, 0);
+          if (device_properties.major == 9 && device_properties.minor == 0)
+            arch_ = UnifiedMetaEnum::Sm90;
+          else if (device_properties.major == 8 && device_properties.minor == 9)
+            arch_ = UnifiedMetaEnum::Sm89;
+          else
+            arch_ = UnifiedMetaEnum::Sm80;
+          // printf("sm: %d%d.\n", device_properties.major, device_properties.minor);
+        } 
 
   // tuning：tensor进入，先构建meta，依次添加序号充当key，取获取op，计算性能，并进行排序，取top5, 保留整个meta。获取不到新op时表示结束。
   //         top1的meta从cpp端写入文件，信息包括shape+序号+meta。保存时，meta信息需要按python脚本的生成方式，转为字符串。
@@ -107,7 +118,11 @@ public:
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_B = weight_scale.value().data_ptr();
       }
       id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmBolckScaleFp8;
-      id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
+      id_meta[IdMetaEnum::Arch] = (int16_t)arch_;
+      if (arch_ != UnifiedMetaEnum::Sm90 && arch_ != UnifiedMetaEnum::Sm89) {
+        printf("fp8 kernel is only supported on GPUs with the sm_89 or sm_90 architecture.");
+        return -1;
+      }
       // PRINTF("id_meta: \n");
       // for (int i=0; i<id_meta.size(); i++) {
       //   PRINTF("%d, ", id_meta[i]);
@@ -360,6 +375,7 @@ private:
   const bool transpose_weight;
 
   int16_t default_schema;
+  UnifiedMetaEnum arch_;
 };
 
 GemmNormal::GemmNormal(

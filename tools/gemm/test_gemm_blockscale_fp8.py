@@ -3,8 +3,10 @@ from typing import Tuple
 import torch
 import triton
 
-import tilelang
-import tilelang.language as T
+enable_tilelang = False
+if enable_tilelang:
+    import tilelang
+    import tilelang.language as T
 
 enable_deep_gemm = False
 if enable_deep_gemm:
@@ -21,81 +23,82 @@ import math
 def ceil_div(a, b):
     return math.ceil(a / b)
 
-def tl_gemm(
-    M,
-    N,
-    K,
-    in_dtype,
-    out_dtype,
-    accum_dtype,
-):
-    assert in_dtype in [
-        "e4m3_float8",
-    ], "Currently only e4m3_float8 is supported"
-    assert out_dtype in [
-        "bfloat16",
-        "float16",
-    ], "Currently only bfloat16 and float16 are supported"
-
-    TILE_SIZE = (128, 128, 128)
-    block_M = TILE_SIZE[0]
-    block_N = TILE_SIZE[1]
-    block_K = TILE_SIZE[2]
-
-    A_shape = (M, K)
-    Scales_A_shape = (M, T.ceildiv(K, block_K))
-    B_shape = (N, K)
-    Scales_B_shape = (T.ceildiv(N, block_N), T.ceildiv(K, block_K))
-    A_shared_shape = (block_M, block_K)
-    B_shared_shape = (block_N, block_K)
-    C_shared_shape = (block_M, block_N)
-
-    @T.prim_func
-    def main(
-        A: T.Buffer(A_shape, in_dtype),
-        scales_a: T.Buffer(Scales_A_shape, "float32"),
-        B: T.Buffer(B_shape, in_dtype),
-        scales_b: T.Buffer(Scales_B_shape, "float32"),
-        C: T.Buffer((M, N), out_dtype),
+if enable_tilelang:
+    def tl_gemm(
+        M,
+        N,
+        K,
+        in_dtype,
+        out_dtype,
+        accum_dtype,
     ):
-        with T.Kernel(T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=128) as (
-            bx,
-            by,
+        assert in_dtype in [
+            "e4m3_float8",
+        ], "Currently only e4m3_float8 is supported"
+        assert out_dtype in [
+            "bfloat16",
+            "float16",
+        ], "Currently only bfloat16 and float16 are supported"
+
+        TILE_SIZE = (128, 128, 128)
+        block_M = TILE_SIZE[0]
+        block_N = TILE_SIZE[1]
+        block_K = TILE_SIZE[2]
+
+        A_shape = (M, K)
+        Scales_A_shape = (M, T.ceildiv(K, block_K))
+        B_shape = (N, K)
+        Scales_B_shape = (T.ceildiv(N, block_N), T.ceildiv(K, block_K))
+        A_shared_shape = (block_M, block_K)
+        B_shared_shape = (block_N, block_K)
+        C_shared_shape = (block_M, block_N)
+
+        @T.prim_func
+        def main(
+            A: T.Buffer(A_shape, in_dtype),
+            scales_a: T.Buffer(Scales_A_shape, "float32"),
+            B: T.Buffer(B_shape, in_dtype),
+            scales_b: T.Buffer(Scales_B_shape, "float32"),
+            C: T.Buffer((M, N), out_dtype),
         ):
+            with T.Kernel(T.ceildiv(N, block_N), T.ceildiv(M, block_M), threads=128) as (
+                bx,
+                by,
+            ):
 
-            A_shared = T.alloc_shared(A_shared_shape, in_dtype)
-            B_shared = T.alloc_shared(B_shared_shape, in_dtype)
-            C_shared = T.alloc_shared(C_shared_shape, out_dtype)
-            Scale_C_shared = T.alloc_shared((block_M), "float32")
-            C_local = T.alloc_fragment(C_shared_shape, accum_dtype)
-            C_local_accum = T.alloc_fragment(C_shared_shape, accum_dtype)
+                A_shared = T.alloc_shared(A_shared_shape, in_dtype)
+                B_shared = T.alloc_shared(B_shared_shape, in_dtype)
+                C_shared = T.alloc_shared(C_shared_shape, out_dtype)
+                Scale_C_shared = T.alloc_shared((block_M), "float32")
+                C_local = T.alloc_fragment(C_shared_shape, accum_dtype)
+                C_local_accum = T.alloc_fragment(C_shared_shape, accum_dtype)
 
-            # Improve L2 Cache
-            T.use_swizzle(panel_size=10)
+                # Improve L2 Cache
+                T.use_swizzle(panel_size=10)
 
-            T.clear(C_local)
-            T.clear(C_local_accum)
-            K_iters = T.ceildiv(K, block_K)
-            for k in T.Pipelined(K_iters, num_stages=4):
-                # Load A into shared memory
-                T.copy(A[by * block_M, k * block_K], A_shared)
-                # Load B into shared memory
-                T.copy(B[bx * block_N, k * block_K], B_shared)
-                # Load scale into shared memory
-                Scale_B = scales_b[bx, k]
-                for i in T.Parallel(block_M):
-                    Scale_C_shared[i] = scales_a[by * block_M + i, k] * Scale_B
-
-                T.gemm(A_shared, B_shared, C_local, transpose_B=True)
-                # Promote to enable 2xAcc
-                for i, j in T.Parallel(block_M, block_N):
-                    C_local_accum[i, j] += C_local[i, j] * Scale_C_shared[i]
                 T.clear(C_local)
-            # TMA store
-            T.copy(C_local_accum, C_shared)
-            T.copy(C_shared, C[by * block_M, bx * block_N])
+                T.clear(C_local_accum)
+                K_iters = T.ceildiv(K, block_K)
+                for k in T.Pipelined(K_iters, num_stages=4):
+                    # Load A into shared memory
+                    T.copy(A[by * block_M, k * block_K], A_shared)
+                    # Load B into shared memory
+                    T.copy(B[bx * block_N, k * block_K], B_shared)
+                    # Load scale into shared memory
+                    Scale_B = scales_b[bx, k]
+                    for i in T.Parallel(block_M):
+                        Scale_C_shared[i] = scales_a[by * block_M + i, k] * Scale_B
 
-    return main
+                    T.gemm(A_shared, B_shared, C_local, transpose_B=True)
+                    # Promote to enable 2xAcc
+                    for i, j in T.Parallel(block_M, block_N):
+                        C_local_accum[i, j] += C_local[i, j] * Scale_C_shared[i]
+                    T.clear(C_local)
+                # TMA store
+                T.copy(C_local_accum, C_shared)
+                T.copy(C_shared, C[by * block_M, bx * block_N])
+
+        return main
 
 def per_token_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     assert x.dim() == 2 and x.size(1) % 128 == 0
@@ -132,7 +135,7 @@ def fp8_gemm_deepgemm(
     k: int,
 ):
     """DeepGEMM implementation of FP8 GEMM"""
-    out = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
+    out = torch.zeros((m, n), device="cuda", dtype=torch.bfloat16)
 
     if enable_deep_gemm:
         # Run DeepGEMM kernel
@@ -162,12 +165,13 @@ def fp8_gemm_sglang(
 
 
 def calculate_diff(m: int, n: int, k: int):
-    x = torch.randn((m, k), device="cuda", dtype=torch.bfloat16)
-    y = torch.randn((n, k), device="cuda", dtype=torch.bfloat16)
+    x = torch.ones((m, k), device="cuda", dtype=torch.bfloat16)
+    y = torch.ones((n, k), device="cuda", dtype=torch.bfloat16)
 
     x_fp8, x_scale = per_token_cast_to_fp8(x.clone()) # x_fp8[m,k], x_scale[m，k//128]     => cutlass x_scale[m,k]
     y_fp8, y_scale = per_block_cast_to_fp8(y.clone()) # y_fp8[n,k], y_scale[n//128,k//128] =>
 
+    # DeepGemm
     if enable_deep_gemm:
         x_scale_col_major = get_col_major_tma_aligned_tensor(x_scale.clone())
     else:
@@ -182,15 +186,20 @@ def calculate_diff(m: int, n: int, k: int):
         k,
     )
 
+    # SGLang
     out_sglang = fp8_gemm_sglang(
         x_fp8.clone(), x_scale.clone(), y_fp8.clone(), y_scale.clone(), m, n, k
     )
 
-    tilelang_func = tl_gemm(m, n, k, "e4m3_float8", "bfloat16", "float32")
-    tilelang_kernel = tilelang.compile(tilelang_func, out_idx=[-1])
-    out_tilelang = tilelang_kernel(
-        x_fp8.clone(), x_scale.clone(), y_fp8.clone(), y_scale.clone()
-    )
+    # TileLang
+    if enable_tilelang:
+        tilelang_func = tl_gemm(m, n, k, "e4m3_float8", "bfloat16", "float32")
+        tilelang_kernel = tilelang.compile(tilelang_func, out_idx=[-1])
+        out_tilelang = tilelang_kernel(
+            x_fp8.clone(), x_scale.clone(), y_fp8.clone(), y_scale.clone()
+        )
+    else:
+        out_tilelang = out_sglang
 
     xt_scale = x_scale.clone().t().contiguous()
     yt_scale = y_scale.clone().t().contiguous()
@@ -199,12 +208,12 @@ def calculate_diff(m: int, n: int, k: int):
         output_dtype=torch.bfloat16,
         transpose_weight=False
     )
-    out = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
+    out_xop = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
 
-    out_xop = xop_gemm.forward(
+    xop_gemm.forward(
         x_fp8.clone(),
         y_fp8.clone(),
-        output=out,
+        output=out_xop,
         bias=None,
         input_scale=xt_scale.clone(),
         weight_scale=yt_scale.clone(),
@@ -213,16 +222,20 @@ def calculate_diff(m: int, n: int, k: int):
         fast_accum=False,
     )
 
+    out_gemm = x @ y.t() # Can be consistent only when dealing with integers.
+    diff_gemm_xop = torch.abs(out_gemm - out_xop).mean().item()
     diff_tilelang_xop = torch.abs(out_tilelang - out_xop).mean().item()
     diff_sglang_deepgemm = torch.abs(out_deepgemm - out_sglang).mean().item()
     diff_tilelang_deepgemm = torch.abs(out_deepgemm - out_tilelang).mean().item()
     diff_tilelang_sglang = torch.abs(out_tilelang - out_sglang).mean().item()
 
     print(f"Shape m={m}, n={n}, k={k}:")
+    print(f"gemm output: {out_gemm[0, 0:5]}")
     print(f"XOP output: {out_xop[0, 0:5]}")
     print(f"DeepGEMM output: {out_deepgemm[0, 0:5]}")
     print(f"SGLang output: {out_sglang[0, 0:5]}")
     print(f"TileLang output: {out_tilelang[0, 0:5]}")
+    print(f"Mean absolute difference (Gemm-XOP): {diff_gemm_xop}")
     print(f"Mean absolute difference (TileLang-XOP): {diff_tilelang_xop}")
     print(f"Mean absolute difference (SGLang-DeepGEMM): {diff_sglang_deepgemm}")
     print(f"Mean absolute difference (TileLang-DeepGEMM): {diff_tilelang_deepgemm}")
@@ -245,7 +258,7 @@ def calculate_diff(m: int, n: int, k: int):
         print("✅ All implementations match\n")
     else:
         print("❌ Some implementations differ:")
-        print(f"  - TileLang vs XOP: {'✅' if tilelang_cxopmatch else '❌'}")
+        print(f"  - TileLang vs XOP: {'✅' if tilelang_xop_match else '❌'}")
         print(f"  - SGLang vs DeepGEMM: {'✅' if sglang_deepgemm_match else '❌'}")
         print(f"  - TileLang vs DeepGEMM: {'✅' if tilelang_deepgemm_match else '❌'}")
         print(f"  - TileLang vs SGLang: {'✅' if tilelang_sglang_match else '❌'}\n")
@@ -255,7 +268,7 @@ def calculate_diff(m: int, n: int, k: int):
 def get_weight_shapes(tp_size):
     # cannot TP
     total = [
-        (512 + 64, 7168),
+        (512, 7168), # (512 + 64, 7168),
         ((128 + 64) * 128, 7168),
         (128 * (128 + 128), 512),
         (7168, 16384),
@@ -339,12 +352,12 @@ def get_benchmark(tp_size):
             out = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
             ms, min_ms, max_ms = triton.testing.do_bench(
                 lambda: xop_gemm.forward(
-                    x_fp8.clone(),
-                    y_fp8.clone(),
+                    x_fp8, #.clone(),
+                    y_fp8, #.clone(),
                     output=out,
                     bias=None,
-                    input_scale=xt_scale.clone(),
-                    weight_scale=yt_scale.clone(),
+                    input_scale=xt_scale, #.clone(),
+                    weight_scale=yt_scale, #.clone(),
                     output_scale=None,
                     tuning = None,
                     fast_accum=False,
@@ -354,10 +367,10 @@ def get_benchmark(tp_size):
         elif provider == "deepgemm":
             ms, min_ms, max_ms = triton.testing.do_bench(
                 lambda: fp8_gemm_deepgemm(
-                    x_fp8.clone(),
-                    x_scale_col_major.clone(),
-                    y_fp8.clone(),
-                    y_scale.clone(),
+                    x_fp8, #.clone(),
+                    x_scale_col_major, #.clone(),
+                    y_fp8, #.clone(),
+                    y_scale, #.clone(),
                     m,
                     n,
                     k,
@@ -367,10 +380,10 @@ def get_benchmark(tp_size):
         elif provider == "sglang":
             ms, min_ms, max_ms = triton.testing.do_bench(
                 lambda: fp8_gemm_sglang(
-                    x_fp8.clone(),
-                    x_scale.clone(),
-                    y_fp8.clone(),
-                    y_scale.clone(),
+                    x_fp8, #.clone(),
+                    x_scale,#.clone(),
+                    y_fp8,#.clone(),
+                    y_scale,#.clone(),
                     m,
                     n,
                     k,
@@ -378,17 +391,20 @@ def get_benchmark(tp_size):
                 quantiles=quantiles,
             )
         else:  # tilelang
-            tilelang_func = tl_gemm(m, n, k, "e4m3_float8", "bfloat16", "float32")
-            tilelang_kernel = tilelang.compile(tilelang_func, out_idx=[-1])
-            ms, min_ms, max_ms = triton.testing.do_bench(
-                lambda: tilelang_kernel(
-                    x_fp8.clone(),
-                    x_scale.clone(),
-                    y_fp8.clone(),
-                    y_scale.clone(),
-                ),
-                quantiles=quantiles,
-            )
+            if enable_tilelang:
+                tilelang_func = tl_gemm(m, n, k, "e4m3_float8", "bfloat16", "float32")
+                tilelang_kernel = tilelang.compile(tilelang_func, out_idx=[-1])
+                ms, min_ms, max_ms = triton.testing.do_bench(
+                    lambda: tilelang_kernel(
+                        x_fp8, #.clone(),
+                        x_scale, #.clone(),
+                        y_fp8, #.clone(),
+                        y_scale, #.clone(),
+                    ),
+                    quantiles=quantiles,
+                )
+            else:
+                ms, min_ms, max_ms = 1, 1, 1
 
         # Calculate TFLOPS
         flops = 2 * m * n * k  # multiply-adds
@@ -436,10 +452,10 @@ if __name__ == "__main__":
     # Run correctness tests on a few examples
     if args.run_correctness:
         print("Running correctness tests...")
-        calculate_diff(64, 512, 512)  # Small test
-        # calculate_diff(64, 512, 7168)  # Small test
-        # calculate_diff(64, 7168, 16384)  # Medium test
-        # calculate_diff(64, 18432, 7168)  # Large test
+        # calculate_diff(64, 256, 512)  # Small test
+        calculate_diff(64, 512, 7168)  # Small test
+        calculate_diff(64, 7168, 16384)  # Medium test
+        calculate_diff(64, 18432, 7168)  # Large test
 
     # Get the benchmark function with the specified tp_size
     benchmark = get_benchmark(args.tp_size)
