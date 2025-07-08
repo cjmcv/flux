@@ -27,6 +27,8 @@ print = partial(print, flush=True)
 warmup_iters = 10
 pref_iters = 20
 
+is_use_fp16_acc = False # True
+
 @dataclasses.dataclass
 class TuningConfig:
     G: int
@@ -45,13 +47,20 @@ class GemmNormalSchema:
     sub_schema = [Meta.GemmNormal, Meta.GemmNormalSimt]
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
-    test_input_dtype = torch.bfloat16
-    space_dtype = [(torch.bfloat16,torch.bfloat16,torch.bfloat16)]
+    if is_use_fp16_acc:
+        test_input_dtype = torch.float16
+        space_dtype = [(torch.float16,torch.float16,torch.float16)]
+    else:
+        test_input_dtype = torch.bfloat16
+        space_dtype = [(torch.bfloat16,torch.bfloat16,torch.bfloat16)]
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
         return input, None, weight, None
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
-                       input_scale: torch.Tensor, weight_scale: torch.Tensor):
+                       input_scale: torch.Tensor, weight_scale: torch.Tensor,
+                       bias: torch.Tensor):
         output = torch.matmul(input, weight.t())
+        if (bias != None):
+            output += bias
         return output.cpu()
 class GemmBlockScaleFp8Schema:
     impl = "GemmBlockScaleFp8"
@@ -63,7 +72,8 @@ class GemmBlockScaleFp8Schema:
         y, y_scale = per_block_cast_to_fp8(weight)
         return x, x_scale.t().contiguous(), y, y_scale.t().contiguous()
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
-                       input_scale: torch.Tensor, weight_scale: torch.Tensor):
+                       input_scale: torch.Tensor, weight_scale: torch.Tensor,
+                       bias: torch.Tensor):
         # output = torch.matmul(input, weight.t())
         # return output.cpu()
         return None
@@ -91,7 +101,8 @@ class GemmGroupedBlockScaleFp8Schema:
         return x_list, x_scale_list, y_list, y_scale_list
         
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
-                       input_scale: torch.Tensor, weight_scale: torch.Tensor):
+                       input_scale: torch.Tensor, weight_scale: torch.Tensor,
+                       bias: torch.Tensor):
         # output = torch.matmul(input, weight.t())
         # return output.cpu()
         return None
@@ -108,7 +119,7 @@ def str2schema(schema_name):
 def gen_tuning_space(schema):
     space: List[TuningConfig] = []
     space_G = [1]
-    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192] # [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192] #,16384,32768 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
     space_NK = [(4096, 4096)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     
     # space_G = [4, 8]
@@ -188,6 +199,7 @@ def profiling_core(tuning, shape, fn: callable, fp):
     
 def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor, 
                         input_scale: torch.Tensor, weight_scale: torch.Tensor,
+                        bias: torch.Tensor,
                         config: TuningConfig, fp):
     m = input.size(0)
     k = input.size(1)
@@ -197,16 +209,13 @@ def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
     else:
         n = weight.size(0)
     g = 1
-    # bias = None
-    # if config.has_bias:
-    #     bias = torch.zeros([m, n], dtype=input.dtype, device=input.device, requires_grad=False)
 
     tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
     output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
     op = xop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
 
     def fn():
-        return op.forward(input, weight, output=output, bias=None, 
+        return op.forward(input, weight, output=output, bias=bias, 
                           input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
                           tuning=tuning, fast_accum=False)
     
@@ -248,14 +257,20 @@ def tune_one_config(schema, config: TuningConfig, fp):
         xop_output = run_xop_grouped_profiling(schema, x, y, x_scale, y_scale, config, fp)
     else:
         x, x_scale, y, y_scale = schema.gen_scale(input.clone(), weight.clone())
-        ref_output = schema.get_ref_output(x, y, x_scale, y_scale)
-        xop_output = run_xop_profiling(schema, x, y, x_scale, y_scale, config, fp)
+        bias = None
+        if config.has_bias:
+            bias = torch.zeros([y.size(0)], dtype=x.dtype, device=x.device, requires_grad=False)
+        ref_output = schema.get_ref_output(x, y, x_scale, y_scale, bias)
+        xop_output = run_xop_profiling(schema, x, y, x_scale, y_scale, bias, config, fp)
 
     if ref_output is not None:
         if config.dtypeC == torch.bfloat16:
             atol, rtol = 0.02, 0.02
         else:
             atol, rtol = 0.01, 0.01
+
+        if is_use_fp16_acc:
+            atol, rtol = 0.1, 0.1
         xop.torch_allclose(xop_output, ref_output, atol=atol, rtol=rtol)
 
 if __name__ == "__main__":

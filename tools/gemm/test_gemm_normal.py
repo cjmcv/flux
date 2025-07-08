@@ -195,7 +195,6 @@ def rand_tensor(shape: list[int], dtype: torch.dtype):
     else:
         return torch.rand(shape, dtype=dtype).cuda() / 10
 
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("M", type=int)
@@ -227,7 +226,7 @@ def parse_args():
 
 
 THRESHOLD_MAP = {
-    torch.float16: 1e-2,
+    torch.float16: 1e-2,  # 1e-1,
     torch.bfloat16: 2e-2,
     torch.float8_e4m3fn: 2e-2,
     torch.float8_e5m2: 2e-2,
@@ -314,6 +313,7 @@ def run(M, args, xop_perf, torch_perf):
     rtol = THRESHOLD_MAP[xop_output.dtype]
     xop.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
 
+# python3 tools/gemm/test_gemm_normal.py --has_bias --dtype=float16 100 1000 1000
 if __name__ == "__main__":
     init_seed()
     args = parse_args()
@@ -333,11 +333,17 @@ if __name__ == "__main__":
     torch_perf = []
     print(f"M: {1}, N: {args.N}, K: {args.K}")
     run(1, args, xop_perf, torch_perf)
-    for m in range(2, args.M, args.step):
+    # for m in range(2, args.M, args.step):
+    #     print(f"M: {m}, N: {args.N}, K: {args.K}")
+    #     run(m, args, xop_perf, torch_perf)
+    # plot_x = [1] + list(range(2, args.M, args.step))
+
+    for m in range(1, 12): # 65536: 17
+        m = 2**m
         print(f"M: {m}, N: {args.N}, K: {args.K}")
         run(m, args, xop_perf, torch_perf)
+    plot_x = [1] + list(range(1, 12))
 
-    plot_x = [1] + list(range(2, args.M, args.step))
     plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
 

@@ -27,7 +27,8 @@
   CHECK_TYPE(x, st)
 
 #define PRINTF printf
-#define NOT_TUNING_SCHEMA "" // "TORCH"
+#define NOT_TUNING_SCHEMA "TORCH" // "TORCH"
+#define DISABLE_FP16_ACC true
 
 int CoarseGrainedTuningM(int actual_m, int schema = 0) {
   int tuned_m = 0;
@@ -38,8 +39,8 @@ int CoarseGrainedTuningM(int actual_m, int schema = 0) {
     if (actual_m <= 1) {
       tuned_m = 1;
     }
-    else if (actual_m >= 8192) {
-      tuned_m = 8192;
+    else if (actual_m >= 32768) {
+      tuned_m = 32768;
     }
     else {
       int exponent = static_cast<int>(std::floor(std::log2(actual_m)));
@@ -156,7 +157,7 @@ public:
       }
       
       int tuned_m = CoarseGrainedTuningM(rt_args->m, 1);
-      printf("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
+      PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
       std::vector<int32_t> shape_meta = {tuned_m, rt_args->n, rt_args->k, 1};       // mnkl + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)
       tins.GetSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);
@@ -203,7 +204,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
+    std::vector<int16_t> id_meta = MakeDefaultMeta(DISABLE_FP16_ACC);     // id + meta
     id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmGroupedBlockScaleFp8;
     id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
 
