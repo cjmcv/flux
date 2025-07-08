@@ -23,3 +23,5 @@ python/xop/version.py
 tools/*.cu
 tools/*.prof.log
 src/ops/flash_attn/instantiations/*
+configs
+abc.txt

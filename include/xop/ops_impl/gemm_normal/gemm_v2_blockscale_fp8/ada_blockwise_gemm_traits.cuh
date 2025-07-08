@@ -79,7 +79,7 @@ struct AdaBlockwiseGemmTraits
         = cute::Shape<cute::Int<ScaleMsPerTile>, cute::Int<ScaleNsPerTile>, cute::Int<ScaleKsPerTile>>;
 
     // MMA atom arch and layout
-    using TiledMma = DefaultGemm_TensorOp_MMA<cute::float_e4m3_t, cutlass::arch::Sm89>::TiledMma;
+    using TiledMma = typename DefaultGemm_TensorOp_MMA<cute::float_e4m3_t, cutlass::arch::Sm89, ElementAccum>::TiledMma;
 
     static constexpr int kBlockKSmem = 128;
     // A memory copy operand

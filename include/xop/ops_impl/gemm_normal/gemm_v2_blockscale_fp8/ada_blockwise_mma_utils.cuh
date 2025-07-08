@@ -28,43 +28,122 @@
 
 namespace cute
 {
+    // struct SM80_16x8x16_F16F16F16F16_TN
+    // {
+    //   using DRegisters = uint32_t[2];
+    //   using ARegisters = uint32_t[4];
+    //   using BRegisters = uint32_t[2];
+    //   using CRegisters = uint32_t[2];
+    
+    //   CUTE_HOST_DEVICE static void
+    //   fma(uint32_t      & d0, uint32_t      & d1,
+    //       uint32_t const& a0, uint32_t const& a1, uint32_t const& a2, uint32_t const& a3,
+    //       uint32_t const& b0, uint32_t const& b1,
+    //       uint32_t const& c0, uint32_t const& c1)
+    //   {
+    // #if defined(CUTE_ARCH_MMA_SM80_ENABLED)
+    //     asm volatile(
+    //       "mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16 "
+    //       "{%0,  %1},"
+    //       "{%2,  %3,  %4,  %5},"
+    //       "{%6,  %7},"
+    //       "{%8,  %9};\n"
+    //       : "=r"(d0), "=r"(d1)
+    //       :  "r"(a0),  "r"(a1),  "r"(a2),  "r"(a3),
+    //          "r"(b0),  "r"(b1),
+    //          "r"(c0),  "r"(c1));
+    // #else
+    //     CUTE_INVALID_CONTROL_PATH("Attempting to use SM80_16x8x16_F16F16F16F16_TN without CUTE_ARCH_MMA_SM80_ENABLED");
+    // #endif
+    //   }
+    // };
 
-// MMA 16x8x32 TN
-struct SM89_16x8x32_F32F8F8F32_TN
+    // struct SM80_16x8x16_F32F16F16F32_TN
+    // {
+    //   using DRegisters = float[4];
+    //   using ARegisters = uint32_t[4];
+    //   using BRegisters = uint32_t[2];
+    //   using CRegisters = float[4];
+    
+    //   CUTE_HOST_DEVICE static void
+    //   fma(float         & d0, float         & d1, float         & d2, float         & d3,
+    //       uint32_t const& a0, uint32_t const& a1, uint32_t const& a2, uint32_t const& a3,
+    //       uint32_t const& b0, uint32_t const& b1,
+    //       float const   & c0, float const   & c1, float const   & c2, float const   & c3)
+    //   {
+    // #if defined(CUTE_ARCH_MMA_SM80_ENABLED)
+    //     asm volatile(
+    //       "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+    //       "{%0,  %1,  %2,  %3},"
+    //       "{%4,  %5,  %6,  %7},"
+    //       "{%8,  %9},"
+    //       "{%10, %11, %12, %13};\n"
+    //       : "=f"(d0), "=f"(d1), "=f"(d2), "=f"(d3)
+    //       :  "r"(a0),  "r"(a1),  "r"(a2),  "r"(a3),
+    //          "r"(b0),  "r"(b1),
+    //          "f"(c0),  "f"(c1),  "f"(c2),  "f"(c3));
+    // #else
+    //     CUTE_INVALID_CONTROL_PATH("Attempting to use SM80_16x8x16_F32F16F16F32_TN without CUTE_ARCH_MMA_SM80_ENABLED");
+    // #endif
+    //   }
+    // };
+    // template <>
+    // struct MMA_Traits<SM80_16x8x16_F16F16F16F16_TN>
+    // {
+    //   using ValTypeD = half_t;
+    //   using ValTypeA = half_t;
+    //   using ValTypeB = half_t;
+    //   using ValTypeC = half_t;
+    
+    //   using Shape_MNK = Shape<_16,_8,_16>;
+    //   using ThrID   = Layout<_32>;
+    //   using ALayout = Layout<Shape <Shape < _4,_8>,Shape < _2,_2,  _2>>,
+    //                          Stride<Stride<_32,_1>,Stride<_16,_8,_128>>>;
+    //   using BLayout = Layout<Shape <Shape < _4,_8>,Shape <_2, _2>>,
+    //                          Stride<Stride<_16,_1>,Stride<_8,_64>>>;
+    //   using CLayout = SM80_16x8_Row;
+    // };
+
+///////////////////////////////////////////////////////////////////
+// // ref: SM80_16x8x16_F32F16F16F32_TN vs SM80_16x8x16_F16F16F16F16_TN
+struct SM89_16x8x32_F16F4M3FE4M3F16_TN
 {
-    using DRegisters = float[4];
+    using DRegisters = uint32_t[2];
     using ARegisters = uint32_t[4];
     using BRegisters = uint32_t[2];
-    using CRegisters = float[4];
+    using CRegisters = uint32_t[2];
 
-    CUTE_HOST_DEVICE static void fma(float& d0, float& d1, float& d2, float& d3, uint32_t const& a0, uint32_t const& a1,
-        uint32_t const& a2, uint32_t const& a3, uint32_t const& b0, uint32_t const& b1, float const& c0,
-        float const& c1, float const& c2, float const& c3)
+    CUTE_HOST_DEVICE static void 
+    fma(uint32_t      & d0, uint32_t      & d1,
+        uint32_t const& a0, uint32_t const& a1, uint32_t const& a2, uint32_t const& a3,
+        uint32_t const& b0, uint32_t const& b1,
+        uint32_t const& c0, uint32_t const& c1)
     {
 #if defined(CUTE_ARCH_MMA_F32_SM89_ENABLED)
         asm volatile(
-            "mma.sync.aligned.m16n8k32.row.col.f32.e4m3.e4m3.f32 "
-            "{%0,  %1,  %2,  %3},"
-            "{%4,  %5,  %6,  %7},"
-            "{%8,  %9},"
-            "{%10, %11, %12, %13};\n"
-            : "=f"(d0), "=f"(d1), "=f"(d2), "=f"(d3)
-            : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(b0), "r"(b1), "f"(c0), "f"(c1), "f"(c2), "f"(c3));
+            "mma.sync.aligned.m16n8k32.row.col.f16.e4m3.e4m3.f16 "
+            "{%0,  %1},"
+            "{%2,  %3,  %4,  %5},"
+            "{%6,  %7},"
+            "{%8, %9};\n"
+            : "=r"(d0), "=r"(d1)
+            : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(b0), "r"(b1), "r"(c0), "r"(c1));
 #else
         CUTE_INVALID_CONTROL_PATH(
-            "Attempting to use SM89_16x8x32_F32F8F8F32_TN without "
+            "Attempting to use SM89_16x8x32_F16F4M3FE4M3F16_TN without "
             "CUTE_ARCH_MMA_F32_SM89_ENABLED");
 #endif
     }
 };
 
+// ref: MMA_Traits<SM80_16x8x16_F16F16F16F16_TN> vs MMA_Traits<SM80_16x8x16_F32F16F16F32_TN>
 template <>
-struct MMA_Traits<SM89_16x8x32_F32F8F8F32_TN>
+struct MMA_Traits<SM89_16x8x32_F16F4M3FE4M3F16_TN>
 {
-    using ValTypeD = float;
+    using ValTypeD = half_t;
     using ValTypeA = float_e4m3_t;
     using ValTypeB = float_e4m3_t;
-    using ValTypeC = float;
+    using ValTypeC = half_t;
 
     using Shape_MNK = Shape<_16, _8, _32>;
     using ThrID = Layout<_32>;
@@ -72,30 +151,75 @@ struct MMA_Traits<SM89_16x8x32_F32F8F8F32_TN>
     using BLayout = Layout<Shape<Shape<_4, _8>, Shape<_4, _2>>, Stride<Stride<_32, _1>, Stride<_8, _128>>>;
     using CLayout = SM80_16x8_Row;
 };
+/////////////////////////////////////////////////////
+
+// // MMA 16x8x32 TN
+// struct SM89_16x8x32_F32F8F8F32_TN
+// {
+//     using DRegisters = float[4];
+//     using ARegisters = uint32_t[4];
+//     using BRegisters = uint32_t[2];
+//     using CRegisters = float[4];
+
+//     CUTE_HOST_DEVICE static void fma(float& d0, float& d1, float& d2, float& d3, uint32_t const& a0, uint32_t const& a1,
+//         uint32_t const& a2, uint32_t const& a3, uint32_t const& b0, uint32_t const& b1, float const& c0,
+//         float const& c1, float const& c2, float const& c3)
+//     {
+// #if defined(CUTE_ARCH_MMA_F32_SM89_ENABLED)
+//         asm volatile(
+//             "mma.sync.aligned.m16n8k32.row.col.f32.e4m3.e4m3.f32 "
+//             "{%0,  %1,  %2,  %3},"
+//             "{%4,  %5,  %6,  %7},"
+//             "{%8,  %9},"
+//             "{%10, %11, %12, %13};\n"
+//             : "=f"(d0), "=f"(d1), "=f"(d2), "=f"(d3)
+//             : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(b0), "r"(b1), "f"(c0), "f"(c1), "f"(c2), "f"(c3));
+// #else
+//         CUTE_INVALID_CONTROL_PATH(
+//             "Attempting to use SM89_16x8x32_F32F8F8F32_TN without "
+//             "CUTE_ARCH_MMA_F32_SM89_ENABLED");
+// #endif
+//     }
+// };
+
+// template <>
+// struct MMA_Traits<SM89_16x8x32_F32F8F8F32_TN>
+// {
+//     using ValTypeD = float;
+//     using ValTypeA = float_e4m3_t;
+//     using ValTypeB = float_e4m3_t;
+//     using ValTypeC = float;
+
+//     using Shape_MNK = Shape<_16, _8, _32>;
+//     using ThrID = Layout<_32>;
+//     using ALayout = Layout<Shape<Shape<_4, _8>, Shape<_4, _2, _2>>, Stride<Stride<_64, _1>, Stride<_16, _8, _256>>>;
+//     using BLayout = Layout<Shape<Shape<_4, _8>, Shape<_4, _2>>, Stride<Stride<_32, _1>, Stride<_8, _128>>>;
+//     using CLayout = SM80_16x8_Row;
+// };
 
 } // namespace cute
 
 namespace ada_blockwise_gemm
 {
 
-template <typename Element, typename Arch>
+template <typename Element, typename Arch, typename AccumType>
 struct DefaultGemm_TensorOp_MMA;
 
 template <>
-struct DefaultGemm_TensorOp_MMA<cute::bfloat16_t, cutlass::arch::Sm80>
+struct DefaultGemm_TensorOp_MMA<cute::float_e4m3_t, cutlass::arch::Sm89, cutlass::half_t>
 {
-    using ArchTag = cutlass::arch::Sm80;
-    using MMA_Atom_Arch = cute::MMA_Atom<cute::SM80_16x8x16_F32BF16BF16F32_TN>;
+    using ArchTag = cutlass::arch::Sm89;
+    using MMA_Atom_Arch = cute::MMA_Atom<cute::SM89_16x8x32_F16F4M3FE4M3F16_TN>; // SM89_16x8x32_F32E4M3E4M3F32_TN
     using ThreadLayoutMNK = cute::Layout<cute::Shape<cute::_2, cute::_2, cute::_1>>;
-    using ValLayoutMNK = cute::Tile<cute::_32, cute::_32, cute::_16>;
+    using ValLayoutMNK = cute::Tile<cute::_32, cute::_32, cute::_32>;
     using TiledMma = cute::TiledMMA<MMA_Atom_Arch, ThreadLayoutMNK, ValLayoutMNK>;
 };
 
 template <>
-struct DefaultGemm_TensorOp_MMA<cute::float_e4m3_t, cutlass::arch::Sm89>
+struct DefaultGemm_TensorOp_MMA<cute::float_e4m3_t, cutlass::arch::Sm89, float>
 {
     using ArchTag = cutlass::arch::Sm89;
-    using MMA_Atom_Arch = cute::MMA_Atom<cute::SM89_16x8x32_F32F8F8F32_TN>;
+    using MMA_Atom_Arch = cute::MMA_Atom<cute::SM89_16x8x32_F32E4M3E4M3F32_TN>;
     using ThreadLayoutMNK = cute::Layout<cute::Shape<cute::_2, cute::_2, cute::_1>>;
     using ValLayoutMNK = cute::Tile<cute::_32, cute::_32, cute::_32>;
     using TiledMma = cute::TiledMMA<MMA_Atom_Arch, ThreadLayoutMNK, ValLayoutMNK>;

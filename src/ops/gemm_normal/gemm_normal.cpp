@@ -27,7 +27,7 @@
   CHECK_TYPE(x, st)
 
 #define PRINTF printf
-#define NOT_TUNING_SCHEMA "TORCH" // "TORCH"
+#define NOT_TUNING_SCHEMA "" // "TORCH"
 #define DISABLE_FP16_ACC true
 
 int CoarseGrainedTuningM(int actual_m, int schema = 0) {

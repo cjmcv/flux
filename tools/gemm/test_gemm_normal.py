@@ -357,3 +357,74 @@ if __name__ == "__main__":
     # plt.xticks(plot_x)
     plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
     plt.show()
+
+
+# # The usage within torch.compile of vllm.
+# # vllm/model_executor/layers/linear.py
+# # vllm/v1/attention/backends/flash_attn.py
+
+# from vllm.utils import direct_register_custom_op
+# from torch.library import Library
+# xop_lib = Library("xop", "FRAGMENT")
+# import xop
+
+# xop_gemm = xop.GemmNormal(
+#     input_dtype=torch.float16,
+#     output_dtype=torch.float16,
+#     transpose_weight=False
+# )
+# def xop_gemm_normal(
+#     input_tensor: torch.Tensor,
+#     weight_tensor: torch.Tensor,
+#     output_tensor: torch.Tensor,
+#     bias_tensor: Optional[torch.Tensor] = None,
+#     input_scale: Optional[torch.Tensor] = None,
+#     weight_scale: Optional[torch.Tensor] = None,
+#     output_scale: Optional[torch.Tensor] = None,
+#     tuning: Optional[torch.Tensor] = None,
+#     fast_accum: bool = False) -> None:
+#     xop_gemm.forward(
+#             input_tensor,
+#             weight_tensor,
+#             output_tensor,
+#             #None, 
+#             bias_tensor,
+#             input_scale,
+#             weight_scale,
+#             output_scale,
+#             tuning,
+#             fast_accum,
+#         )
+#     # if bias_tensor is not None:
+#     #     output_tensor += bias_tensor # output_tensor = output_tensor + bias_tensor is not allow in vllm torch compile
+# def xop_gemm_normal_fake(
+#     input_tensor: torch.Tensor,
+#     weight_tensor: torch.Tensor,
+#     output_tensor: torch.Tensor,
+#     bias_tensor: Optional[torch.Tensor] = None,
+#     input_scale: Optional[torch.Tensor] = None,
+#     weight_scale: Optional[torch.Tensor] = None,
+#     output_scale: Optional[torch.Tensor] = None,
+#     tuning: Optional[torch.Tensor] = None,
+#     fast_accum: bool = False) -> None:
+#     pass
+# direct_register_custom_op(
+#     op_name="xop_gemm_normal",
+#     op_func=xop_gemm_normal,
+#     mutates_args=["output_tensor"],
+#     fake_impl=xop_gemm_normal_fake,
+#     target_lib=xop_lib,
+# )
+
+# # Call
+# torch.ops.xop.xop_gemm_normal(
+#                 input_tensor = x,
+#                 weight_tensor = layer.weight,
+#                 output_tensor = output,
+#                 bias_tensor = bias,
+#                 input_scale = None,
+#                 weight_scale = None,
+#                 output_scale = None,
+#                 tuning = None,
+#                 fast_accum=False,
+#             )

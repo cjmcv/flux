@@ -457,8 +457,8 @@ if __name__ == "__main__":
         calculate_diff(64, 7168, 16384)  # Medium test
         calculate_diff(64, 18432, 7168)  # Large test
 
-    # Get the benchmark function with the specified tp_size
-    benchmark = get_benchmark(args.tp_size)
+    # # Get the benchmark function with the specified tp_size
+    # benchmark = get_benchmark(args.tp_size)
 
-    print(f"Running performance benchmark for TP size = {args.tp_size}...")
-    benchmark.run(print_data=True, save_path=args.save_path)
+    # print(f"Running performance benchmark for TP size = {args.tp_size}...")
+    # benchmark.run(print_data=True, save_path=args.save_path)
