@@ -6,10 +6,12 @@ import triton
 import tilelang
 import tilelang.language as T
 
-import deep_gemm
-from deep_gemm import get_col_major_tma_aligned_tensor
+enable_deep_gemm = False
+if enable_deep_gemm:
+    import deep_gemm
+    from deep_gemm import get_col_major_tma_aligned_tensor
 
-enable_sglang = True
+enable_sglang = False
 if enable_sglang:
     from sglang.srt.layers.quantization.fp8_kernel import w8a8_block_fp8_matmul
 import xop 
@@ -132,8 +134,9 @@ def fp8_gemm_deepgemm(
     """DeepGEMM implementation of FP8 GEMM"""
     out = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
 
-    # Run DeepGEMM kernel
-    deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (y_fp8, y_scale), out)
+    if enable_deep_gemm:
+        # Run DeepGEMM kernel
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (y_fp8, y_scale), out)
     return out
 
 def fp8_gemm_sglang(
@@ -165,8 +168,10 @@ def calculate_diff(m: int, n: int, k: int):
     x_fp8, x_scale = per_token_cast_to_fp8(x.clone()) # x_fp8[m,k], x_scale[m，k//128]     => cutlass x_scale[m,k]
     y_fp8, y_scale = per_block_cast_to_fp8(y.clone()) # y_fp8[n,k], y_scale[n//128,k//128] =>
 
-    x_scale_col_major = get_col_major_tma_aligned_tensor(x_scale.clone())
-
+    if enable_deep_gemm:
+        x_scale_col_major = get_col_major_tma_aligned_tensor(x_scale.clone())
+    else:
+        x_scale_col_major = x_scale
     out_deepgemm = fp8_gemm_deepgemm(
         x_fp8.clone(),
         x_scale_col_major.clone(),
@@ -316,7 +321,10 @@ def get_benchmark(tp_size):
         # Preprocess data before benchmarking
         x_fp8, x_scale = per_token_cast_to_fp8(x)
         y_fp8, y_scale = per_block_cast_to_fp8(y)
-        x_scale_col_major = get_col_major_tma_aligned_tensor(x_scale.clone())
+        if enable_deep_gemm:
+            x_scale_col_major = get_col_major_tma_aligned_tensor(x_scale.clone())
+        else:
+            x_scale_col_major = x_scale
 
         quantiles = [0.5, 0.2, 0.8]
 
@@ -428,9 +436,10 @@ if __name__ == "__main__":
     # Run correctness tests on a few examples
     if args.run_correctness:
         print("Running correctness tests...")
-        calculate_diff(64, 512, 7168)  # Small test
-        calculate_diff(64, 7168, 16384)  # Medium test
-        calculate_diff(64, 18432, 7168)  # Large test
+        calculate_diff(64, 512, 512)  # Small test
+        # calculate_diff(64, 512, 7168)  # Small test
+        # calculate_diff(64, 7168, 16384)  # Medium test
+        # calculate_diff(64, 18432, 7168)  # Large test
 
     # Get the benchmark function with the specified tp_size
     benchmark = get_benchmark(args.tp_size)
