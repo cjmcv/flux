@@ -356,7 +356,8 @@ struct AdaBlockwiseGemmKernel
                     {
                         tOsA_read = tOsA(cute::_, cute::_, cute::_, smem_pipe_read);
                         tOsB_read = tOsB(cute::_, cute::_, cute::_, smem_pipe_read);
-
+                        cute::print_tensor(tOsA_read);
+                        cute::print_tensor(tOsB_read);
                         tOsScaleA_read = tOsScaleA(cute::_, cute::_, cute::_, smem_pipe_read);
                         tOsScaleB_read = tOsScaleB(cute::_, cute::_, cute::_, smem_pipe_read);
 

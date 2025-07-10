@@ -350,7 +350,7 @@ if __name__ == "__main__":
     #     run(m, args, xop_perf, torch_perf)
     # plot_x = [1] + list(range(2, args.M, args.step))
 
-    exponent = 8 # 65536: 17
+    exponent = 3 # 65536: 17
     for m in range(1, exponent):
         m = 2**m
         print(f"M: {m}, N: {args.N}, K: {args.K}")

@@ -2,7 +2,7 @@
 #include "xop/ops_impl/global_resource.h"
 #include "xop/ops_impl/args_util.h"
 
-#include "gemm_v2_blockscale_fp8/ada_blockwise_gemm.cuh"
+#include "gemm_v2_blockscale_fp8/ada_blockwise_gemm_device.cuh"
 
 namespace xop {
 
