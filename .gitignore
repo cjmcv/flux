@@ -25,3 +25,4 @@ tools/*.prof.log
 src/ops/flash_attn/instantiations/*
 configs
 abc.txt
+autotuner.log

@@ -1,7 +1,10 @@
-from typing import Tuple
 
 import torch
 import triton
+
+import xop 
+import xop.util as xutil
+import math
 
 enable_tilelang = False
 if enable_tilelang:
@@ -16,12 +19,8 @@ if enable_deep_gemm:
 enable_sglang = False
 if enable_sglang:
     from sglang.srt.layers.quantization.fp8_kernel import w8a8_block_fp8_matmul
-import xop 
 
-import math
-
-def ceil_div(a, b):
-    return math.ceil(a / b)
+output_dtype = torch.bfloat16 # torch.float16 / torch.bfloat16
 
 if enable_tilelang:
     def tl_gemm(
@@ -100,31 +99,6 @@ if enable_tilelang:
 
         return main
 
-def per_token_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-    assert x.dim() == 2 and x.size(1) % 128 == 0
-    m, n = x.shape
-    x_view = x.view(m, -1, 128)
-    x_amax = x_view.abs().float().amax(dim=2).view(m, -1).clamp(1e-4)
-    return (x_view * (448.0 / x_amax.unsqueeze(2))).to(torch.float8_e4m3fn).view(
-        m, n
-    ), (x_amax / 448.0).view(m, -1)
-
-
-def per_block_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-    assert x.dim() == 2
-    m, n = x.shape
-    x_padded = torch.zeros(
-        (ceil_div(m, 128) * 128, ceil_div(n, 128) * 128), dtype=x.dtype, device=x.device
-    )
-    x_padded[:m, :n] = x
-    x_view = x_padded.view(-1, 128, x_padded.size(1) // 128, 128)
-    x_amax = x_view.abs().float().amax(dim=(1, 3), keepdim=True).clamp(1e-4)
-    x_scaled = (x_view * (448.0 / x_amax)).to(torch.float8_e4m3fn)
-    return x_scaled.view_as(x_padded)[:m, :n].contiguous(), (x_amax / 448.0).view(
-        x_view.size(0), x_view.size(2)
-    )
-
-
 def fp8_gemm_deepgemm(
     x_fp8: torch.Tensor,
     x_scale: torch.Tensor,
@@ -165,11 +139,11 @@ def fp8_gemm_sglang(
 
 
 def calculate_diff(m: int, n: int, k: int):
-    x = torch.ones((m, k), device="cuda", dtype=torch.bfloat16)
-    y = torch.ones((n, k), device="cuda", dtype=torch.bfloat16)
+    x = torch.ones((m, k), device="cuda", dtype=output_dtype)
+    y = torch.ones((n, k), device="cuda", dtype=output_dtype)
 
-    x_fp8, x_scale = per_token_cast_to_fp8(x.clone()) # x_fp8[m,k], x_scale[m，k//128]     => cutlass x_scale[m,k]
-    y_fp8, y_scale = per_block_cast_to_fp8(y.clone()) # y_fp8[n,k], y_scale[n//128,k//128] =>
+    x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone()) # x_fp8[m,k], x_scale[m，k//128]     => cutlass x_scale[m,k]
+    y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone()) # y_fp8[n,k], y_scale[n//128,k//128] =>
 
     # DeepGemm
     if enable_deep_gemm:
@@ -205,10 +179,10 @@ def calculate_diff(m: int, n: int, k: int):
     yt_scale = y_scale.clone().t().contiguous()
     xop_gemm = xop.GemmNormal(
         input_dtype=torch.float8_e4m3fn,
-        output_dtype=torch.bfloat16,
+        output_dtype=output_dtype,
         transpose_weight=False
     )
-    out_xop = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
+    out_xop = torch.empty((m, n), device="cuda", dtype=output_dtype)
 
     xop_gemm.forward(
         x_fp8.clone(),
@@ -328,12 +302,12 @@ def get_benchmark(tp_size):
     )
     def benchmark(m, n, k, tp_size, provider):
         print(f"Shape (m={m}, n={n}, k={k}, tp={tp_size}), Provider: {provider}")
-        x = torch.randn((m, k), device="cuda", dtype=torch.bfloat16)
-        y = torch.randn((n, k), device="cuda", dtype=torch.bfloat16)
+        x = torch.randn((m, k), device="cuda", dtype=output_dtype)
+        y = torch.randn((n, k), device="cuda", dtype=output_dtype)
 
         # Preprocess data before benchmarking
-        x_fp8, x_scale = per_token_cast_to_fp8(x)
-        y_fp8, y_scale = per_block_cast_to_fp8(y)
+        x_fp8, x_scale = xutil.per_token_cast_to_fp8(x)
+        y_fp8, y_scale = xutil.per_block_cast_to_fp8(y)
         if enable_deep_gemm:
             x_scale_col_major = get_col_major_tma_aligned_tensor(x_scale.clone())
         else:
@@ -344,12 +318,12 @@ def get_benchmark(tp_size):
         if provider == "xop": 
             xop_gemm = xop.GemmNormal(
                 input_dtype=torch.float8_e4m3fn,
-                output_dtype=torch.bfloat16,
+                output_dtype=output_dtype,
                 transpose_weight=False
             )
             xt_scale = x_scale.clone().t().contiguous()
             yt_scale = y_scale.clone().t().contiguous()
-            out = torch.empty((m, n), device="cuda", dtype=torch.bfloat16)
+            out = torch.empty((m, n), device="cuda", dtype=output_dtype)
             ms, min_ms, max_ms = triton.testing.do_bench(
                 lambda: xop_gemm.forward(
                     x_fp8, #.clone(),

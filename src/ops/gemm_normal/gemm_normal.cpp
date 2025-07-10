@@ -110,7 +110,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
+    std::vector<int16_t> id_meta = MakeDefaultMeta(DISABLE_FP16_ACC);     // id + meta
     std::unique_ptr<RtArguments> rt_args;
     if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
       rt_args = std::make_unique<RtBlockScaleFp8ArgumentsV3>();

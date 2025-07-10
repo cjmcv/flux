@@ -209,7 +209,7 @@ template <>
 struct DefaultGemm_TensorOp_MMA<cute::float_e4m3_t, cutlass::arch::Sm89, cutlass::half_t>
 {
     using ArchTag = cutlass::arch::Sm89;
-    using MMA_Atom_Arch = cute::MMA_Atom<cute::SM89_16x8x32_F16F4M3FE4M3F16_TN>; // SM89_16x8x32_F32E4M3E4M3F32_TN
+    using MMA_Atom_Arch = cute::MMA_Atom<cute::SM89_16x8x32_F16F4M3FE4M3F16_TN>;
     using ThreadLayoutMNK = cute::Layout<cute::Shape<cute::_2, cute::_2, cute::_1>>;
     using ValLayoutMNK = cute::Tile<cute::_32, cute::_32, cute::_32>;
     using TiledMma = cute::TiledMMA<MMA_Atom_Arch, ThreadLayoutMNK, ValLayoutMNK>;

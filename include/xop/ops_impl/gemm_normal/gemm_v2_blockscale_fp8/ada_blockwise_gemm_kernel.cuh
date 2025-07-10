@@ -127,7 +127,7 @@ struct AdaBlockwiseGemmKernel
                 sFA = tCrScaleA(mma_m);
                 sFB = tCrScaleB(0);
             }
-            
+
             AccumType scale = sFA * sFB;
             CUTE_UNROLL
             for (int mma_n = 0; mma_n < cute::get<0>(cute::shape<0>(accum)); ++mma_n)

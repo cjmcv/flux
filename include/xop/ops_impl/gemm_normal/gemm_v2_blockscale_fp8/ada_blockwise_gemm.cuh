@@ -25,6 +25,10 @@
 
 #include "ada_blockwise_gemm_kernel.cuh"
 
+// #if (CUTLASS_DEBUG_TRACE_LEVEL > 1)
+//             CUTLASS_TRACE_HOST("GemmUniversal::run: Launching static 1x1x1 kernel");
+// #endif
+
 #define CUTLASS_HOST_TRACE(x)                                                                                          \
     {                                                                                                                  \
         std::cout << __FILE__ << ":" << __LINE__ << "  " << x << std::endl;                                            \
