@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,506 +17,421 @@
 #pragma once
 
 #include "ada_blockwise_gemm_traits.cuh"
+#include "xop/ops_impl/debug_util.h"
 
-namespace ada_blockwise_gemm
-{
+namespace xop {
+namespace kernel {
+
+template <typename GemmKernel>
+CUTLASS_GLOBAL void sm89_fp8_gemm_1d1d_impl(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, void const* A,
+  void const* B, void* D, float const* scales_a, float const* scales_b) {
+  GemmKernel op;
+  op.invoke(shape_m, shape_n, shape_k, A, B, D, scales_a, scales_b);
+}
+
+template <typename GemmKernel>
+CUTLASS_GLOBAL void sm89_fp8_bmm_1d1d_impl(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, 
+                                        __nv_fp8_e4m3* A, __nv_fp8_e4m3* B, __nv_bfloat16* D, 
+                                        float* scales_a, float* scales_b, 
+                                        uint64_t stride_a, uint64_t stride_b, uint64_t stride_d, 
+                                        uint64_t stride_scales_a, uint64_t stride_scales_b) {
+  GemmKernel op;
+
+  auto ptr_a = reinterpret_cast<typename GemmKernel::ElementInput const*>(A + blockIdx.z * stride_a);
+  auto ptr_b = reinterpret_cast<typename GemmKernel::ElementInput const*>(B + blockIdx.z * stride_b);
+  auto ptr_scale_a = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_a + blockIdx.z * stride_scales_a);
+  auto ptr_scale_b = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_b + blockIdx.z * stride_scales_b);
+  auto ptr_output = reinterpret_cast<typename GemmKernel::ElementOutput*>(D + blockIdx.z * stride_d);
+
+  op(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, ptr_output, shape_m, shape_n, shape_k);
+}
 
 template <typename KT>
-struct AdaBlockwiseGemmKernel
-{
-    using Params = typename KT::Params;
-    using Arguments = typename KT::Arguments;
-    using SharedStorage = typename KT::SharedStorage;
+struct AdaBlockwiseGemmKernel {
+  using SharedStorage = typename KT::SharedStorage;
+  using ElementInput = typename KT::ElementInput;
+  using ElementOutput = typename KT::ElementOutput;
+  using ElementBlockScale = typename KT::ElementBlockScale;
 
-    static constexpr int kThreadCount = KT::kThreadCount;
-    static constexpr int kSmemSize = KT::kSmemSize;
+  // Factory invocation
+  CUTLASS_DEVICE
+  void invoke(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, 
+              void const* A, void const* B, void* D,
+              float const* scales_a, float const* scales_b) {
+    auto ptr_a = reinterpret_cast<ElementInput const*>(A);
+    auto ptr_b = reinterpret_cast<ElementInput const*>(B);
+    auto ptr_scale_a = reinterpret_cast<ElementBlockScale const*>(scales_a);
+    auto ptr_scale_b = reinterpret_cast<ElementBlockScale const*>(scales_b);
+    auto ptr_output = reinterpret_cast<ElementOutput*>(D);
 
-    static dim3 get_grid_shape(GemmCoord problem_size)
-    {
+    (*this)(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, ptr_output, shape_m, shape_n, shape_k);
+  }
 
-        int grid_m = (problem_size.m() + KT::kTileM - 1) / KT::kTileM;
-        int grid_n = (problem_size.n() + KT::kTileN - 1) / KT::kTileN;
-        int grid_k = 1;
-        return dim3(grid_m, grid_n, grid_k);
+  CUTE_DEVICE auto gmem_tensor_init(typename KT::ElementInput const* ptr_a, typename KT::ElementInput const* ptr_b,
+                                    typename KT::ElementBlockScale const* ptr_scale_a, typename KT::ElementBlockScale const* ptr_scale_b,
+                                    uint32_t M, uint32_t N, uint32_t K, int* SharedStorageBase) {
+
+    using X = cute::Underscore;
+
+    uint32_t const ScaleM = (((M + 3) >> 2) << 2); // align 4
+    uint32_t const ScaleN = (N + KT::ScaleGranularityN - 1) / KT::ScaleGranularityN;
+    uint32_t const ScaleK = (K + KT::ScaleGranularityK - 1) / KT::ScaleGranularityK;
+
+    auto mA_mk = cute::make_tensor(cute::make_gmem_ptr(ptr_a), cute::make_shape(M, K), cute::make_stride(K, cute::_1{}));
+    auto mB_nk = cute::make_tensor(cute::make_gmem_ptr(ptr_b), cute::make_shape(N, K), cute::make_stride(K, cute::_1{}));
+    auto mSFA_mk = cute::make_tensor(
+    cute::make_gmem_ptr(ptr_scale_a), cute::make_shape(ScaleM, ScaleK), cute::make_stride(cute::_1{}, ScaleM));
+    auto mSFB_nk = cute::make_tensor(
+    cute::make_gmem_ptr(ptr_scale_b), cute::make_shape(ScaleN, ScaleK), cute::make_stride(ScaleK, cute::_1{}));
+    
+    if (threadIdx.x == 0) {
+      cute::print_tensor("mSFA_mk", mSFA_mk);
     }
+  
+    auto cta_coord = cute::make_coord(blockIdx.x, blockIdx.y, cute::_);          // (m,n,k)
+    auto gA = cute::local_tile(mA_mk, typename KT::TileShape{}, cta_coord, cute::Step<_1, X, _1>{}); // (BLK_M,BLK_K,k)
+    auto gB = cute::local_tile(mB_nk, typename KT::TileShape{}, cta_coord, cute::Step<X, _1, _1>{}); // (BLK_N,BLK_K,k)
+    auto gSFA = cute::local_tile(mSFA_mk, typename KT::ScalePerTileShape{}, cta_coord, cute::Step<_1, X, _1>{});    // (BLK_M,BLK_K)
+    auto gSFB = cute::local_tile(mSFB_nk, typename KT::ScalePerTileShape{}, cta_coord, cute::Step<X, _1, _1>{});    // (BLK_N,BLK_K)
 
-    static dim3 get_block_shape()
-    {
-        return dim3(kThreadCount, 1, 1);
+    typename KT::SharedStorageLoad* load_storage = reinterpret_cast<typename KT::SharedStorageLoad*>(SharedStorageBase);
+    auto sA = cute::make_tensor(cute::make_smem_ptr(load_storage->smem_a.data()), typename KT::SmemLayoutA{});
+    auto sB = cute::make_tensor(cute::make_smem_ptr(load_storage->smem_b.data()), typename KT::SmemLayoutB{});
+    auto sSFA = cute::make_tensor(cute::make_smem_ptr(load_storage->smem_sfa.data()), typename KT::SmemLayoutSFA{});
+    auto sSFB = cute::make_tensor(cute::make_smem_ptr(load_storage->smem_sfb.data()), typename KT::SmemLayoutSFB{});
+
+    return cute::make_tuple(gA, gB, gSFA, gSFB, sA, sB, sSFA, sSFB);
+  }
+
+  template <class Accumulator, class SharedStorage, class ElementOutput>
+  CUTE_DEVICE void epilogue_with_smem(Accumulator& accum, SharedStorage& shared_storage, 
+                                      ElementOutput* o, int M, int N) {
+    // convert type
+    auto epi = cute::make_fragment_like<ElementOutput>(accum);
+    cute::for_each(cute::make_int_sequence<cute::size(epi)>{}, [&](auto i) { epi(i) = ElementOutput(accum(i)); });
+
+    auto sO = cute::make_tensor(cute::make_smem_ptr(shared_storage.smem_o.data()), typename KT::SmemLayoutO{});
+    // copy rf -> smem
+    typename KT::TiledMma mma;
+    auto tiled_copy_R2S = cute::make_tiled_copy_C(typename KT::SmemCopyAtomR2S{}, mma);
+    auto thr_copy_R2S = tiled_copy_R2S.get_slice(threadIdx.x);
+    auto tRS_rO = thr_copy_R2S.retile_S(epi);
+    auto tRS_sO = thr_copy_R2S.partition_D(sO);
+
+    cute::copy(tiled_copy_R2S, tRS_rO, tRS_sO);
+    __syncthreads();
+
+    // copy smem -> rf
+    typename KT::TiledCopyS2G tiled_copy_S2G;
+    auto thr_copy_S2G = tiled_copy_S2G.get_slice(threadIdx.x);
+    auto tSR_sO = thr_copy_S2G.partition_S(sO);
+    auto tSR_rO = cute::make_tensor<KT::ElementOutput>(cute::shape(tSR_sO));
+
+    cute::copy(tiled_copy_S2G, tSR_sO, tSR_rO);
+    __syncthreads();
+
+    // copy rf -> gmem
+    auto mO = cute::make_tensor(cute::make_gmem_ptr(o), cute::make_shape(M, N), cute::make_stride(N, cute::_1{}));
+    auto cta_coord = cute::make_coord(blockIdx.x, blockIdx.y, cute::_);
+    auto gO = cute::local_tile(mO, typename KT::TileShape{}, cta_coord, cute::Step<cute::_1, cute::_1, X>{});
+    auto cO = cute::make_identity_tensor(cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kTileN>{}));
+    auto tRG_rO = thr_copy_S2G.retile_S(tSR_rO);
+    auto tRG_gO = thr_copy_S2G.partition_D(gO);
+    auto tRG_cO = thr_copy_S2G.partition_D(cO);
+
+    int residue_m = M - KT::kTileM * blockIdx.x;
+    int residue_n = N - KT::kTileN * blockIdx.y;
+    CUTE_UNROLL
+    for (int m = 0; m < cute::size<1>(tRG_gO); ++m) {
+      CUTE_UNROLL
+      for (int n = 0; n < cute::size<2>(tRG_gO); ++n) {
+        if (cute::get<0>(tRG_cO(0, m, n)) < residue_m && cute::get<1>(tRG_cO(0, m, n)) < residue_n) {
+          cute::copy(typename KT::GmemCopyAtomR2G{}, tRG_rO(cute::_, m, n), tRG_gO(cute::_, m, n));
+        }
+      }
     }
+  }
 
-    static Params to_underlying_arguments(Arguments const& args)
-    {
-        return KT::to_underlying_arguments(args);
-    }
+  template <class TensorD, class TensorC, class TensorScale, class Index>
+  CUTE_DEVICE void promote(TensorD& accum, TensorC const& temp_accum, TensorScale const& scale, Index n_block) {
 
-    // Factory invocation
-    CUTLASS_DEVICE
-    static void invoke(Params const& params, SharedStorage& shared_storage)
-    {
-        AdaBlockwiseGemmKernel op;
-        op(params, shared_storage);
-    }
-
-    CUTE_DEVICE auto gmem_tensor_init(Params const& params)
-    {
-        using X = cute::Underscore;
-
-        int const M = params.problem_size.m();
-        int const N = params.problem_size.n();
-        int const K = params.problem_size.k();
-        int const ScaleM = (((M + 3) >> 2) << 2); // align 4
-        int const ScaleN = (N + KT::ScaleGranularityN - 1) / KT::ScaleGranularityN;
-        int const ScaleK = (K + KT::ScaleGranularityK - 1) / KT::ScaleGranularityK;
-
-        typename KT::ElementA const* ptr_A_ = params.ptr_a;
-        typename KT::ElementB const* ptr_B_ = params.ptr_b;
-        typename KT::ElementOutput* ptr_output_ = params.ptr_output;
-        typename KT::ElementBlockScale const* ptr_scale_a_ = params.ptr_scale_a;
-        typename KT::ElementBlockScale const* ptr_scale_b_ = params.ptr_scale_b;
-
-        cute::Tensor mA_mk
-            = cute::make_tensor(cute::make_gmem_ptr(ptr_A_), cute::make_shape(M, K), cute::make_stride(K, cute::_1{}));
-
-        cute::Tensor mB_nk
-            = cute::make_tensor(cute::make_gmem_ptr(ptr_B_), cute::make_shape(N, K), cute::make_stride(K, cute::_1{}));
-
-        cute::Tensor mOutput_mn = cute::make_tensor(
-            cute::make_gmem_ptr(ptr_output_), cute::make_shape(M, N), cute::make_stride(N, cute::_1{}));
-
-        cute::Tensor mScaleA_mk = cute::make_tensor(
-            cute::make_gmem_ptr(ptr_scale_a_), cute::make_shape(ScaleM, ScaleK), cute::make_stride(cute::_1{}, ScaleM));
-
-        cute::Tensor mScaleB_nk = cute::make_tensor(
-            cute::make_gmem_ptr(ptr_scale_b_), cute::make_shape(ScaleN, ScaleK), cute::make_stride(ScaleK, cute::_1{}));
-
-        // partition the gmem tensor for each Cta
-        cute::Tensor gA_mk = cute::local_tile(mA_mk, typename KT::TileShape{},
-            cute::make_coord(cute::_, cute::_, cute::_), cute::Step<cute::_1, X, cute::_1>{}); // (BLK_M, BLK_K, m, k)
-
-        cute::Tensor gB_nk = cute::local_tile(mB_nk, typename KT::TileShape{},
-            cute::make_coord(cute::_, cute::_, cute::_), cute::Step<X, cute::_1, cute::_1>{}); // (BLK_N, BLK_K, n, k)
-
-        cute::Tensor gOutput_mn = cute::local_tile(mOutput_mn, typename KT::TileShape{},
-            cute::make_coord(cute::_, cute::_, cute::_), cute::Step<cute::_1, cute::_1, X>{}); // (BLK_M, BLK_N, m, n)
-
-        cute::Tensor gScaleA_mk = cute::local_tile(mScaleA_mk, typename KT::ScalePerTileShape{},
-            cute::make_coord(cute::_, cute::_, cute::_), cute::Step<cute::_1, X, cute::_1>{}); // (BLK_M, BLK_K, m, k)
-
-        cute::Tensor gScaleB_nk = cute::local_tile(mScaleB_nk, typename KT::ScalePerTileShape{},
-            cute::make_coord(cute::_, cute::_, cute::_), cute::Step<X, cute::_1, cute::_1>{}); // (BLK_N, BLK_K, n, k)
-
-        return cute::make_tuple(gA_mk, gB_nk, gOutput_mn, gScaleA_mk, gScaleB_nk);
-    }
-
-    template <class TensorAccum, class TensorScaleA, class TensorScaleB>
-    CUTE_DEVICE void promote(
-        TensorAccum& accum, TensorAccum const& temp_accum, TensorScaleA const& tCrScaleA, TensorScaleB const& tCrScaleB)
-    {
-
-        using AccumType = typename TensorAccum::value_type;
+    using AccumType = typename TensorD::value_type;
+    for (int mma_m = 0; mma_m < cute::get<1>(cute::shape<0>(accum)); ++mma_m) {
+      CUTE_UNROLL
+      for (int mma_n = 0; mma_n < cute::get<0>(cute::shape<0>(accum)); ++mma_n) {
         CUTE_UNROLL
-        for (int mma_m = 0; mma_m < cute::get<1>(cute::shape<0>(accum)); ++mma_m)
-        {
-            AccumType sFA, sFB;
+        for (int mma_iter_m = 0; mma_iter_m < cute::size<1>(accum); ++mma_iter_m) {
+          CUTE_UNROLL
+          for (int mma_iter_n = 0; mma_iter_n < cute::size<2>(accum); ++mma_iter_n) {
+            auto coord_d = cute::make_coord(cute::make_coord(mma_n, mma_m), mma_iter_m, mma_iter_n, n_block);
+            auto coord_c = cute::make_coord(cute::make_coord(mma_n, mma_m), mma_iter_m, mma_iter_n);
             if constexpr (cute::is_same_v<AccumType, cutlass::half_t>) {
-                sFA = cutlass::half_t(tCrScaleA(mma_m));
-                sFB = cutlass::half_t(tCrScaleB(0));
+              accum(coord_d) += cutlass::half_t(temp_accum(coord_c) * scale(mma_m, mma_iter_m, cute::_0{}));
             }
             else {
-                sFA = tCrScaleA(mma_m);
-                sFB = tCrScaleB(0);
+              accum(coord_d) += temp_accum(coord_c) * scale(mma_m, mma_iter_m, cute::_0{});
             }
-
-            AccumType scale = sFA * sFB;
-            CUTE_UNROLL
-            for (int mma_n = 0; mma_n < cute::get<0>(cute::shape<0>(accum)); ++mma_n)
-            {
-                CUTE_UNROLL
-                for (int mma_iter_m = 0; mma_iter_m < cute::size<1>(accum); ++mma_iter_m)
-                {
-                    CUTE_UNROLL
-                    for (int mma_iter_n = 0; mma_iter_n < cute::size<2>(accum); ++mma_iter_n)
-                    {
-                        auto coord = cute::make_coord(cute::make_coord(mma_n, mma_m), mma_iter_m, mma_iter_n);
-                        accum(coord) += temp_accum(coord) * scale;
-                    }
-                }
-            }
+          }
         }
+      }
+    }
+    // if (threadIdx.x == 0) {
+    //   cute::my_print_tensor(temp_accum);        
+    // }
+  }
+
+  /// Executes one GEMM
+  CUTE_DEVICE
+  void operator()(typename KT::ElementInput const* ptr_a, typename KT::ElementInput const* ptr_b,
+                typename KT::ElementBlockScale const* ptr_scale_a, typename KT::ElementBlockScale const* ptr_scale_b,
+                typename KT::ElementOutput* ptr_output, uint32_t M, uint32_t N, uint32_t K) {
+    // Dynamic shared memory base pointer
+    extern __shared__ int SharedStorageBase[];
+    auto [gA, gB, gSFA, gSFB, sA, sB, sSFA, sSFB] = gmem_tensor_init(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, M, N, K, SharedStorageBase);
+    if (threadIdx.x == 0) {
+      cute::print_tensor("gSFA", gSFA);
     }
 
-    /// Executes one GEMM
-    CUTE_DEVICE
-    void operator()(Params const& params, SharedStorage& shared_storage)
-    {
-        int const block_m_idx = blockIdx.x;
-        int const block_n_idx = blockIdx.y;
-        int const thread_idx = threadIdx.x;
-        int const residue_m = params.problem_size.m() - block_m_idx * cute::size<0>(typename KT::TileShape{});
-        int const residue_n = params.problem_size.n() - block_n_idx * cute::size<1>(typename KT::TileShape{});
-        // gmem tensor partition ..
-        auto [gA_mk, gB_nk, gOutput_mn, gScaleA_mk, gScaleB_nk] = gmem_tensor_init(params);
+    typename KT::GmemTiledCopyA g2s_copy_A;
+    typename KT::GmemTiledCopyB g2s_copy_B;
+    auto g2s_thr_copy_A = g2s_copy_A.get_slice(threadIdx.x);
+    auto g2s_thr_copy_B = g2s_copy_B.get_slice(threadIdx.x);
 
-        // smem tensor ..
-        cute::Tensor sA = cute::make_tensor(
-            cute::make_smem_ptr(shared_storage.smem_a.data()), typename KT::SmemLayoutA{}); // (BLK_M, BLK_K, Stage)
-        cute::Tensor sB = cute::make_tensor(
-            cute::make_smem_ptr(shared_storage.smem_b.data()), typename KT::SmemLayoutB{}); // (BLK_N, BLK_K, Stage)
-        cute::Tensor sO = cute::make_tensor(
-            cute::make_smem_ptr(shared_storage.smem_o.data()), typename KT::SmemLayoutO{}); // (BLK_M, BLK_N)
+    auto tAgA = g2s_thr_copy_A.partition_S(gA); // (ACPY,ACPY_M,ACPY_K,k)
+    auto tAsA = g2s_thr_copy_A.partition_D(sA); // (ACPY,ACPY_M,ACPY_K,Stage)
+    auto tBgB = g2s_thr_copy_B.partition_S(gB); // (BCPY,BCPY_N,BCPY_K,k)
+    auto tBsB = g2s_thr_copy_B.partition_D(sB); // (BCPY,BCPY_N,BCPY_K,Stage)
 
-        cute::Tensor sScaleA = cute::make_tensor(cute::make_smem_ptr(shared_storage.smem_scale_a.data()),
-            typename KT::SmemLayoutScaleA{}); // (BLK_M, BLK_K, Stage)
-        cute::Tensor sScaleB = cute::make_tensor(cute::make_smem_ptr(shared_storage.smem_scale_b.data()),
-            typename KT::SmemLayoutScaleB{}); // (BLK_N, BLK_K, Stage)
+    typename KT::GmemTiledCopySFA g2s_copy_SFA;
+    typename KT::GmemTiledCopySFB g2s_copy_SFB;
+    auto g2s_thr_copy_SFA = g2s_copy_SFA.get_slice(threadIdx.x);
+    auto g2s_thr_copy_SFB = g2s_copy_SFB.get_slice(threadIdx.x);
 
-        // (1) first step, get the B_res and B_gate
+    auto tAgSFA = g2s_thr_copy_SFA.partition_S(gSFA); // (ACPY,ACPY_M,ACPY_K,Stage)
+    auto tAsSFA = g2s_thr_copy_SFA.partition_D(sSFA); // (ACPY,ACPY_M,ACPY_K,Stage)
+    auto tBgSFB = g2s_thr_copy_SFB.partition_S(gSFB); // (BCPY,BCPY_N,BCPY_K,Stage)
+    auto tBsSFB = g2s_thr_copy_SFB.partition_D(sSFB); // (BCPY,BCPY_N,BCPY_K,Stage)
 
-        // (1.1) get partition for gmem -> smem
-        cute::Tensor gA = gA_mk(cute::_, cute::_, block_m_idx, cute::_); // (BLK_M, BLK_K, k)
-        cute::Tensor gB = gB_nk(cute::_, cute::_, block_n_idx, cute::_); // (BLK_N, BLK_K, k)
+    auto cA = make_identity_tensor(cute::make_shape(cute::size<0>(sA), cute::size<1>(sA)));
+    auto tAcA = g2s_thr_copy_A.partition_S(cA);
 
-        cute::Tensor gScaleA = gScaleA_mk(cute::_, cute::_, block_m_idx, cute::_);
-        cute::Tensor gScaleB = gScaleB_nk(cute::_, cute::_, block_n_idx, cute::_);
+    auto cB = make_identity_tensor(cute::make_shape(cute::size<0>(sB), cute::size<1>(sB)));
+    auto tBcB = g2s_thr_copy_B.partition_S(cB);
 
-        typename KT::GmemTiledCopyA gmem_tiled_copy_A;
-        typename KT::GmemTiledCopyB gmem_tiled_copy_B;
-        auto gmem_thr_copy_A = gmem_tiled_copy_A.get_slice(thread_idx);
-        auto gmem_thr_copy_B = gmem_tiled_copy_B.get_slice(thread_idx);
+    auto cSFA = cute::make_identity_tensor(typename KT::GmemTiledCopySFA::Tiler_MN{});
+    auto tAcSFA = g2s_thr_copy_SFA.partition_S(cSFA);
 
-        cute::Tensor tAgA = gmem_thr_copy_A.partition_S(gA); // (ACPY,ACPY_M,ACPY_K,k)
-        cute::Tensor tAsA = gmem_thr_copy_A.partition_D(sA); // (ACPY,ACPY_M,ACPY_K,Stage)
-        cute::Tensor tBgB = gmem_thr_copy_B.partition_S(gB); // (BCPY,BCPY_N,BCPY_K,k)
-        cute::Tensor tBsB = gmem_thr_copy_B.partition_D(sB); // (BCPY,BCPY_N,BCPY_K,Stage)
+    int residue_m = M - KT::kTileM * blockIdx.x;
+    int residue_n = N - KT::kTileN * blockIdx.y;
+    residue_m = residue_m > KT::kTileM ? KT::kTileM : residue_m;
+    residue_n = residue_n > KT::kTileN ? KT::kTileN : residue_n;
 
-        typename KT::GmemTiledCopyScaleA gmem_tiled_copy_ScaleA;
-        typename KT::GmemTiledCopyScaleB gmem_tiled_copy_ScaleB;
-        auto gmem_thr_copy_ScaleA = gmem_tiled_copy_ScaleA.get_slice(thread_idx);
-        auto gmem_thr_copy_ScaleB = gmem_tiled_copy_ScaleB.get_slice(thread_idx);
+    auto tApA = cute::make_tensor<bool>(cute::make_shape(cute::size<1>(tAsA), cute::size<2>(tAsA)), cute::Stride<cute::_1, cute::_0>{});
+    CUTLASS_PRAGMA_UNROLL
+    for (int m = 0; m < cute::size<0>(tApA); ++m) {
+      tApA(m, 0) = cute::get<0>(tAcA(0, m, 0)) < residue_m; // blk_m coord < residue_m
+    }
 
-        cute::Tensor tAgScaleA = gmem_thr_copy_ScaleA.partition_S(gScaleA); // (ACPY,ACPY_M,ACPY_K,k)
-        cute::Tensor tAsScaleA = gmem_thr_copy_ScaleA.partition_D(sScaleA); // (ACPY,ACPY_M,ACPY_K,Stage)
-        cute::Tensor tBgScaleB = gmem_thr_copy_ScaleB.partition_S(gScaleB); // (BCPY,BCPY_N,BCPY_K,k)
-        cute::Tensor tBsScaleB = gmem_thr_copy_ScaleB.partition_D(sScaleB); // (BCPY,BCPY_N,BCPY_K,Stage)
+    auto tBpB = cute::make_tensor<bool>(cute::make_shape(cute::size<1>(tBsB), cute::size<2>(tBsB)), cute::Stride<cute::_1, cute::_0>{});
+    CUTLASS_PRAGMA_UNROLL
+    for (int n = 0; n < cute::size<0>(tBpB); ++n) {
+      tBpB(n, 0) = cute::get<0>(tBcB(0, n, 0)) < residue_n; // blk_n coord < residue_n
+    }
 
-        // Allocate predicate tensors for input and fc weight (actually we only need input predicate tensor)
-        cute::Tensor tApA = cute::make_tensor<bool>(
-            cute::make_shape(cute::size<1>(tAsA), cute::size<2>(tAsA)), cute::Stride<cute::_1, cute::_0>{});
-        // Construct identity layout for sA
-        cute::Tensor cA = make_identity_tensor(
-            cute::make_shape(cute::size<0>(sA), cute::size<1>(sA))); // (BLK_M,BLK_K) -> (blk_m,blk_k)
+    auto tApSFA = cute::make_tensor<bool>(cute::make_shape(cute::size<1>(tAsSFA), cute::size<2>(tAsSFA)), cute::Stride<cute::_1, cute::_0>{});
+    CUTLASS_PRAGMA_UNROLL
+    for (int m = 0; m < cute::size<0>(tApSFA); ++m) {
+      tApSFA(m, 0) = cute::get<0>(tAcSFA(0, m, 0)) < residue_m; // blk_m coord < residue_m
+    }
 
-        // Repeat the partitioning with identity layouts
-        cute::Tensor tAcA = gmem_thr_copy_A.partition_S(cA); // (ACPY,ACPY_M,ACPY_K) -> (blk_m,blk_k)
+    // prefetch gmem A/B
+    cute::clear(tAsA);
+    cute::clear(tBsB);
+    cute::clear(tAsSFA);
 
-        // Set predicates for m bounds
-        CUTLASS_PRAGMA_UNROLL
-        for (int m = 0; m < cute::size<0>(tApA); ++m)
-        {
-            tApA(m, 0) = cute::get<0>(tAcA(0, m, 0)) < residue_m; // blk_m coord < residue_m
+    int k_tile_count = cute::size<2>(gA);
+    CUTLASS_PRAGMA_NO_UNROLL
+    for (int k_pipe = 0; k_pipe < KT::Stages - 1; ++k_pipe) {
+      if (k_pipe >= k_tile_count) {
+        cute::clear(tApA);
+        cute::clear(tBpB);
+        cute::clear(tApSFA);
+      }
+      auto k_tile_iter = std::min(k_pipe, k_tile_count - 1);
+      cute::copy_if(g2s_copy_A, tApA, tAgA(cute::_, cute::_, cute::_, k_tile_iter),
+        tAsA(cute::_, cute::_, cute::_, k_pipe));
+      cute::copy_if(g2s_copy_B, tBpB, tBgB(cute::_, cute::_, cute::_, k_tile_iter),
+        tBsB(cute::_, cute::_, cute::_, k_pipe));
+      cute::copy_if(g2s_copy_SFA, tApSFA, tAgSFA(cute::_, cute::_, cute::_, k_tile_iter),
+        tAsSFA(cute::_, cute::_, cute::_, k_pipe));
+      cute::copy(g2s_copy_SFB, tBgSFB(cute::_, cute::_, cute::_, k_tile_iter),
+        tBsSFB(cute::_, cute::_, cute::_, k_pipe));
+
+      cute::cp_async_fence();
+    }
+
+    if (threadIdx.x == 0) {
+      cute::print_tensor("tAgSFA", tAgSFA);
+    }
+  
+    typename KT::TiledMma mma;
+    auto thr_mma = mma.get_slice(threadIdx.x);
+    auto accum = cute::partition_fragment_C(mma, cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kMmaPermN>{}, cute::Int<KT::NUM_GROUP_N>{})); // (MMA,MMA_M,MMA_N)
+    auto temp = cute::partition_fragment_C(mma, cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kMmaPermN>{})); // (MMA,MMA_M,MMA_N)
+
+    auto mma_shape_A = cute::partition_shape_A(mma, cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kTileK>{}));
+    auto tCrA = cute::make_tensor<typename KT::ElementInput>(mma_shape_A);
+
+    auto mma_shape_B = cute::partition_shape_B(mma, cute::make_shape(cute::Int<KT::kMmaPermN>{}, cute::Int<KT::kTileK>{}, cute::Int<KT::NUM_GROUP_N>{}));
+    auto tCrB = cute::make_tensor<typename KT::ElementInput>(mma_shape_B);
+
+    auto s2r_copy_A = cute::make_tiled_copy_A(typename KT::SmemCopyAtomA{}, mma);
+    auto s2r_thr_copy_A = s2r_copy_A.get_slice(threadIdx.x);
+    auto tXsA = s2r_thr_copy_A.partition_S(sA); // (CPY,CPY_M,CPY_K,Stage)
+    auto tXrA = s2r_thr_copy_A.retile_D(tCrA);  // (CPY,CPY_M,CPY_K)
+    static_assert(is_static<decltype(tXrA.layout())>::value, "tXrA layout must be static");
+
+    auto s2r_copy_B = cute::make_tiled_copy_B(typename KT::SmemCopyAtomB{}, mma);
+    auto s2r_thr_copy_B = s2r_copy_B.get_slice(threadIdx.x);
+    auto tXsB = s2r_thr_copy_B.partition_S(sB); // (CPY,CPY_N,CPY_K,Stage)
+    auto tXrB = s2r_thr_copy_B.retile_D(tCrB)(cute::_, cute::Int<0>{}, cute::_, cute::_);
+
+    typename KT::SmemTiledCopySFA s2r_copy_SFA;
+    typename KT::SmemTiledCopySFB s2r_copy_SFB;
+    auto s2r_thr_copy_SFA = s2r_copy_SFA.get_slice(threadIdx.x);
+    auto s2r_thr_copy_SFB = s2r_copy_SFB.get_slice(threadIdx.x);
+
+    auto tXsSFA = s2r_thr_copy_SFA.partition_S(sSFA);
+    auto tXrSFA = cute::make_fragment_like(tXsSFA(cute::_, cute::_, cute::_, 0));
+    auto tXsSFB = s2r_thr_copy_SFB.partition_S(sSFB);
+    auto tXrSFB = cute::make_fragment_like(tXsSFB(cute::_, cute::_, cute::_, 0));
+    auto scale = cute::make_fragment_like(tXrSFA);
+
+    int smem_pipe_write = KT::Stages - 1;
+    int smem_pipe_read = 0;
+
+    auto tXsA_read = tXsA(cute::_, cute::_, cute::_, smem_pipe_read);
+    auto tXsB_read = tXsB(cute::_, cute::_, cute::_, smem_pipe_read);
+    auto tXsSFA_read = tXsSFA(cute::_, cute::_, cute::_, smem_pipe_read);
+    auto tXsSFB_read = tXsSFB(cute::_, cute::_, cute::_, smem_pipe_read);
+    cute::cp_async_wait<KT::Stages - 2>();
+    __syncthreads();
+    // prefetch smem -> rf
+    cute::copy(s2r_copy_SFA, tXsSFA_read, tXrSFA);
+    cute::copy(s2r_copy_SFB, tXsSFB_read, tXrSFB);
+    cute::copy(s2r_copy_A, tXsA_read, tXrA);
+    cute::copy(s2r_copy_B, tXsB_read(cute::_, cute::Int<0>{}, cute::_), tXrB(cute::_, cute::_, cute::Int<0>{}));
+
+    cute::clear(accum);
+    int k_tile_iter = KT::Stages - 1;
+    while (k_tile_iter < k_tile_count) {
+      cute::for_each(cute::make_int_sequence<KT::NUM_GROUP_N>{}, [&](auto n_block) {
+        if constexpr (n_block == KT::NUM_GROUP_N - 1) {
+          tXsA_read = tXsA(cute::_, cute::_, cute::_, smem_pipe_read);
+          tXsB_read = tXsB(cute::_, cute::_, cute::_, smem_pipe_read);
+          tXsSFA_read = tXsSFA(cute::_, cute::_, cute::_, smem_pipe_read);
+          tXsSFB_read = tXsSFB(cute::_, cute::_, cute::_, smem_pipe_read);
+          cute::cp_async_wait<KT::Stages - 2>();
+          __syncthreads();
+          cute::copy(s2r_copy_SFA, tXsSFA_read, tXrSFA);
+          cute::copy(s2r_copy_SFB, tXsSFB_read, tXrSFB);
+        }
+        auto n_block_next = (n_block + cute::_1{}) % KT::NUM_GROUP_N;
+        cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_), tXrB(cute::_, cute::_, n_block_next));
+        if constexpr (n_block == 0) {
+          // gmem -> smem
+          cute::copy_if(g2s_copy_A, tApA, tAgA(cute::_, cute::_, cute::_, k_tile_iter), tAsA(cute::_, cute::_, cute::_, smem_pipe_write));
+          cute::copy_if(g2s_copy_B, tBpB, tBgB(cute::_, cute::_, cute::_, k_tile_iter), tBsB(cute::_, cute::_, cute::_, smem_pipe_write));
+          cute::copy_if(g2s_copy_SFA,  tApSFA, tAgSFA(cute::_, cute::_, cute::_, k_tile_iter), tAsSFA(cute::_, cute::_, cute::_, smem_pipe_write));
+          cute::copy(g2s_copy_SFB, tBgSFB(cute::_, cute::_, cute::_, k_tile_iter), tBsSFB(cute::_, cute::_, cute::_, smem_pipe_write));
+          cute::cp_async_fence();
+
+          k_tile_iter++;
+          smem_pipe_write = smem_pipe_read;
+          ++smem_pipe_read;
+          smem_pipe_read = smem_pipe_read == KT::Stages ? 0 : smem_pipe_read;
+          cute::for_each(cute::make_int_sequence<cute::size(scale)>{}, [&](auto i) {
+            scale(i) = tXrSFA(i) * tXrSFB(0);
+          });
         }
 
-        cute::Tensor tBpB = cute::make_tensor<bool>(
-            cute::make_shape(cute::size<1>(tBsB), cute::size<2>(tBsB)), cute::Stride<cute::_1, cute::_0>{});
-        // Construct identity layout for sB
-        cute::Tensor cB = make_identity_tensor(
-            cute::make_shape(cute::size<0>(sB), cute::size<1>(sB))); // (BLK_N,BLK_K) -> (blk_n,blk_k)
-        // Repeat the partitioning with identity layouts
-        cute::Tensor tBcB = gmem_thr_copy_B.partition_S(cB); // (BCPY,BCPY_N,BCPY_K) -> (blk_n,blk_k)
-
-        // Set predicates for n bounds
-        CUTLASS_PRAGMA_UNROLL
-        for (int n = 0; n < cute::size<0>(tBpB); ++n)
-        {
-            tBpB(n, 0) = cute::get<0>(tBcB(0, n, 0)) < residue_n; // blk_n coord < residue_n
+        cute::clear(temp);
+        cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
+        if constexpr (n_block == KT::NUM_GROUP_N - 1) {
+          cute::copy(s2r_copy_A, tXsA_read, tXrA);
         }
-
-        cute::Tensor tApSFA = cute::make_tensor<bool>(
-            cute::make_shape(cute::size<1>(tAsScaleA), cute::size<2>(tAsScaleA)), cute::Stride<cute::_1, cute::_0>{});
-        cute::Tensor tAcSFA = gmem_thr_copy_ScaleA.partition_S(cA); // (ACPY,ACPY_M,ACPY_K) -> (blk_m,blk_k)
-        CUTLASS_PRAGMA_UNROLL
-        for (int m = 0; m < cute::size<0>(tApSFA); ++m)
-        {
-            tApSFA(m, 0) = cute::get<0>(tAcSFA(0, m, 0)) < residue_m; // blk_m coord < residue_m
-        }
-        // (1.2) prefetch gmem -> smem
-        cute::clear(tAsA); // we don't need to clear tBsB..
-        cute::clear(tBsB);
-
-        cute::clear(tAsScaleA);
-        cute::clear(tBsScaleB);
-
-        auto k_tile_iter = cute::make_coord_iterator(cute::size<2>(gA)); // emm, iter start from 0
-        int k_tile_count = cute::size<2>(gA);
-        CUTLASS_PRAGMA_UNROLL
-        for (int k_pipe = 0; k_pipe < KT::Stages - 1; ++k_pipe)
-        {
-            if (k_tile_count <= 0)
-            {
-                cute::clear(tApA);
-                cute::clear(tBpB);
-                cute::clear(tApSFA);
-            }
-            cute::copy_if(gmem_tiled_copy_A, tApA, tAgA(cute::_, cute::_, cute::_, *k_tile_iter),
-                tAsA(cute::_, cute::_, cute::_, k_pipe));
-            cute::copy_if(gmem_tiled_copy_B, tBpB, tBgB(cute::_, cute::_, cute::_, *k_tile_iter),
-                tBsB(cute::_, cute::_, cute::_, k_pipe));
-
-            cute::copy_if(gmem_tiled_copy_ScaleA, tApSFA, tAgScaleA(cute::_, cute::_, cute::_, *k_tile_iter),
-                tAsScaleA(cute::_, cute::_, cute::_, k_pipe));
-            cute::copy(gmem_tiled_copy_ScaleB, tBgScaleB(cute::_, cute::_, cute::_, *k_tile_iter),
-                tBsScaleB(cute::_, cute::_, cute::_, k_pipe));
-
-            cute::cp_async_fence();
-            k_tile_count--;
-            if (k_tile_count > 0)
-            {
-                ++k_tile_iter;
-            }
-        }
-
-        // (1.3) get partition for rf
-        typename KT::TiledMma tiled_mma;
-        auto thr_mma = tiled_mma.get_thread_slice(thread_idx);
-        cute::Tensor tCrA = thr_mma.partition_fragment_A(sA(cute::_, cute::_, 0)); // (MMA,MMA_M,MMA_K)
-        cute::Tensor tCrB = thr_mma.partition_fragment_B(sB(cute::_, cute::_, 0)); // (MMA,MMA_N,MMA_K)
-
-        cute::Tensor accum
-            = cute::partition_fragment_C(tiled_mma, cute::take<0, 2>(typename KT::TileShape{})); // (MMA,MMA_M,MMA_N)
-        cute::Tensor temp_accum
-            = cute::partition_fragment_C(tiled_mma, cute::take<0, 2>(typename KT::TileShape{})); // (MMA,MMA_M,MMA_N)
-        cute::clear(accum);
-        // checkout the shape
-        CUTE_STATIC_ASSERT_V(cute::size<1>(tCrA) == cute::size<1>(accum)); // MMA_M
-        CUTE_STATIC_ASSERT_V(cute::size<1>(tCrB) == cute::size<2>(accum)); // MMA_N
-        CUTE_STATIC_ASSERT_V(cute::size<2>(tCrA) == cute::size<2>(tCrB));  // MMA_K
-        CUTE_STATIC_ASSERT_V(cute::size(gmem_tiled_copy_A) == cute::size(tiled_mma));
-        CUTE_STATIC_ASSERT_V(cute::size(gmem_tiled_copy_B) == cute::size(tiled_mma));
-
-        // (1.4)retiling the smem and rf for copy..
-        auto smem_tiled_copy_A = cute::make_tiled_copy_A(typename KT::SmemCopyAtomA{}, tiled_mma);
-        auto smem_thr_copy_A = smem_tiled_copy_A.get_thread_slice(thread_idx);
-        cute::Tensor tOsA = smem_thr_copy_A.partition_S(sA);                    // (CPY,CPY_M,CPY_K,Stage)
-        cute::Tensor tCrA_write = smem_thr_copy_A.retile_D(tCrA);               // (CPY,CPY_M,CPY_K)
-        CUTE_STATIC_ASSERT_V(cute::size<1>(tOsA) == cute::size<1>(tCrA_write)); // CPY_M
-        CUTE_STATIC_ASSERT_V(cute::size<2>(tOsA) == cute::size<2>(tCrA_write)); // CPY_K
-
-        auto smem_tiled_copy_B = cute::make_tiled_copy_B(typename KT::SmemCopyAtomB{}, tiled_mma);
-        auto smem_thr_copy_B = smem_tiled_copy_B.get_thread_slice(thread_idx);
-        cute::Tensor tOsB = smem_thr_copy_B.partition_S(sB);                    // (CPY,CPY_N,CPY_K,Stage)
-        cute::Tensor tCrB_write = smem_thr_copy_B.retile_D(tCrB);               // (CPY,CPY_N,CPY_K)
-        CUTE_STATIC_ASSERT_V(cute::size<1>(tOsB) == cute::size<1>(tCrB_write)); // CPY_N
-        CUTE_STATIC_ASSERT_V(cute::size<2>(tOsB) == cute::size<2>(tCrB_write)); // CPY_K
-
-        typename KT::SmemCopyAtomScaleA smem_tiled_copy_ScaleA;
-        typename KT::SmemCopyAtomScaleB smem_tiled_copy_ScaleB;
-        auto smem_thr_copy_ScaleA = smem_tiled_copy_ScaleA.get_thread_slice(thread_idx);
-        auto smem_thr_copy_ScaleB = smem_tiled_copy_ScaleB.get_thread_slice(thread_idx);
-
-        cute::Tensor tOsScaleA = smem_thr_copy_ScaleA.partition_S(sScaleA);
-        cute::Tensor tCrScaleA = cute::make_fragment_like(tOsScaleA(cute::_, cute::_, cute::_, 0));
-        cute::Tensor tOsScaleB = smem_thr_copy_ScaleB.partition_S(sScaleB);
-        cute::Tensor tCrScaleB = cute::make_fragment_like(tOsScaleB(cute::_, cute::_, cute::_, 0));
-
-        // (1.5) mainloop
-        // Current pipe index in smem to read from
-        int smem_pipe_read = 0;
-        // Current pipe index in smem to write to
-        int smem_pipe_write = KT::Stages - 1;
-
-        cute::Tensor tOsA_read = tOsA(cute::_, cute::_, cute::_, smem_pipe_read);
-        cute::Tensor tOsB_read = tOsB(cute::_, cute::_, cute::_, smem_pipe_read);
-
-        cute::Tensor tOsScaleA_read = tOsScaleA(cute::_, cute::_, cute::_, smem_pipe_read);
-        cute::Tensor tOsScaleB_read = tOsScaleB(cute::_, cute::_, cute::_, smem_pipe_read);
-
-        constexpr int K_BLOCK_MAX = cute::size<2>(tCrA);
-        // prefetch register pipeline
-        if constexpr (K_BLOCK_MAX > 1)
-        {
-            cute::cp_async_wait<KT::Stages - 2>();
+        promote(accum, temp, scale, n_block);
+      });
+    }
+    // load tail
+    cute::for_each(cute::make_int_sequence<KT::Stages - 2>{}, [&](auto WaitIndex) {
+      using WaitIndex_t = decltype(WaitIndex);
+      cute::for_each(cute::make_int_sequence<KT::NUM_GROUP_N>{}, [&](auto n_block) {
+        if constexpr (n_block == KT::NUM_GROUP_N - 1) {
+            tXsA_read = tXsA(cute::_, cute::_, cute::_, smem_pipe_read);
+            tXsB_read = tXsB(cute::_, cute::_, cute::_, smem_pipe_read);
+            tXsSFA_read = tXsSFA(cute::_, cute::_, cute::_, smem_pipe_read);
+            tXsSFB_read = tXsSFB(cute::_, cute::_, cute::_, smem_pipe_read);
+            cute::cp_async_wait<KT::Stages - 3 - WaitIndex_t::value>();
             __syncthreads();
-
-            // Prefetch the first k-tile smem -> reg
-            cute::copy(smem_tiled_copy_A, tOsA_read(cute::_, cute::_, cute::Int<0>{}),
-                tCrA_write(cute::_, cute::_, cute::Int<0>{}));
-            cute::copy(smem_tiled_copy_B, tOsB_read(cute::_, cute::_, cute::Int<0>{}),
-                tCrB_write(cute::_, cute::_, cute::Int<0>{}));
+            cute::copy(s2r_copy_SFA, tXsSFA_read, tXrSFA);
+            cute::copy(s2r_copy_SFB, tXsSFB_read, tXrSFB);
         }
-        // k loop for mainloop
-        CUTLASS_PRAGMA_NO_UNROLL
-        for (; k_tile_count > 0; --k_tile_count)
-        {
-            cute::clear(temp_accum);
-            cute::for_each(cute::make_int_sequence<K_BLOCK_MAX>{},
-                [&](auto k_block)
-                {
-                    if (k_block == K_BLOCK_MAX - 1)
-                    {
-                        tOsA_read = tOsA(cute::_, cute::_, cute::_, smem_pipe_read);
-                        tOsB_read = tOsB(cute::_, cute::_, cute::_, smem_pipe_read);
-                        cute::print_tensor(tOsA_read);
-                        cute::print_tensor(tOsB_read);
-                        tOsScaleA_read = tOsScaleA(cute::_, cute::_, cute::_, smem_pipe_read);
-                        tOsScaleB_read = tOsScaleB(cute::_, cute::_, cute::_, smem_pipe_read);
 
-                        cute::cp_async_wait<KT::Stages - 2>();
-                        __syncthreads();
-                    }
-                    // Load A, B smem -> reg for k_block+1
-                    auto k_block_next = (k_block + cute::_1{}) % K_BLOCK_MAX;
-                    cute::copy(smem_tiled_copy_A, tOsA_read(cute::_, cute::_, k_block_next),
-                        tCrA_write(cute::_, cute::_, k_block_next));
-                    cute::copy(smem_tiled_copy_B, tOsB_read(cute::_, cute::_, k_block_next),
-                        tCrB_write(cute::_, cute::_, k_block_next));
-                    // Copy gmem -> smem before computing gemm on each k-pipe
-                    if (k_block == 0)
-                    {
-                        cute::copy_if(gmem_tiled_copy_A, tApA, tAgA(cute::_, cute::_, cute::_, *k_tile_iter),
-                            tAsA(cute::_, cute::_, cute::_, smem_pipe_write));
-                        cute::copy_if(gmem_tiled_copy_B, tBpB, tBgB(cute::_, cute::_, cute::_, *k_tile_iter),
-                            tBsB(cute::_, cute::_, cute::_, smem_pipe_write));
-
-                        cute::copy_if(gmem_tiled_copy_ScaleA, tApSFA,
-                            tAgScaleA(cute::_, cute::_, cute::_, *k_tile_iter),
-                            tAsScaleA(cute::_, cute::_, cute::_, smem_pipe_write));
-                        cute::copy(gmem_tiled_copy_ScaleB, tBgScaleB(cute::_, cute::_, cute::_, *k_tile_iter),
-                            tBsScaleB(cute::_, cute::_, cute::_, smem_pipe_write));
-
-                        cute::cp_async_fence();
-                        if (k_tile_count - 1 > 0)
-                        {
-                            ++k_tile_iter;
-                        }
-
-                        cute::copy(smem_tiled_copy_ScaleA, tOsScaleA_read, tCrScaleA);
-                        cute::copy(smem_tiled_copy_ScaleB, tOsScaleB_read, tCrScaleB);
-
-                        // Advance the pipe -- Doing it here accounts for K_BLOCK_MAX = 1 (no rmem pipe)
-                        smem_pipe_write = smem_pipe_read;
-                        ++smem_pipe_read;
-                        smem_pipe_read = (smem_pipe_read == KT::Stages) ? 0 : smem_pipe_read;
-                    }
-                    // Thread-level register gemm for k_block
-                    cute::gemm(tiled_mma, temp_accum, tCrA(cute::_, cute::_, k_block), tCrB(cute::_, cute::_, k_block),
-                        temp_accum);
-                });
-
-            promote(accum, temp_accum, tCrScaleA, tCrScaleB);
+        auto n_block_next = (n_block + cute::_1{}) % KT::NUM_GROUP_N;
+        cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_),
+            tXrB(cute::_, cute::_, n_block_next));
+        
+        if constexpr (n_block == 0) {
+          ++smem_pipe_read;
+          smem_pipe_read = smem_pipe_read == KT::Stages ? 0 : smem_pipe_read;
+          cute::for_each(cute::make_int_sequence<cute::size(scale)>{},
+          [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
+          if (threadIdx.x == 0) {
+            cute::print_tensor("tXrSFA", tXrSFA);
+            cute::print_tensor("tXrSFB", tXrSFB);
+            cute::print_tensor("tXscale", scale);
+          }
         }
-        // load tail
-        cute::for_each(cute::make_int_sequence<KT::Stages - 2>{},
-            [&](auto WaitIndex)
-            {
-                k_tile_count--;
-                using WaitIndex_t = decltype(WaitIndex);
-                cute::clear(temp_accum);
-                cute::for_each(cute::make_int_sequence<K_BLOCK_MAX>{},
-                    [&](auto k_block)
-                    {
-                        if (k_block == K_BLOCK_MAX - 1)
-                        {
-                            tOsA_read = tOsA(cute::_, cute::_, cute::_, smem_pipe_read);
-                            tOsB_read = tOsB(cute::_, cute::_, cute::_, smem_pipe_read);
 
-                            tOsScaleA_read = tOsScaleA(cute::_, cute::_, cute::_, smem_pipe_read);
-                            tOsScaleB_read = tOsScaleB(cute::_, cute::_, cute::_, smem_pipe_read);
-
-                            cute::cp_async_wait<KT::Stages - 3 - WaitIndex_t::value>();
-                            __syncthreads();
-                        }
-                        // Load A, B smem -> reg for k_block+1
-                        auto k_block_next = (k_block + cute::_1{}) % K_BLOCK_MAX;
-                        cute::copy(smem_tiled_copy_A, tOsA_read(cute::_, cute::_, k_block_next),
-                            tCrA_write(cute::_, cute::_, k_block_next));
-                        cute::copy(smem_tiled_copy_B, tOsB_read(cute::_, cute::_, k_block_next),
-                            tCrB_write(cute::_, cute::_, k_block_next));
-                        if (k_block == 0)
-                        {
-
-                            cute::copy(smem_tiled_copy_ScaleA, tOsScaleA_read, tCrScaleA);
-                            cute::copy(smem_tiled_copy_ScaleB, tOsScaleB_read, tCrScaleB);
-
-                            // only update smem_pipe_read
-                            ++smem_pipe_read;
-                            smem_pipe_read = (smem_pipe_read == KT::Stages) ? 0 : smem_pipe_read;
-                        }
-                        // Thread-level register gemm for k_block
-                        cute::gemm(tiled_mma, temp_accum, tCrA(cute::_, cute::_, k_block),
-                            tCrB(cute::_, cute::_, k_block), temp_accum);
-                    });
-
-                promote(accum, temp_accum, tCrScaleA, tCrScaleB);
-            });
-        // mma tail
-        cute::clear(temp_accum);
-        cute::for_each(cute::make_int_sequence<K_BLOCK_MAX>{},
-            [&](auto k_block)
-            {
-                // Load A, B smem -> reg for k_block+1
-                auto k_block_next = (k_block + cute::_1{}) % K_BLOCK_MAX;
-                cute::copy(smem_tiled_copy_A, tOsA_read(cute::_, cute::_, k_block_next),
-                    tCrA_write(cute::_, cute::_, k_block_next));
-                cute::copy(smem_tiled_copy_B, tOsB_read(cute::_, cute::_, k_block_next),
-                    tCrB_write(cute::_, cute::_, k_block_next));
-                if (k_block == 0)
-                {
-
-                    cute::copy(smem_tiled_copy_ScaleA, tOsScaleA_read, tCrScaleA);
-                    cute::copy(smem_tiled_copy_ScaleB, tOsScaleB_read, tCrScaleB);
-                }
-                // Thread-level register gemm for k_block
-                cute::gemm(tiled_mma, temp_accum, tCrA(cute::_, cute::_, k_block), tCrB(cute::_, cute::_, k_block),
-                    temp_accum);
-            });
-
-        promote(accum, temp_accum, tCrScaleA, tCrScaleB);
-
-        // (4) push all the result to smem
-        // (4.1) convert result from ElementAccum to ElementA
-        cute::Tensor epi = util_convert_type<KT::ElementOutput>(accum);
-
-        // (4.2) rf -> smem
-        auto smem_tiled_copy_R2S = cute::make_tiled_copy_C(typename KT::SmemCopyAtomR2S{}, tiled_mma);
-        auto smem_thr_copy_R2S = smem_tiled_copy_R2S.get_thread_slice(thread_idx);
-        // cute::clear(sO);
-        cute::Tensor tRS_rO = smem_thr_copy_R2S.retile_S(epi);
-        cute::Tensor tRS_sO = smem_thr_copy_R2S.partition_D(sO);
-
-        cute::copy(smem_tiled_copy_R2S, tRS_rO, tRS_sO);
-        __syncthreads();
-
-        // (4.3) smem -> rf
-
-        typename KT::SmemTiledCopyS2R smem_tiled_copy_S2R;
-        auto smem_thr_copy_S2R = smem_tiled_copy_S2R.get_thread_slice(thread_idx);
-        cute::Tensor tSR_sO = smem_thr_copy_S2R.partition_S(sO);
-        cute::Tensor tSR_rO = cute::make_tensor<KT::ElementOutput>(cute::shape(tSR_sO));
-
-        cute::copy(smem_tiled_copy_S2R, tSR_sO, tSR_rO);
-        __syncthreads();
-
-        // (4.4) rf -> gmem
-        cute::Tensor gO = gOutput_mn(cute::_, cute::_, block_m_idx, block_n_idx);
-        cute::Tensor cO = cute::make_identity_tensor(
-            cute::make_shape(cute::size<0>(typename KT::TileShape{}), cute::size<1>(typename KT::TileShape{})));
-        auto tRG_rO = smem_thr_copy_S2R.retile_S(tSR_rO);
-        auto tRG_gO = smem_thr_copy_S2R.partition_D(gO);
-        auto tRG_cO = smem_thr_copy_S2R.partition_D(cO);
-        CUTLASS_PRAGMA_UNROLL
-        for (int m = 0; m < cute::size<1>(tRG_cO); ++m)
-        {
-            CUTLASS_PRAGMA_UNROLL
-            for (int n = 0; n < cute::size<2>(tRG_cO); ++n)
-            {
-                if (cute::get<0>(tRG_cO(0, m, n)) < residue_m && cute::get<1>(tRG_cO(0, m, n)) < residue_n)
-                {
-                    cute::copy(typename KT::GmemCopyAtomR2G{}, tRG_rO(cute::_, m, n), tRG_gO(cute::_, m, n));
-                }
-            }
+        cute::clear(temp);
+        cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
+        // if (threadIdx.x == 0) {
+        //   auto tCrB2 = tCrB(cute::_, cute::_, cute::_, n_block);
+        //   cute::print_tensor("mma_tCrA", tCrA);
+        //   cute::print_tensor("mma_tCrB2", tCrB2);
+        //   cute::print_tensor("mma_temp", temp);        
+        // }
+        if constexpr (n_block == KT::NUM_GROUP_N - 1) {
+          cute::copy(s2r_copy_A, tXsA_read, tXrA);
         }
-    }
+        promote(accum, temp, scale, n_block);
+        if (threadIdx.x == 0) {
+          cute::print_tensor("accum", accum);
+          // cute::print_tensor("temp", temp);
+          cute::print_tensor("scale", scale);
+        }
+      });
+    });
+    // mma tail
+    cute::for_each(cute::make_int_sequence<KT::NUM_GROUP_N>{}, [&](auto n_block) {
+      auto n_block_next = (n_block + cute::_1{}) % KT::NUM_GROUP_N;
+      cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_), tXrB(cute::_, cute::_, n_block_next));
+      cute::clear(temp);
+      if constexpr (n_block == 0) {
+        cute::for_each(cute::make_int_sequence<cute::size(scale)>{},
+          [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
+      }
+      cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
+      promote(accum, temp, scale, n_block);
+    });
+
+    // epilogue
+    __syncthreads(); // sync before using store smem
+    typename KT::SharedStorageStore* store_storage = reinterpret_cast<typename KT::SharedStorageStore*>(SharedStorageBase);
+    epilogue_with_smem(accum, *store_storage, ptr_output, M, N);
+  }
 };
 
-} // namespace ada_blockwise_gemm
+} // namespace kernel
+} // namespace xop

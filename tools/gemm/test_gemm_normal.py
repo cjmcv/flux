@@ -201,7 +201,9 @@ def run(M, args, xop_perf, torch_perf):
             # x = xutil.rand_tensor((M, K), dtype=output_dtype)
             # y = xutil.rand_tensor((N, K), dtype=output_dtype)
             x = torch.ones((M, K), device="cuda", dtype=output_dtype)
-            y = torch.ones((N, K), device="cuda", dtype=output_dtype)          
+            y = torch.ones((N, K), device="cuda", dtype=output_dtype)
+            # x = torch.arange(1, M*K+1, dtype=output_dtype, device="cuda").reshape(M, K)
+            # y = torch.arange(1, N*K+1, dtype=output_dtype, device="cuda").reshape(N, K)   
             x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone()) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
             y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone())
 
@@ -213,7 +215,7 @@ def run(M, args, xop_perf, torch_perf):
             weights.append(y_fp8)
 
             xt_scale = x_scale.clone().t().contiguous()
-            yt_scale = y_scale.clone().t().contiguous()
+            yt_scale = y_scale.clone().contiguous()
             inputs_scale.append(xt_scale)
             weights_scale.append(yt_scale)
             
@@ -312,8 +314,8 @@ def parse_args():
     parser.add_argument("N", type=int)
     parser.add_argument("K", type=int)
     parser.add_argument("--step", default=5, type=int, help="m step")
-    parser.add_argument("--warmup_iters", default=50, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=200, type=int, help="perf iterations")
+    parser.add_argument("--warmup_iters", default=0, type=int, help="perf warmup iterations")
+    parser.add_argument("--iters", default=1, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16", # float16, float8_e4m3fn
@@ -344,17 +346,21 @@ if __name__ == "__main__":
     xop_perf = []
     torch_perf = []
     print(f"M: {1}, N: {args.N}, K: {args.K}")
-    run(1, args, xop_perf, torch_perf)
+    run(4, args, xop_perf, torch_perf)
     # for m in range(2, args.M, args.step):
     #     print(f"M: {m}, N: {args.N}, K: {args.K}")
     #     run(m, args, xop_perf, torch_perf)
     # plot_x = [1] + list(range(2, args.M, args.step))
 
-    exponent = 3 # 65536: 17
-    for m in range(1, exponent):
-        m = 2**m
-        print(f"M: {m}, N: {args.N}, K: {args.K}")
-        run(m, args, xop_perf, torch_perf)
+    # for m in range(4, args.M, 4):
+    #     print(f"M: {m}, N: {args.N}, K: {args.K}")
+    #     run(m, args, xop_perf, torch_perf)
+
+    # exponent = 10 # 65536: 17
+    # for m in range(5, exponent):
+    #     m = 2**m
+    #     print(f"M: {m}, N: {args.N}, K: {args.K}")
+    #     run(m, args, xop_perf, torch_perf)
     
     plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
     plot_x = range(len(plot_x_value))

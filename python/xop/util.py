@@ -50,9 +50,9 @@ def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
     end = time.time()
     total_time = end - start
 
-    output.zero_()
-    output = fn(0)
-    print(output)
+    # output.zero_()
+    # output = fn(0)
+    # print(output)
     torch.cuda.synchronize()
     return PerfResult(name=name, output=output, gemm_time_ms=total_time / iters * 1000)
 
@@ -76,6 +76,9 @@ def per_token_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     return (x_view * (448.0 / x_amax.unsqueeze(2))).to(torch.float8_e4m3fn).view(
         m, n
     ), (x_amax / 448.0).view(m, -1)
+    return (x_view).to(torch.float8_e4m3fn).view(
+        m, n
+    ), (x_amax / 448.0).view(m, -1)
 
 
 def per_block_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -88,6 +91,7 @@ def per_block_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     x_view = x_padded.view(-1, 128, x_padded.size(1) // 128, 128)
     x_amax = x_view.abs().float().amax(dim=(1, 3), keepdim=True).clamp(1e-4)
     x_scaled = (x_view * (448.0 / x_amax)).to(torch.float8_e4m3fn)
+    # x_scaled = (x_view).to(torch.float8_e4m3fn)
     return x_scaled.view_as(x_padded)[:m, :n].contiguous(), (x_amax / 448.0).view(
         x_view.size(0), x_view.size(2)
     )

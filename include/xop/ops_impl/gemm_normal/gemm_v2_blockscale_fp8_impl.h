@@ -14,14 +14,14 @@ class GemmV2BlockScaleFp8Impl : public GemmBase {
   using ElementBlockScale = float;
   static constexpr int Stages = 4;
   using TileShape = cutlass::gemm::GemmShape<32, 128, 128>; // only support 32x128x128 for now
-  using KT = ada_blockwise_gemm::AdaBlockwiseGemmTraits<ElementA, ElementC, ElementAccumulator, ElementBlockScale,
+  using KT = traits::AdaBlockwiseGemmTraits<ElementA, ElementC, ElementAccumulator, ElementBlockScale,
       Stages, TileShape::kM, TileShape::kN, TileShape::kK>;
-  using Gemm = ada_blockwise_gemm::AdaBlockwiseGemm<KT>;
+  using Gemm = device::AdaBlockwiseGemm<KT>;
 
 public:
-  typename KT::Arguments args_from_options(RtBlockScaleFp8ArgumentsV3 *rt_args) {
+  typename Gemm::Arguments args_from_options(RtBlockScaleFp8ArgumentsV3 *rt_args) {
     cutlass::gemm::GemmCoord problem_size = {rt_args->m, rt_args->n, rt_args->k};
-    return typename KT::Arguments (
+    return typename Gemm::Arguments (
       problem_size, 
       rt_args->ptr_A, 
       rt_args->ptr_B, 

@@ -106,7 +106,7 @@ public:
       c10::optional<torch::Tensor> tuning,
       bool fast_accum
     ) {
-
+    // std::cout << "Tensor input:\n" << input << std::endl;
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
@@ -325,16 +325,26 @@ private:
         rt_args->C_s = 0;
       }
     }
+    ///////////////////////////
+    // if (m < 32) {
+    //   padded_input_ = torch::zeros({32, k}, input.options());
+    //   padded_input_.slice(0, 0, m).slice(1, 0, k).copy_(input);
+    //   m = 32;
+    //   // std::cout << "Tensor padded_input_:\n" << padded_input_ << std::endl;
+    // }
+    ///////////////////////////
     rt_args->m = m;
     rt_args->n = n;
     rt_args->k = k;
     rt_args->l = 1;
+    // rt_args->ptr_A = padded_input_.data_ptr();
     rt_args->ptr_A = input.data_ptr();
     rt_args->ptr_B = weight.data_ptr();
     rt_args->ptr_C = bias.has_value() ? bias.value().data_ptr() : nullptr;
     rt_args->ptr_D = output.data_ptr();
     rt_args->alpha = 1.0f;
     rt_args->beta = 0.0f;
+
 
     // int32_t k_remainder = k % 16;
     // if (k_remainder != 0) {
@@ -377,6 +387,8 @@ private:
 
   int16_t default_schema;
   UnifiedMetaEnum arch_;
+
+  torch::Tensor padded_input_;
 };
 
 GemmNormal::GemmNormal(

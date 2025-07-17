@@ -1,18 +1,3 @@
-/*
- * Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 #pragma once
 #include <cuda_bf16.h>
@@ -24,154 +9,95 @@
 #include <cutlass/trace.h>
 
 #include "ada_blockwise_gemm_kernel.cuh"
-
-// #if (CUTLASS_DEBUG_TRACE_LEVEL > 1)
-//             CUTLASS_TRACE_HOST("GemmUniversal::run: Launching static 1x1x1 kernel");
-// #endif
-
-#define CUTLASS_HOST_TRACE(x)                                                                                          \
-    {                                                                                                                  \
-        std::cout << __FILE__ << ":" << __LINE__ << "  " << x << std::endl;                                            \
-    }
-
-namespace ada_blockwise_gemm
-{
-
-template <typename GemmKernel>
-CUTLASS_GLOBAL void run_global(typename GemmKernel::Params params)
-{
-    // Dynamic shared memory base pointer
-    extern __shared__ int SharedStorageBase[];
-    // Declare pointer to dynamic shared memory.
-    typename GemmKernel::SharedStorage* shared_storage
-        = reinterpret_cast<typename GemmKernel::SharedStorage*>(SharedStorageBase);
-
-    GemmKernel::invoke(params, *shared_storage);
-}
+namespace xop {
+namespace device {
 
 using namespace cutlass;
 
 template <typename KT>
-struct AdaBlockwiseGemm
-{
+struct AdaBlockwiseGemm {
 
-    using GemmKernel = AdaBlockwiseGemmKernel<KT>;
+  struct Arguments {
+    GemmCoord problem_size{};
+    void const* ptr_a;
+    void const* ptr_b;
+    void* ptr_d;
+    float const* ptr_scale_a;
+    float const* ptr_scale_b;
 
-    static constexpr int kSmemSize = GemmKernel::kSmemSize;
-    static constexpr int kThreadCount = GemmKernel::kThreadCount;
+    Arguments() {}
+    Arguments(GemmCoord problem_size_, void const* ptr_a_, void const* ptr_b_, void* ptr_d_,
+            float const* ptr_scale_a_, float const* ptr_scale_b_)
+            : problem_size(problem_size_)
+            , ptr_a(ptr_a_)
+            , ptr_b(ptr_b_)
+            , ptr_d(ptr_d_)
+            , ptr_scale_a(ptr_scale_a_)
+            , ptr_scale_b(ptr_scale_b_) {}
+  };
 
-    /// Kernel parameters object
-    typename GemmKernel::Params params_;
+  using GemmKernel = kernel::AdaBlockwiseGemmKernel<KT>;
 
-    AdaBlockwiseGemm()
-        : params_()
-    {
+  static constexpr int kSmemSize = KT::kSmemSize;
+  static constexpr int kThreadCount = KT::kThreadCount;
+
+  /// Kernel parameters object
+  Arguments params_;
+
+  AdaBlockwiseGemm(): params_() {}
+
+  Status can_implement(Arguments const& args) {
+    if (kSmemSize > (48 << 10)) {
+      cudaFuncSetAttribute(kernel::sm89_fp8_gemm_1d1d_impl<GemmKernel>,
+            cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize);
+      auto result = cudaGetLastError();
+        
+      if (result != cudaSuccess) {
+        CUTLASS_TRACE_HOST("sm89 gemm kernel cannot launch: "  << cudaGetErrorString(result));
+        return Status::kInvalid;    
+      }
     }
 
-    using Arguments = typename GemmKernel::Arguments;
-
-    /// Computes the maximum number of active blocks per multiprocessor
-    static int maximum_active_blocks(int smem_capacity = -1)
-    {
-
-        CUTLASS_TRACE_HOST("AdaBlockwiseGemmKernel::maximum_active_blocks()");
-
-        CUTLASS_TRACE_HOST("  kSmemSize: " << kSmemSize << " bytes");
-
-        cudaError_t result;
-        if (kSmemSize > (48 << 10))
-        {
-            result
-                = cudaFuncSetAttribute(run_global<GemmKernel>, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize);
-
-            if (result != cudaSuccess)
-            {
-                // Call cudaGetLastError() to clear the error bit
-                result = cudaGetLastError();
-                CUTLASS_HOST_TRACE("  cudaFuncSetAttribute() returned error " << cudaGetErrorString(result));
-                return -1;
-            }
-        }
-
-        int max_active_blocks = -1;
-        result = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-            &max_active_blocks, run_global<GemmKernel>, kThreadCount, kSmemSize);
-
-        if (result != cudaSuccess)
-        {
-            // Call cudaGetLastError() to clear the error bit
-            result = cudaGetLastError();
-            CUTLASS_HOST_TRACE(
-                "  cudaOccupancyMaxActiveBlocksPerMultiprocessor() returned "
-                "error "
-                << cudaGetErrorString(result));
-            return -1;
-        }
-
-        CUTLASS_HOST_TRACE("  max_active_blocks: " << max_active_blocks);
-        return max_active_blocks;
+    if (args.problem_size.n() % KT::kTileN != 0) {
+      CUTLASS_TRACE_HOST("  n:" << args.problem_size.n() << " % kTileN:" << KT::kTileN << " != 0");
+      return Status::kInvalid;
     }
 
-    Status can_implement(Arguments const& args)
-    {
-        if (kSmemSize > (48 << 10))
-        {
-            cudaError_t result
-                = cudaFuncSetAttribute(run_global<GemmKernel>, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize);
-
-            if (result != cudaSuccess)
-            {
-                // Call cudaGetLastError() to clear the error bit
-                result = cudaGetLastError();
-                CUTLASS_HOST_TRACE("  cudaFuncSetAttribute() returned error " << cudaGetErrorString(result));
-                return Status::kInvalid;
-            }
-        }
-
-        if (args.problem_size.n() % KT::kTileN != 0)
-        {
-            CUTLASS_HOST_TRACE("  n:" << args.problem_size.n() << " % kTileN:" << KT::kTileN << " != 0");
-            return Status::kInvalid;
-        }
-
-        if (args.problem_size.k() % KT::kTileK != 0)
-        {
-            CUTLASS_HOST_TRACE("  k:" << args.problem_size.k() << " % kTileK:" << KT::kTileK << " != 0");
-            return Status::kInvalid;
-        }
-
-        return Status::kSuccess;
+    if (args.problem_size.k() % KT::kTileK != 0) {
+      CUTLASS_TRACE_HOST("  k:" << args.problem_size.k() << " % kTileK:" << KT::kTileK << " != 0");
+      return Status::kInvalid;
     }
 
-    Status initialize(Arguments const& args, void* workspace = nullptr, cudaStream_t stream = nullptr)
-    {
+    return Status::kSuccess;
+  }
 
-        params_ = GemmKernel::to_underlying_arguments(args);
+  Status initialize(Arguments const& args, void* workspace = nullptr, cudaStream_t stream = nullptr) {
+    auto ptr_a = reinterpret_cast<typename GemmKernel::ElementInput const*>(args.ptr_a);
+    auto ptr_b = reinterpret_cast<typename GemmKernel::ElementInput const*>(args.ptr_b);
+    auto ptr_d = reinterpret_cast<typename GemmKernel::ElementOutput*>(args.ptr_d);
+    auto ptr_scale_a = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(args.ptr_scale_a);
+    auto ptr_scale_b = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(args.ptr_scale_b);
 
-        return Status::kSuccess;
-    }
+    Arguments params(args.problem_size, ptr_a, ptr_b, ptr_d, ptr_scale_a, ptr_scale_b);
+    params_ = params;
+    return Status::kSuccess;
+  }
 
-    Status run(cudaStream_t stream = nullptr)
-    {
+  Status run(cudaStream_t stream = nullptr) {
+    int shape_m = params_.problem_size.m();
+    int shape_n = params_.problem_size.n();
+    int shape_k = params_.problem_size.k();
+    int grid_m = (shape_m + KT::kTileM - 1) / KT::kTileM;
+    int grid_n = (shape_n + KT::kTileN - 1) / KT::kTileN;
+    int grid_k = 1;
+    dim3 grid = dim3(grid_m, grid_n, grid_k);
+    dim3 block = dim3(kThreadCount, 1, 1);
+    kernel::sm89_fp8_gemm_1d1d_impl<GemmKernel>
+        <<<grid, block, kSmemSize, stream>>>(shape_m, shape_n, shape_k, params_.ptr_a, params_.ptr_b, params_.ptr_d, params_.ptr_scale_a, params_.ptr_scale_b);
 
-        // Configure grid and block dimensions
-
-        dim3 grid = GemmKernel::get_grid_shape(params_.problem_size);
-        dim3 block = GemmKernel::get_block_shape();
-
-        // Launch kernel
-        run_global<GemmKernel><<<grid, block, kSmemSize, stream>>>(params_);
-
-        // Query for errors
-        cudaError_t result = cudaGetLastError();
-        if (result != cudaSuccess)
-        {
-            CUTLASS_HOST_TRACE("  grid launch failed with error " << cudaGetErrorString(result));
-            return Status::kErrorInternal;
-        }
-
-        return Status::kSuccess;
-    }
+    return Status::kSuccess;
+  }
 };
 
-} // namespace ada_blockwise_gemm
+} // namespace device
+} // namespace xop
