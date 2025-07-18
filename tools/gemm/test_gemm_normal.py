@@ -164,6 +164,15 @@ THRESHOLD_MAP = {
     torch.int32: 0,
 }
 
+def pad_row_to_alignment(x, align):
+    row = x.size(0)
+    pad_rows = (align - (row % align)) % align
+    if pad_rows == 0:
+        return x
+  
+    padding = torch.zeros(pad_rows, x.size(1), dtype=x.dtype, device="cuda")
+    return torch.cat([x, padding], dim=0)
+
 def run(M, args, xop_perf, torch_perf):
     dtype = DTYPE_MAP[args.dtype]
     is_fp8 = xutil.is_fp8_dtype(dtype)
@@ -207,6 +216,15 @@ def run(M, args, xop_perf, torch_perf):
             x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone()) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
             y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone())
 
+            torch.set_printoptions(precision=8)
+            # print(x_scale)
+            # x and x_scale are internally read in multiples of 4, and use predicate tensors handle boundary cases.
+            # But x_scale is transposed before input, if the m-dimension is not padded to a multiple of 4, the transposed data will be mismatched.
+            # org: [[1,1]] =>transpose [[1],[1]], in memory, they are the same, like [1,1]
+            # org: [[1,1]] =>pad [[1,1], [0,0], [0,0], [0,0]] =>transpose [[1,0,0,0], [1,0,0,0]] => it looks like [1,0,0,0,1,0,0,0]
+            x_scale = pad_row_to_alignment(x_scale, 4) # 
+            # print(x_scale)
+            # print(x_scale.clone().t().contiguous())
             # print("x_scale: ", x_scale)
             # print("y_scale: ", y_scale)
             fp8_org_inputs.append(x)
@@ -346,11 +364,11 @@ if __name__ == "__main__":
     xop_perf = []
     torch_perf = []
     print(f"M: {1}, N: {args.N}, K: {args.K}")
-    run(4, args, xop_perf, torch_perf)
-    # for m in range(2, args.M, args.step):
-    #     print(f"M: {m}, N: {args.N}, K: {args.K}")
-    #     run(m, args, xop_perf, torch_perf)
-    # plot_x = [1] + list(range(2, args.M, args.step))
+    run(1, args, xop_perf, torch_perf) 
+    for m in range(2, args.M, args.step):
+        print(f"M: {m}, N: {args.N}, K: {args.K}")
+        run(m, args, xop_perf, torch_perf)
+    plot_x = [1] + list(range(2, args.M, args.step))
 
     # for m in range(4, args.M, 4):
     #     print(f"M: {m}, N: {args.N}, K: {args.K}")
@@ -362,9 +380,9 @@ if __name__ == "__main__":
     #     print(f"M: {m}, N: {args.N}, K: {args.K}")
     #     run(m, args, xop_perf, torch_perf)
     
-    plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
-    plot_x = range(len(plot_x_value))
-    plt.xticks(plot_x, plot_x_value, rotation=45)
+    # plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
+    # plot_x = range(len(plot_x_value))
+    # plt.xticks(plot_x, plot_x_value, rotation=45)
 
     plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)

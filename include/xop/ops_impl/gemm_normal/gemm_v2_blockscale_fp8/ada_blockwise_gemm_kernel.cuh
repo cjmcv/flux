@@ -1,18 +1,3 @@
-/*
- * Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 #pragma once
 
@@ -79,14 +64,12 @@ struct AdaBlockwiseGemmKernel {
 
     auto mA_mk = cute::make_tensor(cute::make_gmem_ptr(ptr_a), cute::make_shape(M, K), cute::make_stride(K, cute::_1{}));
     auto mB_nk = cute::make_tensor(cute::make_gmem_ptr(ptr_b), cute::make_shape(N, K), cute::make_stride(K, cute::_1{}));
-    auto mSFA_mk = cute::make_tensor(
-    cute::make_gmem_ptr(ptr_scale_a), cute::make_shape(ScaleM, ScaleK), cute::make_stride(cute::_1{}, ScaleM));
-    auto mSFB_nk = cute::make_tensor(
-    cute::make_gmem_ptr(ptr_scale_b), cute::make_shape(ScaleN, ScaleK), cute::make_stride(ScaleK, cute::_1{}));
+    auto mSFA_mk = cute::make_tensor(cute::make_gmem_ptr(ptr_scale_a), cute::make_shape(ScaleM, ScaleK), cute::make_stride(cute::_1{}, ScaleM));
+    auto mSFB_nk = cute::make_tensor(cute::make_gmem_ptr(ptr_scale_b), cute::make_shape(ScaleN, ScaleK), cute::make_stride(ScaleK, cute::_1{}));
     
-    if (threadIdx.x == 0) {
-      cute::print_tensor("mSFA_mk", mSFA_mk);
-    }
+    // if (threadIdx.x == 0) {
+    //   cute::print_tensor("mSFA_mk", mSFA_mk);
+    // }
   
     auto cta_coord = cute::make_coord(blockIdx.x, blockIdx.y, cute::_);          // (m,n,k)
     auto gA = cute::local_tile(mA_mk, typename KT::TileShape{}, cta_coord, cute::Step<_1, X, _1>{}); // (BLK_M,BLK_K,k)
@@ -188,9 +171,9 @@ struct AdaBlockwiseGemmKernel {
     // Dynamic shared memory base pointer
     extern __shared__ int SharedStorageBase[];
     auto [gA, gB, gSFA, gSFB, sA, sB, sSFA, sSFB] = gmem_tensor_init(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, M, N, K, SharedStorageBase);
-    if (threadIdx.x == 0) {
-      cute::print_tensor("gSFA", gSFA);
-    }
+    // if (threadIdx.x == 0) {
+    //   cute::print_tensor("gSFA", gSFA);
+    // }
 
     typename KT::GmemTiledCopyA g2s_copy_A;
     typename KT::GmemTiledCopyB g2s_copy_B;
@@ -270,9 +253,9 @@ struct AdaBlockwiseGemmKernel {
       cute::cp_async_fence();
     }
 
-    if (threadIdx.x == 0) {
-      cute::print_tensor("tAgSFA", tAgSFA);
-    }
+    // if (threadIdx.x == 0) {
+    //   cute::print_tensor("tAgSFA", tAgSFA);
+    // }
   
     typename KT::TiledMma mma;
     auto thr_mma = mma.get_slice(threadIdx.x);
@@ -336,8 +319,10 @@ struct AdaBlockwiseGemmKernel {
           cute::copy(s2r_copy_SFA, tXsSFA_read, tXrSFA);
           cute::copy(s2r_copy_SFB, tXsSFB_read, tXrSFB);
         }
+
         auto n_block_next = (n_block + cute::_1{}) % KT::NUM_GROUP_N;
         cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_), tXrB(cute::_, cute::_, n_block_next));
+        
         if constexpr (n_block == 0) {
           // gmem -> smem
           cute::copy_if(g2s_copy_A, tApA, tAgA(cute::_, cute::_, cute::_, k_tile_iter), tAsA(cute::_, cute::_, cute::_, smem_pipe_write));
@@ -379,19 +364,19 @@ struct AdaBlockwiseGemmKernel {
         }
 
         auto n_block_next = (n_block + cute::_1{}) % KT::NUM_GROUP_N;
-        cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_),
-            tXrB(cute::_, cute::_, n_block_next));
+        cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_), tXrB(cute::_, cute::_, n_block_next));
         
         if constexpr (n_block == 0) {
           ++smem_pipe_read;
           smem_pipe_read = smem_pipe_read == KT::Stages ? 0 : smem_pipe_read;
           cute::for_each(cute::make_int_sequence<cute::size(scale)>{},
-          [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
-          if (threadIdx.x == 0) {
-            cute::print_tensor("tXrSFA", tXrSFA);
-            cute::print_tensor("tXrSFB", tXrSFB);
-            cute::print_tensor("tXscale", scale);
-          }
+            [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
+
+          // if (threadIdx.x == 0) {
+          //   cute::print_tensor("tXrSFA", tXrSFA);
+          //   cute::print_tensor("tXrSFB", tXrSFB);
+          //   cute::print_tensor("tXscale", scale);
+          // }
         }
 
         cute::clear(temp);
@@ -406,11 +391,11 @@ struct AdaBlockwiseGemmKernel {
           cute::copy(s2r_copy_A, tXsA_read, tXrA);
         }
         promote(accum, temp, scale, n_block);
-        if (threadIdx.x == 0) {
-          cute::print_tensor("accum", accum);
-          // cute::print_tensor("temp", temp);
-          cute::print_tensor("scale", scale);
-        }
+        // if (threadIdx.x == 0) {
+        //   cute::print_tensor("accum", accum);
+        //   // cute::print_tensor("temp", temp);
+        //   cute::print_tensor("scale", scale);
+        // }
       });
     });
     // mma tail

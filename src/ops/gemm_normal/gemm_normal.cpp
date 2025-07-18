@@ -28,7 +28,8 @@
 
 #define PRINTF printf
 #define NOT_TUNING_SCHEMA "" // "TORCH"
-#define DISABLE_FP16_ACC true
+#define ENABLE_FP8_IN_FP16_ACC false  // else fp32 acc
+#define ENABLE_FP16_IN_FP16_ACC true // else fp32 acc
 
 int CoarseGrainedTuningM(int actual_m, int schema = 0) {
   int tuned_m = 0;
@@ -110,7 +111,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    std::vector<int16_t> id_meta = MakeDefaultMeta(DISABLE_FP16_ACC);     // id + meta
+    std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
     std::unique_ptr<RtArguments> rt_args;
     if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
       rt_args = std::make_unique<RtBlockScaleFp8ArgumentsV3>();
@@ -204,7 +205,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    std::vector<int16_t> id_meta = MakeDefaultMeta(DISABLE_FP16_ACC);     // id + meta
+    std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
     id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmGroupedBlockScaleFp8;
     id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
 
@@ -271,7 +272,7 @@ public:
   }
 
 private:
-  std::vector<int16_t> MakeDefaultMeta(bool is_fp32_acc = true) {
+  std::vector<int16_t> MakeDefaultMeta() {
     std::vector<int16_t> meta;
     meta.resize(8);
     meta[IdMetaEnum::Id] = -1;                                  // id
@@ -281,10 +282,20 @@ private:
     meta[IdMetaEnum::TypeA] = from_torch_dtype(this->input_dtype);  // type A
     meta[IdMetaEnum::TypeB] = from_torch_dtype(this->input_dtype);  // type B
     meta[IdMetaEnum::TypeCD] = from_torch_dtype(this->output_dtype); // type C/D
-    if (is_fp32_acc)
-      meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP32;        // type acc
+
+    bool is_enable_fp16_acc = false;
+    if (meta[IdMetaEnum::TypeA] == (int)UnifiedMetaEnum::E4M3) {
+      is_enable_fp16_acc = ENABLE_FP8_IN_FP16_ACC;
+    }
+    else if (meta[IdMetaEnum::TypeA] == (int)UnifiedMetaEnum::FP16) {
+      is_enable_fp16_acc = ENABLE_FP16_IN_FP16_ACC;
+    }
+
+    if (is_enable_fp16_acc)
+      meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP16;        // type acc
     else
-      meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP16;
+      meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP32;
+
     if (transpose_weight)                           // layout
       meta[IdMetaEnum::Layout] = (int16_t)UnifiedMetaEnum::RRR; 
     else

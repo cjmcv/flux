@@ -1,18 +1,3 @@
-/*
- * Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 #pragma once
 #include "cute/atom/mma_atom.hpp"
@@ -195,17 +180,14 @@ struct AdaBlockwiseGemmTraits {
     = Layout<Shape<Shape<_4, _8, _2, _2>, Shape<_2>>, Stride<Stride<_0, _1, _16, _0>, Stride<_8, _0>>>;
   using SmemTileShapeSFA = Shape<Int<kMmaPermM>, _1>;
   using SmemTiledCopySFA = decltype(make_tiled_copy_impl(SmemCopyAtomScale{}, SmemLayoutTVSFA{}, SmemTileShapeSFA{}));
-
   using SmemLayoutSFA = decltype(tile_to_shape(make_layout(SmemTileShapeSFA{}),
     make_shape(shape<0>(ScalePerTileShape{}), shape<2>(ScalePerTileShape{}), Int<Stages>{}))); // BLK_M, BLK_K, Stages
 
   using SmemLayoutTVSFB = Layout<Shape<Shape<_4, _8, _2, _2>, Shape<_1>>, Stride<Stride<_0, _0, _0, _0>, Stride<_0, _0>>>;
   using SmemTileShapeSFB = Shape<_1, _1>;
   using SmemTiledCopySFB = decltype(make_tiled_copy_impl(SmemCopyAtomScale{}, SmemLayoutTVSFB{}, SmemTileShapeSFB{}));
-
   using SmemLayoutSFB = decltype(tile_to_shape(make_layout(SmemTileShapeSFB{}),
-    make_shape(
-      shape<1>(ScalePerTileShape{}), shape<2>(ScalePerTileShape{}), Int<Stages>{}))); // BLK_N, BLK_K, Stages
+    make_shape(shape<1>(ScalePerTileShape{}), shape<2>(ScalePerTileShape{}), Int<Stages>{}))); // BLK_N, BLK_K, Stages
 
   // we need at least 2 stages..
   static_assert(Stages >= 2);
