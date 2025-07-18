@@ -191,7 +191,7 @@ def run(M, args, xop_perf, torch_perf):
     cache_size = 100 * 1024 * 1024 # 100MB 
     total_bytes = (M*K + K*N) * torch.finfo(dtype).bits // 8 # + M*N
 
-    problem_count = 1 + int((3 * cache_size) / total_bytes)
+    problem_count = 5 # 1 + int((3 * cache_size) / total_bytes)
     print("problem_count", problem_count, cache_size, total_bytes)
     #
     inputs = []
@@ -207,10 +207,10 @@ def run(M, args, xop_perf, torch_perf):
         fp8_org_inputs = []
         fp8_org_weights = []
         for i in range(problem_count):
-            # x = xutil.rand_tensor((M, K), dtype=output_dtype)
-            # y = xutil.rand_tensor((N, K), dtype=output_dtype)
-            x = torch.ones((M, K), device="cuda", dtype=output_dtype)
-            y = torch.ones((N, K), device="cuda", dtype=output_dtype)
+            x = xutil.rand_tensor((M, K), dtype=output_dtype)
+            y = xutil.rand_tensor((N, K), dtype=output_dtype)
+            # x = torch.ones((M, K), device="cuda", dtype=output_dtype)
+            # y = torch.ones((N, K), device="cuda", dtype=output_dtype)
             # x = torch.arange(1, M*K+1, dtype=output_dtype, device="cuda").reshape(M, K)
             # y = torch.arange(1, N*K+1, dtype=output_dtype, device="cuda").reshape(N, K)   
             x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone()) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
@@ -333,7 +333,7 @@ def parse_args():
     parser.add_argument("K", type=int)
     parser.add_argument("--step", default=5, type=int, help="m step")
     parser.add_argument("--warmup_iters", default=0, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=1, type=int, help="perf iterations")
+    parser.add_argument("--iters", default=2, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16", # float16, float8_e4m3fn
@@ -342,7 +342,7 @@ def parse_args():
     )
     parser.add_argument(
         "--output_dtype",
-        default="",
+        default="bfloat16", # float16
         type=str,
         help="allowed data type:: bfloat16,float16,s32.",
     )
@@ -356,7 +356,7 @@ def parse_args():
     return parser.parse_args()
 
 # python3 tools/gemm/test_gemm_normal.py --has_bias --dtype=float16 100 1000 1000
-# python3 tools/gemm/test_gemm_normal.py 100 1280 1280 --show_tflops --dtype=float8_e4m3fn
+# python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn
 if __name__ == "__main__":
     init_seed()
     args = parse_args()
@@ -364,25 +364,23 @@ if __name__ == "__main__":
     xop_perf = []
     torch_perf = []
     print(f"M: {1}, N: {args.N}, K: {args.K}")
-    run(1, args, xop_perf, torch_perf) 
-    for m in range(2, args.M, args.step):
-        print(f"M: {m}, N: {args.N}, K: {args.K}")
-        run(m, args, xop_perf, torch_perf)
-    plot_x = [1] + list(range(2, args.M, args.step))
+    run(1, args, xop_perf, torch_perf)
 
-    # for m in range(4, args.M, 4):
-    #     print(f"M: {m}, N: {args.N}, K: {args.K}")
-    #     run(m, args, xop_perf, torch_perf)
-
-    # exponent = 10 # 65536: 17
-    # for m in range(5, exponent):
-    #     m = 2**m
-    #     print(f"M: {m}, N: {args.N}, K: {args.K}")
-    #     run(m, args, xop_perf, torch_perf)
-    
-    # plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
-    # plot_x = range(len(plot_x_value))
-    # plt.xticks(plot_x, plot_x_value, rotation=45)
+    if 0:
+        for m in range(2, args.M, args.step):
+            print(f"M: {m}, N: {args.N}, K: {args.K}")
+            run(m, args, xop_perf, torch_perf)
+        plot_x = [1] + list(range(2, args.M, args.step))
+    else:
+        exponent = 17 # 65536: 17
+        for m in range(1, exponent):
+            m = 2**m
+            print(f"M: {m}, N: {args.N}, K: {args.K}")
+            run(m, args, xop_perf, torch_perf)
+        
+        plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
+        plot_x = range(len(plot_x_value))
+        plt.xticks(plot_x, plot_x_value, rotation=45)
 
     plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)

@@ -50,8 +50,8 @@ def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
     end = time.time()
     total_time = end - start
 
-    # output.zero_()
-    # output = fn(0)
+    output.zero_()
+    output = fn(0)
     # print(output)
     torch.cuda.synchronize()
     return PerfResult(name=name, output=output, gemm_time_ms=total_time / iters * 1000)
