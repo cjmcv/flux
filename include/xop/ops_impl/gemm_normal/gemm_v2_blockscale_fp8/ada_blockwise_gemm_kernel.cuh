@@ -8,28 +8,28 @@ namespace xop {
 namespace kernel {
 
 template <typename GemmKernel>
-CUTLASS_GLOBAL void sm89_fp8_gemm_1d1d_impl(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, void const* A,
+CUTLASS_GLOBAL void sm89_fp8_gemm_impl(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, void const* A,
   void const* B, void* D, float const* scales_a, float const* scales_b) {
   GemmKernel op;
   op.invoke(shape_m, shape_n, shape_k, A, B, D, scales_a, scales_b);
 }
 
-template <typename GemmKernel>
-CUTLASS_GLOBAL void sm89_fp8_bmm_1d1d_impl(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, 
-                                        __nv_fp8_e4m3* A, __nv_fp8_e4m3* B, __nv_bfloat16* D, 
-                                        float* scales_a, float* scales_b, 
-                                        uint64_t stride_a, uint64_t stride_b, uint64_t stride_d, 
-                                        uint64_t stride_scales_a, uint64_t stride_scales_b) {
-  GemmKernel op;
+// template <typename GemmKernel>
+// CUTLASS_GLOBAL void sm89_fp8_bmm_impl(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, 
+//                                         __nv_fp8_e4m3* A, __nv_fp8_e4m3* B, __nv_bfloat16* D, 
+//                                         float* scales_a, float* scales_b, 
+//                                         uint64_t stride_a, uint64_t stride_b, uint64_t stride_d, 
+//                                         uint64_t stride_scales_a, uint64_t stride_scales_b) {
+//   GemmKernel op;
 
-  auto ptr_a = reinterpret_cast<typename GemmKernel::ElementInput const*>(A + blockIdx.z * stride_a);
-  auto ptr_b = reinterpret_cast<typename GemmKernel::ElementInput const*>(B + blockIdx.z * stride_b);
-  auto ptr_scale_a = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_a + blockIdx.z * stride_scales_a);
-  auto ptr_scale_b = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_b + blockIdx.z * stride_scales_b);
-  auto ptr_output = reinterpret_cast<typename GemmKernel::ElementOutput*>(D + blockIdx.z * stride_d);
+//   auto ptr_a = reinterpret_cast<typename GemmKernel::ElementInput const*>(A + blockIdx.z * stride_a);
+//   auto ptr_b = reinterpret_cast<typename GemmKernel::ElementInput const*>(B + blockIdx.z * stride_b);
+//   auto ptr_scale_a = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_a + blockIdx.z * stride_scales_a);
+//   auto ptr_scale_b = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_b + blockIdx.z * stride_scales_b);
+//   auto ptr_output = reinterpret_cast<typename GemmKernel::ElementOutput*>(D + blockIdx.z * stride_d);
 
-  op(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, ptr_output, shape_m, shape_n, shape_k);
-}
+//   op(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, ptr_output, shape_m, shape_n, shape_k);
+// }
 
 template <typename KT>
 struct AdaBlockwiseGemmKernel {
@@ -68,7 +68,7 @@ struct AdaBlockwiseGemmKernel {
     auto mSFB_nk = cute::make_tensor(cute::make_gmem_ptr(ptr_scale_b), cute::make_shape(ScaleN, ScaleK), cute::make_stride(ScaleK, cute::_1{}));
     
     // if (threadIdx.x == 0) {
-    //   cute::print_tensor("mSFA_mk", mSFA_mk);
+    //   xop::print_tensor("mSFA_mk", mSFA_mk);
     // }
   
     auto cta_coord = cute::make_coord(blockIdx.x, blockIdx.y, cute::_);          // (m,n,k)
@@ -172,7 +172,7 @@ struct AdaBlockwiseGemmKernel {
     extern __shared__ int SharedStorageBase[];
     auto [gA, gB, gSFA, gSFB, sA, sB, sSFA, sSFB] = gmem_tensor_init(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, M, N, K, SharedStorageBase);
     // if (threadIdx.x == 0) {
-    //   cute::print_tensor("gSFA", gSFA);
+    //   xop::print_tensor("gSFA", gSFA);
     // }
 
     typename KT::GmemTiledCopyA g2s_copy_A;
@@ -254,7 +254,7 @@ struct AdaBlockwiseGemmKernel {
     }
 
     // if (threadIdx.x == 0) {
-    //   cute::print_tensor("tAgSFA", tAgSFA);
+    //   xop::print_tensor("tAgSFA", tAgSFA);
     // }
   
     typename KT::TiledMma mma;
@@ -373,28 +373,31 @@ struct AdaBlockwiseGemmKernel {
             [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
 
           // if (threadIdx.x == 0) {
-          //   cute::print_tensor("tXrSFA", tXrSFA);
-          //   cute::print_tensor("tXrSFB", tXrSFB);
-          //   cute::print_tensor("tXscale", scale);
+          //   xop::print_tensor("tXrSFA", tXrSFA);
+          //   xop::print_tensor("tXrSFB", tXrSFB);
+          //   xop::print_tensor("tXscale", scale);
           // }
         }
 
         cute::clear(temp);
+        // if (threadIdx.x == 0) {
+        //   xop::print_tensor("mma_temp_before", temp);        
+        // }
         cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
         // if (threadIdx.x == 0) {
         //   auto tCrB2 = tCrB(cute::_, cute::_, cute::_, n_block);
-        //   cute::print_tensor("mma_tCrA", tCrA);
-        //   cute::print_tensor("mma_tCrB2", tCrB2);
-        //   cute::print_tensor("mma_temp", temp);        
+        //   xop::print_tensor("mma_tCrA", tCrA);
+        //   xop::print_tensor("mma_tCrB2", tCrB2);
+        //   xop::print_tensor("mma_temp", temp);        
         // }
         if constexpr (n_block == KT::NUM_GROUP_N - 1) {
           cute::copy(s2r_copy_A, tXsA_read, tXrA);
         }
         promote(accum, temp, scale, n_block);
         // if (threadIdx.x == 0) {
-        //   cute::print_tensor("accum", accum);
-        //   // cute::print_tensor("temp", temp);
-        //   cute::print_tensor("scale", scale);
+        //   xop::print_tensor("accum", accum);
+        //   // xop::print_tensor("temp", temp);
+        //   xop::print_tensor("scale", scale);
         // }
       });
     });

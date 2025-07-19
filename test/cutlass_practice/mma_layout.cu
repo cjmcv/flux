@@ -25,9 +25,9 @@ int main() {
     auto mma_shape_B2 = cute::partition_shape_B(mma, cute::make_shape(cute::Int<32>{}, cute::Int<128>{}, cute::Int<4>{})); // N/4, K, 4
     auto tCrB2 = cute::make_tensor<cutlass::float_e4m3_t>(mma_shape_B2);
 
-    cute::print_tensor("tCrA", tCrA);
-    cute::print_tensor("tCrB", tCrB);
-    cute::print_tensor("tCrB2", tCrB2);
+    xop::print_tensor("tCrA", tCrA);
+    xop::print_tensor("tCrB", tCrB);
+    xop::print_tensor("tCrB2", tCrB2);
     
     // tCrA: ptr[8b](0x7fffff40c8e0) o ((_4,_2,_2),_1,_4):((_1,_4,_8),_0,_16):
     // tCrB: ptr[8b](0x7fff2b6bb170) o ((_4,_2),_8,_4):((_1,_4),_8,_64):
@@ -53,9 +53,9 @@ int main() {
     auto mma_shape_B2 = cute::partition_shape_B(mma, cute::make_shape(cute::Int<32>{}, cute::Int<128>{}, cute::Int<4>{})); // N/4, K, 4
     auto tCrB2 = cute::make_tensor<cutlass::float_e4m3_t>(mma_shape_B2);
 
-    cute::print_tensor("tCrA", tCrA);
-    cute::print_tensor("tCrB", tCrB);
-    cute::print_tensor("tCrB2", tCrB2);
+    xop::print_tensor("tCrA", tCrA);
+    xop::print_tensor("tCrB", tCrB);
+    xop::print_tensor("tCrB2", tCrB2);
 
     // rank1是指令shape，rank2和rank3是两个方向上的mma次数。
     // tCrA: ptr[8b](0x7ffcb383d0d0) o ((_4,_2,_2),_2,_4):((_1,_4,_8),_16,_32):
@@ -81,9 +81,9 @@ int main() {
     auto mma_shape_B2 = cute::partition_shape_B(mma, cute::make_shape(cute::Int<32>{}, cute::Int<128>{}, cute::Int<4>{})); // N/4, K, 4
     auto tCrB2 = cute::make_tensor<cutlass::float_e4m3_t>(mma_shape_B2);
 
-    cute::print_tensor("tCrA", tCrA);
-    cute::print_tensor("tCrB", tCrB);
-    cute::print_tensor("tCrB2", tCrB2);
+    xop::print_tensor("tCrA", tCrA);
+    xop::print_tensor("tCrB", tCrB);
+    xop::print_tensor("tCrB2", tCrB2);
 
     // tCrA: ptr[8b](0x7ffcb383d0d0) o ((_4,_2,_2),_2,_4):((_1,_4,_8),_16,_32):
     // tCrB: ptr[8b](0x7ffcb383d150) o ((_4,_2),_16,_4):((_1,_4),_8,_128):

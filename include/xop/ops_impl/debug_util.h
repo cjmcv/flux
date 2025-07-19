@@ -7,7 +7,8 @@
 // #include <cutlass/cutlass.h>
 #include <cutlass/util/device_memory.h>
 // 3rdparty/cutlass/tools/util/include/cutlass/util/device_memory.h
-namespace cute {
+
+namespace xop {
 
 // synclog / CUTLASS_HOST_TRACE      => -DCUTLASS_DEBUG_TRACE_LEVEL=1
 // cutlass::debug::dump_fragment     => tools/util/include/cutlass/util/device_dump.h
@@ -34,66 +35,99 @@ void print_device_tensor(cute::Tensor<Engine, Layout> const& t)
 
 
 template <class Engine, class Layout>
-CUTE_HOST_DEVICE void print_tensor_shape(const char* name, Tensor<Engine,Layout> const& tensor)
+CUTE_HOST_DEVICE void print_tensor_shape(const char* name, cute::Tensor<Engine,Layout> const& tensor)
 {  
-  print("%s: ", name); 
-  auto tshape = shape(tensor.layout());
-  print(tshape); 
-  print("\n");
+  printf("%s: ", name); 
+  auto tshape = cute::shape(tensor.layout());
+  cute::print(tshape); 
+  printf("\n");
+}
+
+// CUTE_HOST_DEVICE
+// void uint32_to_2xhalf(uint32_t in, cutlass::half_t out[2]) {
+//   std::memcpy(out, &in, sizeof(uint32_t));
+// }
+
+CUTE_HOST_DEVICE void print_4xfp8e4m3(const char* name, uint32_t src) {
+  cutlass::float_e4m3_t dst[4];
+  // dst[0] = cutlass::float_e4m3_t::from_bits(static_cast<uint8_t>(src >> 0));
+  // dst[1] = cutlass::float_e4m3_t::from_bits(static_cast<uint8_t>(src >> 8));
+  // dst[2] = cutlass::float_e4m3_t::from_bits(static_cast<uint8_t>(src >> 16));
+  // dst[3] = cutlass::float_e4m3_t::from_bits(static_cast<uint8_t>(src >> 24));
+
+  const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&src);
+  printf("%s: %f, %f, %f, %f\n", name, 
+    static_cast<float>(*reinterpret_cast<const cutlass::float_e4m3_t*>(&bytes[0])), 
+    static_cast<float>(*reinterpret_cast<const cutlass::float_e4m3_t*>(&bytes[1])),
+    static_cast<float>(*reinterpret_cast<const cutlass::float_e4m3_t*>(&bytes[2])),
+    static_cast<float>(*reinterpret_cast<const cutlass::float_e4m3_t*>(&bytes[3])));
 }
 
 // cute::print_tensor
 template <class Engine, class Layout>
-CUTE_HOST_DEVICE void print_tensor(const char* name, Tensor<Engine,Layout> const& tensor, int tensor_type = 0, bool print_type = true)
-{
+CUTE_HOST_DEVICE void print_tensor(const char* name, cute::Tensor<Engine,Layout> const& tensor, 
+                                   bool is_tid0 = true, bool is_bid0 = true, bool print_type = true) {
   // ((_4,_2,_2),_1,_4):((_1,_4,_8),_0,_16)
   // => shape  ((_4,_2,_2),_1,_4)
   // => stride ((_1,_4,_8),_0,_16)
-  print("%s: ", name); 
-  if (print_type) {
-    print(tensor); print(":\n");
+  
+  printf("%s ", name); 
+  using ElementType = typename cute::Tensor<Engine,Layout>::value_type;
+  if constexpr (std::is_same_v<ElementType, float>) {
+    printf("(float): ");
+  } else if constexpr (__is_same(ElementType, cutlass::half_t)) {
+    printf("(half_t): ");
+  } else if constexpr (__is_same(ElementType, cutlass::bfloat16_t)) {
+    printf("(bfloat16_t): ");
+  } else if constexpr (__is_same(ElementType, cutlass::float_e4m3_t)) {
+    printf("(float_e4m3_t): ");
   }
+  cute::print_tensor(tensor);
+  
+  // if (print_type) {
+  //   cute::print(tensor); printf(":\n");
+  // }
 
-  if constexpr (Layout::rank == 1)
-  {
-    // print("dim[%d].\n", size(tensor));
-    for (int m = 0; m < size(tensor); ++m) {
-      pretty_print(tensor(m));
-      printf("\n");
-    }
-  } else
-  if constexpr (Layout::rank == 2)
-  {
-    // print("dim[%d, %d].\n", size<0>(tensor), size<1>(tensor));
-    for (int m = 0; m < size<0>(tensor); ++m) {
-      for (int n = 0; n < size<1>(tensor); ++n) {
-        pretty_print(tensor(m,n));
-      }
-      printf("\n");
-    }
-  } else
-  if constexpr (Layout::rank == 3)
-  {
-    // if (tensor_type == 0) {
-    //   print_tensor(tensor(0,_,_), false);
-    // }
-    // else {
-      print_tensor(tensor(_,_,0), false);
-      for (int k = 1; k < size<2>(tensor); ++k) {
-        for (int i = 0; i < 5*size<1>(tensor); ++i) { print("-"); } print("\n");
-        print_tensor(tensor(_,_,k), false);
-      }      
-    // }
-  } else
-  if constexpr (Layout::rank == 4)
-  {
-    // print("dim[%d, %d, %d, %d].\n", size<0>(tensor) , size<1>(tensor), size<2>(tensor), size<3>(tensor));
-    print_tensor(tensor(_,_,_,0), false);
-    for (int p = 1; p < size<3>(tensor); ++p) {
-      for (int i = 0; i < 5*size<1>(tensor); ++i) { print("="); } print("\n");
-      print_tensor(tensor(_,_,_,p), false);
-    }
-  }
+  // if constexpr (Layout::rank == 1)
+  // {
+  //   // print("dim[%d].\n", size(tensor));
+  //   for (int m = 0; m < cute::size(tensor); ++m) {
+  //     cute::pretty_print(tensor(m));
+  //     printf("\n");
+  //   }
+  // } else
+  // if constexpr (Layout::rank == 2)
+  // {
+  //   // print("dim[%d, %d].\n", size<0>(tensor), size<1>(tensor));
+  //   for (int m = 0; m < cute::size<0>(tensor); ++m) {
+  //     for (int n = 0; n < cute::size<1>(tensor); ++n) {
+  //       cute::pretty_print(tensor(m,n));
+  //     }
+  //     printf("\n");
+  //   }
+  // } else
+  // if constexpr (Layout::rank == 3)
+  // {
+  //   // if (tensor_type == 0) {
+  //   //   print_tensor(tensor(0,_,_), false);
+  //   // }
+  //   // else {
+  //     print_tensor(tensor(_,_,0), false);
+  //     for (int k = 1; k < size<2>(tensor); ++k) {
+  //       for (int i = 0; i < 5*size<1>(tensor); ++i) { print("-"); } print("\n");
+  //       print_tensor(tensor(_,_,k), false);
+  //     }      
+  //   // }
+  // } else
+  // if constexpr (Layout::rank == 4)
+  // {
+  //   // print("dim[%d, %d, %d, %d].\n", size<0>(tensor) , size<1>(tensor), size<2>(tensor), size<3>(tensor));
+  //   print_tensor(tensor(_,_,_,0), false);
+  //   for (int p = 1; p < size<3>(tensor); ++p) {
+  //     for (int i = 0; i < 5*size<1>(tensor); ++i) { print("="); } print("\n");
+  //     print_tensor(tensor(_,_,_,p), false);
+  //   }
+  // }
 }
 
 }  // namespace cute

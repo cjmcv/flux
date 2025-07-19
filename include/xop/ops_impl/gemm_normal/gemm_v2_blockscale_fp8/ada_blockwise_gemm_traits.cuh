@@ -9,9 +9,11 @@
 #include <cutlass/arch/mma.h>
 #include <cutlass/cutlass.h>
 
+#include "xop/ops_impl/debug_util.h"
+
 // Config
 #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 890))
-#define CUTE_ARCH_MMA_F32_SM89_ENABLED
+#define CUTE_ARCH_MMA_F16_SM89_ENABLED
 #endif
 
 namespace cute
@@ -19,7 +21,7 @@ namespace cute
 
 // MMA 16x8x32 TN
 // ref: SM80_16x8x16_F16F16F16F16_TN vs SM80_16x8x16_F32F16F16F32_TN
-struct SM89_16x8x32_F16F4M3FE4M3F16_TN
+struct SM89_16x8x32_F16E4M3E4M3F16_TN
 {
   using DRegisters = uint32_t[2];
   using ARegisters = uint32_t[4];
@@ -32,7 +34,7 @@ struct SM89_16x8x32_F16F4M3FE4M3F16_TN
     uint32_t const& b0, uint32_t const& b1,
     uint32_t const& c0, uint32_t const& c1)
   {
-#if defined(CUTE_ARCH_MMA_F32_SM89_ENABLED)
+#if defined(CUTE_ARCH_MMA_F16_SM89_ENABLED)
     asm volatile(
       "mma.sync.aligned.m16n8k32.row.col.f16.e4m3.e4m3.f16 "
       "{%0,  %1},"
@@ -46,12 +48,15 @@ struct SM89_16x8x32_F16F4M3FE4M3F16_TN
       "Attempting to use SM89_16x8x32_F16F4M3FE4M3F16_TN without "
       "CUTE_ARCH_MMA_F32_SM89_ENABLED");
 #endif
+
+    // xop::print_4xfp8e4m3("b0", b0);
+    // xop::print_4xfp8e4m3("b1", b1);
   }
 };
 
 // ref: MMA_Traits<SM80_16x8x16_F16F16F16F16_TN> vs MMA_Traits<SM80_16x8x16_F32F16F16F32_TN>
 template <>
-struct MMA_Traits<SM89_16x8x32_F16F4M3FE4M3F16_TN>
+struct MMA_Traits<SM89_16x8x32_F16E4M3E4M3F16_TN>
 {
   using ValTypeD = half_t;
   using ValTypeA = float_e4m3_t;
@@ -75,7 +80,7 @@ struct GetMMAAtom<float> {
 
 template <>
 struct GetMMAAtom<cutlass::half_t> {
-  using MMA_Atom = MMA_Atom<cute::SM89_16x8x32_F16F4M3FE4M3F16_TN>;
+  using MMA_Atom = MMA_Atom<cute::SM89_16x8x32_F16E4M3E4M3F16_TN>;
 };
 
 } // namespace cute
@@ -93,7 +98,7 @@ template <typename ElementType, typename OutElementType, typename AccumElementTy
 struct AdaBlockwiseGemmTraits {
   using ElementInput = ElementType;
   using ElementOutput = OutElementType;
-  using ElementAccumulator = float;
+  using ElementAccumulator = AccumElementType;
   using ElementBlockScale = float;
 
   using index_t = uint32_t;

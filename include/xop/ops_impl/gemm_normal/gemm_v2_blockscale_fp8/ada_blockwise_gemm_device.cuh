@@ -48,7 +48,7 @@ struct AdaBlockwiseGemm {
 
   Status can_implement(Arguments const& args) {
     if (kSmemSize > (48 << 10)) {
-      cudaFuncSetAttribute(kernel::sm89_fp8_gemm_1d1d_impl<GemmKernel>,
+      cudaFuncSetAttribute(kernel::sm89_fp8_gemm_impl<GemmKernel>,
             cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize);
       auto result = cudaGetLastError();
         
@@ -92,7 +92,7 @@ struct AdaBlockwiseGemm {
     int grid_k = 1;
     dim3 grid = dim3(grid_m, grid_n, grid_k);
     dim3 block = dim3(kThreadCount, 1, 1);
-    kernel::sm89_fp8_gemm_1d1d_impl<GemmKernel>
+    kernel::sm89_fp8_gemm_impl<GemmKernel>
         <<<grid, block, kSmemSize, stream>>>(shape_m, shape_n, shape_k, params_.ptr_a, params_.ptr_b, params_.ptr_d, params_.ptr_scale_a, params_.ptr_scale_b);
 
     return Status::kSuccess;

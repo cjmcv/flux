@@ -28,7 +28,7 @@
 
 #define PRINTF printf
 #define NOT_TUNING_SCHEMA "" // "TORCH"
-#define ENABLE_FP8_IN_FP16_ACC true  // else fp32 acc
+#define ENABLE_FP8_IN_FP16_ACC false  // else fp32 acc
 #define ENABLE_FP16_IN_FP16_ACC false // else fp32 acc
 
 int CoarseGrainedTuningM(int actual_m, int schema = 0) {
