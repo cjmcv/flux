@@ -18,7 +18,7 @@ namespace xop {
 using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
-          class ArchTag, class TileScheduler, class TileShape,  class ClusterShape, 
+          class ArchTag, class TileScheduler, class TileShape, class ClusterShape, 
           RasterOrderOptions RasterOrder, int Swizzle>
 class GemmBlockScaleFp8Impl : public GemmBase {
 public:

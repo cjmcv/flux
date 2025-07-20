@@ -5,17 +5,15 @@
 #include "gemm_v2_blockscale_fp8/ada_blockwise_gemm_device.cuh"
 
 namespace xop {
-
+// 
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
-          class ArchTag>
+          class ArchTag, class TileShape, int NumStages>
 class GemmV2BlockScaleFp8Impl : public GemmBase {
 
   using ElementBlockScale = float;
-  static constexpr int Stages = 4;
-  using TileShape = cutlass::gemm::GemmShape<32, 128, 128>; // only support 32x128x128 for now
   using KT = traits::AdaBlockwiseGemmTraits<ElementA, ElementC, ElementAccumulator, ElementBlockScale,
-      Stages, TileShape::kM, TileShape::kN, TileShape::kK>;
+                                            TileShape, NumStages>;
   using Gemm = device::AdaBlockwiseGemm<KT>;
 
 public:

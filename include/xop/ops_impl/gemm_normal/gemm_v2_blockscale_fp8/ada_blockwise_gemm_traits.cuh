@@ -70,19 +70,6 @@ struct MMA_Traits<SM89_16x8x32_F16E4M3E4M3F16_TN>
   using CLayout = SM80_16x8_Row;
 };
 
-template <typename AccumElementType>
-struct GetMMAAtom {};
-
-template <>
-struct GetMMAAtom<float> {
-  using MMA_Atom = MMA_Atom<cute::SM89_16x8x32_F32E4M3E4M3F32_TN>;
-};
-
-template <>
-struct GetMMAAtom<cutlass::half_t> {
-  using MMA_Atom = MMA_Atom<cute::SM89_16x8x32_F16E4M3E4M3F16_TN>;
-};
-
 } // namespace cute
 
 using namespace cute;
@@ -91,26 +78,25 @@ using namespace cutlass::gemm;
 
 namespace xop {
 namespace traits {
-  
 
 template <typename ElementType, typename OutElementType, typename AccumElementType, typename BlockScaleElementType,
-  int Stages_, int TileM_, int TileN_, int TileK_>
+  typename TileShape_, int Stages_>
 struct AdaBlockwiseGemmTraits {
   using ElementInput = ElementType;
   using ElementOutput = OutElementType;
   using ElementAccumulator = AccumElementType;
   using ElementBlockScale = float;
+  using TileShape = TileShape_;
 
   using index_t = uint32_t;
-  static_assert(TileM_ % 16 == 0);
-  static_assert(TileN_ % 32 == 0);
-  static_assert(TileK_ % 32 == 0);
+  static_assert(size<0>(TileShape{}) % 16 == 0);
+  static_assert(size<1>(TileShape{}) % 32 == 0);
+  static_assert(size<2>(TileShape{}) % 32 == 0);
   static constexpr int Stages = Stages_;
-  static constexpr int kTileM = TileM_;
-  static constexpr int kTileN = TileN_;
-  static constexpr int kTileK = TileK_;
+  static constexpr int kTileM = size<0>(TileShape{});
+  static constexpr int kTileN = size<1>(TileShape{});
+  static constexpr int kTileK = size<2>(TileShape{});
 
-  using TileShape = Shape<Int<kTileM>, Int<kTileN>, Int<kTileK>>;
   static constexpr int kWarpsCount = 4;
   static constexpr int kThreadCount = kWarpsCount * 32;
 
@@ -126,16 +112,21 @@ struct AdaBlockwiseGemmTraits {
   using ScalePerTileShape = Shape<Int<ScaleMsPerTile>, Int<ScaleNsPerTile>, Int<ScaleKsPerTile>>;
 
   // ====== mma ======
+  // (32,64,64)
   static constexpr int kMmaPermM = 32;
   static constexpr int kMmaPermN = 32;
   static constexpr int kMmaPermK = 32;
   constexpr static int NUM_GROUP_M = kTileM / kMmaPermM;
   constexpr static int NUM_GROUP_N = kTileN / kMmaPermN;
   constexpr static int NUM_GROUP_K = kTileK / kMmaPermK;
-  using MMA_Atom = typename GetMMAAtom<AccumElementType>::MMA_Atom;
-  using AtomLayoutMNK = Layout<Shape<_2, _2, _1>>;
-  using PermutationMNK = Tile<Int<kMmaPermM>, Int<kMmaPermN>, Int<kMmaPermK>>;
-  using TiledMma = TiledMMA<MMA_Atom, AtomLayoutMNK, PermutationMNK>;
+  using MMA_Atom_SM89 = std::conditional_t<
+    std::is_same_v<AccumElementType, cutlass::half_t>,
+    MMA_Atom<SM89_16x8x32_F16E4M3E4M3F16_TN>,
+    MMA_Atom<SM89_16x8x32_F32E4M3E4M3F32_TN>
+  >;
+  using TiledMma = decltype(make_tiled_mma(MMA_Atom_SM89{},
+                                           Layout<Shape<_2, _2, _1>>{},
+                                           Tile<Int<kMmaPermM>, Int<kMmaPermN>, Int<kMmaPermK>>{}));
 
   // ====== load gmem -> smem ======
   using GmemTiledCopyLoad = decltype(make_tiled_copy(Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<uint128_t>, ElementInput>{},
@@ -144,7 +135,8 @@ struct AdaBlockwiseGemmTraits {
   using GmemTiledCopyA = GmemTiledCopyLoad;
   using GmemTiledCopyB = GmemTiledCopyLoad;
 
-  // ====== load smem -> rf ======
+  // ====== load smem -> rf =====
+  // using SmemAtomLayoutLoad = decltype(composition(Swizzle<2, 4, 3>{}, Layout<Shape<_8, _128>, Stride<_128, _1>>{}));
   using SmemAtomLayoutLoad = decltype(composition(Swizzle<3, 4, 3>{}, Layout<Shape<_16, _128>, Stride<_128, _1>>{}));
   using SmemLayoutA = decltype(tile_to_shape(SmemAtomLayoutLoad{}, Shape<Int<kTileM>, Int<kTileK>, Int<Stages>>{}));
   using SmemLayoutB = decltype(tile_to_shape(SmemAtomLayoutLoad{}, Shape<Int<kTileN>, Int<kTileK>, Int<Stages>>{}));
@@ -154,24 +146,18 @@ struct AdaBlockwiseGemmTraits {
   using SmemCopyAtomB = SmemCopyAtomLoad;
 
   // ====== store rf -> smem ======
-  using SmemAtomLayoutStore = decltype(composition(
-    Swizzle<3, 3, 3>{}, Layout<Shape<_8, Shape<_8, _8>>, Stride<_8, Stride<_1, _64>>>{})); //  8x64
-
+  using SmemAtomLayoutStore = decltype(composition(Swizzle<3, 3, 3>{}, Layout<Shape<_8, Shape<_8, _8>>, Stride<_8, Stride<_1, _64>>>{})); //  8x64
   using SmemLayoutO = decltype(tile_to_shape(SmemAtomLayoutStore{}, Shape<Int<kTileM>, Int<kTileN>>{}));
-
   using SmemCopyAtomR2S = Copy_Atom<AutoVectorizingCopy, ElementOutput>;
 
   // ====== store smem -> gmem ======
   using SmemCopyAtomS2R = Copy_Atom<UniversalCopy<uint128_t>, ElementOutput>;
   using GmemCopyAtomR2G = SmemCopyAtomS2R;
-
-  using TiledCopyS2G = decltype(make_tiled_copy(
-    SmemCopyAtomS2R{}, Layout<Shape<_16, _8>, Stride<_8, _1>>{}, Layout<Shape<_1, _8>>{})); // 16x64
+  using TiledCopyS2G = decltype(make_tiled_copy(SmemCopyAtomS2R{}, Layout<Shape<_16, _8>, Stride<_8, _1>>{}, Layout<Shape<_1, _8>>{})); // 16x64
 
   // ====== load scale gmem -> smem ======
   using GmemCopyAtomScale = Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<ElementBlockScale>, ElementBlockScale>;
-  using GmemLayoutTVSFA = Layout<Shape<Shape<Int<ScaleMsPerTile>, Int<kThreadCount / ScaleMsPerTile>>, Shape<_1, _1>>,
-    Stride<Stride<_1, _0>, Stride<_1, _1>>>;
+  using GmemLayoutTVSFA = Layout<Shape<Shape<Int<ScaleMsPerTile>, Int<kThreadCount / ScaleMsPerTile>>, Shape<_1, _1>>, Stride<Stride<_1, _0>, Stride<_1, _1>>>;
   using GmemTileShapeSFA = Shape<Int<ScaleMsPerTile>, Int<ScaleKsPerTile>>;
   using GmemTiledCopySFA = decltype(make_tiled_copy_impl(GmemCopyAtomScale{}, GmemLayoutTVSFA{}, GmemTileShapeSFA{}));
 
@@ -181,8 +167,7 @@ struct AdaBlockwiseGemmTraits {
 
   // ====== load scale smem -> rf ======
   using SmemCopyAtomScale = Copy_Atom<UniversalCopy<ElementBlockScale>, ElementBlockScale>;
-  using SmemLayoutTVSFA
-    = Layout<Shape<Shape<_4, _8, _2, _2>, Shape<_2>>, Stride<Stride<_0, _1, _16, _0>, Stride<_8, _0>>>;
+  using SmemLayoutTVSFA = Layout<Shape<Shape<_4, _8, _2, _2>, Shape<_2>>, Stride<Stride<_0, _1, _16, _0>, Stride<_8, _0>>>;
   using SmemTileShapeSFA = Shape<Int<kMmaPermM>, _1>;
   using SmemTiledCopySFA = decltype(make_tiled_copy_impl(SmemCopyAtomScale{}, SmemLayoutTVSFA{}, SmemTileShapeSFA{}));
   using SmemLayoutSFA = decltype(tile_to_shape(make_layout(SmemTileShapeSFA{}),
