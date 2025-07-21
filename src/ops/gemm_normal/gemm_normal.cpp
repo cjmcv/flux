@@ -119,7 +119,7 @@ public:
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_A = input_scale.value().data_ptr();
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_B = weight_scale.value().data_ptr();
       }
-      id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmBolckScaleFp8;
+      id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmBlockScaleFp8;
       id_meta[IdMetaEnum::Arch] = (int16_t)arch_;
       if (arch_ != UnifiedMetaEnum::Sm90 && arch_ != UnifiedMetaEnum::Sm89) {
         printf("fp8 kernel is only supported on GPUs with the sm_89 or sm_90 architecture.");
@@ -276,7 +276,7 @@ private:
     std::vector<int16_t> meta;
     meta.resize(8);
     meta[IdMetaEnum::Id] = -1;                                  // id
-    // (GemmNormal / GemmNormalSimt / GemmBolckScaleFp8 / GemmGroupedBlockScaleFp8)
+    // (GemmNormal / GemmNormalSimt / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)
     meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmNormal; // schema type 
 
     meta[IdMetaEnum::TypeA] = from_torch_dtype(this->input_dtype);  // type A

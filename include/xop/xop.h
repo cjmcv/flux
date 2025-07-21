@@ -62,7 +62,7 @@ class CheckFail {
 // Enum classes
 /////////////////////////////////////////////////////
 enum class UnifiedMetaEnum : int8_t {
-  GemmNormal = 0, GemmNormalSimt, GemmBolckScaleFp8,   // gemm type
+  GemmNormal = 0, GemmNormalSimt, GemmBlockScaleFp8,   // gemm type
   GemmGroupedBlockScaleFp8,
   Void = 10, FP16, BF16, FP32, E4M3, E5M2, S8, S32,    // data type
   Sm80 = 20, Sm89, Sm90,                               // arch

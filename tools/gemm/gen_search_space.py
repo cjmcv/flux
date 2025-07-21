@@ -9,6 +9,10 @@ import itertools
 # print(sys.path)
 
 class TypeWarpper:
+    def tag_unify(self, tag):
+        if (tag == "GemmV2BlockScaleFp8"):
+            return "GemmBlockScaleFp8"
+        return tag
     # xop type warp
     def xtw(self, type):
         return "(int16_t)ME::" + type
@@ -158,7 +162,36 @@ class GemmNormalSimtSchema:
             res.append(hparam_str)
         return res
     
-class GemmBolckScaleFp8Schema:
+class GemmV2BlockScaleFp8Schema:
+    impl = "GemmV2BlockScaleFp8Impl"
+    impl_header = "gemm_normal/gemm_v2_blockscale_fp8_impl.h"
+    
+    def get_meta_space(self, w):
+        # ('E4M3', 'E4M3', 'FP16', 'FP16')
+        data_type = [('E4M3', 'E4M3', 'BF16', 'FP32')] # a,b,cd,acc
+        layout = ['RCR'] # , 'RRR'
+        arch = ['Sm89']
+        res = make_meta_space(w, data_type, layout, arch)
+        return res
+
+    def get_hparam_space(self, w):
+        tile_shapes = [(32, 128, 128), (64, 128, 128), (128, 128, 128), (16, 128, 128)]
+        perm_shapes = [(32, 32, 32), (32, 64, 64), (16, 32, 32)]
+        stages = [3, 4]
+
+        res = []
+        for tile_shape, perm_shape, stage in itertools.product(
+            tile_shapes, perm_shapes, stages):
+            if (perm_shape[0] > tile_shape[0]):
+                continue
+            if (perm_shape[0]==16 and tile_shape[0]!=16):
+                continue
+            hparam_str = '{0},{1},{2}'.format(
+                w.cstw(tile_shape,3), w.cstw(perm_shape,3), str(stage))
+            res.append(hparam_str)
+        return res
+    
+class GemmBlockScaleFp8Schema:
     impl = "GemmBlockScaleFp8Impl"
     impl_header = "gemm_normal/gemm_v3_blockscale_fp8_impl.h"
     
@@ -184,7 +217,7 @@ class GemmBolckScaleFp8Schema:
                 w.xop_to_cutlasstype(raster_order), str(swizzle))
             res.append(hparam_str)
         return res
-
+    
 class GemmGroupedBolckScaleFp8Schema:
     impl = "GemmGroupedBlockScaleFp8Impl"
     impl_header = "gemm_normal/gemm_v3_grouped_blockscale_fp8_impl.h"
@@ -216,7 +249,8 @@ def str2schema(schema_name):
     string_to_schema = {
         "GemmNormal": GemmNormalSchema(),
         "GemmNormalSimt": GemmNormalSimtSchema(),
-        "GemmBolckScaleFp8": GemmBolckScaleFp8Schema(),
+        "GemmV2BlockScaleFp8": GemmV2BlockScaleFp8Schema(),
+        "GemmBlockScaleFp8": GemmBlockScaleFp8Schema(),
         "GemmGroupedBlockScaleFp8": GemmGroupedBolckScaleFp8Schema(),
     }
     return string_to_schema.get(schema_name, None)
@@ -236,7 +270,7 @@ class SearchSpaceGenerator:
         fp[tag].write('  GemmConfigRegister& ins = GemmConfigRegister::instance();\n')
 
         type_warpper = TypeWarpper()
-        xop_tag = type_warpper.xtw(tag)
+        xop_tag = type_warpper.xtw(type_warpper.tag_unify(tag))
         meta = schema.get_meta_space(type_warpper)
         hparam = schema.get_hparam_space(type_warpper)
         for m in meta:
@@ -255,7 +289,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmNormal (GemmNormal/GemmNormalSimt/GemmBolckScaleFp8/GemmGroupedBlockScaleFp8)")
+        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmNormal (GemmNormal/GemmNormalSimt/GemmV2BlockScaleFp8/GemmBlockScaleFp8/GemmGroupedBlockScaleFp8)")
         exit()
     generator = SearchSpaceGenerator()
     generator.run(args.schema, args.output_path) 

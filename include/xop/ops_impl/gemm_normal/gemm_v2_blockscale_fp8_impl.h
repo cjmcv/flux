@@ -8,12 +8,13 @@ namespace xop {
 // 
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
-          class ArchTag, class TileShape, int NumStages>
+          class ArchTag, 
+          class TileShape, class PermShape, int NumStages>
 class GemmV2BlockScaleFp8Impl : public GemmBase {
 
   using ElementBlockScale = float;
   using KT = traits::AdaBlockwiseGemmTraits<ElementA, ElementC, ElementAccumulator, ElementBlockScale,
-                                            TileShape, NumStages>;
+                                            TileShape, PermShape, NumStages>;
   using Gemm = device::AdaBlockwiseGemm<KT>;
 
 public:

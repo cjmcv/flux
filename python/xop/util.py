@@ -96,6 +96,14 @@ def per_block_cast_to_fp8(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x_view.size(0), x_view.size(2)
     )
 
+def pad_row_to_alignment(x, align):
+    row = x.size(0)
+    pad_rows = (align - (row % align)) % align
+    if pad_rows == 0:
+        return x
+  
+    padding = torch.zeros(pad_rows, x.size(1), dtype=x.dtype, device="cuda")
+    return torch.cat([x, padding], dim=0)
 
 def torch_allclose(x, y, rtol, atol, verbose=True):
     if not torch.allclose(x, y, rtol=rtol, atol=atol):

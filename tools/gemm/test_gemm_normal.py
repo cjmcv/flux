@@ -164,15 +164,6 @@ THRESHOLD_MAP = {
     torch.int32: 0,
 }
 
-def pad_row_to_alignment(x, align):
-    row = x.size(0)
-    pad_rows = (align - (row % align)) % align
-    if pad_rows == 0:
-        return x
-  
-    padding = torch.zeros(pad_rows, x.size(1), dtype=x.dtype, device="cuda")
-    return torch.cat([x, padding], dim=0)
-
 def run(M, args, xop_perf, torch_perf):
     dtype = DTYPE_MAP[args.dtype]
     is_fp8 = xutil.is_fp8_dtype(dtype)
@@ -222,7 +213,7 @@ def run(M, args, xop_perf, torch_perf):
             # But x_scale is transposed before input, if the m-dimension is not padded to a multiple of 4, the transposed data will be mismatched.
             # org: [[1,1]] =>transpose [[1],[1]], in memory, they are the same, like [1,1]
             # org: [[1,1]] =>pad [[1,1], [0,0], [0,0], [0,0]] =>transpose [[1,0,0,0], [1,0,0,0]] => it looks like [1,0,0,0,1,0,0,0]
-            x_scale = pad_row_to_alignment(x_scale, 4) # 
+            x_scale = xutil.pad_row_to_alignment(x_scale, 4) # 
             # print(x_scale)
             # print(x_scale.clone().t().contiguous())
             # print("x_scale: ", x_scale)
@@ -382,6 +373,7 @@ if __name__ == "__main__":
         plot_x = range(len(plot_x_value))
         plt.xticks(plot_x, plot_x_value, rotation=45)
 
+    print("xop_perf:", xop_perf)
     plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
     

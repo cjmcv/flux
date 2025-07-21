@@ -11,7 +11,8 @@ import time
 import torch
 
 import xop
-from tune_common import Meta, per_token_cast_to_fp8, per_block_cast_to_fp8
+import xop.util as xutil
+from tune_common import Meta
 
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 torch.use_deterministic_algorithms(True, warn_only=True)
@@ -24,9 +25,8 @@ torch.backends.cuda.matmul.allow_tf32 = False
 np.random.seed(3)
 print = partial(print, flush=True)
 
-warmup_iters = 10
+warmup_iters = 20
 pref_iters = 20
-
 is_use_fp16_acc = False # True
 
 @dataclasses.dataclass
@@ -62,14 +62,31 @@ class GemmNormalSchema:
         if (bias != None):
             output += bias
         return output.cpu()
+
+class GemmV2BlockScaleFp8Schema:
+    impl = "GemmV2BlockScaleFp8"
+    sub_schema = [Meta.GemmBlockScaleFp8]
+    test_input_dtype = torch.bfloat16
+    space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
+    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
+        x, x_scale = xutil.per_token_cast_to_fp8(input)
+        y, y_scale = xutil.per_block_cast_to_fp8(weight)
+        x_scale = xutil.pad_row_to_alignment(x_scale, 4)
+        return x, x_scale.t().contiguous(), y, y_scale.t().contiguous()
+    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
+                       input_scale: torch.Tensor, weight_scale: torch.Tensor,
+                       bias: torch.Tensor):
+        # output = torch.matmul(input, weight.t())
+        # return output.cpu()
+        return None
 class GemmBlockScaleFp8Schema:
     impl = "GemmBlockScaleFp8"
     sub_schema = [Meta.GemmBlockScaleFp8]
     test_input_dtype = torch.bfloat16
     space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
-        x, x_scale = per_token_cast_to_fp8(input)
-        y, y_scale = per_block_cast_to_fp8(weight)
+        x, x_scale = xutil.per_token_cast_to_fp8(input)
+        y, y_scale = xutil.per_block_cast_to_fp8(weight)
         return x, x_scale.t().contiguous(), y, y_scale.t().contiguous()
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
                        input_scale: torch.Tensor, weight_scale: torch.Tensor,
@@ -90,8 +107,8 @@ class GemmGroupedBlockScaleFp8Schema:
         y_scale_list = []
 
         for i in range(config.G):
-            x, x_scale = per_token_cast_to_fp8(input)
-            y, y_scale = per_block_cast_to_fp8(weight)
+            x, x_scale = xutil.per_token_cast_to_fp8(input)
+            y, y_scale = xutil.per_block_cast_to_fp8(weight)
 
             x_list.append(x)
             x_scale_list.append(x_scale.t().contiguous())
@@ -110,6 +127,7 @@ class GemmGroupedBlockScaleFp8Schema:
 def str2schema(schema_name):
     string_to_schema = {
         "GemmNormal": GemmNormalSchema(),
+        "GemmV2BlockScaleFp8": GemmV2BlockScaleFp8Schema(),
         "GemmBlockScaleFp8": GemmBlockScaleFp8Schema(),
         "GemmGroupedBlockScaleFp8": GemmGroupedBlockScaleFp8Schema(),
     }
@@ -119,7 +137,7 @@ def str2schema(schema_name):
 def gen_tuning_space(schema):
     space: List[TuningConfig] = []
     space_G = [1]
-    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192] #,16384,32768 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536] #,16384,32768 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
     space_NK = [(4096, 4096)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     
     # space_G = [4, 8]
@@ -280,7 +298,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmNormal (GemmNormal(GemmNormalSimt) / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
+        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmNormal (GemmNormal(GemmNormalSimt) / GemmV2BlockScaleFp8 / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
         exit()
 
     if args.output_path and not os.path.isdir(args.output_path):

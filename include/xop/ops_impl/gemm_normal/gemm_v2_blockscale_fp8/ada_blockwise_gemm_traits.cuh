@@ -46,7 +46,7 @@ struct SM89_16x8x32_F16E4M3E4M3F16_TN
 #else
     CUTE_INVALID_CONTROL_PATH(
       "Attempting to use SM89_16x8x32_F16F4M3FE4M3F16_TN without "
-      "CUTE_ARCH_MMA_F32_SM89_ENABLED");
+      "CUTE_ARCH_MMA_F16_SM89_ENABLED");
 #endif
 
     // xop::print_4xfp8e4m3("b0", b0);
@@ -80,7 +80,7 @@ namespace xop {
 namespace traits {
 
 template <typename ElementType, typename OutElementType, typename AccumElementType, typename BlockScaleElementType,
-  typename TileShape_, int Stages_>
+  typename TileShape_, typename PermShape_, int Stages_>
 struct AdaBlockwiseGemmTraits {
   using ElementInput = ElementType;
   using ElementOutput = OutElementType;
@@ -112,10 +112,9 @@ struct AdaBlockwiseGemmTraits {
   using ScalePerTileShape = Shape<Int<ScaleMsPerTile>, Int<ScaleNsPerTile>, Int<ScaleKsPerTile>>;
 
   // ====== mma ======
-  // (32,64,64)
-  static constexpr int kMmaPermM = 32;
-  static constexpr int kMmaPermN = 32;
-  static constexpr int kMmaPermK = 32;
+  static constexpr int kMmaPermM = size<0>(PermShape_{});
+  static constexpr int kMmaPermN = size<1>(PermShape_{});
+  static constexpr int kMmaPermK = size<2>(PermShape_{});
   constexpr static int NUM_GROUP_M = kTileM / kMmaPermM;
   constexpr static int NUM_GROUP_N = kTileN / kMmaPermN;
   constexpr static int NUM_GROUP_K = kTileK / kMmaPermK;
@@ -124,8 +123,7 @@ struct AdaBlockwiseGemmTraits {
     MMA_Atom<SM89_16x8x32_F16E4M3E4M3F16_TN>,
     MMA_Atom<SM89_16x8x32_F32E4M3E4M3F32_TN>
   >;
-  using TiledMma = decltype(make_tiled_mma(MMA_Atom_SM89{},
-                                           Layout<Shape<_2, _2, _1>>{},
+  using TiledMma = decltype(make_tiled_mma(MMA_Atom_SM89{}, Layout<Shape<_2, _2, _1>>{},
                                            Tile<Int<kMmaPermM>, Int<kMmaPermN>, Int<kMmaPermK>>{}));
 
   // ====== load gmem -> smem ======
