@@ -43,18 +43,29 @@ CUTE_HOST_DEVICE void print_tensor_shape(const char* name, cute::Tensor<Engine,L
   printf("\n");
 }
 
-// CUTE_HOST_DEVICE
-// void uint32_to_2xhalf(uint32_t in, cutlass::half_t out[2]) {
-//   std::memcpy(out, &in, sizeof(uint32_t));
-// }
+
+template <class Engine, class Layout>
+CUTE_HOST_DEVICE bool is_tensor_aligned(cute::Tensor<Engine,Layout> const& tensor, size_t alignment) {
+    auto ptr = tensor.data();
+    uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
+    return (addr % alignment) == 0;
+}
+
+CUTE_HOST_DEVICE void print_2xbfloat16(const char* name, uint32_t src) {
+  const uint16_t* bytes = reinterpret_cast<const uint16_t*>(&src);
+  printf("%s: %f, %f\n", name, 
+    static_cast<float>(*reinterpret_cast<const cutlass::bfloat16_t*>(&bytes[0])), 
+    static_cast<float>(*reinterpret_cast<const cutlass::bfloat16_t*>(&bytes[1])));
+}
+
+CUTE_HOST_DEVICE void print_2xhalf(const char* name, uint32_t src) {
+  const uint16_t* bytes = reinterpret_cast<const uint16_t*>(&src);
+  printf("%s: %f, %f\n", name, 
+    static_cast<float>(*reinterpret_cast<const cutlass::half_t*>(&bytes[0])), 
+    static_cast<float>(*reinterpret_cast<const cutlass::half_t*>(&bytes[1])));
+}
 
 CUTE_HOST_DEVICE void print_4xfp8e4m3(const char* name, uint32_t src) {
-  cutlass::float_e4m3_t dst[4];
-  // dst[0] = cutlass::float_e4m3_t::from_bits(static_cast<uint8_t>(src >> 0));
-  // dst[1] = cutlass::float_e4m3_t::from_bits(static_cast<uint8_t>(src >> 8));
-  // dst[2] = cutlass::float_e4m3_t::from_bits(static_cast<uint8_t>(src >> 16));
-  // dst[3] = cutlass::float_e4m3_t::from_bits(static_cast<uint8_t>(src >> 24));
-
   const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&src);
   printf("%s: %f, %f, %f, %f\n", name, 
     static_cast<float>(*reinterpret_cast<const cutlass::float_e4m3_t*>(&bytes[0])), 

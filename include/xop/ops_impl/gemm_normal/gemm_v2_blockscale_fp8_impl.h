@@ -28,38 +28,14 @@ public:
       (float const* )rt_args->d_blockscale_A, 
       (float const* )rt_args->d_blockscale_B);
   }
-
-  inline int getMultiProcessorCount() {
-      int nSM{0};
-      int deviceID{0};
-      cudaGetDevice(&deviceID);
-      cudaDeviceGetAttribute(&nSM, cudaDevAttrMultiProcessorCount, deviceID);
-      return nSM;
-  }
   
-
   void initialize(RtArguments *args, void *stream = nullptr) {
-    RtBlockScaleFp8ArgumentsV3 *rt_args = dynamic_cast<RtBlockScaleFp8ArgumentsV3*>(args);    
-    static int num_device_sms = -1;
-    if (num_device_sms < 0) {
-        num_device_sms = getMultiProcessorCount();
-    }
-
+    RtBlockScaleFp8ArgumentsV3 *rt_args = dynamic_cast<RtBlockScaleFp8ArgumentsV3*>(args);
     gemm_dev_ = Gemm();
 
-    // Using the arguments, query for extra workspace required for matrix multiplication computation
     auto arguments = args_from_options(rt_args);
-    // size_t workspace_size = Gemm::get_workspace_size(arguments);
-  
-    // // Allocate workspace memory
-    // void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size);
-  
-    // Check the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
-  
-    // Initialize CUTLASS kernel with arguments and workspace pointer
-    // auto cu_stream = static_cast<cudaStream_t>(stream);
-    CUTLASS_CHECK(gemm_dev_.initialize(arguments)); // , workspace_ptr, cu_stream
+    CUTLASS_CHECK(gemm_dev_.initialize(arguments));
   }
 
   void run(void *stream = nullptr) {

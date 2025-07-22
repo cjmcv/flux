@@ -34,6 +34,15 @@ struct SM89_16x8x32_F16E4M3E4M3F16_TN
     uint32_t const& b0, uint32_t const& b1,
     uint32_t const& c0, uint32_t const& c1)
   {
+    // printf("b0: %u\n", b0); // 写个单线程kernel，直接调用fma函数进行排查调试。！
+    // xop::print_4xfp8e4m3("a0", a0);
+    // xop::print_4xfp8e4m3("a1", a1);
+    // xop::print_4xfp8e4m3("a2", a2);
+    // xop::print_4xfp8e4m3("a3", a3);
+    // xop::print_4xfp8e4m3("b0", b0);
+    // xop::print_4xfp8e4m3("b1", b1);
+    // xop::print_2xhalf("c0z", c0);
+    // xop::print_2xhalf("c1z", c1);
 #if defined(CUTE_ARCH_MMA_F16_SM89_ENABLED)
     asm volatile(
       "mma.sync.aligned.m16n8k32.row.col.f16.e4m3.e4m3.f16 "
@@ -42,31 +51,36 @@ struct SM89_16x8x32_F16E4M3E4M3F16_TN
       "{%6,  %7},"
       "{%8, %9};\n"
       : "=r"(d0), "=r"(d1)
-      : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(b0), "r"(b1), "r"(c0), "r"(c1));
+      : "r"(a0), "r"(a1), "r"(a2), "r"(a3), 
+        "r"(b0), "r"(b1), 
+        "r"(c0), "r"(c1));
 #else
     CUTE_INVALID_CONTROL_PATH(
       "Attempting to use SM89_16x8x32_F16F4M3FE4M3F16_TN without "
       "CUTE_ARCH_MMA_F16_SM89_ENABLED");
 #endif
 
-    // xop::print_4xfp8e4m3("b0", b0);
-    // xop::print_4xfp8e4m3("b1", b1);
+    // xop::print_2xhalf("c0f", c0);
+    // xop::print_2xhalf("c1f", c1);
+    // xop::print_2xhalf("d0", d0);
+    // xop::print_2xhalf("d1", d1);
   }
 };
 
 // ref: MMA_Traits<SM80_16x8x16_F16F16F16F16_TN> vs MMA_Traits<SM80_16x8x16_F32F16F16F32_TN>
 template <>
-struct MMA_Traits<SM89_16x8x32_F16E4M3E4M3F16_TN>
-{
+struct MMA_Traits<SM89_16x8x32_F16E4M3E4M3F16_TN> {
   using ValTypeD = half_t;
   using ValTypeA = float_e4m3_t;
   using ValTypeB = float_e4m3_t;
   using ValTypeC = half_t;
 
-  using Shape_MNK = Shape<_16, _8, _32>;
-  using ThrID = Layout<_32>;
-  using ALayout = Layout<Shape<Shape<_4, _8>, Shape<_4, _2, _2>>, Stride<Stride<_64, _1>, Stride<_16, _8, _256>>>;
-  using BLayout = Layout<Shape<Shape<_4, _8>, Shape<_4, _2>>, Stride<Stride<_32, _1>, Stride<_8, _128>>>;
+  using Shape_MNK = Shape<_16,_8,_32>;
+  using ThrID   = Layout<_32>;
+  using ALayout = Layout<Shape <Shape < _4,_8>,Shape < _4,_2,  _2>>,
+                         Stride<Stride<_64,_1>,Stride<_16,_8,_256>>>;
+  using BLayout = Layout<Shape <Shape < _4,_8>,Shape <_4,  _2>>,
+                         Stride<Stride<_32,_1>,Stride<_8,_128>>>;
   using CLayout = SM80_16x8_Row;
 };
 
@@ -85,7 +99,7 @@ struct AdaBlockwiseGemmTraits {
   using ElementInput = ElementType;
   using ElementOutput = OutElementType;
   using ElementAccumulator = AccumElementType;
-  using ElementBlockScale = float;
+  using ElementBlockScale = BlockScaleElementType;
   using TileShape = TileShape_;
 
   using index_t = uint32_t;

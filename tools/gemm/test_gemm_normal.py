@@ -206,6 +206,7 @@ def run(M, args, xop_perf, torch_perf):
             # y = torch.arange(1, N*K+1, dtype=output_dtype, device="cuda").reshape(N, K)   
             x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone()) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
             y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone())
+            # print("data_ptr: ", x_fp8.data_ptr(), y_fp8.data_ptr(), (x_fp8.data_ptr() % 128) == 0, (y_fp8.data_ptr() % 128) == 0)
 
             torch.set_printoptions(precision=8)
             # print(x_scale)
@@ -348,6 +349,7 @@ def parse_args():
 
 # python3 tools/gemm/test_gemm_normal.py --has_bias --dtype=float16 100 1000 1000
 # python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn
+# python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn --output_dtype=float16
 if __name__ == "__main__":
     init_seed()
     args = parse_args()
