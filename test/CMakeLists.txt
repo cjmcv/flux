@@ -40,8 +40,19 @@ include_directories(${COMMON_HEADER_DIRS})
 
 # ##
 
-add_executable(cutlass_practice cutlass_practice/mma_layout.cu)
-target_link_libraries(cutlass_practice PUBLIC xop)
+# add_executable(gemm_multi_stage cute_practice/gemm-multi-stage.cu)
+# target_link_libraries(gemm_multi_stage PUBLIC xop)
+# add_executable(gemm-simple cute_practice/gemm-simple.cu)
+# target_link_libraries(gemm-simple PUBLIC xop)
+
+# add_executable(mma_layout cute_practice/mma_layout.cu)
+# target_link_libraries(mma_layout PUBLIC xop)
+# add_executable(sgemm_sm80 cute_practice/sgemm_sm80.cu)
+# target_link_libraries(sgemm_sm80 PUBLIC xop)
+# add_executable(tiled_copy cute_practice/tiled_copy.cu)
+# target_link_libraries(tiled_copy PUBLIC xop)
+add_executable(my_sgemm cute_practice/my_sgemm.cu)
+target_link_libraries(my_sgemm PUBLIC xop)
 
 # add_executable(cutlass_unittest cutlass_unittest/minitest.cu)
 # target_link_libraries(cutlass_unittest PUBLIC xop)

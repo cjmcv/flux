@@ -11,6 +11,7 @@ git clone
 # For Hopper(sm90) GPU
 ./build.sh --arch 90 --jobs 6
 
+pdflatex a.tex
 compute-sanitizer --tool memcheck python tools/test*.py
 ```
 
