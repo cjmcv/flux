@@ -34,7 +34,7 @@ struct SM89_16x8x32_F16E4M3E4M3F16_TN
     uint32_t const& b0, uint32_t const& b1,
     uint32_t const& c0, uint32_t const& c1)
   {
-    // printf("b0: %u\n", b0); // 写个单线程kernel，直接调用fma函数进行排查调试。！
+    // printf("b0: %u\n", b0);
     // xop::print_4xfp8e4m3("a0", a0);
     // xop::print_4xfp8e4m3("a1", a1);
     // xop::print_4xfp8e4m3("a2", a2);

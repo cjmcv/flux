@@ -99,6 +99,7 @@ def perf_xop(
     iters: int,
     problem_cnt: int,
     output_dtype: torch.dtype,
+    fast_accum: bool,
 ):
     m = inputs[0].size(0)
     if transpose_weight:
@@ -144,7 +145,7 @@ def perf_xop(
             weight_scale=weights_scale[problem_idx],
             output_scale=None,
             tuning = None,
-            fast_accum=False,
+            fast_accum=fast_accum,
         )
         # print("bias:", bias, iter_id)
         # print("inputs[problem_idx]:", inputs[problem_idx])
@@ -204,8 +205,8 @@ def run(M, args, xop_perf, torch_perf):
             # y = torch.ones((N, K), device="cuda", dtype=output_dtype)
             # x = torch.arange(1, M*K+1, dtype=output_dtype, device="cuda").reshape(M, K)
             # y = torch.arange(1, N*K+1, dtype=output_dtype, device="cuda").reshape(N, K)   
-            x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone()) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
-            y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone())
+            x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone(), args.fast_accum) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
+            y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone(), args.fast_accum)
             # print("data_ptr: ", x_fp8.data_ptr(), y_fp8.data_ptr(), (x_fp8.data_ptr() % 128) == 0, (y_fp8.data_ptr() % 128) == 0)
 
             torch.set_printoptions(precision=8)
@@ -275,6 +276,7 @@ def run(M, args, xop_perf, torch_perf):
         args.iters,
         problem_count, 
         output_dtype,
+        args.fast_accum,
     )
     
     if not is_fp8:
@@ -339,6 +341,9 @@ def parse_args():
         help="allowed data type:: bfloat16,float16,s32.",
     )
     parser.add_argument(
+        "--fast_accum", default=False, action="store_true", help="whether to use fp16 accum"
+    )
+    parser.add_argument(
         "--has_bias", default=False, action="store_true", help="whether to add bias"
     )
     parser.add_argument(
@@ -349,7 +354,7 @@ def parse_args():
 
 # python3 tools/gemm/test_gemm_normal.py --has_bias --dtype=float16 100 1000 1000
 # python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn
-# python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn --output_dtype=float16
+# python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
 if __name__ == "__main__":
     init_seed()
     args = parse_args()

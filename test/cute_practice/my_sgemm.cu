@@ -82,7 +82,7 @@ gemm_simple_tn(int m, int n, int k,
   constexpr int kTileN = 128; 
   constexpr int kTileK = 32; 
 
-  printf("size(MMA{}): %d.\n", cute::value<size(MMA{})>);
+  // printf("size(MMA{}): %d.\n", cute::value<size(MMA{})>);
   dim3 block(size(MMA{}));
   dim3 grid(n / kTileN, m / kTileM);
   gemm_simple<TA, kTileM, kTileN, kTileK, MMA><<<grid, block>>>(C, A, B, m, n, k);

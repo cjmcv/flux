@@ -14,23 +14,6 @@ CUTLASS_GLOBAL void sm89_fp8_gemm_impl(uint32_t shape_m, uint32_t shape_n, uint3
   op.invoke(shape_m, shape_n, shape_k, A, B, D, scales_a, scales_b);
 }
 
-// template <typename GemmKernel>
-// CUTLASS_GLOBAL void sm89_fp8_bmm_impl(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, 
-//                                         __nv_fp8_e4m3* A, __nv_fp8_e4m3* B, __nv_bfloat16* D, 
-//                                         float* scales_a, float* scales_b, 
-//                                         uint64_t stride_a, uint64_t stride_b, uint64_t stride_d, 
-//                                         uint64_t stride_scales_a, uint64_t stride_scales_b) {
-//   GemmKernel op;
-
-//   auto ptr_a = reinterpret_cast<typename GemmKernel::ElementInput const*>(A + blockIdx.z * stride_a);
-//   auto ptr_b = reinterpret_cast<typename GemmKernel::ElementInput const*>(B + blockIdx.z * stride_b);
-//   auto ptr_scale_a = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_a + blockIdx.z * stride_scales_a);
-//   auto ptr_scale_b = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_b + blockIdx.z * stride_scales_b);
-//   auto ptr_output = reinterpret_cast<typename GemmKernel::ElementOutput*>(D + blockIdx.z * stride_d);
-
-//   op(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, ptr_output, shape_m, shape_n, shape_k);
-// }
-
 template <typename KT>
 struct AdaBlockwiseGemmKernel {
   using SharedStorage = typename KT::SharedStorage;
@@ -62,20 +45,18 @@ struct AdaBlockwiseGemmKernel {
     uint32_t const ScaleN = (N + KT::ScaleGranularityN - 1) / KT::ScaleGranularityN;
     uint32_t const ScaleK = (K + KT::ScaleGranularityK - 1) / KT::ScaleGranularityK;
 
-    auto mA_mk = cute::make_tensor(cute::make_gmem_ptr(ptr_a), cute::make_shape(M, K), cute::make_stride(K, cute::_1{}));
-    auto mB_nk = cute::make_tensor(cute::make_gmem_ptr(ptr_b), cute::make_shape(N, K), cute::make_stride(K, cute::_1{}));
-    auto mSFA_mk = cute::make_tensor(cute::make_gmem_ptr(ptr_scale_a), cute::make_shape(ScaleM, ScaleK), cute::make_stride(cute::_1{}, ScaleM));
-    auto mSFB_nk = cute::make_tensor(cute::make_gmem_ptr(ptr_scale_b), cute::make_shape(ScaleN, ScaleK), cute::make_stride(ScaleK, cute::_1{}));
+    auto A = cute::make_tensor(cute::make_gmem_ptr(ptr_a), cute::make_shape(M, K), cute::make_stride(K, cute::_1{}));
+    auto B = cute::make_tensor(cute::make_gmem_ptr(ptr_b), cute::make_shape(N, K), cute::make_stride(K, cute::_1{}));
+    auto SFA = cute::make_tensor(cute::make_gmem_ptr(ptr_scale_a), cute::make_shape(ScaleM, ScaleK), cute::make_stride(cute::_1{}, ScaleM));
+    auto SFB = cute::make_tensor(cute::make_gmem_ptr(ptr_scale_b), cute::make_shape(ScaleN, ScaleK), cute::make_stride(ScaleK, cute::_1{}));
     
-    // if (threadIdx.x == 0) {
-    //   xop::print_tensor("mSFA_mk", mSFA_mk);
-    // }
+    // xop::print_tensor("SFA", SFA);
   
     auto cta_coord = cute::make_coord(blockIdx.x, blockIdx.y, cute::_);          // (m,n,k)
-    auto gA = cute::local_tile(mA_mk, typename KT::TileShape{}, cta_coord, cute::Step<_1, X, _1>{}); // (BLK_M,BLK_K,k)
-    auto gB = cute::local_tile(mB_nk, typename KT::TileShape{}, cta_coord, cute::Step<X, _1, _1>{}); // (BLK_N,BLK_K,k)
-    auto gSFA = cute::local_tile(mSFA_mk, typename KT::ScalePerTileShape{}, cta_coord, cute::Step<_1, X, _1>{});    // (BLK_M,BLK_K)
-    auto gSFB = cute::local_tile(mSFB_nk, typename KT::ScalePerTileShape{}, cta_coord, cute::Step<X, _1, _1>{});    // (BLK_N,BLK_K)
+    auto gA = cute::local_tile(A, typename KT::TileShape{}, cta_coord, cute::Step<_1, X, _1>{}); // (BLK_M,BLK_K,k)
+    auto gB = cute::local_tile(B, typename KT::TileShape{}, cta_coord, cute::Step<X, _1, _1>{}); // (BLK_N,BLK_K,k)
+    auto gSFA = cute::local_tile(SFA, typename KT::ScalePerTileShape{}, cta_coord, cute::Step<_1, X, _1>{});    // (BLK_M,BLK_K)
+    auto gSFB = cute::local_tile(SFB, typename KT::ScalePerTileShape{}, cta_coord, cute::Step<X, _1, _1>{});    // (BLK_N,BLK_K)
 
     typename KT::SharedStorageLoad* load_storage = reinterpret_cast<typename KT::SharedStorageLoad*>(SharedStorageBase);
     auto sA = cute::make_tensor(cute::make_smem_ptr(load_storage->smem_a.data()), typename KT::SmemLayoutA{});
@@ -88,7 +69,7 @@ struct AdaBlockwiseGemmKernel {
 
   template <class Accumulator, class SharedStorage, class ElementOutput>
   CUTE_DEVICE void epilogue_with_smem(Accumulator& accum, SharedStorage& shared_storage, 
-                                      ElementOutput* o, int M, int N) {
+                                      ElementOutput* o, int M, int N, int residue_m, int residue_n) {
     // convert type
     auto epi = cute::make_fragment_like<ElementOutput>(accum);
     cute::for_each(cute::make_int_sequence<cute::size(epi)>{}, [&](auto i) { epi(i) = ElementOutput(accum(i)); });
@@ -122,8 +103,6 @@ struct AdaBlockwiseGemmKernel {
     auto tRG_gO = thr_copy_S2G.partition_D(gO);
     auto tRG_cO = thr_copy_S2G.partition_D(cO);
 
-    int residue_m = M - KT::kTileM * blockIdx.x;
-    int residue_n = N - KT::kTileN * blockIdx.y;
     CUTE_UNROLL
     for (int m = 0; m < cute::size<1>(tRG_gO); ++m) {
       CUTE_UNROLL
@@ -171,9 +150,7 @@ struct AdaBlockwiseGemmKernel {
     // Dynamic shared memory base pointer
     extern __shared__ int SharedStorageBase[];
     auto [gA, gB, gSFA, gSFB, sA, sB, sSFA, sSFB] = gmem_tensor_init(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, M, N, K, SharedStorageBase);
-    // if (threadIdx.x == 0) {
-    //   xop::print_tensor("gSFA", gSFA);
-    // }
+    // xop::print_tensor("gSFA", gSFA);
 
     typename KT::GmemTiledCopyA g2s_copy_A;
     typename KT::GmemTiledCopyB g2s_copy_B;
@@ -252,10 +229,7 @@ struct AdaBlockwiseGemmKernel {
 
       cute::cp_async_fence();
     }
-
-    // if (threadIdx.x == 0) {
-    //   xop::print_tensor("tAgSFA", tAgSFA);
-    // }
+    // xop::print_tensor("tAgSFA", tAgSFA);
   
     typename KT::TiledMma mma;
     auto thr_mma = mma.get_slice(threadIdx.x);
@@ -272,7 +246,6 @@ struct AdaBlockwiseGemmKernel {
     auto s2r_thr_copy_A = s2r_copy_A.get_slice(threadIdx.x);
     auto tXsA = s2r_thr_copy_A.partition_S(sA); // (CPY,CPY_M,CPY_K,Stage)
     auto tXrA = s2r_thr_copy_A.retile_D(tCrA);  // (CPY,CPY_M,CPY_K)
-    static_assert(is_static<decltype(tXrA.layout())>::value, "tXrA layout must be static");
 
     auto s2r_copy_B = cute::make_tiled_copy_B(typename KT::SmemCopyAtomB{}, mma);
     auto s2r_thr_copy_B = s2r_copy_B.get_slice(threadIdx.x);
@@ -299,6 +272,7 @@ struct AdaBlockwiseGemmKernel {
     auto tXsSFB_read = tXsSFB(cute::_, cute::_, cute::_, smem_pipe_read);
     cute::cp_async_wait<KT::Stages - 2>();
     __syncthreads();
+
     // prefetch smem -> rf
     cute::copy(s2r_copy_SFA, tXsSFA_read, tXrSFA);
     cute::copy(s2r_copy_SFB, tXsSFB_read, tXrSFB);
@@ -372,33 +346,28 @@ struct AdaBlockwiseGemmKernel {
           cute::for_each(cute::make_int_sequence<cute::size(scale)>{},
             [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
 
-          // if (threadIdx.x == 0) {
-          //   xop::print_tensor("tXrSFA", tXrSFA);
-          //   xop::print_tensor("tXrSFB", tXrSFB);
-          //   xop::print_tensor("tXscale", scale);
-          // }
+          // xop::print_tensor("tXrSFA", tXrSFA);
+          // xop::print_tensor("tXrSFB", tXrSFB);
+          // xop::print_tensor("tXscale", scale);
         }
 
         cute::clear(temp);
-        // if (threadIdx.x == 0) {
-        //   xop::print_tensor("mma_temp_before", temp);        
-        // }
+        // xop::print_tensor("mma_temp_before", temp);        
+
         cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
-        // if (threadIdx.x == 0) {
-        //   auto tCrB2 = tCrB(cute::_, cute::_, cute::_, n_block);
-        //   xop::print_tensor("mma_tCrA", tCrA);
-        //   xop::print_tensor("mma_tCrB2", tCrB2);
-        //   xop::print_tensor("mma_temp", temp);        
-        // }
+
+        // auto tCrB2 = tCrB(cute::_, cute::_, cute::_, n_block);
+        // xop::print_tensor("mma_tCrA", tCrA);
+        // xop::print_tensor("mma_tCrB2", tCrB2);
+        // xop::print_tensor("mma_temp", temp);        
+
         if constexpr (n_block == KT::NUM_GROUP_N - 1) {
           cute::copy(s2r_copy_A, tXsA_read, tXrA);
         }
         promote(accum, temp, scale, n_block);
-        // if (threadIdx.x == 0) {
-        //   xop::print_tensor("accum", accum);
-        //   // xop::print_tensor("temp", temp);
-        //   xop::print_tensor("scale", scale);
-        // }
+        // xop::print_tensor("accum", accum);
+        // // xop::print_tensor("temp", temp);
+        // xop::print_tensor("scale", scale);
       });
     });
     // mma tail
@@ -417,7 +386,7 @@ struct AdaBlockwiseGemmKernel {
     // epilogue
     __syncthreads(); // sync before using store smem
     typename KT::SharedStorageStore* store_storage = reinterpret_cast<typename KT::SharedStorageStore*>(SharedStorageBase);
-    epilogue_with_smem(accum, *store_storage, ptr_output, M, N);
+    epilogue_with_smem(accum, *store_storage, ptr_output, M, N, residue_m, residue_n);
   }
 };
 

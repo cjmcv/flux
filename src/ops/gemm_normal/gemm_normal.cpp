@@ -28,8 +28,6 @@
 
 #define PRINTF printf
 #define NOT_TUNING_SCHEMA "" // "TORCH"
-#define ENABLE_FP8_IN_FP16_ACC false  // else fp32 acc
-#define ENABLE_FP16_IN_FP16_ACC false // else fp32 acc
 
 int CoarseGrainedTuningM(int actual_m, int schema = 0) {
   int tuned_m = 0;
@@ -111,7 +109,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
+    std::vector<int16_t> id_meta = MakeDefaultMeta(fast_accum);       // id + meta
     std::unique_ptr<RtArguments> rt_args;
     if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
       rt_args = std::make_unique<RtBlockScaleFp8ArgumentsV3>();
@@ -167,8 +165,12 @@ public:
       if (id_meta[IdMetaEnum::Id] == -1) {
         if constexpr (NOT_TUNING_SCHEMA == "TORCH")
           return RunTorch(input, weight, output, bias);
-        else
-          id_meta[IdMetaEnum::Id] = 0;          
+        else {
+          id_meta[IdMetaEnum::Id] = 0;
+          if (fast_accum) {  
+            id_meta[IdMetaEnum::Id] = 1; // Temporary solution: fp16 acc uses Scheme 1 by default.
+          }
+        }
       }
       PRINTF("[runing] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
       op = ins.GetOp(id_meta, is_tuning);
@@ -205,7 +207,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    std::vector<int16_t> id_meta = MakeDefaultMeta();     // id + meta
+    std::vector<int16_t> id_meta = MakeDefaultMeta(false);     // id + meta
     id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmGroupedBlockScaleFp8;
     id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
 
@@ -272,7 +274,7 @@ public:
   }
 
 private:
-  std::vector<int16_t> MakeDefaultMeta() {
+  std::vector<int16_t> MakeDefaultMeta(bool fast_accum) {
     std::vector<int16_t> meta;
     meta.resize(8);
     meta[IdMetaEnum::Id] = -1;                                  // id
@@ -283,15 +285,7 @@ private:
     meta[IdMetaEnum::TypeB] = from_torch_dtype(this->input_dtype);  // type B
     meta[IdMetaEnum::TypeCD] = from_torch_dtype(this->output_dtype); // type C/D
 
-    bool is_enable_fp16_acc = false;
-    if (meta[IdMetaEnum::TypeA] == (int)UnifiedMetaEnum::E4M3) {
-      is_enable_fp16_acc = ENABLE_FP8_IN_FP16_ACC;
-    }
-    else if (meta[IdMetaEnum::TypeA] == (int)UnifiedMetaEnum::FP16) {
-      is_enable_fp16_acc = ENABLE_FP16_IN_FP16_ACC;
-    }
-
-    if (is_enable_fp16_acc)
+    if (fast_accum)
       meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP16;        // type acc
     else
       meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP32;
