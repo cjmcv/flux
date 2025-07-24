@@ -87,14 +87,14 @@ struct MMA_Traits<SM89_16x8x32_F16E4M3E4M3F16_TN> {
 } // namespace cute
 
 using namespace cute;
-using namespace cutlass;
-using namespace cutlass::gemm;
+// using namespace cutlass;
+// using namespace cutlass::gemm;
 
 namespace xop {
 namespace traits {
 
 template <typename ElementType, typename OutElementType, typename AccumElementType, typename BlockScaleElementType,
-  typename TileShape_, typename PermShape_, int Stages_>
+          typename TileShape_, typename PermShape_, int Stages_>
 struct AdaBlockwiseGemmTraits {
   using ElementInput = ElementType;
   using ElementOutput = OutElementType;
@@ -102,10 +102,11 @@ struct AdaBlockwiseGemmTraits {
   using ElementBlockScale = BlockScaleElementType;
   using TileShape = TileShape_;
 
-  using index_t = uint32_t;
   static_assert(size<0>(TileShape{}) % 16 == 0);
   static_assert(size<1>(TileShape{}) % 32 == 0);
   static_assert(size<2>(TileShape{}) % 32 == 0);
+  static_assert(Stages_ >= 2);
+
   static constexpr int Stages = Stages_;
   static constexpr int kTileM = size<0>(TileShape{});
   static constexpr int kTileN = size<1>(TileShape{});
@@ -122,78 +123,91 @@ struct AdaBlockwiseGemmTraits {
   static constexpr int ScaleNsPerTile = (kTileN + ScaleGranularityN - 1) / ScaleGranularityN;
   static constexpr int ScaleKsPerTile = (kTileK + ScaleGranularityK - 1) / ScaleGranularityK;
 
-  using ScaleGranularity = Shape<Int<ScaleGranularityM>, Int<ScaleGranularityN>, Int<ScaleGranularityK>>;
   using ScalePerTileShape = Shape<Int<ScaleMsPerTile>, Int<ScaleNsPerTile>, Int<ScaleKsPerTile>>;
-
-  // ====== mma ======
+  
+  /////////
+  // mma //
+  /////////
   static constexpr int kMmaPermM = size<0>(PermShape_{});
   static constexpr int kMmaPermN = size<1>(PermShape_{});
   static constexpr int kMmaPermK = size<2>(PermShape_{});
   constexpr static int NUM_GROUP_M = kTileM / kMmaPermM;
   constexpr static int NUM_GROUP_N = kTileN / kMmaPermN;
   constexpr static int NUM_GROUP_K = kTileK / kMmaPermK;
+
   using MMA_Atom_SM89 = std::conditional_t<
     std::is_same_v<AccumElementType, cutlass::half_t>,
     MMA_Atom<SM89_16x8x32_F16E4M3E4M3F16_TN>,
     MMA_Atom<SM89_16x8x32_F32E4M3E4M3F32_TN>
   >;
-  using TiledMma = decltype(make_tiled_mma(MMA_Atom_SM89{}, Layout<Shape<_2, _2, _1>>{},
+  using TiledMma = decltype(make_tiled_mma(MMA_Atom_SM89{}, 
+                                           Layout<Shape<_2, _2, _1>>{},
                                            Tile<Int<kMmaPermM>, Int<kMmaPermN>, Int<kMmaPermK>>{}));
 
-  // ====== load gmem -> smem ======
-  using GmemTiledCopyLoad = decltype(make_tiled_copy(Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<uint128_t>, ElementInput>{},
-    Layout<Shape<_16, _8>, Stride<_8, _1>>{}, Layout<Shape<_1, _16>>{}));
+  ///////////////////////
+  // load gmem -> smem //
+  ///////////////////////
 
-  using GmemTiledCopyA = GmemTiledCopyLoad;
-  using GmemTiledCopyB = GmemTiledCopyLoad;
+  // ====== A/B ======
+  using G2STiledCopy = decltype(make_tiled_copy(Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<uint128_t>, ElementInput>{},
+                                                Layout<Shape<_16, _8>, Stride<_8, _1>>{}, 
+                                                Layout<Shape<_1, _16>>{}));
+  // ====== scale A/B ======
+  using GmemCopyAtomScale = Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<ElementBlockScale>, ElementBlockScale>;
+  using G2STileCopySFA = decltype(make_tiled_copy_impl(GmemCopyAtomScale{}, 
+                                                       Layout<Shape<Shape<Int<ScaleMsPerTile>, Int<kThreadCount / ScaleMsPerTile>>, Shape<_1, _1>>, 
+                                                              Stride<Stride<_1, _0>, Stride<_1, _1>>>{}, 
+                                                       Shape<Int<ScaleMsPerTile>, Int<ScaleKsPerTile>>{}));
+  using G2STileCopySFB = decltype(make_tiled_copy_impl(GmemCopyAtomScale{}, 
+                                                       Layout<Shape<Shape<_32, _4>, Shape<_1, _1>>, 
+                                                              Stride<Stride<_0, _0>, Stride<_1, _1>>>{}, 
+                                                       Shape<Int<ScaleNsPerTile>, Int<ScaleKsPerTile>>{}));
 
-  // ====== load smem -> rf =====
+  /////////////////////
+  // load smem -> rf //
+  /////////////////////
+
+  // ====== A/B =====
   // using SmemAtomLayoutLoad = decltype(composition(Swizzle<2, 4, 3>{}, Layout<Shape<_8, _128>, Stride<_128, _1>>{}));
   using SmemAtomLayoutLoad = decltype(composition(Swizzle<3, 4, 3>{}, Layout<Shape<_16, _128>, Stride<_128, _1>>{}));
   using SmemLayoutA = decltype(tile_to_shape(SmemAtomLayoutLoad{}, Shape<Int<kTileM>, Int<kTileK>, Int<Stages>>{}));
   using SmemLayoutB = decltype(tile_to_shape(SmemAtomLayoutLoad{}, Shape<Int<kTileN>, Int<kTileK>, Int<Stages>>{}));
+  using S2RCopyAtom = Copy_Atom<SM75_U32x4_LDSM_N, ElementInput>;
+  // ====== scale A/B ======
+  using SmemCopyAtomScale = Copy_Atom<UniversalCopy<ElementBlockScale>, ElementBlockScale>;
+  using S2RLayoutTVSFA = Layout<Shape<Shape<_4, _8, _2, _2>, Shape<_2>>, Stride<Stride<_0, _1, _16, _0>, Stride<_8, _0>>>;
+  using S2RShapeSFA = Shape<Int<kMmaPermM>, _1>;
+  using S2RCopySFA = decltype(make_tiled_copy_impl(SmemCopyAtomScale{}, S2RLayoutTVSFA{}, S2RShapeSFA{}));
+  using SmemLayoutSFA = decltype(tile_to_shape(make_layout(S2RShapeSFA{}),
+                                               make_shape(shape<0>(ScalePerTileShape{}), 
+                                                          shape<2>(ScalePerTileShape{}), 
+                                                          Int<Stages>{}))); // BLK_M, BLK_K, Stages
 
-  using SmemCopyAtomLoad = Copy_Atom<SM75_U32x4_LDSM_N, ElementInput>;
-  using SmemCopyAtomA = SmemCopyAtomLoad;
-  using SmemCopyAtomB = SmemCopyAtomLoad;
+  using SmemLayoutTVSFB = Layout<Shape<Shape<_4, _8, _2, _2>, Shape<_1>>, Stride<Stride<_0, _0, _0, _0>, Stride<_0, _0>>>;
+  using S2RShapeSFB = Shape<_1, _1>;
+  using S2RCopySFB = decltype(make_tiled_copy_impl(SmemCopyAtomScale{}, SmemLayoutTVSFB{}, S2RShapeSFB{}));
+  using SmemLayoutSFB = decltype(tile_to_shape(make_layout(S2RShapeSFB{}),
+                                               make_shape(shape<1>(ScalePerTileShape{}), 
+                                                          shape<2>(ScalePerTileShape{}), 
+                                                          Int<Stages>{}))); // BLK_N, BLK_K, Stages
+
+  //////////////////////
+  // store smem -> rf //
+  //////////////////////
 
   // ====== store rf -> smem ======
   using SmemAtomLayoutStore = decltype(composition(Swizzle<3, 3, 3>{}, Layout<Shape<_8, Shape<_8, _8>>, Stride<_8, Stride<_1, _64>>>{})); //  8x64
   using SmemLayoutO = decltype(tile_to_shape(SmemAtomLayoutStore{}, Shape<Int<kTileM>, Int<kTileN>>{}));
   using SmemCopyAtomR2S = Copy_Atom<AutoVectorizingCopy, ElementOutput>;
-
   // ====== store smem -> gmem ======
   using SmemCopyAtomS2R = Copy_Atom<UniversalCopy<uint128_t>, ElementOutput>;
   using GmemCopyAtomR2G = SmemCopyAtomS2R;
   using TiledCopyS2G = decltype(make_tiled_copy(SmemCopyAtomS2R{}, Layout<Shape<_16, _8>, Stride<_8, _1>>{}, Layout<Shape<_1, _8>>{})); // 16x64
 
-  // ====== load scale gmem -> smem ======
-  using GmemCopyAtomScale = Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<ElementBlockScale>, ElementBlockScale>;
-  using GmemLayoutTVSFA = Layout<Shape<Shape<Int<ScaleMsPerTile>, Int<kThreadCount / ScaleMsPerTile>>, Shape<_1, _1>>, Stride<Stride<_1, _0>, Stride<_1, _1>>>;
-  using GmemTileShapeSFA = Shape<Int<ScaleMsPerTile>, Int<ScaleKsPerTile>>;
-  using GmemTiledCopySFA = decltype(make_tiled_copy_impl(GmemCopyAtomScale{}, GmemLayoutTVSFA{}, GmemTileShapeSFA{}));
 
-  using GmemLayoutTVSFB = Layout<Shape<Shape<_32, _4>, Shape<_1, _1>>, Stride<Stride<_0, _0>, Stride<_1, _1>>>;
-  using GmemTileShapeSFB = Shape<Int<ScaleNsPerTile>, Int<ScaleKsPerTile>>;
-  using GmemTiledCopySFB = decltype(make_tiled_copy_impl(GmemCopyAtomScale{}, GmemLayoutTVSFB{}, GmemTileShapeSFB{}));
-
-  // ====== load scale smem -> rf ======
-  using SmemCopyAtomScale = Copy_Atom<UniversalCopy<ElementBlockScale>, ElementBlockScale>;
-  using SmemLayoutTVSFA = Layout<Shape<Shape<_4, _8, _2, _2>, Shape<_2>>, Stride<Stride<_0, _1, _16, _0>, Stride<_8, _0>>>;
-  using SmemTileShapeSFA = Shape<Int<kMmaPermM>, _1>;
-  using SmemTiledCopySFA = decltype(make_tiled_copy_impl(SmemCopyAtomScale{}, SmemLayoutTVSFA{}, SmemTileShapeSFA{}));
-  using SmemLayoutSFA = decltype(tile_to_shape(make_layout(SmemTileShapeSFA{}),
-    make_shape(shape<0>(ScalePerTileShape{}), shape<2>(ScalePerTileShape{}), Int<Stages>{}))); // BLK_M, BLK_K, Stages
-
-  using SmemLayoutTVSFB = Layout<Shape<Shape<_4, _8, _2, _2>, Shape<_1>>, Stride<Stride<_0, _0, _0, _0>, Stride<_0, _0>>>;
-  using SmemTileShapeSFB = Shape<_1, _1>;
-  using SmemTiledCopySFB = decltype(make_tiled_copy_impl(SmemCopyAtomScale{}, SmemLayoutTVSFB{}, SmemTileShapeSFB{}));
-  using SmemLayoutSFB = decltype(tile_to_shape(make_layout(SmemTileShapeSFB{}),
-    make_shape(shape<1>(ScalePerTileShape{}), shape<2>(ScalePerTileShape{}), Int<Stages>{}))); // BLK_N, BLK_K, Stages
-
-  // we need at least 2 stages..
-  static_assert(Stages >= 2);
-
+  ///////////////////////////
+  // shared memory storage //
+  ///////////////////////////
   struct SharedStorageLoad : aligned_struct<128> {
     array_aligned<ElementInput, cosize_v<SmemLayoutA>> smem_a;
     array_aligned<ElementInput, cosize_v<SmemLayoutB>> smem_b;

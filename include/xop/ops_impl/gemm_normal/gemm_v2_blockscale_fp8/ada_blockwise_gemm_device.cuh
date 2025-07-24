@@ -18,7 +18,7 @@ template <typename KT>
 struct AdaBlockwiseGemm {
 
   struct Arguments {
-    GemmCoord problem_size{};
+    cutlass::gemm::GemmCoord problem_size{};
     void const* ptr_a;
     void const* ptr_b;
     void* ptr_d;
@@ -26,7 +26,7 @@ struct AdaBlockwiseGemm {
     float const* ptr_scale_b;
 
     Arguments() {}
-    Arguments(GemmCoord problem_size_, void const* ptr_a_, void const* ptr_b_, void* ptr_d_,
+    Arguments(cutlass::gemm::GemmCoord problem_size_, void const* ptr_a_, void const* ptr_b_, void* ptr_d_,
             float const* ptr_scale_a_, float const* ptr_scale_b_)
             : problem_size(problem_size_)
             , ptr_a(ptr_a_)
@@ -47,6 +47,7 @@ struct AdaBlockwiseGemm {
   AdaBlockwiseGemm(): params_() {}
 
   Status can_implement(Arguments const& args) {
+    // printf("kSmemSize: %d.\n", int(kSmemSize));
     if (kSmemSize > (48 << 10)) {
       cudaFuncSetAttribute(kernel::sm89_fp8_gemm_impl<GemmKernel>,
             cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize);

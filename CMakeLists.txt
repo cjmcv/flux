@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
-project(XOP LANGUAGES C CXX CUDA)
+project(XOP LANGUAGES C CXX) # CUDA
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 
@@ -12,8 +12,12 @@ message("PYTHONPATH: ${PYTHONPATH}")
 
 # find cuda
 # specify cuda path if other than default
-# set(CUDA_TOOLKIT_ROOT_DIR /path/to/installed/cuda)
+# /usr/include, usr/bin/nvcc
+set(CMAKE_CUDA_COMPILER "/usr/local/cuda-12.8/bin/nvcc" CACHE FILEPATH "Path to nvcc")
+# set(CUDAToolkit_INCLUDE_DIRS "/usr/local/cuda-12.8/include")
+# set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-12.8/")
 find_package(CUDAToolkit REQUIRED)
+message("CUDAToolkit_INCLUDE_DIRS: ${CUDAToolkit_INCLUDE_DIRS}")
 
 message(STATUS "CUDAToolkit_VERSION: ${CUDAToolkit_VERSION}")
 if(CUDAToolkit_VERSION VERSION_LESS "11.0")
