@@ -66,11 +66,16 @@ class GemmNormalSchema:
 class GemmV2BlockScaleFp8Schema:
     impl = "GemmV2BlockScaleFp8"
     sub_schema = [Meta.GemmBlockScaleFp8]
-    test_input_dtype = torch.bfloat16
-    space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
+    
+    if is_use_fp16_acc:
+        test_input_dtype = torch.float16
+        space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.float16)]
+    else:
+        test_input_dtype = torch.bfloat16
+        space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
-        x, x_scale = xutil.per_token_cast_to_fp8(input)
-        y, y_scale = xutil.per_block_cast_to_fp8(weight)
+        x, x_scale = xutil.per_token_cast_to_fp8(input, is_use_fp16_acc)
+        y, y_scale = xutil.per_block_cast_to_fp8(weight, is_use_fp16_acc)
         x_scale = xutil.pad_row_to_alignment(x_scale, 4)
         return x, x_scale.t().contiguous(), y, y_scale.t().contiguous()
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
@@ -235,7 +240,7 @@ def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
     def fn():
         return op.forward(input, weight, output=output, bias=bias, 
                           input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
-                          tuning=tuning, fast_accum=False)
+                          tuning=tuning, fast_accum=is_use_fp16_acc)
     
     profiling_core(tuning, [m,n,k,g], fn, fp)
     return output.cpu()

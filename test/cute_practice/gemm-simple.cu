@@ -6,6 +6,38 @@
 template <typename T>
 void gen_rand_data(T *data, int n);
 
+template <class TA, class TB, class TC>
+void gemm_host(int M, int N, int K,
+              TA const* A, int ldA,
+              TB const* B, int ldB,
+              TC      * C, int ldC) {
+  float *nA = new float[M*K];
+  float *nB = new float[N*K];
+  for (size_t i = 0; i < M; i++) {
+    for (size_t k = 0; k < K; k++) {
+      nA[i*K+k] = static_cast<float>(A[i*K+k]);
+    }
+  }
+  for (size_t j = 0; j < N; j++) {
+    for (size_t k = 0; k < K; k++) {
+      nB[j*K+k] = static_cast<float>(B[j*K+k]);
+    }
+  }
+  printf("finish host cast.\n");
+  for (size_t i = 0; i < M; i++) {
+    for (size_t j = 0; j < N; j++) {
+      float ctemp = 0.0f;
+      for (size_t k = 0; k < K; k++) {
+        ctemp += nA[i*K+k] * nB[j*K+k];
+      }
+      C[i*N+j] = static_cast<TC>(ctemp);
+    }
+  }
+
+  delete[] nA;
+  delete[] nB;
+}
+
 template <typename T, int kTileM, int kTileN, int kTileK, typename TiledMMA>
 __global__ void gemm_simple(T *Cptr, const T *Aptr, const T *Bptr, int m, int n, int k) {
 
@@ -59,9 +91,9 @@ int main() {
   T *Aptr;
   T *Bptr;
 
-  int m = 81920;
-  int n = 256;
-  int k = 256;
+  int m = 1024;
+  int n = 1024;
+  int k = 1024;
 
   cudaMalloc(&Cptr, sizeof(T) * m * n);
   cudaMalloc(&Aptr, sizeof(T) * m * k);
@@ -69,8 +101,12 @@ int main() {
 
   T *Aptr_host;
   T *Bptr_host;
+  T *Cptr_host0;
+  T *Cptr_host1;
   Aptr_host = (T*)malloc(sizeof(T) * m * k);
   Bptr_host = (T*)malloc(sizeof(T) * n * k);
+  Cptr_host0 = (T*)malloc(sizeof(T) * m * n);
+  Cptr_host1 = (T*)malloc(sizeof(T) * m * n);
   gen_rand_data(Aptr_host, m * k);
   gen_rand_data(Bptr_host, n * k);
 
@@ -90,6 +126,26 @@ int main() {
 
   dim3 block(size(MMA{}));
   dim3 grid(n / kTileN, m / kTileM);
+  gemm_simple<T, kTileM, kTileN, kTileK, MMA><<<grid, block>>>(Cptr, Aptr, Bptr, m, n, k);
+  cudaMemcpy(Cptr_host0, Cptr, sizeof(T) * m * n, cudaMemcpyDeviceToHost);
+
+  gemm_host(m,n,k, Aptr_host, k, Bptr_host, k, Cptr_host1, n);
+  float acc_host = 0;
+  for (int i=0; i<m; i++) {
+    for (int j=0; j<n; j++) {
+      float v1 = Cptr_host0[i*n+j];
+      float v2 = Cptr_host1[i*n+j];
+      if (fabs(v1 - v2) > 0.2) {
+        printf("v1 = %f, v2 = %f\n", v1, v2);
+      }
+      // acc_host += static_cast<float>(Cptr_host[i*n+j]);
+      // printf("%f, ", static_cast<float>(h_C[i*n+j]));
+    }
+    // printf("\n");
+  }
+  // printf("mean: %f vs %f\n", acc_dev/(m*n), acc_host/(m*n));
+
+
   for (int i = 0; i < 100; ++i) {
     gemm_simple<T, kTileM, kTileN, kTileK, MMA><<<grid, block>>>(Cptr, Aptr, Bptr, m, n, k);
   }
@@ -124,14 +180,14 @@ int main() {
   // err = cudaGetLastError();
   // printf("err = %d, str = %s\n", err, cudaGetErrorString(err));
 
-  T *Cptr_host;
-  // T *Cptr_cublas_host;
+  // T *Cptr_host;
+  // // T *Cptr_cublas_host;
 
-  Cptr_host = (T*)malloc(sizeof(T) * m * n);
-  // Cptr_cublas_host = (T*)malloc(sizeof(T) * m * n);
+  // Cptr_host = (T*)malloc(sizeof(T) * m * n);
+  // // Cptr_cublas_host = (T*)malloc(sizeof(T) * m * n);
 
-  // compare
-  cudaMemcpy(Cptr_host, Cptr, sizeof(T) * m * n, cudaMemcpyDeviceToHost);
+  // // compare
+  // cudaMemcpy(Cptr_host, Cptr, sizeof(T) * m * n, cudaMemcpyDeviceToHost);
   // cudaMemcpy(Cptr_cublas_host, Cptr_cublas, sizeof(T) * m * n, cudaMemcpyDeviceToHost);
 
   // float threshold = 0.1;

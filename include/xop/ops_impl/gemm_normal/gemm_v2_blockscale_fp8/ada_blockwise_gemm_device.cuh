@@ -54,7 +54,7 @@ struct AdaBlockwiseGemm {
       auto result = cudaGetLastError();
         
       if (result != cudaSuccess) {
-        CUTLASS_TRACE_HOST("sm89 gemm kernel cannot launch: "  << cudaGetErrorString(result));
+        printf("sm89 gemm kernel cannot launch: %s.\n", cudaGetErrorString(result));
         return Status::kInvalid;    
       }
     }
