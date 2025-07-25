@@ -8,7 +8,7 @@ namespace xop {
 namespace kernel {
 
 template <typename GemmKernel>
-CUTLASS_GLOBAL void sm89_fp8_gemm_impl(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, void const* A,
+CUTLASS_GLOBAL void ada_blockwise_fp8_gemm_run_kernel(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, void const* A,
   void const* B, void* D, float const* scales_a, float const* scales_b) {
   GemmKernel op;
   op.invoke(shape_m, shape_n, shape_k, A, B, D, scales_a, scales_b);
@@ -62,10 +62,10 @@ struct AdaBlockwiseGemmKernel {
 
   template <class TileS, class TileC>
   CUTE_DEVICE auto get_tile_predicate(TileS& ts, TileC& tc, int residue) {
-    auto tp = cute::make_tensor<bool>(cute::make_shape(cute::size<1>(ts), cute::size<2>(ts)), cute::Stride<cute::_1, cute::_0>{}); \
-    CUTE_UNROLL                                           \
-    for (int i = 0; i < cute::size<0>(tp); ++i) {         \
-      tp(i, 0) = cute::get<0>(tc(0, i, 0)) < residue;     \
+    auto tp = cute::make_tensor<bool>(cute::make_shape(cute::size<1>(ts), cute::size<2>(ts)), cute::Stride<cute::_1, cute::_0>{});
+    CUTE_UNROLL
+    for (int i = 0; i < cute::size<0>(tp); ++i) {
+      tp(i, 0) = cute::get<0>(tc(0, i, 0)) < residue;
     }
     return tp;
   }
@@ -84,30 +84,42 @@ struct AdaBlockwiseGemmKernel {
     auto t##N0##g##N1 = g2s_thr_copy##N0##N1.partition_S(G);          \
     auto t##N0##s##N1 = g2s_thr_copy##N0##N1.partition_D(S)  
 
+  #define GET_S2R_THREAD_PARTITION_SR(N0, S2GCopy, S, R, mma)                  \
+    auto s2r_copy_##N0 = cute::make_tiled_copy_##N0(typename S2GCopy{}, mma);  \
+    auto s2r_thr_copy_##N0 = s2r_copy_##N0.get_slice(threadIdx.x);             \
+    auto tXs##N0 = s2r_thr_copy_##N0.partition_S(S);                           \
+    auto tXr##N0 = s2r_thr_copy_##N0.retile_D(R);
 
-  // template <class G2SCopy, class TensorC, class TensorG, class TensorS>
-  // CUTE_DEVICE auto set_(G2SCopy& tile_copy, TensorC& c, TensorG& g, TensorS& s) {
-  //   auto g2s_thr_copy = tile_copy.get_slice(threadIdx.x);
-  //   auto tc = g2s_thr_copy.partition_S(c);
-  //   auto tg = g2s_thr_copy.partition_S(g); // (ACPY,ACPY_M,ACPY_K,k)
-  //   auto ts = g2s_thr_copy.partition_D(s);
-  //   return cute::make_tuple(tc, tg, ts);
-  // }
-  // template <class SFA, class SFB, class S>
-  // CUTE_DEVICE auto calculate_scale(SFA& tXrSFA, SFB& tXrSFB, S const& scale) {
-  //   cute::for_each(cute::make_int_sequence<cute::size(scale)>{}, [&](auto i) {
-  //     scale(i) = tXrSFA(i) * tXrSFB(0);
-  //   });
-  // }
-  
-  /// Executes one GEMM
+  #define STEP0_SMEM_PIPE_READ(TYPE) \
+    TYPE tXsA_read   = tXsA(cute::_, cute::_, cute::_, smem_pipe_read); \
+    TYPE tXsB_read   = tXsB(cute::_, cute::_, cute::_, smem_pipe_read); \
+    TYPE tXsSFA_read = tXsSFA(cute::_, cute::_, cute::_, smem_pipe_read); \
+    TYPE tXsSFB_read = tXsSFB(cute::_, cute::_, cute::_, smem_pipe_read);
+
+  #define STEP0_READ_FROM_GMEM_TO_SMEM(k_tile_iter, k_pipe) \
+    cute::copy_if(g2s_copy_A,   tApA,   tAgA(cute::_, cute::_, cute::_, k_tile_iter),   tAsA(cute::_, cute::_, cute::_, k_pipe));   \
+    cute::copy_if(g2s_copy_B,   tBpB,   tBgB(cute::_, cute::_, cute::_, k_tile_iter),   tBsB(cute::_, cute::_, cute::_, k_pipe));   \
+    cute::copy_if(g2s_copy_SFA, tApSFA, tAgSFA(cute::_, cute::_, cute::_, k_tile_iter), tAsSFA(cute::_, cute::_, cute::_, k_pipe)); \
+    cute::copy(   g2s_copy_SFB,         tBgSFB(cute::_, cute::_, cute::_, k_tile_iter), tBsSFB(cute::_, cute::_, cute::_, k_pipe));
+
+  #define STEP0_PREFETCH_B_BLOCK_NEXT() \
+    auto n_block_next = (n_block + cute::_1{}) % KT::NUM_GROUP_N; \
+    cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_), tXrBs(cute::_, cute::_, n_block_next));
+
+  #define STEP1_GET_SCALE() \
+    cute::for_each(cute::make_int_sequence<cute::size(scale)>{}, \
+            [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
+
+  #define STEP2_MMA()                                                      \
+    cute::clear(temp);                                                     \
+    cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
+      
   CUTE_DEVICE
   void operator()(typename KT::ElementInput const* ptr_a, typename KT::ElementInput const* ptr_b,
                 typename KT::ElementBlockScale const* ptr_scale_a, typename KT::ElementBlockScale const* ptr_scale_b,
                 typename KT::ElementOutput* ptr_output, uint32_t M, uint32_t N, uint32_t K) {
-    // Dynamic shared memory base pointer
+
     extern __shared__ int SharedStorageBase[];
-    //
     using X = cute::Underscore;
 
     uint32_t const ScaleM = (((M + 3) >> 2) << 2); // align 4
@@ -135,9 +147,6 @@ struct AdaBlockwiseGemmKernel {
     auto sSFA = cute::make_tensor(cute::make_smem_ptr(load_storage->smem_sfa.data()), typename KT::SmemLayoutSFA{}); // (BLK_M,BLK_K,Stages)
     auto sSFB = cute::make_tensor(cute::make_smem_ptr(load_storage->smem_sfb.data()), typename KT::SmemLayoutSFB{}); // (BLK_N,BLK_K,Stages)
 
-    // printf("sA: %d, %d.\n", int(cute::size<0>(sA)), int(cute::size<1>(sA)));
-    // printf("sB: %d, %d.\n", int(cute::size<0>(sB)), int(cute::size<1>(sB)));
-    // printf("T: %d, %d, %d.\n", int(KT::kTileM), int(KT::kTileN), int(KT::kTileK));
     auto cA   = cute::make_identity_tensor(cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kTileK>{})); // G2S
     auto cB   = cute::make_identity_tensor(cute::make_shape(cute::Int<KT::kTileN>{}, cute::Int<KT::kTileK>{})); // G2S
     auto cO   = cute::make_identity_tensor(cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kTileN>{})); // S2G
@@ -153,9 +162,7 @@ struct AdaBlockwiseGemmKernel {
     GET_G2S_THREAD_PARTITION_GSP(A, SFA, KT::G2STileCopySFA, cSFA, gSFA, sSFA, residue_m); // g2s_copy_SFA => tAgSFA[CPY,ACPY_M,ACPY_K,Stage],  tAsSFA[ACPY,ACPY_M,ACPY_K,Stage], tApSFA
     GET_G2S_THREAD_PARTITION_GS (B, SFB, KT::G2STileCopySFB, gSFB, sSFB);                  // g2s_copy_SFB => tBgSFB[BCPY,BCPY_N,BCPY_K,Stage], tBsSFB[BCPY,BCPY_N,BCPY_K,Stage]
 
-    ///////////////////////
     // smem -> rmem
-    ///////////////////////
     // mnk => 32x128x128 => 32x(32x4)x128 => [32,128] x [32x128] x 4
     typename KT::TiledMma mma;
     auto accum = cute::partition_fragment_C(mma, cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kMmaPermN>{}, cute::Int<KT::NUM_GROUP_N>{})); // (MMA,MMA_M,MMA_N)
@@ -166,15 +173,9 @@ struct AdaBlockwiseGemmKernel {
     auto tCrA = cute::make_tensor<typename KT::ElementInput>(mma_shape_A);
     auto tCrB = cute::make_tensor<typename KT::ElementInput>(mma_shape_B);
 
-    auto s2r_copy_A = cute::make_tiled_copy_A(typename KT::S2RCopyAtom{}, mma);
-    auto s2r_thr_copy_A = s2r_copy_A.get_slice(threadIdx.x);
-    auto tXsA = s2r_thr_copy_A.partition_S(sA); // (CPY,CPY_M,CPY_K,Stage)
-    auto tXrA = s2r_thr_copy_A.retile_D(tCrA);  // (CPY,CPY_M,CPY_K)
-
-    auto s2r_copy_B = cute::make_tiled_copy_B(typename KT::S2RCopyAtom{}, mma);
-    auto s2r_thr_copy_B = s2r_copy_B.get_slice(threadIdx.x);
-    auto tXsB = s2r_thr_copy_B.partition_S(sB); // (CPY,CPY_N,CPY_K,Stage)
-    auto tXrB = s2r_thr_copy_B.retile_D(tCrB)(cute::_, cute::Int<0>{}, cute::_, cute::_);
+    GET_S2R_THREAD_PARTITION_SR(A, KT::S2RCopyAtom, sA, tCrA, mma);  // tXsA (CPY,CPY_N,CPY_K,Stage) tXrB
+    GET_S2R_THREAD_PARTITION_SR(B, KT::S2RCopyAtom, sB, tCrB, mma);  // tXsB (CPY,CPY_N,CPY_K,Stage) tXrB
+    auto tXrBs = tXrB(cute::_, cute::Int<0>{}, cute::_, cute::_);
     
     typename KT::S2RCopySFA s2r_copy_SFA;
     auto s2r_thr_copy_SFA = s2r_copy_SFA.get_slice(threadIdx.x);
@@ -189,6 +190,7 @@ struct AdaBlockwiseGemmKernel {
     auto scale = cute::make_fragment_like(tXrSFA);
 
     ////////////////////////////////////////////////////
+    // mainloop
 
     // prefetch gmem A/B
     cute::clear(tAsA);
@@ -204,10 +206,7 @@ struct AdaBlockwiseGemmKernel {
         cute::clear(tApSFA);
       }
       auto k_tile_iter = std::min(k_pipe, k_tile_count - 1);
-      cute::copy_if(g2s_copy_A,   tApA,   tAgA(cute::_, cute::_, cute::_, k_tile_iter),   tAsA(cute::_, cute::_, cute::_, k_pipe));
-      cute::copy_if(g2s_copy_B,   tBpB,   tBgB(cute::_, cute::_, cute::_, k_tile_iter),   tBsB(cute::_, cute::_, cute::_, k_pipe));
-      cute::copy_if(g2s_copy_SFA, tApSFA, tAgSFA(cute::_, cute::_, cute::_, k_tile_iter), tAsSFA(cute::_, cute::_, cute::_, k_pipe));
-      cute::copy(   g2s_copy_SFB,         tBgSFB(cute::_, cute::_, cute::_, k_tile_iter), tBsSFB(cute::_, cute::_, cute::_, k_pipe));
+      STEP0_READ_FROM_GMEM_TO_SMEM(k_tile_iter, k_pipe);
 
       cute::cp_async_fence();
     }
@@ -216,10 +215,7 @@ struct AdaBlockwiseGemmKernel {
     int smem_pipe_write = KT::Stages - 1;
     int smem_pipe_read = 0;
 
-    auto tXsA_read   = tXsA(cute::_, cute::_, cute::_, smem_pipe_read);
-    auto tXsB_read   = tXsB(cute::_, cute::_, cute::_, smem_pipe_read);
-    auto tXsSFA_read = tXsSFA(cute::_, cute::_, cute::_, smem_pipe_read);
-    auto tXsSFB_read = tXsSFB(cute::_, cute::_, cute::_, smem_pipe_read);
+    STEP0_SMEM_PIPE_READ(auto);
     cute::cp_async_wait<KT::Stages - 2>();
     __syncthreads();
 
@@ -227,45 +223,34 @@ struct AdaBlockwiseGemmKernel {
     cute::copy(s2r_copy_SFA, tXsSFA_read, tXrSFA);
     cute::copy(s2r_copy_SFB, tXsSFB_read, tXrSFB);
     cute::copy(s2r_copy_A,   tXsA_read,   tXrA);
-    cute::copy(s2r_copy_B,   tXsB_read(cute::_, cute::Int<0>{}, cute::_), tXrB(cute::_, cute::_, cute::Int<0>{}));
+    cute::copy(s2r_copy_B,   tXsB_read(cute::_, cute::Int<0>{}, cute::_), tXrBs(cute::_, cute::_, cute::Int<0>{}));
 
     cute::clear(accum);
     int k_tile_iter = KT::Stages - 1;
     while (k_tile_iter < k_tile_count) {
       cute::for_each(cute::make_int_sequence<KT::NUM_GROUP_N>{}, [&](auto n_block) {
         if constexpr (n_block == KT::NUM_GROUP_N - 1) {
-          tXsA_read   = tXsA(cute::_, cute::_, cute::_, smem_pipe_read);
-          tXsB_read   = tXsB(cute::_, cute::_, cute::_, smem_pipe_read);
-          tXsSFA_read = tXsSFA(cute::_, cute::_, cute::_, smem_pipe_read);
-          tXsSFB_read = tXsSFB(cute::_, cute::_, cute::_, smem_pipe_read);
+          STEP0_SMEM_PIPE_READ();
           cute::cp_async_wait<KT::Stages - 2>();
           __syncthreads();
           cute::copy(s2r_copy_SFA, tXsSFA_read, tXrSFA);
           cute::copy(s2r_copy_SFB, tXsSFB_read, tXrSFB);
         }
 
-        auto n_block_next = (n_block + cute::_1{}) % KT::NUM_GROUP_N;
-        cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_), tXrB(cute::_, cute::_, n_block_next));
+        STEP0_PREFETCH_B_BLOCK_NEXT();
         
         if constexpr (n_block == 0) {
-          // gmem -> smem
-          cute::copy_if(g2s_copy_A,   tApA,     tAgA(cute::_, cute::_, cute::_, k_tile_iter),   tAsA(cute::_, cute::_, cute::_, smem_pipe_write));
-          cute::copy_if(g2s_copy_B,   tBpB,     tBgB(cute::_, cute::_, cute::_, k_tile_iter),   tBsB(cute::_, cute::_, cute::_, smem_pipe_write));
-          cute::copy_if(g2s_copy_SFA, tApSFA, tAgSFA(cute::_, cute::_, cute::_, k_tile_iter), tAsSFA(cute::_, cute::_, cute::_, smem_pipe_write));
-          cute::copy   (g2s_copy_SFB,         tBgSFB(cute::_, cute::_, cute::_, k_tile_iter), tBsSFB(cute::_, cute::_, cute::_, smem_pipe_write));
+          STEP0_READ_FROM_GMEM_TO_SMEM(k_tile_iter, smem_pipe_write);
           cute::cp_async_fence();
 
           k_tile_iter++;
           smem_pipe_write = smem_pipe_read;
           ++smem_pipe_read;
           smem_pipe_read = smem_pipe_read == KT::Stages ? 0 : smem_pipe_read;
-          cute::for_each(cute::make_int_sequence<cute::size(scale)>{}, [&](auto i) {
-            scale(i) = tXrSFA(i) * tXrSFB(0);
-          });
+          STEP1_GET_SCALE();
         }
 
-        cute::clear(temp);
-        cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
+        STEP2_MMA();
         if constexpr (n_block == KT::NUM_GROUP_N - 1) {
           cute::copy(s2r_copy_A, tXsA_read, tXrA);
         }
@@ -277,28 +262,22 @@ struct AdaBlockwiseGemmKernel {
       using WaitIndex_t = decltype(WaitIndex);
       cute::for_each(cute::make_int_sequence<KT::NUM_GROUP_N>{}, [&](auto n_block) {
         if constexpr (n_block == KT::NUM_GROUP_N - 1) {
-          tXsA_read   = tXsA(cute::_, cute::_, cute::_, smem_pipe_read);
-          tXsB_read   = tXsB(cute::_, cute::_, cute::_, smem_pipe_read);
-          tXsSFA_read = tXsSFA(cute::_, cute::_, cute::_, smem_pipe_read);
-          tXsSFB_read = tXsSFB(cute::_, cute::_, cute::_, smem_pipe_read);
+          STEP0_SMEM_PIPE_READ();
           cute::cp_async_wait<KT::Stages - 3 - WaitIndex_t::value>();
           __syncthreads();
           cute::copy(s2r_copy_SFA, tXsSFA_read, tXrSFA);
           cute::copy(s2r_copy_SFB, tXsSFB_read, tXrSFB);
         }
 
-        auto n_block_next = (n_block + cute::_1{}) % KT::NUM_GROUP_N;
-        cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_), tXrB(cute::_, cute::_, n_block_next));
+        STEP0_PREFETCH_B_BLOCK_NEXT();
         
         if constexpr (n_block == 0) {
           ++smem_pipe_read;
           smem_pipe_read = smem_pipe_read == KT::Stages ? 0 : smem_pipe_read;
-          cute::for_each(cute::make_int_sequence<cute::size(scale)>{},
-            [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
+          STEP1_GET_SCALE();
         }
 
-        cute::clear(temp);
-        cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
+        STEP2_MMA();
         if constexpr (n_block == KT::NUM_GROUP_N - 1) {
           cute::copy(s2r_copy_A, tXsA_read, tXrA);
         }
@@ -307,14 +286,11 @@ struct AdaBlockwiseGemmKernel {
     });
     // mma tail
     cute::for_each(cute::make_int_sequence<KT::NUM_GROUP_N>{}, [&](auto n_block) {
-      auto n_block_next = (n_block + cute::_1{}) % KT::NUM_GROUP_N;
-      cute::copy(s2r_copy_B, tXsB_read(cute::_, n_block_next, cute::_), tXrB(cute::_, cute::_, n_block_next));
-      cute::clear(temp);
+      STEP0_PREFETCH_B_BLOCK_NEXT();
       if constexpr (n_block == 0) {
-        cute::for_each(cute::make_int_sequence<cute::size(scale)>{},
-          [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
+        STEP1_GET_SCALE();
       }
-      cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
+      STEP2_MMA();
       promote(accum, temp, scale, n_block);
     });
 

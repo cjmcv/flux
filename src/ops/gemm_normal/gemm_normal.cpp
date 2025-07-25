@@ -38,8 +38,8 @@ int CoarseGrainedTuningM(int actual_m, int schema = 0) {
     if (actual_m <= 1) {
       tuned_m = 1;
     }
-    else if (actual_m >= 32768) {
-      tuned_m = 32768;
+    else if (actual_m >= 8192) { // 32768
+      tuned_m = 8192;
     }
     else {
       int exponent = static_cast<int>(std::floor(std::log2(actual_m)));

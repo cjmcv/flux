@@ -87,8 +87,6 @@ struct MMA_Traits<SM89_16x8x32_F16E4M3E4M3F16_TN> {
 } // namespace cute
 
 using namespace cute;
-// using namespace cutlass;
-// using namespace cutlass::gemm;
 
 namespace xop {
 namespace traits {
@@ -203,7 +201,6 @@ struct AdaBlockwiseGemmTraits {
   using SmemCopyAtomS2R = Copy_Atom<UniversalCopy<uint128_t>, ElementOutput>;
   using GmemCopyAtomR2G = SmemCopyAtomS2R;
   using TiledCopyS2G = decltype(make_tiled_copy(SmemCopyAtomS2R{}, Layout<Shape<_16, _8>, Stride<_8, _1>>{}, Layout<Shape<_1, _8>>{})); // 16x64
-
 
   ///////////////////////////
   // shared memory storage //

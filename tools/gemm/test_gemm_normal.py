@@ -314,8 +314,8 @@ def parse_args():
     parser.add_argument("N", type=int)
     parser.add_argument("K", type=int)
     parser.add_argument("--step", default=5, type=int, help="m step")
-    parser.add_argument("--warmup_iters", default=0, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=1, type=int, help="perf iterations")
+    parser.add_argument("--warmup_iters", default=10, type=int, help="perf warmup iterations")
+    parser.add_argument("--iters", default=20, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16", # float16, float8_e4m3fn
@@ -350,42 +350,42 @@ if __name__ == "__main__":
     xop_perf = []
     torch_perf = []
     print(f"M: {1}, N: {args.N}, K: {args.K}")
-    run(32770, args, xop_perf, torch_perf)
+    run(1, args, xop_perf, torch_perf)
 
-    # if 0:
-    #     for m in range(2, args.M, args.step):
-    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
-    #         run(m, args, xop_perf, torch_perf)
-    #     plot_x = [1] + list(range(2, args.M, args.step))
-    # else:
-    #     exponent = 17 # 65536: 17
-    #     for m in range(1, exponent):
-    #         m = 2**m
-    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
-    #         run(m, args, xop_perf, torch_perf)
+    if 0:
+        for m in range(2, args.M, args.step):
+            print(f"M: {m}, N: {args.N}, K: {args.K}")
+            run(m, args, xop_perf, torch_perf)
+        plot_x = [1] + list(range(2, args.M, args.step))
+    else:
+        exponent = 17 # 65536: 17
+        for m in range(1, exponent):
+            m = 2**m
+            print(f"M: {m}, N: {args.N}, K: {args.K}")
+            run(m, args, xop_perf, torch_perf)
         
-    #     plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
-    #     plot_x = range(len(plot_x_value))
-    #     plt.xticks(plot_x, plot_x_value, rotation=45)
+        plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
+        plot_x = range(len(plot_x_value))
+        plt.xticks(plot_x, plot_x_value, rotation=45)
 
-    # print("xop_perf:", xop_perf)
-    # plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
-    # plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
+    print("xop_perf:", xop_perf)
+    plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
+    plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
     
-    # plt.ylim(bottom=0)
-    # plt.title(f'perf-N{args.N}-K{args.K}')
-    # plt.xlabel('m_size')
-    # if args.show_tflops:
-    #     plt.ylabel('tflops')
-    # else:
-    #     plt.ylabel('ms')
+    plt.ylim(bottom=0)
+    plt.title(f'perf-N{args.N}-K{args.K}')
+    plt.xlabel('m_size')
+    if args.show_tflops:
+        plt.ylabel('tflops')
+    else:
+        plt.ylabel('ms')
 
-    # plt.legend()
-    # plt.grid(True)
+    plt.legend()
+    plt.grid(True)
 
-    # # plt.xticks(plot_x)
-    # plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
-    # plt.show()
+    # plt.xticks(plot_x)
+    plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
+    plt.show()
 
 
 # # The usage within torch.compile of vllm.
