@@ -13,6 +13,8 @@ git clone
 
 pdflatex a.tex
 compute-sanitizer --tool memcheck python tools/test*.py
+ncu --set full --section "SpeedOfLight_RooflineChart" -k "sm89_fp8_gemm_impl" -o my_profile python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn
+ncu-ui # Open file£ºmy_profile.ncu-rep
 ```
 
 #### Dependencies
