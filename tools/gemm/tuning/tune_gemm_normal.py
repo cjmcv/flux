@@ -76,8 +76,8 @@ class GemmV2BlockScaleFp8Schema:
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
         x, x_scale = xutil.per_token_cast_to_fp8(input, is_use_fp16_acc)
         y, y_scale = xutil.per_block_cast_to_fp8(weight, is_use_fp16_acc)
-        x_scale = xutil.pad_row_to_alignment(x_scale, 4)
-        return x, x_scale.t().contiguous(), y, y_scale.t().contiguous()
+        x_scale = xop.gemm_v2_blockscale_fp8_scale_preprocess(x_scale)
+        return x, x_scale, y, y_scale.contiguous()
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
                        input_scale: torch.Tensor, weight_scale: torch.Tensor,
                        bias: torch.Tensor):
@@ -142,7 +142,7 @@ def str2schema(schema_name):
 def gen_tuning_space(schema):
     space: List[TuningConfig] = []
     space_G = [1]
-    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536] #,16384,32768 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384] #,16384,32768,65536 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
     space_NK = [(4096, 4096)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     
     # space_G = [4, 8]

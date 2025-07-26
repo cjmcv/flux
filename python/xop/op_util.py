@@ -21,7 +21,7 @@ def pad_row_to_alignment(x, align):
 # org: [[1,1]] =>pad [[1,1], [0,0], [0,0], [0,0]] =>transpose [[1,0,0,0], [1,0,0,0]] => it looks like [1,0,0,0,1,0,0,0]
 def gemm_v2_blockscale_fp8_scale_preprocess(scale_a):
     torch.set_printoptions(precision=8)
-    chunk_size = 8192
+    chunk_size = 16384
     if (scale_a.size(0) <= chunk_size):
         return pad_row_to_alignment(scale_a, 4).t().contiguous()
         

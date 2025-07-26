@@ -85,7 +85,7 @@ struct AdaBlockwiseGemm {
   }
 
   std::vector<int> HeuristicSchema(int m) {
-    const int size = 8192;
+    const int size = 16384;
     int quotient = m / size;
     int remainder = m % size;
     
