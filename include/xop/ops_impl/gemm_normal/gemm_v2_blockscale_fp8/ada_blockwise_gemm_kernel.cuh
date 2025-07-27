@@ -11,29 +11,20 @@ template <typename GemmKernel>
 CUTLASS_GLOBAL void ada_blockwise_fp8_gemm_run_kernel(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, void const* A,
   void const* B, void* D, float const* scales_a, float const* scales_b) {
   GemmKernel op;
-  op.invoke(shape_m, shape_n, shape_k, A, B, D, scales_a, scales_b);
+  auto ptr_a = reinterpret_cast<typename GemmKernel::ElementInput const*>(A);
+  auto ptr_b = reinterpret_cast<typename GemmKernel::ElementInput const*>(B);
+  auto ptr_scale_a = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_a);
+  auto ptr_scale_b = reinterpret_cast<typename GemmKernel::ElementBlockScale const*>(scales_b);
+  auto ptr_output = reinterpret_cast<typename GemmKernel::ElementOutput*>(D);
+
+  op(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, ptr_output, shape_m, shape_n, shape_k);
 }
 
 template <typename KT>
 struct AdaBlockwiseGemmKernel {
-  using SharedStorage = typename KT::SharedStorage;
   using ElementInput = typename KT::ElementInput;
   using ElementOutput = typename KT::ElementOutput;
   using ElementBlockScale = typename KT::ElementBlockScale;
-
-  // Factory invocation
-  CUTLASS_DEVICE
-  void invoke(uint32_t shape_m, uint32_t shape_n, uint32_t shape_k, 
-              void const* A, void const* B, void* D,
-              float const* scales_a, float const* scales_b) {
-    auto ptr_a = reinterpret_cast<ElementInput const*>(A);
-    auto ptr_b = reinterpret_cast<ElementInput const*>(B);
-    auto ptr_scale_a = reinterpret_cast<ElementBlockScale const*>(scales_a);
-    auto ptr_scale_b = reinterpret_cast<ElementBlockScale const*>(scales_b);
-    auto ptr_output = reinterpret_cast<ElementOutput*>(D);
-
-    (*this)(ptr_a, ptr_b, ptr_scale_a, ptr_scale_b, ptr_output, shape_m, shape_n, shape_k);
-  }
 
   template <class TensorD, class TensorC, class TensorScale, class Index>
   CUTE_DEVICE void promote(TensorD& accum, TensorC const& temp_accum, TensorScale const& scale, Index n_block) {
@@ -317,28 +308,48 @@ struct AdaBlockwiseGemmKernel {
     cute::copy(tiled_copy_R2S, tRS_rO, tRS_sO);
     __syncthreads();
 
-    // copy smem -> rf
-    typename KT::TiledCopyS2G tiled_copy_S2G;
-    auto thr_copy_S2G = tiled_copy_S2G.get_slice(threadIdx.x);
-    auto tSR_sO = thr_copy_S2G.partition_S(sO);
-    auto tSR_rO = cute::make_tensor<KT::ElementOutput>(cute::shape(tSR_sO));
+    if constexpr (0) {
+      // copy smem -> rf
+      typename KT::TiledCopyS2G tiled_copy_S2G;
+      auto thr_copy_S2G = tiled_copy_S2G.get_slice(threadIdx.x);
+      auto tSR_sO = thr_copy_S2G.partition_S(sO);
+      auto tSR_rO = cute::make_tensor<KT::ElementOutput>(cute::shape(tSR_sO));
 
-    cute::copy(tiled_copy_S2G, tSR_sO, tSR_rO);
-    __syncthreads();
+      cute::copy(tiled_copy_S2G, tSR_sO, tSR_rO);
+      __syncthreads();
 
-    // copy rf -> gmem
-    auto tRG_rO = thr_copy_S2G.retile_S(tSR_rO);
-    auto tRG_gO = thr_copy_S2G.partition_D(gO);
-    auto tRG_cO = thr_copy_S2G.partition_D(cO);
-
-    CUTE_UNROLL
-    for (int m = 0; m < cute::size<1>(tRG_gO); ++m) {
+      // copy rf -> gmem
+      auto tRG_rO = thr_copy_S2G.retile_S(tSR_rO);
+      auto tRG_gO = thr_copy_S2G.partition_D(gO);
+      auto tRG_cO = thr_copy_S2G.partition_D(cO);
+      
       CUTE_UNROLL
-      for (int n = 0; n < cute::size<2>(tRG_gO); ++n) {
-        if (cute::get<0>(tRG_cO(0, m, n)) < residue_m && cute::get<1>(tRG_cO(0, m, n)) < residue_n) {
-          cute::copy(typename KT::GmemCopyAtomR2G{}, tRG_rO(cute::_, m, n), tRG_gO(cute::_, m, n));
+      for (int m = 0; m < cute::size<1>(tRG_gO); ++m) {
+        CUTE_UNROLL
+        for (int n = 0; n < cute::size<2>(tRG_gO); ++n) {
+          if (cute::get<0>(tRG_cO(0, m, n)) < residue_m && cute::get<1>(tRG_cO(0, m, n)) < residue_n) {
+            cute::copy(typename KT::GmemCopyAtomR2G{}, tRG_rO(cute::_, m, n), tRG_gO(cute::_, m, n));
+          }
         }
       }
+    }
+    else {
+      // copy smem -> gmem
+      typename KT::TiledCopyS2G tiled_copy_S2G;
+      auto thr_copy_S2G = tiled_copy_S2G.get_slice(threadIdx.x);
+      auto tSR_sO = thr_copy_S2G.partition_S(sO);
+      auto tRG_gO = thr_copy_S2G.partition_D(gO);
+      auto tRG_cO = thr_copy_S2G.partition_D(cO);
+
+      CUTE_UNROLL
+      for (int m = 0; m < cute::size<1>(tRG_gO); ++m) {
+        CUTE_UNROLL
+        for (int n = 0; n < cute::size<2>(tRG_gO); ++n) {
+          if (cute::get<0>(tRG_cO(0, m, n)) < residue_m && cute::get<1>(tRG_cO(0, m, n)) < residue_n) {
+            cute::copy(typename KT::GmemCopyAtomR2G{}, tSR_sO(cute::_, m, n), tRG_gO(cute::_, m, n));
+          }
+        }
+      }      
     }
   }
 };

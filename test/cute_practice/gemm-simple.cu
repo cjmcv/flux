@@ -84,7 +84,7 @@ __global__ void gemm_simple(T *Cptr, const T *Aptr, const T *Bptr, int m, int n,
 int main() {
   srand(10086);
 
-  using T = cute::half_t;
+  using T = float; // cute::half_t;
   using namespace cute;
 
   T *Cptr;
@@ -92,8 +92,8 @@ int main() {
   T *Bptr;
 
   int m = 1024;
-  int n = 1024;
-  int k = 1024;
+  int n = 640;
+  int k = 2048;
 
   cudaMalloc(&Cptr, sizeof(T) * m * n);
   cudaMalloc(&Aptr, sizeof(T) * m * k);
@@ -113,7 +113,7 @@ int main() {
   cudaMemcpy(Aptr, Aptr_host, sizeof(T) * m * k, cudaMemcpyHostToDevice);
   cudaMemcpy(Bptr, Bptr_host, sizeof(T) * n * k, cudaMemcpyHostToDevice);
 
-  using mma_op = SM80_16x8x16_F16F16F16F16_TN;
+  using mma_op = SM80_16x8x4_F32TF32TF32F32_TN; // SM80_16x8x16_F16F16F16F16_TN;
   using mma_traits = MMA_Traits<mma_op>;
   using mma_atom = MMA_Atom<mma_traits>;
 
