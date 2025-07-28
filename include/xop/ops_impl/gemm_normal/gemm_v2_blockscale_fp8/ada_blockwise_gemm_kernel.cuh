@@ -28,7 +28,6 @@ struct AdaBlockwiseGemmKernel {
 
   template <class TensorD, class TensorC, class TensorScale, class Index>
   CUTE_DEVICE void promote(TensorD& accum, TensorC const& temp_accum, TensorScale const& scale, Index n_block) {
-
     using AccumType = typename TensorD::value_type;
     for (int mma_m = 0; mma_m < cute::get<1>(cute::shape<0>(accum)); ++mma_m) {
       CUTE_UNROLL
@@ -102,8 +101,8 @@ struct AdaBlockwiseGemmKernel {
             [&](auto i) { scale(i) = tXrSFA(i) * tXrSFB(0); });
 
   #define STEP2_MMA()                                                      \
-    cute::clear(temp);                                                     \
-    cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp);
+    cute::clear(temp_accum);                                                     \
+    cute::gemm(mma, tCrA, tCrB(cute::_, cute::_, cute::_, n_block), temp_accum);
       
   CUTE_DEVICE
   void operator()(typename KT::ElementInput const* ptr_a, typename KT::ElementInput const* ptr_b,
@@ -113,7 +112,7 @@ struct AdaBlockwiseGemmKernel {
     extern __shared__ int SharedStorageBase[];
     using X = cute::Underscore;
 
-    uint32_t const ScaleM = (((M + 3) >> 2) << 2); // align 4
+    uint32_t const ScaleM = (((M + 3) >> 2) << 2);
     uint32_t const ScaleN = (N + KT::ScaleGranularityN - 1) / KT::ScaleGranularityN;
     uint32_t const ScaleK = (K + KT::ScaleGranularityK - 1) / KT::ScaleGranularityK;
 
@@ -156,8 +155,8 @@ struct AdaBlockwiseGemmKernel {
     // smem -> rmem
     // mnk => 32x128x128 => 32x(32x4)x128 => [32,128] x [32x128] x 4
     typename KT::TiledMma mma;
-    auto accum = cute::partition_fragment_C(mma, cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kMmaPermN>{}, cute::Int<KT::NUM_GROUP_N>{})); // (MMA,MMA_M,MMA_N)
-    auto temp  = cute::partition_fragment_C(mma, cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kMmaPermN>{})); // (MMA,MMA_M,MMA_N)
+    auto accum      = cute::partition_fragment_C(mma, cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kMmaPermN>{}, cute::Int<KT::NUM_GROUP_N>{})); // (MMA,MMA_M,MMA_N)
+    auto temp_accum = cute::partition_fragment_C(mma, cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kMmaPermN>{})); // (MMA,MMA_M,MMA_N)
 
     auto mma_shape_A = cute::partition_shape_A(mma, cute::make_shape(cute::Int<KT::kTileM>{}, cute::Int<KT::kTileK>{}));
     auto mma_shape_B = cute::partition_shape_B(mma, cute::make_shape(cute::Int<KT::kMmaPermN>{}, cute::Int<KT::kTileK>{}, cute::Int<KT::NUM_GROUP_N>{}));
@@ -245,7 +244,7 @@ struct AdaBlockwiseGemmKernel {
         if constexpr (n_block == KT::NUM_GROUP_N - 1) {
           cute::copy(s2r_copy_A, tXsA_read, tXrA);
         }
-        promote(accum, temp, scale, n_block);
+        promote(accum, temp_accum, scale, n_block);
       });
     }
     // load tail
@@ -272,7 +271,7 @@ struct AdaBlockwiseGemmKernel {
         if constexpr (n_block == KT::NUM_GROUP_N - 1) {
           cute::copy(s2r_copy_A, tXsA_read, tXrA);
         }
-        promote(accum, temp, scale, n_block);
+        promote(accum, temp_accum, scale, n_block);
       });
     });
     // mma tail
@@ -282,7 +281,7 @@ struct AdaBlockwiseGemmKernel {
         STEP1_GET_SCALE();
       }
       STEP2_MMA();
-      promote(accum, temp, scale, n_block);
+      promote(accum, temp_accum, scale, n_block);
     });
 
     /////////////////
@@ -308,7 +307,7 @@ struct AdaBlockwiseGemmKernel {
     cute::copy(tiled_copy_R2S, tRS_rO, tRS_sO);
     __syncthreads();
 
-    if constexpr (0) {
+    if constexpr (1) {
       // copy smem -> rf
       typename KT::TiledCopyS2G tiled_copy_S2G;
       auto thr_copy_S2G = tiled_copy_S2G.get_slice(threadIdx.x);

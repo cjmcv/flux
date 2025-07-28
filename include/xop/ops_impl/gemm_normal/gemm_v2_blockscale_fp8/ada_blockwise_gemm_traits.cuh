@@ -34,15 +34,6 @@ struct SM89_16x8x32_F16E4M3E4M3F16_TN
     uint32_t const& b0, uint32_t const& b1,
     uint32_t const& c0, uint32_t const& c1)
   {
-    // printf("b0: %u\n", b0);
-    // xop::print_4xfp8e4m3("a0", a0);
-    // xop::print_4xfp8e4m3("a1", a1);
-    // xop::print_4xfp8e4m3("a2", a2);
-    // xop::print_4xfp8e4m3("a3", a3);
-    // xop::print_4xfp8e4m3("b0", b0);
-    // xop::print_4xfp8e4m3("b1", b1);
-    // xop::print_2xhalf("c0z", c0);
-    // xop::print_2xhalf("c1z", c1);
 #if defined(CUTE_ARCH_MMA_F16_SM89_ENABLED)
     asm volatile(
       "mma.sync.aligned.m16n8k32.row.col.f16.e4m3.e4m3.f16 "
@@ -59,11 +50,6 @@ struct SM89_16x8x32_F16E4M3E4M3F16_TN
       "Attempting to use SM89_16x8x32_F16F4M3FE4M3F16_TN without "
       "CUTE_ARCH_MMA_F16_SM89_ENABLED");
 #endif
-
-    // xop::print_2xhalf("c0f", c0);
-    // xop::print_2xhalf("c1f", c1);
-    // xop::print_2xhalf("d0", d0);
-    // xop::print_2xhalf("d1", d1);
   }
 };
 
@@ -124,8 +110,7 @@ struct AdaBlockwiseGemmTraits {
   using ScalePerTileShape = Shape<Int<ScaleMsPerTile>, Int<ScaleNsPerTile>, Int<ScaleKsPerTile>>;
   
   /////////
-  // mma //
-  /////////
+  // mma 
   static constexpr int kMmaPermM = size<0>(PermShape_{});
   static constexpr int kMmaPermN = size<1>(PermShape_{});
   static constexpr int kMmaPermK = size<2>(PermShape_{});
@@ -143,8 +128,7 @@ struct AdaBlockwiseGemmTraits {
                                            Tile<Int<kMmaPermM>, Int<kMmaPermN>, Int<kMmaPermK>>{}));
 
   ///////////////////////
-  // load gmem -> smem //
-  ///////////////////////
+  // load gmem -> smem 
 
   // ====== A/B ======
   using G2STiledCopy = decltype(make_tiled_copy(Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<uint128_t>, ElementInput>{},
@@ -162,8 +146,7 @@ struct AdaBlockwiseGemmTraits {
                                                        Shape<Int<ScaleNsPerTile>, Int<ScaleKsPerTile>>{}));
 
   /////////////////////
-  // load smem -> rf //
-  /////////////////////
+  // load smem -> rf 
 
   // ====== A/B =====
   // using SmemAtomLayoutLoad = decltype(composition(Swizzle<2, 4, 3>{}, Layout<Shape<_8, _128>, Stride<_128, _1>>{}));
@@ -190,21 +173,22 @@ struct AdaBlockwiseGemmTraits {
                                                           Int<Stages>{}))); // BLK_N, BLK_K, Stages
 
   //////////////////////
-  // store smem -> rf //
-  //////////////////////
+  // store rf -> smem 
 
-  // ====== store rf -> smem ======
   using SmemAtomLayoutStore = decltype(composition(Swizzle<3, 3, 3>{}, Layout<Shape<_8, Shape<_8, _8>>, Stride<_8, Stride<_1, _64>>>{})); //  8x64
   using SmemLayoutO = decltype(tile_to_shape(SmemAtomLayoutStore{}, Shape<Int<kTileM>, Int<kTileN>>{}));
   using SmemCopyAtomR2S = Copy_Atom<AutoVectorizingCopy, ElementOutput>;
-  // ====== store smem -> gmem ======
+
+  ////////////////////////
+  // store smem -> gmem 
+
   using SmemCopyAtomS2R = Copy_Atom<UniversalCopy<uint128_t>, ElementOutput>;
   using GmemCopyAtomR2G = SmemCopyAtomS2R;
   using TiledCopyS2G = decltype(make_tiled_copy(SmemCopyAtomS2R{}, Layout<Shape<_16, _8>, Stride<_8, _1>>{}, Layout<Shape<_1, _8>>{})); // 16x64
 
   ///////////////////////////
-  // shared memory storage //
-  ///////////////////////////
+  // shared memory storage
+
   struct SharedStorageLoad : aligned_struct<128> {
     array_aligned<ElementInput, cosize_v<SmemLayoutA>> smem_a;
     array_aligned<ElementInput, cosize_v<SmemLayoutB>> smem_b;
