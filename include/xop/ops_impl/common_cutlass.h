@@ -9,6 +9,17 @@
 
 #include "xop/common_cuda.h"
 
+/**
+ * Panic wrapper for unwinding CUTLASS errors
+ */
+#define CUTLASS_CHECK(status)                                            \
+  do {                                                                   \
+    cutlass::Status error = status;                                      \
+    XOP_CHECK(error == cutlass::Status::kSuccess)                       \
+        << "Got cutlass error: " << cutlassGetStatusString(error) << "(" \
+        << static_cast<int>(error) << ") at: " << #status << "\n";       \
+  } while (0)
+  
 namespace xop {
 
 template <class LayoutA, class LayoutB, class LayoutC>

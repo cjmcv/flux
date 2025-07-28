@@ -1,6 +1,6 @@
 #pragma once
 #include "xop/ops_impl/global_resource.h"
-#include "xop/ops_impl/args_util.h"
+#include "xop/ops_impl/common_cutlass.h"
 
 namespace xop {
 

@@ -1,29 +1,12 @@
 
 #pragma once
 
-#include "cutlass/detail/dependent_false.hpp"
-#include "cutlass/float8.h"
 #include "xop/xop.h"
 #include <cuda_fp8.h>
 #include <cuda_runtime.h>
-#include "cutlass/cutlass.h"
-#include "cutlass/arch/arch.h"
-#include "cutlass/layout/matrix.h"
-#include "cutlass/numeric_types.h"
 #include <type_traits>
 #include "cuda_fp16.h"
 #include "cuda_bf16.h"
-
-/**
- * Panic wrapper for unwinding CUTLASS errors
- */
-#define CUTLASS_CHECK(status)                                            \
-  do {                                                                   \
-    cutlass::Status error = status;                                      \
-    XOP_CHECK(error == cutlass::Status::kSuccess)                       \
-        << "Got cutlass error: " << cutlassGetStatusString(error) << "(" \
-        << static_cast<int>(error) << ") at: " << #status << "\n";       \
-  } while (0)
 
 /**
  * Panic wrapper for unwinding CUDA runtime errors

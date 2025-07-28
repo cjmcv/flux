@@ -24,8 +24,7 @@ namespace xop {
 
 
 template<class Engine, class Layout>
-void print_device_tensor(cute::Tensor<Engine, Layout> const& t)
-{
+void print_device_tensor(cute::Tensor<Engine, Layout> const& t) {
   // Assumes size = cosize, i.e. compact tensor
   std::vector<typename Engine::value_type> data_host(t.size());
   cutlass::device_memory::copy_to_host(data_host.data(), t.data(), t.size());
@@ -35,8 +34,7 @@ void print_device_tensor(cute::Tensor<Engine, Layout> const& t)
 
 
 template <class Engine, class Layout>
-CUTE_HOST_DEVICE void print_tensor_shape(const char* name, cute::Tensor<Engine,Layout> const& tensor)
-{  
+CUTE_HOST_DEVICE void print_tensor_shape(const char* name, cute::Tensor<Engine,Layout> const& tensor) {  
   printf("%s: ", name); 
   auto tshape = cute::shape(tensor.layout());
   cute::print(tshape); 
@@ -46,9 +44,9 @@ CUTE_HOST_DEVICE void print_tensor_shape(const char* name, cute::Tensor<Engine,L
 
 template <class Engine, class Layout>
 CUTE_HOST_DEVICE bool is_tensor_aligned(cute::Tensor<Engine,Layout> const& tensor, size_t alignment) {
-    auto ptr = tensor.data();
-    uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
-    return (addr % alignment) == 0;
+  auto ptr = tensor.data();
+  uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
+  return (addr % alignment) == 0;
 }
 
 CUTE_HOST_DEVICE void print_2xbfloat16(const char* name, uint32_t src) {
@@ -94,51 +92,6 @@ CUTE_HOST_DEVICE void print_tensor(const char* name, cute::Tensor<Engine,Layout>
     printf("(float_e4m3_t): ");
   }
   cute::print_tensor(tensor);
-  
-  // if (print_type) {
-  //   cute::print(tensor); printf(":\n");
-  // }
-
-  // if constexpr (Layout::rank == 1)
-  // {
-  //   // print("dim[%d].\n", size(tensor));
-  //   for (int m = 0; m < cute::size(tensor); ++m) {
-  //     cute::pretty_print(tensor(m));
-  //     printf("\n");
-  //   }
-  // } else
-  // if constexpr (Layout::rank == 2)
-  // {
-  //   // print("dim[%d, %d].\n", size<0>(tensor), size<1>(tensor));
-  //   for (int m = 0; m < cute::size<0>(tensor); ++m) {
-  //     for (int n = 0; n < cute::size<1>(tensor); ++n) {
-  //       cute::pretty_print(tensor(m,n));
-  //     }
-  //     printf("\n");
-  //   }
-  // } else
-  // if constexpr (Layout::rank == 3)
-  // {
-  //   // if (tensor_type == 0) {
-  //   //   print_tensor(tensor(0,_,_), false);
-  //   // }
-  //   // else {
-  //     print_tensor(tensor(_,_,0), false);
-  //     for (int k = 1; k < size<2>(tensor); ++k) {
-  //       for (int i = 0; i < 5*size<1>(tensor); ++i) { print("-"); } print("\n");
-  //       print_tensor(tensor(_,_,k), false);
-  //     }      
-  //   // }
-  // } else
-  // if constexpr (Layout::rank == 4)
-  // {
-  //   // print("dim[%d, %d, %d, %d].\n", size<0>(tensor) , size<1>(tensor), size<2>(tensor), size<3>(tensor));
-  //   print_tensor(tensor(_,_,_,0), false);
-  //   for (int p = 1; p < size<3>(tensor); ++p) {
-  //     for (int i = 0; i < 5*size<1>(tensor); ++i) { print("="); } print("\n");
-  //     print_tensor(tensor(_,_,_,p), false);
-  //   }
-  // }
 }
 
 }  // namespace cute
