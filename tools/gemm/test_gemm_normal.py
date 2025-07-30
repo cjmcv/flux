@@ -374,7 +374,8 @@ if __name__ == "__main__":
     plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
     
-    plt.ylim(bottom=0)
+    # plt.ylim(bottom=0)  # 
+
     plt.title(f'perf-N{args.N}-K{args.K}')
     plt.xlabel('m_size')
     if args.show_tflops:

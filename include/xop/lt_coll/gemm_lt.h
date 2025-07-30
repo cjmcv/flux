@@ -9,15 +9,11 @@
 
 namespace xop {
 
-// struct AlgoResource {
-//   int m;
-//   int n;
-//   int k;
-
-
-// };
-
-
+// GemmLt cublaslt_gemm;
+// cublaslt_gemm.init(handle, n, m, k, type_input, type_output, type_compute, true);
+// cublasLtMatmulAlgo_t algo;
+// cublaslt_gemm.get_algo(0, algo);
+// cublaslt_gemm.run(algo, weight.data_ptr(), input.data_ptr(), output.data_ptr());
 struct GemmLt {
   cublasLtHandle_t handle_;
 
@@ -60,12 +56,9 @@ struct GemmLt {
     CUBLASLT_CHECK(cublasLtMatrixLayoutCreate(&b_desc_, type_input, k, n, k));
     CUBLASLT_CHECK(cublasLtMatrixLayoutCreate(&c_desc_, type_output, m, n, m));
   
-    CUBLASLT_CHECK(cublasLtMatrixLayoutSetAttribute(
-        a_desc_, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch, sizeof(batch)));
-    CUBLASLT_CHECK(cublasLtMatrixLayoutSetAttribute(
-        b_desc_, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch, sizeof(batch)));
-    CUBLASLT_CHECK(cublasLtMatrixLayoutSetAttribute(
-        c_desc_, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch, sizeof(batch)));
+    CUBLASLT_CHECK(cublasLtMatrixLayoutSetAttribute(a_desc_, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch, sizeof(batch)));
+    CUBLASLT_CHECK(cublasLtMatrixLayoutSetAttribute(b_desc_, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch, sizeof(batch)));
+    CUBLASLT_CHECK(cublasLtMatrixLayoutSetAttribute(c_desc_, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch, sizeof(batch)));
   
     CUBLASLT_CHECK(cublasLtMatrixLayoutSetAttribute(a_desc_, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &a_stride, sizeof(a_stride)));
     CUBLASLT_CHECK(cublasLtMatrixLayoutSetAttribute(b_desc_, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &b_stride, sizeof(b_stride)));

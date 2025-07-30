@@ -53,4 +53,23 @@ struct DebugUtils {
   }
 };
 
+inline cublasDataType_t WarpIdMeta2CublasLtType(int16_t meta_data) {
+  switch (meta_data) {
+    case (int16_t)UnifiedMetaEnum::FP32:     return CUDA_R_32F;
+    case (int16_t)UnifiedMetaEnum::BF16:     return CUDA_R_16BF;
+    case (int16_t)UnifiedMetaEnum::FP16:     return CUDA_R_16F;
+    case (int16_t)UnifiedMetaEnum::E4M3:     return CUDA_R_8F_E4M3;
+    case (int16_t)UnifiedMetaEnum::E5M2:     return CUDA_R_8F_E5M2;
+  }
+  throw std::runtime_error(std::string("<WarpIdMeta2CublasLtType> unsupported dtype: ") + std::to_string(meta_data));
+}
+
+inline cublasComputeType_t WarpIdMeta2CublasLtComputeType(int16_t meta_data) {
+  switch (meta_data) {
+    case (int16_t)UnifiedMetaEnum::FP32:     return CUBLAS_COMPUTE_32F;
+    case (int16_t)UnifiedMetaEnum::FP16:     return CUBLAS_COMPUTE_16F;
+  }
+  throw std::runtime_error(std::string("<WarpIdMeta2CublasLtType> unsupported dtype: ") + std::to_string(meta_data));
+}
+
 }  // namespace xop

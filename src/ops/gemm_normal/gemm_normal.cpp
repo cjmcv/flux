@@ -120,33 +120,6 @@ public:
       c10::optional<torch::Tensor> tuning,
       bool fast_accum
     ) {
-    // {
-    //   // GemmLtConfigRegister& ins_lt = GemmLtConfigRegister::instance(); 
-
-    //   int32_t m = input.size(0);
-    //   int32_t k = input.size(1);
-    //   int32_t n = transpose_weight ? weight.size(1) : weight.size(0);
-
-    //   // CUDA_R_16BF
-    //   // CUBLAS_COMPUTE_16F / CUBLAS_COMPUTE_32F
-    //   // CUDA_R_32F
-    //   cublasLtHandle_t handle;
-    //   CUBLASLT_CHECK(cublasLtCreate(&handle));
-
-    //   cudaDataType_t type_input = CUDA_R_16BF;
-    //   cudaDataType_t type_output = CUDA_R_16BF;
-    //   cublasComputeType_t type_compute = CUBLAS_COMPUTE_32F;
-
-    //   GemmLt cublaslt_gemm;
-    //   cublaslt_gemm.init(handle, n, m, k, type_input, type_output, type_compute, true);
-    //   cublasLtMatmulAlgo_t algo;
-    //   cublaslt_gemm.get_algo(0, algo);
-    //   cublaslt_gemm.run(algo, weight.data_ptr(), input.data_ptr(), output.data_ptr());
-
-    //   CUBLASLT_CHECK(cublasLtDestroy(handle));
-    //   return 0;
-    // }
-
     // std::cout << "Tensor input:\n" << input << std::endl;
     std::vector<int16_t> id_meta = MakeDefaultMeta(fast_accum);       // id + meta
     std::unique_ptr<RtArguments> rt_args;
@@ -206,19 +179,13 @@ public:
       }
       PRINTF("[runing] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
       if (id_meta[IdMetaEnum::Schema] == (int16_t)UnifiedMetaEnum::GemmLt) {
-        cudaDataType_t type_input, type_output;
-        cublasComputeType_t type_compute;
-        if (id_meta[IdMetaEnum::TypeA] == (int16_t)UnifiedMetaEnum::BF16) {
-          type_input = CUDA_R_16BF;
+        if constexpr (TUNING_WITH_CUBLASLT == false) {
+          return RunTorch(input, weight, output, bias);
         }
-        if (id_meta[IdMetaEnum::TypeCD] == (int16_t)UnifiedMetaEnum::BF16) {
-          type_output = CUDA_R_16BF;
-        }
-        if (id_meta[IdMetaEnum::TypeAcc] == (int16_t)UnifiedMetaEnum::FP32) {
-          type_compute = CUBLAS_COMPUTE_32F;
-        }
-
-        printf("Run cublasLt.\n");
+        cudaDataType_t type_input = WarpIdMeta2CublasLtType(id_meta[IdMetaEnum::TypeA]);
+        cudaDataType_t type_output = WarpIdMeta2CublasLtType(id_meta[IdMetaEnum::TypeCD]);
+        cublasComputeType_t type_compute = WarpIdMeta2CublasLtComputeType(id_meta[IdMetaEnum::TypeAcc]);
+        
         GemmLt cublaslt_gemm;
         cublaslt_gemm.init(cublaslt_handle_, rt_args->n, rt_args->m, rt_args->k, type_input, type_output, type_compute, false);
         cublaslt_gemm.run(algo, weight.data_ptr(), input.data_ptr(), output.data_ptr());
@@ -419,18 +386,13 @@ private:
     id_meta[IdMetaEnum::Schema] = tuning_data[2];
     
     PRINTF("[tuning] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
-    if (TUNING_WITH_CUBLASLT && id_meta[IdMetaEnum::Schema] == (int16_t)UnifiedMetaEnum::GemmLt) {
-      cudaDataType_t type_input, type_output;
-      cublasComputeType_t type_compute;
-      if (id_meta[IdMetaEnum::TypeA] == (int16_t)UnifiedMetaEnum::BF16) {
-        type_input = CUDA_R_16BF;
+    if (id_meta[IdMetaEnum::Schema] == (int16_t)UnifiedMetaEnum::GemmLt) {
+      if constexpr (TUNING_WITH_CUBLASLT == false) {
+        return -1;
       }
-      if (id_meta[IdMetaEnum::TypeCD] == (int16_t)UnifiedMetaEnum::BF16) {
-        type_output = CUDA_R_16BF;
-      }
-      if (id_meta[IdMetaEnum::TypeAcc] == (int16_t)UnifiedMetaEnum::FP32) {
-        type_compute = CUBLAS_COMPUTE_32F;
-      }
+      cudaDataType_t type_input = WarpIdMeta2CublasLtType(id_meta[IdMetaEnum::TypeA]);
+      cudaDataType_t type_output = WarpIdMeta2CublasLtType(id_meta[IdMetaEnum::TypeCD]);
+      cublasComputeType_t type_compute = WarpIdMeta2CublasLtComputeType(id_meta[IdMetaEnum::TypeAcc]);
 
       // Only create in the first No.0
       if (id_meta[IdMetaEnum::Id] == 0 && cublaslt_gemm_ == nullptr) {
