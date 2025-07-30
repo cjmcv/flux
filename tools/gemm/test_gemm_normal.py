@@ -340,7 +340,9 @@ def parse_args():
 
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_normal.py --has_bias --dtype=float16 100 1000 1000
+# python3 tools/gemm/test_gemm_normal.py 12 4096 4096
+# python3 tools/gemm/test_gemm_normal.py --dtype=float16 100 4096 4096
+# python3 tools/gemm/test_gemm_normal.py --has_bias --dtype=float16 100 4096 4096
 # python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn
 # python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
 if __name__ == "__main__":
@@ -358,7 +360,7 @@ if __name__ == "__main__":
             run(m, args, xop_perf, torch_perf)
         plot_x = [1] + list(range(2, args.M, args.step))
     else:
-        exponent = 17 # 65536: 17
+        exponent = args.M # 65536: 17
         for m in range(1, exponent):
             m = 2**m
             print(f"M: {m}, N: {args.N}, K: {args.K}")

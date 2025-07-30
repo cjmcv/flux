@@ -13,6 +13,7 @@
 #include "cute/numeric/integral_constant.hpp"
 #include "cute/util/type_traits.hpp"
 
+#include "xop/xop.h"
 #include "arguments.h"
 
 namespace xop {
@@ -149,8 +150,6 @@ private:
   std::map<std::vector<int32_t>, std::vector<int16_t>> tuned_map;
 
   TunedConfigRegister() = default;
-
-  // 防止拷贝构造和赋值操作
   TunedConfigRegister(const TunedConfigRegister&) = delete;
   TunedConfigRegister& operator=(const TunedConfigRegister&) = delete;
 
@@ -164,11 +163,14 @@ public:
     tuned_map[key] = select_config;
   }
 
-  void GetSelectedConfig(const std::vector<int32_t> &key, int16_t *selected_id, int16_t *schema_id) {
+  void GetSelectedConfig(const std::vector<int32_t> &key, int16_t *selected_id, int16_t *schema_id, uint64_t *cublaslt_algo = nullptr) {
     auto it = tuned_map.find(key);
     if (it != tuned_map.end()) {
       *selected_id = it->second[0];
       *schema_id = it->second[1];
+      if (cublaslt_algo != nullptr && *schema_id == (int16_t)UnifiedMetaEnum::GemmLt) {
+        memcpy(cublaslt_algo, &it->second[2], sizeof(uint64_t) * 8);
+      }
       return;
     }
   }

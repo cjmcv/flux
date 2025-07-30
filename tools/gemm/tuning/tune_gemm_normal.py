@@ -44,7 +44,7 @@ class TuningConfig:
 
 class GemmNormalSchema:
     name = "GemmNormal"
-    sub_schema = [Meta.GemmNormal, Meta.GemmNormalSimt]
+    sub_schema = [Meta.GemmNormal, Meta.GemmLt] # GemmNormalSimt
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
     if is_use_fp16_acc:
@@ -142,7 +142,7 @@ def str2schema(schema_name):
 def gen_tuning_space(schema):
     space: List[TuningConfig] = []
     space_G = [1]
-    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384] #,16384,32768,65536 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096] #,8192,16384,32768,65536 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
     space_NK = [(4096, 4096)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     
     # space_G = [4, 8]
@@ -162,7 +162,8 @@ def gen_tuning_space(schema):
         space.append(config)
     return space
 
-def profiling_core(tuning, shape, fn: callable, fp):
+def profiling_core(shape, fn: callable, fp):
+    tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
     m = shape[0]
     n = shape[1]
     k = shape[2]
@@ -173,7 +174,7 @@ def profiling_core(tuning, shape, fn: callable, fp):
         for id in range(500):
             # warmup and check if exist.
             tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
-            ret = fn()
+            ret = fn(tuning)
             code = 0
             if (isinstance(ret, torch.Tensor) and ret is None):
                 code = -1
@@ -188,27 +189,40 @@ def profiling_core(tuning, shape, fn: callable, fp):
                     torch.cuda.synchronize()
                     start = time.time()
                 tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
-                fn()
+                fn(tuning)
             torch.cuda.synchronize()
             elapsed_time = time.time() - start
             tuning_data.append((elapsed_time, id, sub_schema))
 
     tuning_data.sort()
     tuning[0], tuning[1], tuning[2] = 1, tuning_data[0][1], tuning_data[0][2]
-    fn()
+    fn(tuning)  # Run it once to retrieve the metadata.
 
-    # tuning: 0:meta_len, 1:id, 2:schema, 3:~meta
-    meta_len = tuning[0]       # len
+    # tuning: 0:meta_end_idx, 1:id, 2:schema, 3:~meta
+    #         [20-28): cublasLt-algo
+    meta_start_idx = 3
+    meta_end_idx = tuning[0] # len
+    cublasLt_start_idx = 20 # 8*uint64_t = 32*int16_t
+    cublasLt_end_idx = 51
+   
     meta_str = ''              #
-    for i in range(3, meta_len):
+    for i in range(meta_start_idx, meta_end_idx):
         meta_str += "(int16_t)ME::" + str(Meta(tuning[i].item())) + ','
-    meta_str += "(int16_t)ME::" + str(Meta(tuning[meta_len].item()))
+    meta_str += "(int16_t)ME::" + str(Meta(tuning[meta_end_idx].item()))
 
     for sid in range(min(3, len(tuning_data))):
         prefix = ''
         if sid != 0:
             prefix = '// '
-        message = "  {0}tins.add({{{1},{2},{3},{4},{5}}}, /*config*/{{{6}, {7}}}); // {8}ms\n".format(prefix, m, n, k, g, meta_str, str(tuning_data[sid][1]), "(int16_t)ME::"+str(tuning_data[sid][2]), str(round(tuning_data[sid][0] * 1000 / pref_iters, 3)))
+        if tuning_data[sid][2] == Meta.GemmLt: # cublasLt schema
+            cublas_algo_str = ''
+            for i in range(cublasLt_start_idx, cublasLt_end_idx):
+                cublas_algo_str += str(tuning[i].item()) + ','
+            cublas_algo_str += str(tuning[cublasLt_end_idx].item())
+            selected_res = "{0}, {1}, {2}".format(str(tuning_data[sid][1]), "(int16_t)ME::"+str(tuning_data[sid][2]), cublas_algo_str)
+        else: # cutlass
+            selected_res = "{0}, {1}".format(str(tuning_data[sid][1]), "(int16_t)ME::"+str(tuning_data[sid][2]))
+        message = "  {0}tins.add({{{1},{2},{3},{4},{5}}}, /*config*/{{{6}}}); // {7}ms\n".format(prefix, m, n, k, g, meta_str, selected_res, str(round(tuning_data[sid][0] * 1000 / pref_iters, 3)))
         fp.write(message)
         fp.flush()
         print(message)
@@ -233,16 +247,15 @@ def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
         n = weight.size(0)
     g = 1
 
-    tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
     output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
     op = xop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
 
-    def fn():
+    def fn(tuning):
         return op.forward(input, weight, output=output, bias=bias, 
                           input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
                           tuning=tuning, fast_accum=is_use_fp16_acc)
     
-    profiling_core(tuning, [m,n,k,g], fn, fp)
+    profiling_core([m,n,k,g], fn, fp)
     return output.cpu()
 
 def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[torch.Tensor], 
@@ -257,14 +270,13 @@ def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[
     for i in range(0, g):
         outputs.append(torch.empty([m, n], dtype=config.dtypeC, device=inputs[0].device, requires_grad=False))
     
-    tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
     op = xop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
 
-    def fn():
+    def fn(tuning):
         return op.grouped_forward(inputs, weights, outputs=outputs, 
                                   inputs_scale=inputs_scale, weights_scale=weights_scale, 
                                   tuning=tuning)
-    profiling_core(tuning, [m,n,k,g], fn, fp)
+    profiling_core([m,n,k,g], fn, fp)
 
     return torch.cat(outputs, dim=0).cpu()
 
@@ -294,7 +306,7 @@ def tune_one_config(schema, config: TuningConfig, fp):
 
         if is_use_fp16_acc:
             atol, rtol = 0.1, 0.1
-        xop.torch_allclose(xop_output, ref_output, atol=atol, rtol=rtol)
+        xutil.torch_allclose(xop_output, ref_output, atol=atol, rtol=rtol)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

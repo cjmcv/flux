@@ -10,6 +10,7 @@ class Meta(IntEnum):
     GemmNormalSimt = auto()
     GemmBlockScaleFp8 = auto()
     GemmGroupedBlockScaleFp8 = auto()
+    GemmLt = auto()
     Void = 10                # data type
     FP16 = auto()   
     BF16 = auto()
@@ -30,6 +31,7 @@ class Meta(IntEnum):
             Meta.GemmNormalSimt: "GemmNormalSimt",
             Meta.GemmBlockScaleFp8: "GemmBlockScaleFp8",
             Meta.GemmGroupedBlockScaleFp8: "GemmGroupedBlockScaleFp8",
+            Meta.GemmLt: "GemmLt",
             Meta.Void: "Void",
             Meta.FP16: "FP16",
             Meta.BF16: "BF16",

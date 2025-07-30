@@ -49,7 +49,7 @@ def cuda_deps():
     cuda_home = Path(os.environ.get("CUDA_HOME", "/usr/local/cuda"))
     include_dirs = [cuda_home / "include"]
     library_dirs = [cuda_home / "lib64", cuda_home / "lib64/stubs"]
-    libraries = ["cuda", "cudart", "nvidia-ml"]
+    libraries = ["cuda", "cudart", "cublasLt", "nvidia-ml"]
     return include_dirs, library_dirs, libraries
 
 def setup_pytorch_extension() -> setuptools.Extension:
