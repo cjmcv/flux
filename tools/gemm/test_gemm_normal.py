@@ -129,7 +129,8 @@ def perf_xop(
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
     ## todo: remove below once moe fp8 gemm invoke get fixed
-    op = xop.GemmNormal(
+    # GemmQuant / GemmNormal
+    op = xop.GemmQuant(
         input_dtype=inputs[0].dtype,
         output_dtype=output_dtype,
         transpose_weight=transpose_weight
@@ -340,11 +341,11 @@ def parse_args():
 
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_normal.py 12 4096 4096
-# python3 tools/gemm/test_gemm_normal.py --dtype=float16 100 4096 4096
-# python3 tools/gemm/test_gemm_normal.py --has_bias --dtype=float16 100 4096 4096
-# python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn
-# python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_tflops
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float16 --show_tflops
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float16 --has_bias 
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_tflops --dtype=float8_e4m3fn
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_tflops --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
 if __name__ == "__main__":
     init_seed()
     args = parse_args()

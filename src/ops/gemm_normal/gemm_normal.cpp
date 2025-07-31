@@ -41,7 +41,7 @@ int CoarseGrainedTuningM(int actual_m, int schema = 0) {
     if (actual_m <= 1) {
       tuned_m = 1;
     }
-    else if (actual_m >= 16384) { // 32768
+    else if (actual_m >= 16384) { // 4096, 8192, 16384, 32768, 65536
       tuned_m = 16384;
     }
     else {
@@ -172,9 +172,6 @@ public:
           return RunTorch(input, weight, output, bias);
         else {
           id_meta[IdMetaEnum::Id] = 0;
-          if (fast_accum) {  
-            id_meta[IdMetaEnum::Id] = 1; // Temporary solution: fp16 acc uses Scheme 1 by default.
-          }
         }
       }
       PRINTF("[runing] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);

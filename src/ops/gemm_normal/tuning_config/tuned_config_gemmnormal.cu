@@ -46,6 +46,7 @@ static int tuned_config_gemmnormal = []() {
   tins.add({4096,4096,4096,1,(int16_t)ME::BF16,(int16_t)ME::BF16,(int16_t)ME::BF16,(int16_t)ME::FP32,(int16_t)ME::RCR,(int16_t)ME::Sm80}, /*config*/{56, (int16_t)ME::GemmNormal}); // 5.187ms
   // tins.add({4096,4096,4096,1,(int16_t)ME::BF16,(int16_t)ME::BF16,(int16_t)ME::BF16,(int16_t)ME::FP32,(int16_t)ME::RCR,(int16_t)ME::Sm80}, /*config*/{0, (int16_t)ME::GemmLt, 6,0,23,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,-10667,1,14,0,14,0,14,14,68,0,0,0,0,0}); // 5.189ms
   // tins.add({4096,4096,4096,1,(int16_t)ME::BF16,(int16_t)ME::BF16,(int16_t)ME::BF16,(int16_t)ME::FP32,(int16_t)ME::RCR,(int16_t)ME::Sm80}, /*config*/{4, (int16_t)ME::GemmNormal}); // 5.19ms
+  tins.add({8192,4096,4096,1,(int16_t)ME::BF16,(int16_t)ME::BF16,(int16_t)ME::BF16,(int16_t)ME::FP32,(int16_t)ME::RCR,(int16_t)ME::Sm80}, /*config*/{56, (int16_t)ME::GemmNormal}); // 5.187ms
   return 0;
 }();
 }// clang-format on
