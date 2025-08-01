@@ -100,6 +100,7 @@ def perf_xop(
     problem_cnt: int,
     output_dtype: torch.dtype,
     fast_accum: bool,
+    quant: bool,
 ):
     m = inputs[0].size(0)
     if transpose_weight:
@@ -128,13 +129,18 @@ def perf_xop(
             raise ValueError("weight_scale's shape should be (1, n) for S8 GEMM")
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
-    ## todo: remove below once moe fp8 gemm invoke get fixed
-    # GemmQuant / GemmNormal
-    op = xop.GemmQuant(
-        input_dtype=inputs[0].dtype,
-        output_dtype=output_dtype,
-        transpose_weight=transpose_weight
-    )
+    if (quant):
+        op = xop.GemmQuant(
+            input_dtype=inputs[0].dtype,
+            output_dtype=output_dtype,
+            transpose_weight=transpose_weight
+        )
+    else:
+        op = xop.GemmNormal(
+            input_dtype=inputs[0].dtype,
+            output_dtype=output_dtype,
+            transpose_weight=transpose_weight
+        )
     def fn(iter_id):
         problem_idx = iter_id % problem_cnt
         op.forward(
@@ -185,7 +191,7 @@ def run(M, args, xop_perf, torch_perf):
     total_bytes = (M*K + K*N) * torch.finfo(dtype).bits // 8 # + M*N
 
     problem_count = 5 # 1 + int((3 * cache_size) / total_bytes)
-    print("problem_count", problem_count, cache_size, total_bytes)
+    # print("problem_count", problem_count, cache_size, total_bytes)
     #
     inputs = []
     weights = []
@@ -266,6 +272,7 @@ def run(M, args, xop_perf, torch_perf):
         problem_count, 
         output_dtype,
         args.fast_accum,
+        args.quant,
     )
     
     if not is_fp8:
@@ -287,18 +294,19 @@ def run(M, args, xop_perf, torch_perf):
         output = torch.nn.functional.linear(fp8_org_inputs[0] , fp8_org_weights[0])
         perf_result_torch = xutil.PerfResult(name="torch.sim", output=output, gemm_time_ms=10000)
 
-    if args.show_tflops:
-        xop_perf.append(xutil.calculate_tflops(M,N,K, perf_result_xop.gemm_time_ms))
-        torch_perf.append(xutil.calculate_tflops(M,N,K, perf_result_torch.gemm_time_ms))
-    else:
+    if args.show_ms:
         xop_perf.append(perf_result_xop.gemm_time_ms)
         torch_perf.append(perf_result_torch.gemm_time_ms)
+    else:
+        xop_perf.append(xutil.calculate_tflops(M,N,K, perf_result_xop.gemm_time_ms))
+        torch_perf.append(xutil.calculate_tflops(M,N,K, perf_result_torch.gemm_time_ms))
 
     print(perf_result_torch)
     print(perf_result_xop)
 
     xop_output = perf_result_xop.output
     torch_output = perf_result_torch.output
+    print(xop_output.dtype, torch_output.dtype)
 
     # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
@@ -309,14 +317,17 @@ def run(M, args, xop_perf, torch_perf):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--show_tflops", default=False, action="store_true", help="whether to print tflops or time."
+        "--quant", default=False, action="store_true", help="whether to use GemmQuant."
+    )
+    parser.add_argument(
+        "--show_ms", default=False, action="store_true", help="whether to print time or tflops."
     )
     parser.add_argument("M", type=int)
     parser.add_argument("N", type=int)
     parser.add_argument("K", type=int)
     parser.add_argument("--step", default=5, type=int, help="m step")
     parser.add_argument("--warmup_iters", default=10, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=20, type=int, help="perf iterations")
+    parser.add_argument("--iters", default=10, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16", # float16, float8_e4m3fn
@@ -341,11 +352,13 @@ def parse_args():
 
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_tflops
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float16 --show_tflops
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_ms
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float16
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float16 --has_bias 
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_tflops --dtype=float8_e4m3fn
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_tflops --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float8_e4m3fn
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float8_e4m3fn --fast_accum
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
 if __name__ == "__main__":
     init_seed()
     args = parse_args()
@@ -379,10 +392,10 @@ if __name__ == "__main__":
 
     plt.title(f'perf-N{args.N}-K{args.K}')
     plt.xlabel('m_size')
-    if args.show_tflops:
-        plt.ylabel('tflops')
-    else:
+    if args.show_ms:
         plt.ylabel('ms')
+    else:
+        plt.ylabel('tflops')
 
     plt.legend()
     plt.grid(True)

@@ -15,7 +15,7 @@ class GemmQuant:
     ): 
         self.gemm_normal = xop.GemmNormal(
             input_dtype=torch.float8_e4m3fn,
-            output_dtype=torch.bfloat16,
+            output_dtype=output_dtype,
             transpose_weight=transpose_weight
         )
 

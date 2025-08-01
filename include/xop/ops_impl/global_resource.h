@@ -130,9 +130,13 @@ public:
 
   // 获取 Gemm 实例，如果已存在则直接返回，不存在则创建
   GemmBase* GetOp(const std::vector<int16_t> &key, bool is_tuning = false) {
+    // printf("Looking for Gemm type {");
+    // for (int i=0; i<key.size(); i++)
+    //   printf("%d-", key[i]);
+
     auto it = created_instances.find(key);
     if (it != created_instances.end()) {
-        return it->second;
+      return it->second;
     }
     return CreateOp(key, is_tuning);
   }

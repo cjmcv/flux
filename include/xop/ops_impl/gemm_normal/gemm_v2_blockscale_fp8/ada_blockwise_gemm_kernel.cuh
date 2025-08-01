@@ -328,6 +328,7 @@ struct AdaBlockwiseGemmKernel {
         for (int n = 0; n < cute::size<2>(tRG_gO); ++n) {
           if (cute::get<0>(tRG_cO(0, m, n)) < residue_m && cute::get<1>(tRG_cO(0, m, n)) < residue_n) {
             cute::copy(typename KT::GmemCopyAtomR2G{}, tRG_rO(cute::_, m, n), tRG_gO(cute::_, m, n));
+            // xop::print_tensor("tRG_gO", tRG_gO(cute::_, m, n));
           }
         }
       }

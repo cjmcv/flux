@@ -18,7 +18,8 @@ ncu-ui # Open file£ºmy_profile.ncu-rep
 ```
 
 #### Dependencies
-1. CUTLASS: Flux leverages CUTLASS to generate high-performance GEMM kernels. We currently use CUTLASS 3.7.0 and a tiny patch should be applied to CUTLASS.
+1. cutlass
+2. cublasLt
 
 ## Quick Start
 
