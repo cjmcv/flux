@@ -76,7 +76,7 @@ class GemmV2BlockScaleFp8Schema:
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
         x, x_scale = xutil.per_token_cast_to_fp8(input, is_use_fp16_acc)
         y, y_scale = xutil.per_block_cast_to_fp8(weight, is_use_fp16_acc)
-        x_scale = xop.gemm_v2_blockscale_fp8_scale_preprocess(x_scale)
+        x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
         return x, x_scale, y, y_scale.contiguous()
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
                        input_scale: torch.Tensor, weight_scale: torch.Tensor,

@@ -20,6 +20,7 @@ ncu-ui # Open file£ºmy_profile.ncu-rep
 #### Dependencies
 1. cutlass
 2. cublasLt
+3. triton
 
 ## Quick Start
 

@@ -135,32 +135,53 @@ def perf_xop(
             output_dtype=output_dtype,
             transpose_weight=transpose_weight
         )
+        weights_fp8 = []
+        weights_fp8_scale = []
+        for i in range(problem_cnt):
+            weight_fp8, weight_fp8_scale = op.weight_preprocess(weights[i], fast_accum)
+            weights_fp8.append(weight_fp8)
+            weights_fp8_scale.append(weight_fp8_scale)
+
+        def fn(iter_id):
+            problem_idx = iter_id % problem_cnt
+            op.forward(
+                inputs[problem_idx],
+                weights_fp8[problem_idx],
+                output=output,
+                bias=bias,
+                input_scale=None,
+                weight_scale=weights_fp8_scale[problem_idx],
+                output_scale=None,
+                tuning = None,
+                fast_accum=fast_accum,
+            )
+            return output
     else:
         op = xop.GemmNormal(
             input_dtype=inputs[0].dtype,
             output_dtype=output_dtype,
             transpose_weight=transpose_weight
         )
-    def fn(iter_id):
-        problem_idx = iter_id % problem_cnt
-        op.forward(
-            inputs[problem_idx],
-            weights[problem_idx],
-            output=output,
-            bias=bias,
-            input_scale=inputs_scale[problem_idx],
-            weight_scale=weights_scale[problem_idx],
-            output_scale=None,
-            tuning = None,
-            fast_accum=fast_accum,
-        )
-        # print("bias:", bias, iter_id)
-        # print("inputs[problem_idx]:", inputs[problem_idx])
-        # print("weights[problem_idx]:", weights[problem_idx])
-        # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
-        # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
-        # print("output:", output)
-        return output
+        def fn(iter_id):
+            problem_idx = iter_id % problem_cnt
+            op.forward(
+                inputs[problem_idx],
+                weights[problem_idx],
+                output=output,
+                bias=bias,
+                input_scale=inputs_scale[problem_idx],
+                weight_scale=weights_scale[problem_idx],
+                output_scale=None,
+                tuning = None,
+                fast_accum=fast_accum,
+            )
+            # print("bias:", bias, iter_id)
+            # print("inputs[problem_idx]:", inputs[problem_idx])
+            # print("weights[problem_idx]:", weights[problem_idx])
+            # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
+            # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
+            # print("output:", output)
+            return output
     return xutil.perf_gemm(warmup_iters, iters, "xop", fn)
 
 THRESHOLD_MAP = {
@@ -215,7 +236,7 @@ def run(M, args, xop_perf, torch_perf):
             x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone(), args.fast_accum) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
             y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone(), args.fast_accum)
             # print("data_ptr: ", x_fp8.data_ptr(), y_fp8.data_ptr(), (x_fp8.data_ptr() % 128) == 0, (y_fp8.data_ptr() % 128) == 0)
-            x_scale = xop.gemm_v2_blockscale_fp8_scale_preprocess(x_scale)
+            x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
 
             fp8_org_inputs.append(x)
             fp8_org_weights.append(y)

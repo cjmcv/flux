@@ -19,6 +19,10 @@ class GemmQuant:
             transpose_weight=transpose_weight
         )
 
+    def weight_preprocess(self, weight: torch.Tensor, fast_accum: bool = False):
+        y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
+        return y_fp8, y_scale
+    
     def forward(
         self,
         input: torch.Tensor,
@@ -34,10 +38,12 @@ class GemmQuant:
         # x_fp8, x_scale = xutil.per_token_cast_to_fp8(input, fast_accum) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
         # y_fp8, y_scale = xutil.per_block_cast_to_fp8(weight, fast_accum)
 
+        if (weight_scale is None):
+            y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
+        else:
+            y_fp8, y_scale = weight, weight_scale
         x_fp8, x_scale = xop.triton_per_token_cast_to_fp8(input, fast_accum)
-        y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
-
-        x_scale = xop.gemm_v2_blockscale_fp8_scale_preprocess(x_scale)
+        x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
 
         ret = self.gemm_normal.forward(
             x_fp8,
