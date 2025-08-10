@@ -8,6 +8,7 @@
 #include <torch/csrc/utils/pybind.h>
 
 #define ENABLE_GEMM_NORMAL 1
+#define ENABLE_MARLIN_KERNEL 1
 // #define ENABLE_FLASH_ATTEN 1
 // #define ENABLE_ALLREDUCE_CUSTOM 1
 

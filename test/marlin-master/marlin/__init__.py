@@ -1,14 +1,42 @@
+# Copyright (C) Marlin.2024 Elias Frantar (elias.frantar@ist.ac.at)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from typing import Optional, List, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 
-import numpy as np
-import xop
+
+import marlin_cuda
+
+def mul(A, B, C, s, workspace, thread_k=-1, thread_n=-1, sms=-1, max_par=16):
+    """Marlin FP16xINT4 multiply; can be used within `torch.compile`.
+    @A: `torch.half` input matrix of shape `(m, k)` in standard row-major layout
+    @B: `torch.int` weight matrix of original shape `(k, n)` in Marlin format; see `Layer.pack()`
+    @C: `torch.half` out matrix of shape `(m, n)` in standard row-major layout
+    @s: `torch.half` scales of shape `(m / groupsize, n)`
+    @workspace: `torch.int` tensor with at least `n / 128 * max_par` entries that are all zero
+    @thread_k: `k` size of a thread_tile in `B` (can usually be left as auto -1)
+    @thread_n: `n` size of a thread_tile in `B` (can usually be left as auto -1)
+    @sms: number of SMs to use for the kernel (can usually be left as auto -1)
+    @max_par: maximum number of batch 64 problems to solve in parallel for large input sizes
+    """
+    marlin_cuda.mul(A, B, C, s, workspace, thread_k, thread_n, sms, max_par)
 
 
 # Precompute permutations for Marlin weight and scale shuffling 
+
 def _get_perms():
     perm = []
     for i in range(32):
@@ -39,68 +67,8 @@ def _get_perms():
 
 _perm, _scale_perm, _scale_perm_single = _get_perms()
 
-def pack2int4(k,n,groupsize, fp16_w, scales):
-    if fp16_w.dtype != torch.half:
-        raise ValueError('Only `torch.half` weights are supported.')
-    tile = 16
-    maxq = 2 ** 4 - 1
-    s = scales
-    w = fp16_w
-    if groupsize != k:
-        w = w.reshape((-1, groupsize, n))
-        w = w.permute(1, 0, 2)
-        w = w.reshape((groupsize, -1))
-        s = s.reshape((1, -1))
-    w = torch.round(w / s).int()
-    w += (maxq + 1) // 2
-    w = torch.clamp(w, 0, maxq)
-    if groupsize != k:
-        w = w.reshape((groupsize, -1, n))
-        w = w.permute(1, 0, 2)
-        w = w.reshape((k, n)).contiguous()
-        s = s.reshape((-1, len(_scale_perm)))[:, _scale_perm]
-    else:
-        s = s.reshape((-1, len(_scale_perm_single)))[:, _scale_perm_single]
-    s = s.reshape((-1, n)).contiguous()
-    w = w.reshape((k // tile, tile, n // tile, tile))
-    w = w.permute((0, 2, 1, 3))
-    w = w.reshape((k // tile, n * tile))
-    res = w
-    res = res.reshape((-1, _perm.numel()))[:, _perm].reshape(res.shape)
-    q = np.zeros((res.shape[0], res.shape[1] // 8), dtype=np.uint32)
-    res = res.cpu().numpy().astype(np.uint32)
-    for i in range(8):
-        q |= res[:, i::8] << 4 * i
-    q = torch.from_numpy(q.astype(np.int32)).to(w.device)
-    return q, s
 
-def marlin_quant_int4(w, groupsize=-1):
-    w_fp = w
-    m = w.shape[0]
-    n = w.shape[1]
-
-    maxq = 2 ** 4 - 1
-    # such as groupsize=2: w[8,4] => w[4,g=2,4] => w[g=2,4,4] => w[g=2,16]£¬
-    # then you can compute the scale row-wise.
-    if groupsize != -1:
-        w = w.reshape((-1, groupsize, n))
-        w = w.permute(1, 0, 2)
-        w = w.reshape((groupsize, -1))
-    # s[1, n], the maximum absolute value of each row.
-    s = torch.max(torch.abs(w), 0, keepdim=True)[0]
-    # maxq = 15, In symmetric quantization, only the range [-8, 7] is actually used. 
-    # The effective "half-span" is 8, so maxq_half = (maxq + 1) // 2 = 8
-    # a / 8 = a / ((maxq + 1) / 2) = a x 2 / (maxq + 1), maxq is taken as 15, omitting the "+1"
-    # so: a x 2 / maxq
-    s *= 2 / maxq
-    s = s.reshape((-1, n)).contiguous()
-
-    if groupsize == -1:
-        groupsize = m
-    qo, so = pack2int4(m,n,groupsize, w_fp, s)
-    return w_fp, qo, so
-
-class MarlinLayer(nn.Module):
+class Layer(nn.Module):
     """PyTorch compatible Marlin layer; 4-bit (symmetric grouped) linear layer without bias."""
 
     def __init__(self, infeatures, outfeatures, groupsize=-1):
@@ -128,7 +96,7 @@ class MarlinLayer(nn.Module):
 
     def forward(self, A):
         C = torch.empty(A.shape[:-1] + (self.s.shape[1],), dtype=A.dtype, device=A.device)
-        xop.marlin_fp16xint4_matmul(A.view((-1, A.shape[-1])), self.B, C.view((-1, C.shape[-1])), self.s, self.workspace)
+        mul(A.view((-1, A.shape[-1])), self.B, C.view((-1, C.shape[-1])), self.s, self.workspace)
         return C
 
     def pack(self, linear, scales):
@@ -171,54 +139,22 @@ class MarlinLayer(nn.Module):
         self.B[:, :] = q.to(self.B.device)
         self.s[:, :] = s.to(self.s.device)
 
-class GemmQuant:
-    def __init__(
-        self,
-        input_dtype: torch.dtype,
-        output_dtype: Optional[torch.dtype] = None,
-        transpose_weight: bool = False,
-    ): 
-        self.gemm_normal = xop.GemmNormal(
-            input_dtype=torch.float8_e4m3fn,
-            output_dtype=output_dtype,
-            transpose_weight=transpose_weight
-        )
 
-    def weight_preprocess(self, weight: torch.Tensor, fast_accum: bool = False):
-        y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
-        return y_fp8, y_scale
-    
-    def forward(
-        self,
-        input: torch.Tensor,
-        weight: torch.Tensor,
-        output: torch.Tensor,
-        bias: Optional[torch.Tensor] = None,
-        input_scale: Optional[torch.Tensor] = None,
-        weight_scale: Optional[torch.Tensor] = None,
-        output_scale: Optional[torch.Tensor] = None,
-        tuning: Optional[torch.Tensor] = None,
-        fast_accum: bool = False,
-    ) -> int: 
-        # x_fp8, x_scale = xutil.per_token_cast_to_fp8(input, fast_accum) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
-        # y_fp8, y_scale = xutil.per_block_cast_to_fp8(weight, fast_accum)
-
-        if (weight_scale is None):
-            y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
-        else:
-            y_fp8, y_scale = weight, weight_scale
-        x_fp8, x_scale = xop.triton_per_token_cast_to_fp8(input, fast_accum)
-        x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
-
-        ret = self.gemm_normal.forward(
-            x_fp8,
-            y_fp8,
-            output=output,
-            bias=bias,
-            input_scale=x_scale,
-            weight_scale=y_scale,
-            output_scale=None,
-            tuning = None,
-            fast_accum=fast_accum,
-        )
-        return ret
+def replace_linear(module, name_filter=lambda n: True, groupsize=-1, name=''):
+    """Recursively replace all `torch.nn.Linear` layers by empty Marlin layers.
+    @module: top-level module in which to perform the replacement 
+    @name_filter: lambda indicating if a layer should be replaced
+    @groupsize: marlin groupsize
+    @name: root-level name
+    """
+    if isinstance(module, Layer):
+        return
+    for attr in dir(module):
+        tmp = getattr(module, attr)
+        name1 = name + '.' + attr if name != '' else attr
+        if isinstance(tmp, nn.Linear) and name_filter(name1):
+            setattr(
+                module, attr, Layer(tmp.in_features, tmp.out_features, groupsize=groupsize)
+            )
+    for name1, child in module.named_children():
+        replace_linear(child, name_filter, groupsize=groupsize, name=name + '.' + name1 if name != '' else name1)

@@ -32,6 +32,8 @@ def _get_xop_member(member):
     return getattr(xop_mod, member, NotCompiled())
 
 GemmNormal = _get_xop_member("GemmNormal")
+marlin_fp16xint4_matmul = _get_xop_member("marlin_fp16xint4_matmul")
+helloABCM = _get_xop_member("helloABCM")
 
 # allreduce_normal
 helloABC = _get_xop_member("helloABC")
