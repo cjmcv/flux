@@ -21,9 +21,11 @@
 
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <cuda_bf16.h>
 #include <cuda_runtime.h>
 #include <iostream>
 
+#define USING_HALF
 
 constexpr int ceildiv(int a, int b) {
   return (a + b - 1) / b;
@@ -44,10 +46,17 @@ using I4 = Vec<int, 4>;
 
 // Matrix fragments for tensor core instructions; their precise layout is documented here: 
 // https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#matrix-fragments-for-mma-m16n8k16-with-floating-point-type
+#ifdef USING_HALF
 using FragA = Vec<half2, 4>;
 using FragB = Vec<half2, 2>;
 using FragC = Vec<float, 4>;
 using FragS = Vec<half2, 1>; // quantization scales
+#else
+using FragA = Vec<nv_bfloat162, 4>;
+using FragB = Vec<nv_bfloat162, 2>;
+using FragC = Vec<float, 4>;
+using FragS = Vec<nv_bfloat162, 1>;
+#endif
 
 // Predicated asynchronous global->shared copy; used for inputs A where we apply predication to handle batchsizes that
 // are not multiples of 16.
@@ -94,6 +103,7 @@ __device__ inline void mma(const FragA& a_frag, const FragB& frag_b, FragC& frag
   const uint32_t* a = reinterpret_cast<const uint32_t*>(&a_frag);
   const uint32_t* b = reinterpret_cast<const uint32_t*>(&frag_b);
   float* c = reinterpret_cast<float*>(&frag_c);
+#ifdef USING_HALF
   asm volatile(
     "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
     "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%10,%11,%12,%13};\n"
@@ -101,6 +111,14 @@ __device__ inline void mma(const FragA& a_frag, const FragB& frag_b, FragC& frag
     :  "r"(a[0]),  "r"(a[1]),  "r"(a[2]),  "r"(a[3]),  "r"(b[0]),  "r"(b[1]),
        "f"(c[0]),  "f"(c[1]),  "f"(c[2]),  "f"(c[3])
   );
+#else
+  asm volatile(
+    "mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 "
+    "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%10,%11,%12,%13};\n"
+    : "=f"(c[0]), "=f"(c[1]), "=f"(c[2]), "=f"(c[3])
+    : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]),
+      "f"(c[0]), "f"(c[1]), "f"(c[2]), "f"(c[3]));
+#endif
 }
 
 // Instruction for loading a full 16x16 matrix fragment of operand A from shared memory, directly in tensor core layout.
@@ -128,6 +146,7 @@ __device__ inline int lop3(int a, int b, int c) {
 // Efficiently dequantize an int32 value into a full B-fragment of 4 fp16 values.
 // We mostly follow the strategy in the link below, with some small changes:
 // https://github.com/NVIDIA/FasterTransformer/blob/main/src/fastertransformer/cutlass_extensions/include/cutlass_extensions/interleaved_numeric_conversion.h
+#ifdef USING_HALF
 __device__ inline FragB dequant(int q) {
   const int LO = 0x000f000f;
   const int HI = 0x00f000f0;
@@ -150,10 +169,42 @@ __device__ inline FragB dequant(int q) {
   );
   return frag_b;
 }
+#else
+__device__ inline FragB dequant(int q) {
+
+  float fp32_intermediates[4];
+  uint32_t* fp32_intermediates_casted =
+      reinterpret_cast<uint32_t*>(fp32_intermediates);
+
+  static constexpr uint32_t fp32_base = 0x4B000000;
+  fp32_intermediates_casted[0] = __byte_perm(q, fp32_base, 0x7650);
+  fp32_intermediates_casted[1] = __byte_perm(q, fp32_base, 0x7652);
+  fp32_intermediates_casted[2] = __byte_perm(q, fp32_base, 0x7651);
+  fp32_intermediates_casted[3] = __byte_perm(q, fp32_base, 0x7653);
+
+  fp32_intermediates[0] -= 8388736.f;
+  fp32_intermediates[1] -= 8388736.f;
+  fp32_intermediates[2] -= 8388736.f;
+  fp32_intermediates[3] -= 8388736.f;
+
+  FragB frag_b;
+  uint32_t* bf16_result_ptr = reinterpret_cast<uint32_t*>(&frag_b);
+  bf16_result_ptr[0] = __byte_perm(fp32_intermediates_casted[0],
+                                   fp32_intermediates_casted[1], 0x7632);
+  bf16_result_ptr[1] = __byte_perm(fp32_intermediates_casted[2],
+                                   fp32_intermediates_casted[3], 0x7632);
+
+  return frag_b;
+}
+#endif
 
 // Multiply dequantized values by the corresponding quantization scale; used only for grouped quantization.
 __device__ inline void scale(FragB& frag_b, FragS& frag_s, int i) {
+  #ifdef USING_HALF
   half2 s = __half2half2(reinterpret_cast<__half*>(&frag_s)[i]);
+  #else
+  nv_bfloat162 s = __bfloat162bfloat162(reinterpret_cast<nv_bfloat16*>(&frag_s)[i]);
+  #endif
   frag_b[0] = __hmul2(frag_b[0], s);
   frag_b[1] = __hmul2(frag_b[1], s);
 }
@@ -548,18 +599,30 @@ __global__ void Marlin(
             int4 c_red = sh[c_sh_wr + i * c_sh_wr_delta];
             #pragma unroll
             for (int j = 0; j < 2 * 4; j++) {
+              #ifdef USING_HALF
               reinterpret_cast<float*>(&frag_c)[4 * 2 * 4 * (i / 4) + 4 * j + (i % 4)] += __half2float(
                 reinterpret_cast<__half*>(&c_red)[j]
               );
+              #else
+              reinterpret_cast<float*>(&frag_c)[4 * 2 * 4 * (i / 4) + 4 * j + (i % 4)] += __bfloat162float(
+                reinterpret_cast<nv_bfloat16*>(&c_red)[j]
+              );
+              #endif
             }
           }
           if (!last) {
             int4 c;
             #pragma unroll
             for (int j = 0; j < 2 * 4; j++) {
+              #ifdef USING_HALF
               reinterpret_cast<__half*>(&c)[j] = __float2half(
                 reinterpret_cast<float*>(&frag_c)[4 * 2 * 4 * (i / 4) + 4 * j + (i % 4)]
               );
+              #else
+              reinterpret_cast<nv_bfloat16*>(&c)[j] = __float2bfloat16(
+                reinterpret_cast<float*>(&frag_c)[4 * 2 * 4 * (i / 4) + 4 * j + (i % 4)]
+              );
+              #endif
             }
             C[c_gl_wr + c_gl_wr_delta_o * (i / 2) + c_gl_wr_delta_i * (i % 2)] = c;
           }
@@ -586,11 +649,19 @@ __global__ void Marlin(
 
     // We first reorder in shared memory to guarantee the most efficient final global write patterns
     auto write = [&] (int idx, float c0, float c1, FragS& s) {
+      #ifdef USING_HALF
       half2 res = __halves2half2(__float2half(c0), __float2half(c1));
       if (group_blocks == -1) // for per-column quantization we finally apply the scale here
         res = __hmul2(res, s[0]);
       ((half2*) sh)[idx] = res;
+      #else
+      nv_bfloat162 res = __halves2bfloat162(__float2bfloat16(c0), __float2bfloat16(c1));
+      if (group_blocks == -1) // for per-column quantization we finally apply the scale here
+        res = __hmul2(res, s[0]);
+      ((nv_bfloat162*) sh)[idx] = res;
+      #endif
     };
+
     if (threadIdx.x / 32 < thread_n_blocks / 4) {
       #pragma unroll
       for (int i = 0; i < thread_m_blocks; i++) {

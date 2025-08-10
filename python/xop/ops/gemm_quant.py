@@ -40,8 +40,8 @@ def _get_perms():
 _perm, _scale_perm, _scale_perm_single = _get_perms()
 
 def pack2int4(k,n,groupsize, fp16_w, scales):
-    if fp16_w.dtype != torch.half:
-        raise ValueError('Only `torch.half` weights are supported.')
+    # if fp16_w.dtype != torch.half:
+    #     raise ValueError('Only `torch.half` weights are supported.')
     tile = 16
     maxq = 2 ** 4 - 1
     s = scales
@@ -158,11 +158,9 @@ class GemmQuant:
                 fast_accum=fast_accum,
             )
         else:
-            DEV = torch.device('cuda:0')
             m = output.shape[0]
             n = output.shape[1]
-            # C = torch.zeros((m, n), dtype=torch.half, device=DEV)
-            workspace = torch.zeros(n // 128 * 16, device=DEV)
+            workspace = torch.zeros(n // 128 * 16, device=input.device)
             thread_k, thread_n = 64, 256
             xop.marlin_fp16xint4_matmul(input, weight, output, weight_scale, workspace, thread_k, thread_n, -1, 16)
             return 0
