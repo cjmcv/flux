@@ -100,93 +100,28 @@ def marlin_quant_int4(w, groupsize=-1):
     qo, so = pack2int4(m,n,groupsize, w_fp, s)
     return w_fp, qo, so
 
-class MarlinLayer(nn.Module):
-    """PyTorch compatible Marlin layer; 4-bit (symmetric grouped) linear layer without bias."""
-
-    def __init__(self, infeatures, outfeatures, groupsize=-1):
-        """Create an empty Marlin layer.
-        @infeatures: number of input features (must be divisible by 128)
-        @outfeatures: number of output features (must be divisible by 256)
-        @groupsize: quantization groupsize (must be -1 or 128)
-        """
-        super().__init__()
-        if groupsize not in [-1, 128]:
-            raise ValueError('Only groupsize -1 and 128 are supported.')
-        if infeatures % 128 != 0 or outfeatures % 256 != 0:
-            raise ValueError('`infeatures` must be divisible by 128 and `outfeatures` by 256.')
-        if groupsize == -1:
-            groupsize = infeatures
-        if infeatures % groupsize != 0:
-            raise ValueError('`infeatures` must be divisible by `groupsize`.')
-        self.k = infeatures
-        self.n = outfeatures
-        self.groupsize = groupsize
-        self.register_buffer('B', torch.empty((self.k // 16, self.n * 16 // 8), dtype=torch.int))
-        self.register_buffer('s', torch.empty((self.k // groupsize, self.n), dtype=torch.half))
-        # 128 is currently the minimum `tile_n`, hence it gives the maximum workspace size; 16 is the default `max_par`
-        self.register_buffer('workspace', torch.zeros(self.n // 128 * 16, dtype=torch.int), persistent=False)
-
-    def forward(self, A):
-        C = torch.empty(A.shape[:-1] + (self.s.shape[1],), dtype=A.dtype, device=A.device)
-        xop.marlin_fp16xint4_matmul(A.view((-1, A.shape[-1])), self.B, C.view((-1, C.shape[-1])), self.s, self.workspace)
-        return C
-
-    def pack(self, linear, scales):
-        """Pack a fake-quantized linear layer into this actual Marlin representation.
-        @linear: fake-quantized `torch.nn.Linear` layer to convert (must be of type `torch.half`)
-        @scales: corresponding quantization scales of shape `(infeatures, groups)`
-        """ 
-        if linear.weight.dtype != torch.half:
-            raise ValueError('Only `torch.half` weights are supported.')
-        tile = 16
-        maxq = 2 ** 4 - 1
-        s = scales.t()
-        w = linear.weight.data.t()
-        if self.groupsize != self.k:
-            w = w.reshape((-1, self.groupsize, self.n))
-            w = w.permute(1, 0, 2)
-            w = w.reshape((self.groupsize, -1))
-            s = s.reshape((1, -1))
-        w = torch.round(w / s).int()
-        w += (maxq + 1) // 2
-        w = torch.clamp(w, 0, maxq)
-        if self.groupsize != self.k:
-            w = w.reshape((self.groupsize, -1, self.n))
-            w = w.permute(1, 0, 2)
-            w = w.reshape((self.k, self.n)).contiguous()
-            s = s.reshape((-1, len(_scale_perm)))[:, _scale_perm]
-        else:
-            s = s.reshape((-1, len(_scale_perm_single)))[:, _scale_perm_single]
-        s = s.reshape((-1, self.n)).contiguous()
-        w = w.reshape((self.k // tile, tile, self.n // tile, tile))
-        w = w.permute((0, 2, 1, 3))
-        w = w.reshape((self.k // tile, self.n * tile))
-        res = w
-        res = res.reshape((-1, _perm.numel()))[:, _perm].reshape(res.shape)
-        q = np.zeros((res.shape[0], res.shape[1] // 8), dtype=np.uint32)
-        res = res.cpu().numpy().astype(np.uint32)
-        for i in range(8):
-            q |= res[:, i::8] << 4 * i
-        q = torch.from_numpy(q.astype(np.int32)).to(w.device)
-        self.B[:, :] = q.to(self.B.device)
-        self.s[:, :] = s.to(self.s.device)
-
 class GemmQuant:
     def __init__(
         self,
         input_dtype: torch.dtype,
         output_dtype: Optional[torch.dtype] = None,
-        transpose_weight: bool = False,
+        quant_bits: int = 8,
     ): 
-        self.gemm_normal = xop.GemmNormal(
-            input_dtype=torch.float8_e4m3fn,
-            output_dtype=output_dtype,
-            transpose_weight=transpose_weight
-        )
+        self.quant_bits = quant_bits
+        if (self.quant_bits == 8):
+            self.gemm_normal = xop.GemmNormal(
+                input_dtype=torch.float8_e4m3fn,
+                output_dtype=output_dtype,
+                transpose_weight=False
+            )
 
     def weight_preprocess(self, weight: torch.Tensor, fast_accum: bool = False):
-        y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
-        return y_fp8, y_scale
+        if (self.quant_bits == 8):
+            y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
+            return y_fp8, y_scale
+        else:
+            w_fp, q_int4, s_int4 = marlin_quant_int4(weight.t())
+        return q_int4, s_int4
     
     def forward(
         self,
@@ -203,22 +138,31 @@ class GemmQuant:
         # x_fp8, x_scale = xutil.per_token_cast_to_fp8(input, fast_accum) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
         # y_fp8, y_scale = xutil.per_block_cast_to_fp8(weight, fast_accum)
 
-        if (weight_scale is None):
-            y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
-        else:
-            y_fp8, y_scale = weight, weight_scale
-        x_fp8, x_scale = xop.triton_per_token_cast_to_fp8(input, fast_accum)
-        x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
+        if (self.quant_bits == 8):
+            if (weight_scale is None):
+                y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
+            else:
+                y_fp8, y_scale = weight, weight_scale
+            x_fp8, x_scale = xop.triton_per_token_cast_to_fp8(input, fast_accum)
+            x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
 
-        ret = self.gemm_normal.forward(
-            x_fp8,
-            y_fp8,
-            output=output,
-            bias=bias,
-            input_scale=x_scale,
-            weight_scale=y_scale,
-            output_scale=None,
-            tuning = None,
-            fast_accum=fast_accum,
-        )
-        return ret
+            return self.gemm_normal.forward(
+                x_fp8,
+                y_fp8,
+                output=output,
+                bias=bias,
+                input_scale=x_scale,
+                weight_scale=y_scale,
+                output_scale=None,
+                tuning = None,
+                fast_accum=fast_accum,
+            )
+        else:
+            DEV = torch.device('cuda:0')
+            m = output.shape[0]
+            n = output.shape[1]
+            # C = torch.zeros((m, n), dtype=torch.half, device=DEV)
+            workspace = torch.zeros(n // 128 * 16, device=DEV)
+            thread_k, thread_n = 64, 256
+            xop.marlin_fp16xint4_matmul(input, weight, output, weight_scale, workspace, thread_k, thread_n, -1, 16)
+            return 0

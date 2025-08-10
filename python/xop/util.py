@@ -21,7 +21,7 @@ def rand_tensor(shape: list[int], dtype: torch.dtype):
         data = torch.rand(shape, dtype=torch.bfloat16).cuda() / 10
         return data.to(dtype)
     else:
-        return torch.rand(shape, dtype=dtype).cuda() / 10
+        return torch.rand(shape, dtype=dtype).cuda() * 2 - 1
     
 def calculate_tflops(m, k, n, time_ms):
     total_flops = m * n * k * 2

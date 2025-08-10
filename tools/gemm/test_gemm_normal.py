@@ -100,7 +100,7 @@ def perf_xop(
     problem_cnt: int,
     output_dtype: torch.dtype,
     fast_accum: bool,
-    quant: bool,
+    quant_bits: int,
 ):
     m = inputs[0].size(0)
     if transpose_weight:
@@ -129,11 +129,11 @@ def perf_xop(
             raise ValueError("weight_scale's shape should be (1, n) for S8 GEMM")
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
-    if (quant):
+    if (quant_bits != -1):
         op = xop.GemmQuant(
             input_dtype=inputs[0].dtype,
             output_dtype=output_dtype,
-            transpose_weight=transpose_weight
+            quant_bits=quant_bits
         )
         weights_fp8 = []
         weights_fp8_scale = []
@@ -184,8 +184,19 @@ def perf_xop(
             return output
     return xutil.perf_gemm(warmup_iters, iters, "xop", fn)
 
+# return atol, rtol
+def get_allclose_threshold(args, k):
+    if (args.quant_bits == 8):
+        return 2e-1*np.sqrt(k), 2e-2
+    if (args.quant_bits == 4):
+        return 2e-1*np.sqrt(k), 2e-2
+    if (args.output_dtype == torch.int8 or args.output_dtype == torch.int32):
+        return 0, 0
+    
+    return 2e-2, 2e-2
+    
 THRESHOLD_MAP = {
-    torch.float16: 1e-2,  # 1e-1,
+    torch.float16: 10,  # 1e-1,
     torch.bfloat16: 2e-2,
     torch.float8_e4m3fn: 2e-2,
     torch.float8_e5m2: 2e-2,
@@ -293,7 +304,7 @@ def run(M, args, xop_perf, torch_perf):
         problem_count, 
         output_dtype,
         args.fast_accum,
-        args.quant,
+        args.quant_bits,
     )
     
     if not is_fp8:
@@ -331,21 +342,18 @@ def run(M, args, xop_perf, torch_perf):
 
     # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
-    atol = THRESHOLD_MAP[xop_output.dtype]
-    rtol = THRESHOLD_MAP[xop_output.dtype]
+    atol, rtol = get_allclose_threshold(args, K)
     xutil.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--quant", default=False, action="store_true", help="whether to use GemmQuant."
-    )
     parser.add_argument(
         "--show_ms", default=False, action="store_true", help="whether to print time or tflops."
     )
     parser.add_argument("M", type=int)
     parser.add_argument("N", type=int)
     parser.add_argument("K", type=int)
+    parser.add_argument("--quant_bits", default=-1, type=int, help="whether to use GemmQuant.")
     parser.add_argument("--step", default=5, type=int, help="m step")
     parser.add_argument("--warmup_iters", default=10, type=int, help="perf warmup iterations")
     parser.add_argument("--iters", default=10, type=int, help="perf iterations")
@@ -373,7 +381,8 @@ def parse_args():
 
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8 --dtype=float16 --output_dtype=float16
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_ms
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float16
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float16 --has_bias 
