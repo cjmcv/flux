@@ -25,7 +25,7 @@
 #include <cuda_runtime.h>
 #include <iostream>
 
-#define USING_HALF
+// #define USING_HALF
 
 constexpr int ceildiv(int a, int b) {
   return (a + b - 1) / b;
@@ -171,29 +171,24 @@ __device__ inline FragB dequant(int q) {
 }
 #else
 __device__ inline FragB dequant(int q) {
+  static constexpr uint32_t MASK = 0x000f000f;
+  static constexpr uint32_t EX = 0x43004300;
 
-  float fp32_intermediates[4];
-  uint32_t* fp32_intermediates_casted =
-      reinterpret_cast<uint32_t*>(fp32_intermediates);
-
-  static constexpr uint32_t fp32_base = 0x4B000000;
-  fp32_intermediates_casted[0] = __byte_perm(q, fp32_base, 0x7650);
-  fp32_intermediates_casted[1] = __byte_perm(q, fp32_base, 0x7652);
-  fp32_intermediates_casted[2] = __byte_perm(q, fp32_base, 0x7651);
-  fp32_intermediates_casted[3] = __byte_perm(q, fp32_base, 0x7653);
-
-  fp32_intermediates[0] -= 8388736.f;
-  fp32_intermediates[1] -= 8388736.f;
-  fp32_intermediates[2] -= 8388736.f;
-  fp32_intermediates[3] -= 8388736.f;
+  // Guarantee that the `(a & b) | c` operations are LOP3s.
+  // clang-format off
+  int lo = lop3<(0xf0 & 0xcc) | 0xaa>(q, MASK, EX);
+  q >>= 4;
+  int hi = lop3<(0xf0 & 0xcc) | 0xaa>(q, MASK, EX);
+  // clang-format on
 
   FragB frag_b;
-  uint32_t* bf16_result_ptr = reinterpret_cast<uint32_t*>(&frag_b);
-  bf16_result_ptr[0] = __byte_perm(fp32_intermediates_casted[0],
-                                   fp32_intermediates_casted[1], 0x7632);
-  bf16_result_ptr[1] = __byte_perm(fp32_intermediates_casted[2],
-                                   fp32_intermediates_casted[3], 0x7632);
+  frag_b[0] = *reinterpret_cast<nv_bfloat162*>(&lo);
+  frag_b[1] = *reinterpret_cast<nv_bfloat162*>(&hi);
 
+  static constexpr uint32_t SUB = 0x43084308;
+
+  frag_b[0] = __hsub2(frag_b[0], *reinterpret_cast<const nv_bfloat162*>(&SUB));
+  frag_b[1] = __hsub2(frag_b[1], *reinterpret_cast<const nv_bfloat162*>(&SUB));
   return frag_b;
 }
 #endif
