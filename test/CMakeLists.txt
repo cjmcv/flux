@@ -42,8 +42,8 @@ include_directories(${COMMON_HEADER_DIRS})
 
 # add_executable(gemm_multi_stage cute_practice/gemm-multi-stage.cu)
 # target_link_libraries(gemm_multi_stage PUBLIC xop)
-add_executable(gemm-simple cute_practice/gemm-simple.cu)
-target_link_libraries(gemm-simple PUBLIC xop)
+# add_executable(gemm-simple cute_practice/gemm-simple.cu)
+# target_link_libraries(gemm-simple PUBLIC xop)
 
 # add_executable(mma_layout cute_practice/mma_layout.cu)
 # target_link_libraries(mma_layout PUBLIC xop)

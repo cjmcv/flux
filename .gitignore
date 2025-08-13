@@ -1,5 +1,6 @@
 # PyCache files
 build/
+bin/
 .cache/
 tmp/
 report*.nsys-rep

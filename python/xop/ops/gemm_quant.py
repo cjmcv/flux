@@ -161,6 +161,6 @@ class GemmQuant:
             m = output.shape[0]
             n = output.shape[1]
             workspace = torch.zeros(n // 128 * 16, device=input.device)
-            thread_k, thread_n = 64, 256
+            thread_k, thread_n = -1, -1 # 64, 256
             xop.marlin_fp16xint4_matmul(input, weight, output, weight_scale, workspace, thread_k, thread_n, -1, 16)
             return 0
