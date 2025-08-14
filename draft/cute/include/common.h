@@ -26,6 +26,20 @@
 
 using namespace cute;
 
+template <typename T> 
+inline auto get_type_name() {
+  if constexpr (std::is_same_v<T, cutlass::half_t>) {
+    return "half";
+  }
+  else if constexpr (std::is_same_v<T, cutlass::bfloat16_t>) {
+    return "bfloat16";
+  }
+  else if constexpr (std::is_same_v<T, float>) {
+    return "float";
+  }
+  return "err_type";
+}
+
 template <typename T> inline auto make_cutlass_rowmajor_tensor(int m, int n) {
   cutlass::HostTensor<T, cutlass::layout::RowMajor> tensor(
       cutlass::MatrixCoord({m, n}));

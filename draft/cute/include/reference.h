@@ -100,7 +100,7 @@ cublas_gemmExTN_ref(cutlass::HostTensor<Atype, ALayout> const &A, // row-major
   Ctype alpha = static_cast<Ctype>(1);
   Ctype beta = static_cast<Ctype>(0);
   int m = A.extent().row();
-  int n = B.extent().column();
+  int n = B.extent().row();
   int k = A.extent().column();
 
   cudaDataType compute_type = CUDA_R_32F;
@@ -126,8 +126,7 @@ cublas_gemmExTN_ref(cutlass::HostTensor<Atype, ALayout> const &A, // row-major
   //                 (Btype_ *)B.device_data(), k, (Atype_ *)A.device_data(), k,
   //                 &beta, (Ctype_ *)C.device_data(), n);
 
-  printf("hello: %d, %d.", data_type, compute_type);
-  // 关键：CUDA_R_16F 表示 FP16，CUDA_R_32F 表示累加精度
+  printf("cublasGemmEx: %d, %d.", data_type, compute_type);
   cublasStatus_t ret = cublasGemmEx(handle,
                 CUBLAS_OP_T, CUBLAS_OP_N,
                 n, m, k,
@@ -278,6 +277,42 @@ void cpu_cosine_similarity(T *x, T *y, size_t n, float threshold = 0.999) {
   // (A dot B) / (mod(A) * mod(B))
   float cos_similarity = xy / (std::sqrt(x_2 + 1e-5) * std::sqrt(y_2 + 1e-5));
   if (cos_similarity >= threshold && cos_similarity <= 1.0f) {
+    printf_pass("check ok, cos_similarity = %f\n", cos_similarity);
+  } else {
+    printf_fail("check fail, cos_similarity = %f\n", cos_similarity);
+  }
+}
+
+template <typename T>
+float cosine_similarity_safe(T *x, T *y, size_t n, float threshold = 0.999) {
+  // 1. 先做一轮扫描，找绝对值最大元素，用来缩放
+  float max_a = 0.0f, max_b = 0.0f;
+  for (size_t i = 0; i < n; ++i) {
+    max_a = std::max(max_a, std::fabs(x[i]));
+    max_b = std::max(max_b, std::fabs(y[i]));
+    // if (i%100 == 0)
+    //   printf("data: %f, %f.\n", x[i], y[i]);
+  }
+  // 若其中一路全 0，直接返回 0 避免 0/0
+  if (max_a == 0.0f || max_b == 0.0f) return 0.0f;
+
+  // 2. 用较大者统一缩放，保证所有乘子 ≤ 1
+  float scale = std::max(max_a, max_b);
+  float dot = 0.0f, na = 0.0f, nb = 0.0f;
+  for (size_t i = 0; i < n; ++i) {
+    // printf("(%f,%f), ", x[i], y[i]);
+    float sa = x[i] / scale;
+    float sb = y[i] / scale;
+    dot += sa * sb;
+    na  += sa * sa;
+    nb  += sb * sb;
+    // if (i%100 == 0)
+    //   printf("data: %f, %f, %f, %f.\n", dot, na, nb, scale);
+  }
+  // printf("zdata: %f, %f, %f.\n", dot, na, nb);
+  // 3. 计算余弦值
+  float cos_similarity = dot / (std::sqrt(na) * std::sqrt(nb));
+  if (cos_similarity >= threshold && cos_similarity <= 1.001f) {
     printf_pass("check ok, cos_similarity = %f\n", cos_similarity);
   } else {
     printf_fail("check fail, cos_similarity = %f\n", cos_similarity);

@@ -2,18 +2,33 @@
 #pragma once
 #include "common.h"
 #include "cute/tensor.hpp"
-
+#include "xop/ops_impl/debug_util.h"
 namespace gemm_no_smem {
 
 using namespace cute;
 
-
 template <typename ElementType, typename OutElementType, typename AccumElementType, class CTA_tile>
 struct KernelTraits {
-  using MMA_Atom_SM80 = std::conditional_t<
-    std::is_same_v<ElementType, cutlass::half_t>,
+  using ElementInput = ElementType;
+  using ElementOutput = OutElementType;
+  using ElementAccumulator = AccumElementType;
+
+  // fp16: SM80_16x8x16_F16F16F16F16_TN + SM80_16x8x16_F32F16F16F32_TN
+  // bf16: SM80_16x8x16_F32BF16BF16F32_TN
+  // fp32: SM80_16x8x4_F32TF32TF32F32_TN
+  using MMA_Atom_HalfIn_SM80 = std::conditional_t<
+    std::is_same_v<ElementAccumulator, cutlass::half_t>,
     MMA_Atom<SM80_16x8x16_F16F16F16F16_TN>,
-    MMA_Atom<SM80_16x8x4_F32TF32TF32F32_TN>
+    MMA_Atom<SM80_16x8x16_F32F16F16F32_TN>
+  >;
+  using MMA_Atom_SM80 = std::conditional_t<
+    std::is_same_v<ElementInput, float>,  
+    MMA_Atom<SM80_16x8x4_F32TF32TF32F32_TN>,
+    std::conditional_t<
+      std::is_same_v<ElementInput, cutlass::half_t>,  
+      MMA_Atom_HalfIn_SM80,
+      MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>
+    >
   >;
   using TiledMma = decltype(make_tiled_mma(MMA_Atom_SM80{}, 
                                           make_layout(Shape<_2, _2, _1>{}), 
@@ -22,25 +37,23 @@ struct KernelTraits {
   static constexpr int kTileM = size<0>(CTA_tile{});
   static constexpr int kTileN = size<1>(CTA_tile{});
   static constexpr int kTileK = size<2>(CTA_tile{});
-
-  using ElementInput = ElementType;
-  using ElementOutput = OutElementType;
-  using ElementAccumulator = AccumElementType;
 };
 
 template <typename KT>
 __global__ void GemmSimpleKernel(void *Cptr, const void *Aptr, const void *Bptr, int m, int n, int k) {
 
-  using T = typename KT::ElementInput;
+  using ElementInput = typename KT::ElementInput;
+  using ElementOutput = typename KT::ElementOutput;
+  using ElementAccumulator = typename KT::ElementAccumulator;
 
   constexpr int kTileM = KT::kTileM;
   constexpr int kTileN = KT::kTileN;
   constexpr int kTileK = KT::kTileK;
 
   // 基于gmem，构建Tensor
-  Tensor A = make_tensor(make_gmem_ptr<T>(Aptr), make_shape(m, k), make_stride(k, Int<1>{}));
-  Tensor B = make_tensor(make_gmem_ptr<T>(Bptr), make_shape(n, k), make_stride(k, Int<1>{}));
-  Tensor C = make_tensor(make_gmem_ptr<T>(Cptr), make_shape(m, n), make_stride(n, Int<1>{}));
+  Tensor A = make_tensor(make_gmem_ptr<ElementInput>(Aptr), make_shape(m, k), make_stride(k, Int<1>{}));
+  Tensor B = make_tensor(make_gmem_ptr<ElementInput>(Bptr), make_shape(n, k), make_stride(k, Int<1>{}));
+  Tensor C = make_tensor(make_gmem_ptr<ElementOutput>(Cptr), make_shape(m, n), make_stride(n, Int<1>{}));
 
   int ix = blockIdx.x;
   int iy = blockIdx.y;
@@ -59,12 +72,12 @@ __global__ void GemmSimpleKernel(void *Cptr, const void *Aptr, const void *Bptr,
   auto tAgA = thr_mma.partition_A(gA);  // (MMA, MMA_M, MMA_K, num_tile_k)
   auto tBgB = thr_mma.partition_B(gB);  // (MMA, MMA_N, MMA_K, num_tile_k)
   auto tCgC = thr_mma.partition_C(gC);  // (MMA, MMA_M, MMA_N)
+
   // 因为gA/gB是三维，对应的partition tAgA/tBgB多了一个线程对应的MMA维度，变成了四维，最后一维同样是num_tile_k，
   // 基于partition创建寄存器fragment，因为后面用num_tile_k的for循环来计算，fragment只需要取一份即可，所以取了0.
   auto tArA = thr_mma.partition_fragment_A(gA(_, _, 0));  // (MMA, MMA_M, MMA_K)
   auto tBrB = thr_mma.partition_fragment_B(gB(_, _, 0));  // (MMA, MMA_N, MMA_K)
   auto tCrC = thr_mma.partition_fragment_C(gC(_, _));     // (MMA, MMA_M, MMA_N)
- 
   clear(tCrC);
   
   // 手动k循环，从gmem中取出对应tile，拷贝到reg。
@@ -75,10 +88,17 @@ __global__ void GemmSimpleKernel(void *Cptr, const void *Aptr, const void *Bptr,
     cute::copy(tAgA(_, _, _, itile), tArA);
     cute::copy(tBgB(_, _, _, itile), tBrB);
 
+    // 对应数据类型应对应mma指令，如果
     cute::gemm(tiled_mma, tCrC, tArA, tBrB, tCrC);
   }
   // 结果放回到tCgC
+  // tCrC取自mma atom，对应的就是mma指令的输出类型。
+  // tCgC取自外面提供的输出类型数据，不一定与mma执行的输出类型一致。
+  // 如fp16*fp16=fp16, accum采用fp32, 则tCrC时fp32的，而tCgC时fp16的。
+  // 即使类型不一致，仍可以直接使用cute::copy，会采用比较低效的拷贝方式完成类型转换。
+  // xop::print_tensor("btCrC", tCrC);
   cute::copy(tCrC, tCgC); 
+  // xop::print_tensor("atCgC", tCgC);
 }
 
 } // namespace gemm_no_smem

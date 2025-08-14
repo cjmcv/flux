@@ -75,11 +75,12 @@ CUTE_HOST_DEVICE void print_4xfp8e4m3(const char* name, uint32_t src) {
 // cute::print_tensor
 template <class Engine, class Layout>
 CUTE_HOST_DEVICE void print_tensor(const char* name, cute::Tensor<Engine,Layout> const& tensor, 
-                                   bool is_tid0 = true, bool is_bid0 = true, bool print_type = true) {
+                                   bool is_tid0 = true, bool print_data = true) {
   // ((_4,_2,_2),_1,_4):((_1,_4,_8),_0,_16)
   // => shape  ((_4,_2,_2),_1,_4)
   // => stride ((_1,_4,_8),_0,_16)
-  
+  if (is_tid0 && !cute::thread0()) { return; }
+
   printf("%s ", name); 
   using ElementType = typename cute::Tensor<Engine,Layout>::value_type;
   if constexpr (std::is_same_v<ElementType, float>) {
@@ -91,7 +92,9 @@ CUTE_HOST_DEVICE void print_tensor(const char* name, cute::Tensor<Engine,Layout>
   } else if constexpr (__is_same(ElementType, cutlass::float_e4m3_t)) {
     printf("(float_e4m3_t): ");
   }
-  cute::print_tensor(tensor);
+
+  if (print_data)
+    cute::print_tensor(tensor);
 }
 
 }  // namespace cute
