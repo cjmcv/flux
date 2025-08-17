@@ -169,7 +169,8 @@ class GemmV2BlockScaleFp8Schema:
     def get_meta_space(self, w):
         # ('E4M3', 'E4M3', 'FP16', 'FP16')
         # data_type = [('E4M3', 'E4M3', 'BF16', 'FP32')] # a,b,cd,acc
-        data_type = [('E4M3', 'E4M3', 'BF16', 'FP32'), ('E4M3', 'E4M3', 'FP16', 'BF16')] # a,b,cd,acc
+        data_type = [('E4M3', 'E4M3', 'BF16', 'FP32'), ('E4M3', 'E4M3', 'BF16', 'FP16'),
+                     ('E4M3', 'E4M3', 'FP16', 'FP32'), ('E4M3', 'E4M3', 'FP16', 'FP16')] # a,b,cd,acc
         layout = ['RCR'] # , 'RRR'
         arch = ['Sm89']
         res = make_meta_space(w, data_type, layout, arch)
