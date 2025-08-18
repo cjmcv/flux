@@ -36,25 +36,7 @@ struct KernelTraits {
                     make_shape(Int<kTileN>{}, Int<kTileK>{}, Int<kStage>{})));
 
                     
-  using MMA_Atom_HalfIn_SM80 = std::conditional_t<
-    std::is_same_v<ElementAccumulator, cutlass::half_t>,
-    MMA_Atom<SM80_16x8x16_F16F16F16F16_TN>,
-    MMA_Atom<SM80_16x8x16_F32F16F16F32_TN>
-  >;
-  using MMA_Atom_SM80 = std::conditional_t<
-    std::is_same_v<ElementInput, float>,  
-    MMA_Atom<SM80_16x8x4_F32TF32TF32F32_TN>,
-    std::conditional_t<
-      std::is_same_v<ElementInput, cutlass::half_t>,  
-      MMA_Atom_HalfIn_SM80,
-      MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>
-    >
-  >;
-
-  // using mma_op = SM80_16x8x16_F16F16F16F16_TN;
-
-  // using mma_traits = MMA_Traits<mma_op>;
-  // using mma_atom = MMA_Atom<mma_traits>;
+  using MMA_Atom_SM80 = typename xop::traits::MMA_Atom_Selector<80, ElementInput, ElementAccumulator>::MMA_Atom_SMSP;
 
   static constexpr int kMmaEURepeatM = 2;
   static constexpr int kMmaEURepeatN = 2;
@@ -116,8 +98,7 @@ struct KernelTraits {
       cute::cosize(SmemLayoutA{}) + cute::cosize(SmemLayoutB{});
   static constexpr int shm_size_C = cute::cosize(SmemLayoutC{});
 
-  static constexpr int kShmSize =
-      cute::max(shm_size_AB, shm_size_C) * sizeof(T);
+  static constexpr int kShmSize = cute::max(shm_size_AB, shm_size_C) * sizeof(T);
 };
 
 template <typename KT>

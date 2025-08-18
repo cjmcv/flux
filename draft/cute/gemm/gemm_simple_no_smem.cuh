@@ -3,6 +3,7 @@
 #include "common.h"
 #include "cute/tensor.hpp"
 #include "xop/ops_impl/debug_util.h"
+#include "common_traits.cuh"
 namespace gemm_no_smem {
 
 using namespace cute;
@@ -13,23 +14,8 @@ struct KernelTraits {
   using ElementOutput = OutElementType;
   using ElementAccumulator = AccumElementType;
 
-  // fp16: SM80_16x8x16_F16F16F16F16_TN + SM80_16x8x16_F32F16F16F32_TN
-  // bf16: SM80_16x8x16_F32BF16BF16F32_TN
-  // fp32: SM80_16x8x4_F32TF32TF32F32_TN
-  using MMA_Atom_HalfIn_SM80 = std::conditional_t<
-    std::is_same_v<ElementAccumulator, cutlass::half_t>,
-    MMA_Atom<SM80_16x8x16_F16F16F16F16_TN>,
-    MMA_Atom<SM80_16x8x16_F32F16F16F32_TN>
-  >;
-  using MMA_Atom_SM80 = std::conditional_t<
-    std::is_same_v<ElementInput, float>,  
-    MMA_Atom<SM80_16x8x4_F32TF32TF32F32_TN>,
-    std::conditional_t<
-      std::is_same_v<ElementInput, cutlass::half_t>,  
-      MMA_Atom_HalfIn_SM80,
-      MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>
-    >
-  >;
+  using MMA_Atom_SM80 = typename xop::traits::MMA_Atom_Selector<80, ElementInput, ElementAccumulator>::MMA_Atom_SMSP;
+
   using TiledMma = decltype(make_tiled_mma(MMA_Atom_SM80{}, 
                                           make_layout(Shape<_2, _2, _1>{}), 
                                           make_layout(Shape<_1, _2, _1>{})));
