@@ -120,7 +120,7 @@ cublas_gemmExTN_ref(cutlass::HostTensor<Atype, ALayout> const &A, // row-major
     compute_type = CUDA_R_16F;
   }
 
-  printf("indata_type: %d, outdata_type %d, compute_type: %d.\n", indata_type, outdata_type, compute_type);
+  printf("cublas indata_type: %d, outdata_type %d, compute_type: %d.\n", indata_type, outdata_type, compute_type);
 
   float gflop = 2.0 * m * n * k / 1e9;
   cublasHandle_t handle;
@@ -135,7 +135,6 @@ cublas_gemmExTN_ref(cutlass::HostTensor<Atype, ALayout> const &A, // row-major
 
   // cublas 如果accum是float，则输出也需要是float。
   // 不支持fp16/bf16输入且accum为float的情况下，输出为fp16/bf16.
-  printf("cublasGemmEx: %d, %d.", indata_type, compute_type);
   cublasStatus_t ret = cublasGemmEx(handle,
                 CUBLAS_OP_T, CUBLAS_OP_N,
                 n, m, k,
@@ -166,7 +165,7 @@ cublas_gemmExTN_ref(cutlass::HostTensor<Atype, ALayout> const &A, // row-major
   timer.stop();
   float duration_ms = timer.elapsed_millis() / repeat;
   float tflops = gflop / duration_ms;
-  printf("cublas ref: %f tflops, %f ms latency\n", tflops, duration_ms);
+  printf("%-30s: %f tflops, %f ms latency\n", "[cublas ref]", tflops, duration_ms);
 
   if (ret != CUBLAS_STATUS_SUCCESS) {
     std::cerr << "Got cublas error at : " << __LINE__ << std::endl;

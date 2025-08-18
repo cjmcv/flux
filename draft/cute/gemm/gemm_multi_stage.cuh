@@ -11,6 +11,7 @@ template <typename InElementType_, typename OutElementType_, typename AccumEleme
 struct KernelTraits {
   using ElementInput = InElementType_;
   using ElementAccumulator = AccumElementType_;
+  using T = InElementType_;
 
   // tile configuration
   static constexpr int kTileM = size<0>(TileShape_{});
@@ -72,7 +73,7 @@ struct KernelTraits {
 
   using g2s_copy_op = SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>;
   using g2s_copy_traits = Copy_Traits<g2s_copy_op>;
-  using g2s_copy_atom = Copy_Atom<g2s_copy_traits, ElementInput>;
+  using g2s_copy_atom = Copy_Atom<g2s_copy_traits, T>;
 
   using G2SCopyA =
       decltype(make_tiled_copy(g2s_copy_atom{},
@@ -121,8 +122,7 @@ struct KernelTraits {
 
 template <typename KT>
 __global__ void /* __launch_bounds__(128, 1) */
-gemm_multi_stage(void *Dptr, const void *Aptr, const void *Bptr, int m, int n,
-                 int k) {
+gemm_multi_stage(void *Dptr, const void *Aptr, const void *Bptr, int m, int n, int k) {
   using namespace cute;
   using X = Underscore;
 
@@ -145,36 +145,28 @@ gemm_multi_stage(void *Dptr, const void *Aptr, const void *Bptr, int m, int n,
   constexpr int kTileK = KT::kTileK;
   constexpr int kStage = KT::kStage;
 
-  extern __shared__ T shm_data[];
+  extern __shared__ int shm_data[];
 
-  T *Ashm = shm_data;
-  T *Bshm = shm_data + cute::cosize(SmemLayoutA{});
+  T *Ashm = (T *)shm_data;
+  T *Bshm = (T *)shm_data + cute::cosize(SmemLayoutA{});
 
   int idx = threadIdx.x;
   int ix = blockIdx.x;
   int iy = blockIdx.y;
 
   // use Tensor notation to represent device pointer + dimension
-  Tensor A = make_tensor(make_gmem_ptr((T *)Aptr), make_shape(m, k),
-                         make_stride(k, Int<1>{}));  // (M, K)
-  Tensor B = make_tensor(make_gmem_ptr((T *)Bptr), make_shape(n, k),
-                         make_stride(k, Int<1>{}));  // (N, K)
-  Tensor D = make_tensor(make_gmem_ptr((T *)Dptr), make_shape(m, n),
-                         make_stride(n, Int<1>{}));  // (M, N)
+  Tensor A = make_tensor(make_gmem_ptr((T *)Aptr), make_shape(m, k), make_stride(k, Int<1>{}));  // (M, K)
+  Tensor B = make_tensor(make_gmem_ptr((T *)Bptr), make_shape(n, k), make_stride(k, Int<1>{}));  // (N, K)
+  Tensor D = make_tensor(make_gmem_ptr((T *)Dptr), make_shape(m, n), make_stride(n, Int<1>{}));  // (M, N)
 
   // slice the tensor to small one which is used for current thread block.
-  Tensor gA = local_tile(A, make_tile(Int<kTileM>{}, Int<kTileK>{}),
-                         make_coord(iy, _));  // (kTileM, kTileK, k)
-  Tensor gB = local_tile(B, make_tile(Int<kTileN>{}, Int<kTileK>{}),
-                         make_coord(ix, _));  // (kTileN, kTileK, k)
-  Tensor gD = local_tile(D, make_tile(Int<kTileM>{}, Int<kTileN>{}),
-                         make_coord(iy, ix));  // (kTileM, kTileN)
+  Tensor gA = local_tile(A, make_tile(Int<kTileM>{}, Int<kTileK>{}), make_coord(iy, _));   // (kTileM, kTileK, k)
+  Tensor gB = local_tile(B, make_tile(Int<kTileN>{}, Int<kTileK>{}), make_coord(ix, _));   // (kTileN, kTileK, k)
+  Tensor gD = local_tile(D, make_tile(Int<kTileM>{}, Int<kTileN>{}), make_coord(iy, ix));  // (kTileM, kTileN)
 
   // shared memory
-  auto sA = make_tensor(make_smem_ptr(Ashm),
-                        SmemLayoutA{});  // (kTileM, kTileK, kStage)
-  auto sB = make_tensor(make_smem_ptr(Bshm),
-                        SmemLayoutB{});  // (kTileN, kTileK, kStage)
+  auto sA = make_tensor(make_smem_ptr(Ashm), SmemLayoutA{});  // (kTileM, kTileK, kStage)
+  auto sB = make_tensor(make_smem_ptr(Bshm), SmemLayoutB{});  // (kTileN, kTileK, kStage)
 
   // dispatch TileA/TileB/TileC mma tensor into thread fragment via partition
   // method
@@ -201,14 +193,12 @@ gemm_multi_stage(void *Dptr, const void *Aptr, const void *Bptr, int m, int n,
   G2SCopyA g2s_tiled_copy_a;
   auto g2s_thr_copy_a = g2s_tiled_copy_a.get_slice(idx);
   auto tAgA_copy = g2s_thr_copy_a.partition_S(gA);  // (CPY, CPY_M, CPY_K, k)
-  auto tAsA_copy =
-      g2s_thr_copy_a.partition_D(sA);  // (CPY, CPY_M, CPY_K, kStage)
+  auto tAsA_copy = g2s_thr_copy_a.partition_D(sA);  // (CPY, CPY_M, CPY_K, kStage)
 
   G2SCopyB g2s_tiled_copy_b;
   auto g2s_thr_copy_b = g2s_tiled_copy_b.get_slice(idx);
   auto tBgB_copy = g2s_thr_copy_b.partition_S(gB);  // (CPY, CPY_N, CPY_K, k)
-  auto tBsB_copy =
-      g2s_thr_copy_b.partition_D(sB);  // (CPY, CPY_N, CPY_K, kStage)
+  auto tBsB_copy = g2s_thr_copy_b.partition_D(sB);  // (CPY, CPY_N, CPY_K, kStage)
 
   int itile_to_read = 0;
   int ismem_read = 0;

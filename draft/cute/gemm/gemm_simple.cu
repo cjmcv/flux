@@ -9,7 +9,7 @@
 using namespace cute;
 
 #define ENBALE_SIMPLE_NO_SMEM_V0
-// #define ENBALE_GEMM_V2
+#define ENBALE_GEMM_V2
 
 #ifdef ENBALE_SIMPLE_NO_SMEM_V0
 #include "gemm_simple_no_smem.cuh"
@@ -24,7 +24,7 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
   using ElementInput = ElementType; // cutlass::half_t;
   using ElementOutput = OutElementType;
   using ElementAccumulator = AccumElementType; // float;
-  printf("gemm m:%d n:%d k:%d - in %s out %s acc %s\n", m, n, k, get_type_name<ElementInput>(), get_type_name<ElementOutput>(), get_type_name<ElementAccumulator>());
+  printf("gemm m:%d n:%d k:%d - %s, %s, <%s>\n", m, n, k, get_type_name<ElementInput>(), get_type_name<ElementOutput>(), get_type_name<ElementAccumulator>());
   // init
   cutlass::HostTensor<ElementInput, cutlass::layout::RowMajor> A_tensor(cutlass::MatrixCoord({m, k}));
   cutlass::HostTensor<ElementInput, cutlass::layout::RowMajor> B_tensor(cutlass::MatrixCoord({n, k}));
@@ -57,22 +57,7 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
   }
   // gemm_host(m,n,k, A_tensor.host_data(), k, B_tensor.host_data(), k, C_ref_tensor.host_data(), n);
 
-  auto run = [&](auto kernel_traits, std::string kernel_name = "kernel") {
-    using KT = decltype(kernel_traits);
-    dim3 block(size(typename KT::TiledMma{}));
-    dim3 grid(ceil_div(n, KT::kTileN), ceil_div(m, KT::kTileM));
-    auto kernel = [&] {
-      #ifdef ENBALE_SIMPLE_NO_SMEM_V0
-      gemm_no_smem::GemmSimpleKernel<KT><<<grid, block, 0, stream>>>(C_tensor.device_data(), A_tensor.device_data(), B_tensor.device_data(), m, n, k);
-      #endif
-      #ifdef ENBALE_GEMM_V2
-      // TODO: ¼Óacc16
-      int shm_size = KT::kShmSize;
-      cudaFuncSetAttribute(gemm_v2::gemm_multi_stage<KT>,
-                           cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
-      gemm_v2::gemm_multi_stage<KT><<<grid, block, shm_size, stream>>>(C_tensor.device_data(), A_tensor.device_data(), B_tensor.device_data(), m, n, k);
-      #endif
-    };
+  auto perf_epi = [&](auto kernel, std::string kernel_name) {
     for (int i = 0; i < warmup; i++) {
       kernel();
     }
@@ -80,7 +65,7 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
     auto duration_ms = launch_with_timer(kernel, repeat, stream);
     auto flop = 2.0 * m * n * k;
     auto tflops = compute_tflops(flop, duration_ms);
-    printf("%s: %f tflops, %f ms latency\n", kernel_name.c_str(), tflops, duration_ms);
+    printf("%-30s: %f tflops, %f ms latency - ", kernel_name.c_str(), tflops, duration_ms);
     cudaDeviceSynchronize();
     C_tensor.sync_host();
 
@@ -89,12 +74,34 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
   };
 
 #ifdef ENBALE_SIMPLE_NO_SMEM_V0
-  run(gemm_no_smem::KernelTraits<ElementInput, ElementOutput, ElementAccumulator, decltype(make_shape(_128{}, _128{}, _32{}))>{}, 
-      "gemm_128*128*32_no_smem_simple");
+  auto run_v0 = [&](auto kernel_traits, std::string kernel_name = "kernel") {
+    using KT = decltype(kernel_traits);
+    dim3 block(size(typename KT::TiledMma{}));
+    dim3 grid(ceil_div(n, KT::kTileN), ceil_div(m, KT::kTileM));
+    auto kernel = [&] {
+      gemm_no_smem::GemmSimpleKernel<KT><<<grid, block, 0, stream>>>(C_tensor.device_data(), A_tensor.device_data(), B_tensor.device_data(), m, n, k);        
+    };
+    perf_epi(kernel, kernel_name);
+  };
+  run_v0(gemm_no_smem::KernelTraits<ElementInput, ElementOutput, ElementAccumulator, decltype(make_shape(_128{}, _128{}, _32{}))>{}, 
+      "[gemm_128*128*32_no_smem]");
 #endif
+
 #ifdef ENBALE_GEMM_V2
-  run(gemm_v2::KernelTraits<ElementInput, ElementOutput, ElementAccumulator, decltype(make_shape(_128{}, _128{}, _32{}))>{}, 
-      "gemm_v2");
+  auto run_v1 = [&](auto kernel_traits, std::string kernel_name = "kernel") {
+    using KT = decltype(kernel_traits);
+    dim3 block(size(typename KT::TiledMma{}));
+    dim3 grid(ceil_div(n, KT::kTileN), ceil_div(m, KT::kTileM));
+    auto kernel = [&] {
+      int shm_size = KT::kShmSize;
+      cudaFuncSetAttribute(gemm_v2::gemm_multi_stage<KT>,
+                           cudaFuncAttributeMaxDynamicSharedMemorySize, shm_size);
+      gemm_v2::gemm_multi_stage<KT><<<grid, block, shm_size, stream>>>(C_tensor.device_data(), A_tensor.device_data(), B_tensor.device_data(), m, n, k);
+    };
+    perf_epi(kernel, kernel_name);
+  };
+  run_v1(gemm_v2::KernelTraits<ElementInput, ElementOutput, ElementAccumulator, decltype(make_shape(_128{}, _128{}, _32{}))>{}, 
+      "[gemm_v2]");
 #endif
 }
 
