@@ -104,16 +104,23 @@ cublas_gemmExTN_ref(cutlass::HostTensor<Atype, ALayout> const &A, // row-major
   int k = A.extent().column();
 
   cudaDataType compute_type = CUDA_R_32F;
-  cudaDataType data_type = CUDA_R_32F;
-  if constexpr (cute::is_same_v<cutlass::half_t, Atype>) {
-    data_type = CUDA_R_16F;
-  }
-  else if constexpr (cute::is_same_v<cutlass::bfloat16_t, Atype>) {
-    data_type = CUDA_R_16BF;
-  }
+  cudaDataType indata_type = CUDA_R_32F;
+  cudaDataType outdata_type = CUDA_R_32F;
+  if constexpr (cute::is_same_v<cutlass::half_t, Atype>)
+    indata_type = CUDA_R_16F;
+  else if constexpr (cute::is_same_v<cutlass::bfloat16_t, Atype>)
+    indata_type = CUDA_R_16BF;
+
+  if constexpr (cute::is_same_v<cutlass::half_t, Ctype>)
+    outdata_type = CUDA_R_16F; 
+  else if constexpr (cute::is_same_v<cutlass::bfloat16_t, Ctype>)
+    outdata_type = CUDA_R_16BF;
+
   if constexpr (cute::is_same_v<cutlass::half_t, Accumtype>) {
     compute_type = CUDA_R_16F;
   }
+
+  printf("indata_type: %d, outdata_type %d, compute_type: %d.\n", indata_type, outdata_type, compute_type);
 
   float gflop = 2.0 * m * n * k / 1e9;
   cublasHandle_t handle;
@@ -126,15 +133,17 @@ cublas_gemmExTN_ref(cutlass::HostTensor<Atype, ALayout> const &A, // row-major
   //                 (Btype_ *)B.device_data(), k, (Atype_ *)A.device_data(), k,
   //                 &beta, (Ctype_ *)C.device_data(), n);
 
-  printf("cublasGemmEx: %d, %d.", data_type, compute_type);
+  // cublas 如果accum是float，则输出也需要是float。
+  // 不支持fp16/bf16输入且accum为float的情况下，输出为fp16/bf16.
+  printf("cublasGemmEx: %d, %d.", indata_type, compute_type);
   cublasStatus_t ret = cublasGemmEx(handle,
                 CUBLAS_OP_T, CUBLAS_OP_N,
                 n, m, k,
                 &alpha,
-                B.device_data(), data_type, k,
-                A.device_data(), data_type, k,
+                B.device_data(), indata_type, k,
+                A.device_data(), indata_type, k,
                 &beta,
-                C.device_data(), data_type, n,
+                C.device_data(), outdata_type, n,
                 compute_type,               // 计算精度
                 CUBLAS_GEMM_DEFAULT_TENSOR_OP);
                 
@@ -147,10 +156,10 @@ cublas_gemmExTN_ref(cutlass::HostTensor<Atype, ALayout> const &A, // row-major
       CUBLAS_OP_T, CUBLAS_OP_N,
       n, m, k,
       &alpha,
-      B.device_data(), data_type, k,
-      A.device_data(), data_type, k,
+      B.device_data(), indata_type, k,
+      A.device_data(), indata_type, k,
       &beta,
-      C.device_data(), data_type, n,
+      C.device_data(), outdata_type, n,
       compute_type,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP);
   }
@@ -218,7 +227,8 @@ __global__ static void gpu_compare_kernel(const T *x, const T *y, int n,
 
   float v0 = x[idx];
   float v1 = y[idx];
-
+  // if (threadIdx.x == 0)
+  //   printf("%f,", v0);
   float diff = fabs(v0 - v1);
   if (diff > threshold) {
     atomicAdd(count, 1);

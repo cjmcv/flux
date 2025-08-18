@@ -6,17 +6,17 @@
 namespace gemm_v2 {
 
 using namespace cute;
-
-template <typename T_, int kTileM_ = 128, int kTileN_ = 128, int kTileK_ = 32,
-          int kStage_ = 5, int kSmemLayoutCBatch_ = 2,
-          typename ComputeType = T_>
+template <typename InElementType_, typename OutElementType_, typename AccumElementType_, typename TileShape_,
+          int kStage_ = 5, int kSmemLayoutCBatch_ = 2>
 struct KernelTraits {
-  using T = T_;
+  using ElementInput = InElementType_;
+  using ElementAccumulator = AccumElementType_;
+  using T = InElementType_;
 
   // tile configuration
-  static constexpr int kTileM = kTileM_;
-  static constexpr int kTileN = kTileN_;
-  static constexpr int kTileK = kTileK_;
+  static constexpr int kTileM = size<0>(TileShape_{});
+  static constexpr int kTileN = size<1>(TileShape_{});
+  static constexpr int kTileK = size<2>(TileShape_{});
   static constexpr int kStage = kStage_;
   static constexpr int kSmemLayoutCBatch = kSmemLayoutCBatch_;
 
@@ -35,16 +35,32 @@ struct KernelTraits {
       tile_to_shape(SmemLayoutAtom{},
                     make_shape(Int<kTileN>{}, Int<kTileK>{}, Int<kStage>{})));
 
-  using mma_op = SM80_16x8x16_F16F16F16F16_TN;
+                    
+  using MMA_Atom_HalfIn_SM80 = std::conditional_t<
+    std::is_same_v<ElementAccumulator, cutlass::half_t>,
+    MMA_Atom<SM80_16x8x16_F16F16F16F16_TN>,
+    MMA_Atom<SM80_16x8x16_F32F16F16F32_TN>
+  >;
+  using MMA_Atom_SM80 = std::conditional_t<
+    std::is_same_v<ElementInput, float>,  
+    MMA_Atom<SM80_16x8x4_F32TF32TF32F32_TN>,
+    std::conditional_t<
+      std::is_same_v<ElementInput, cutlass::half_t>,  
+      MMA_Atom_HalfIn_SM80,
+      MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>
+    >
+  >;
 
-  using mma_traits = MMA_Traits<mma_op>;
-  using mma_atom = MMA_Atom<mma_traits>;
+  // using mma_op = SM80_16x8x16_F16F16F16F16_TN;
+
+  // using mma_traits = MMA_Traits<mma_op>;
+  // using mma_atom = MMA_Atom<mma_traits>;
 
   static constexpr int kMmaEURepeatM = 2;
   static constexpr int kMmaEURepeatN = 2;
   static constexpr int kMmaEURepeatK = 1;
 
-  using mma_atom_shape = mma_traits::Shape_MNK;
+  using mma_atom_shape = typename MMA_Atom_SM80::Traits::Shape_MNK;
   static constexpr int kMmaPM = 1 * kMmaEURepeatM * get<0>(mma_atom_shape{});
   static constexpr int kMmaPN = 2 * kMmaEURepeatN * get<1>(mma_atom_shape{});
   static constexpr int kMmaPK = 1 * kMmaEURepeatK * get<2>(mma_atom_shape{});
@@ -53,7 +69,7 @@ struct KernelTraits {
       Int<kMmaEURepeatM>{}, Int<kMmaEURepeatN>{}, Int<kMmaEURepeatK>{})));
   using MMA_P_T = Tile<Int<kMmaPM>, Int<kMmaPN>, Int<kMmaPK>>;
 
-  using TiledMma = decltype(make_tiled_mma(mma_atom{}, MMA_EU_RepeatT{}, MMA_P_T{}));
+  using TiledMma = decltype(make_tiled_mma(MMA_Atom_SM80{}, MMA_EU_RepeatT{}, MMA_P_T{}));
 
   using g2s_copy_op = SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>;
   using g2s_copy_traits = Copy_Traits<g2s_copy_op>;
@@ -104,31 +120,31 @@ struct KernelTraits {
       cute::max(shm_size_AB, shm_size_C) * sizeof(T);
 };
 
-template <typename Config>
+template <typename KT>
 __global__ void /* __launch_bounds__(128, 1) */
 gemm_multi_stage(void *Dptr, const void *Aptr, const void *Bptr, int m, int n,
                  int k) {
   using namespace cute;
   using X = Underscore;
 
-  using T = typename Config::T;
-  using SmemLayoutA = typename Config::SmemLayoutA;
-  using SmemLayoutB = typename Config::SmemLayoutB;
-  using SmemLayoutC = typename Config::SmemLayoutC;
-  using TiledMMA = typename Config::TiledMma;
+  using T = typename KT::T;
+  using SmemLayoutA = typename KT::SmemLayoutA;
+  using SmemLayoutB = typename KT::SmemLayoutB;
+  using SmemLayoutC = typename KT::SmemLayoutC;
+  using TiledMMA = typename KT::TiledMma;
 
-  using S2RCopyAtomA = typename Config::S2RCopyAtomA;
-  using S2RCopyAtomB = typename Config::S2RCopyAtomB;
-  using G2SCopyA = typename Config::G2SCopyA;
-  using G2SCopyB = typename Config::G2SCopyB;
-  using R2SCopyAtomC = typename Config::R2SCopyAtomC;
-  using S2GCopyAtomC = typename Config::S2GCopyAtomC;
-  using S2GCopyC = typename Config::S2GCopyC;
+  using S2RCopyAtomA = typename KT::S2RCopyAtomA;
+  using S2RCopyAtomB = typename KT::S2RCopyAtomB;
+  using G2SCopyA = typename KT::G2SCopyA;
+  using G2SCopyB = typename KT::G2SCopyB;
+  using R2SCopyAtomC = typename KT::R2SCopyAtomC;
+  using S2GCopyAtomC = typename KT::S2GCopyAtomC;
+  using S2GCopyC = typename KT::S2GCopyC;
 
-  constexpr int kTileM = Config::kTileM;
-  constexpr int kTileN = Config::kTileN;
-  constexpr int kTileK = Config::kTileK;
-  constexpr int kStage = Config::kStage;
+  constexpr int kTileM = KT::kTileM;
+  constexpr int kTileN = KT::kTileN;
+  constexpr int kTileK = KT::kTileK;
+  constexpr int kStage = KT::kStage;
 
   extern __shared__ T shm_data[];
 

@@ -19,28 +19,25 @@ using namespace cute;
 #include "gemm_multi_stage.cuh"
 #endif
 
-template <typename ABCtype, typename Accumtype>
+template <typename ElementType, typename OutElementType, typename AccumElementType>
 void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) {
-  using TYPE = ABCtype; // cutlass::half_t;
-  using ACCUM_TYPE = Accumtype; // float;
-  printf("gemm m:%d n:%d k:%d - io %s - acc %s\n", m, n, k, get_type_name<TYPE>(), get_type_name<ACCUM_TYPE>());
+  using ElementInput = ElementType; // cutlass::half_t;
+  using ElementOutput = OutElementType;
+  using ElementAccumulator = AccumElementType; // float;
+  printf("gemm m:%d n:%d k:%d - in %s out %s acc %s\n", m, n, k, get_type_name<ElementInput>(), get_type_name<ElementOutput>(), get_type_name<ElementAccumulator>());
   // init
-  cutlass::HostTensor<TYPE, cutlass::layout::RowMajor> A_tensor(cutlass::MatrixCoord({m, k}));
-  cutlass::HostTensor<TYPE, cutlass::layout::RowMajor> B_tensor(cutlass::MatrixCoord({n, k}));
-  cutlass::HostTensor<TYPE, cutlass::layout::RowMajor> C_tensor(cutlass::MatrixCoord({m, n}));
-  cutlass::HostTensor<TYPE, cutlass::layout::RowMajor> C_ref_tensor(cutlass::MatrixCoord({m, n}));
+  cutlass::HostTensor<ElementInput, cutlass::layout::RowMajor> A_tensor(cutlass::MatrixCoord({m, k}));
+  cutlass::HostTensor<ElementInput, cutlass::layout::RowMajor> B_tensor(cutlass::MatrixCoord({n, k}));
+  cutlass::HostTensor<ElementOutput, cutlass::layout::RowMajor> C_tensor(cutlass::MatrixCoord({m, n}));
+  cutlass::HostTensor<ElementOutput, cutlass::layout::RowMajor> C_ref_tensor(cutlass::MatrixCoord({m, n}));
 
-  // auto A_tensor = make_cutlass_rowmajor_tensor<TYPE>(m, k);
-  // auto B_tensor = make_cutlass_colmajor_tensor<TYPE>(k, n);
-  // auto C_tensor = make_cutlass_rowmajor_tensor<TYPE>(m, n);
-  // auto C_ref_tensor = make_cutlass_rowmajor_tensor<TYPE>(m, n);
-  cutlass::reference::host::TensorFillRandomUniform(A_tensor.host_view(), 0, -1, 1);
-  cutlass::reference::host::TensorFillRandomUniform(B_tensor.host_view(), 0, -1, 1);
-  // cutlass::reference::host::TensorFill(A_tensor.host_view(), TYPE(1));
-  // cutlass::reference::host::TensorFill(B_tensor.host_view(), TYPE(1));
+  // cutlass::reference::host::TensorFillRandomUniform(A_tensor.host_view(), 0, -1, 1);
+  // cutlass::reference::host::TensorFillRandomUniform(B_tensor.host_view(), 0, -1, 1);
+  cutlass::reference::host::TensorFill(A_tensor.host_view(), ElementInput(1));
+  cutlass::reference::host::TensorFill(B_tensor.host_view(), ElementInput(1));
   A_tensor.sync_device();
   B_tensor.sync_device();
-  cublas_gemmExTN_ref<ACCUM_TYPE>(A_tensor, B_tensor, C_ref_tensor, repeat, stream);
+  cublas_gemmExTN_ref<ElementAccumulator>(A_tensor, B_tensor, C_ref_tensor, repeat, stream);
   // gemm_host(m,n,k, A_tensor.host_data(), k, B_tensor.host_data(), k, C_ref_tensor.host_data(), n);
   C_ref_tensor.sync_host();
 
@@ -76,12 +73,12 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
   };
 
 #ifdef ENBALE_SIMPLE_NO_SMEM_V0
-  run(gemm_no_smem::KernelTraits<TYPE, TYPE, ACCUM_TYPE, decltype(make_shape(_128{}, _128{}, _32{}))>{}, 
+  run(gemm_no_smem::KernelTraits<ElementInput, ElementOutput, ElementAccumulator, decltype(make_shape(_128{}, _128{}, _32{}))>{}, 
       "gemm_128*128*32_no_smem_simple");
 #endif
 #ifdef ENBALE_GEMM_V2
-  run(gemm_v2::KernelTraits<TYPE>{}, 
-      "gemm_128*128*32_no_smem_simple");
+  run(gemm_v2::KernelTraits<ElementInput, ElementOutput, ElementAccumulator, decltype(make_shape(_128{}, _128{}, _32{}))>{}, 
+      "gemm_v2");
 #endif
 }
 
@@ -101,8 +98,9 @@ int main(int argc, const char *argv[]) {
   cudaStream_t stream;
   cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
 
-  // TestGemm<cutlass::half_t, float>(stream, warmup, repeat, m, n, k);
-  TestGemm<float, float>(stream, warmup, repeat, m, n, k);
+  TestGemm<cutlass::half_t, cutlass::half_t, cutlass::half_t>(stream, warmup, repeat, m, n, k);
+  TestGemm<cutlass::half_t, float, float>(stream, warmup, repeat, m, n, k);
+  TestGemm<cutlass::bfloat16_t, float, float>(stream, warmup, repeat, m, n, k);
 
   cudaStreamDestroy(stream);
   return 0;
