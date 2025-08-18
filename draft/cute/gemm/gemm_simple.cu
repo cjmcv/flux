@@ -37,9 +37,25 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
   cutlass::reference::host::TensorFill(B_tensor.host_view(), ElementInput(1));
   A_tensor.sync_device();
   B_tensor.sync_device();
-  cublas_gemmExTN_ref<ElementAccumulator>(A_tensor, B_tensor, C_ref_tensor, repeat, stream);
+
+  // cublas 如果accum是float，则输出也需要是float。
+  // 不支持fp16/bf16输入且accum为float的情况下，输出为fp16/bf16.
+  if constexpr (cute::is_same_v<float, ElementAccumulator> && !cute::is_same_v<float, ElementOutput>) {
+    cutlass::HostTensor<float, cutlass::layout::RowMajor> C_ref_tensor_fp32(cutlass::MatrixCoord({m, n}));
+    cublas_gemmExTN_ref<ElementAccumulator>(A_tensor, B_tensor, C_ref_tensor_fp32, repeat, stream);
+    C_ref_tensor_fp32.sync_host();
+    
+    cutlass::NumericConverter<ElementOutput, float> converter;
+    for (int i = 0; i < C_ref_tensor.size(); ++i) {
+      C_ref_tensor.host_data()[i] = converter(C_ref_tensor_fp32.host_data()[i]);
+      // printf("%f, ", C_ref_tensor_fp32.host_data()[i]);
+    }
+  }
+  else {
+    cublas_gemmExTN_ref<ElementAccumulator>(A_tensor, B_tensor, C_ref_tensor, repeat, stream);
+    C_ref_tensor.sync_host();
+  }
   // gemm_host(m,n,k, A_tensor.host_data(), k, B_tensor.host_data(), k, C_ref_tensor.host_data(), n);
-  C_ref_tensor.sync_host();
 
   auto run = [&](auto kernel_traits, std::string kernel_name = "kernel") {
     using KT = decltype(kernel_traits);
@@ -99,8 +115,11 @@ int main(int argc, const char *argv[]) {
   cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
 
   TestGemm<cutlass::half_t, cutlass::half_t, cutlass::half_t>(stream, warmup, repeat, m, n, k);
-  TestGemm<cutlass::half_t, float, float>(stream, warmup, repeat, m, n, k);
-  TestGemm<cutlass::bfloat16_t, float, float>(stream, warmup, repeat, m, n, k);
+  TestGemm<cutlass::half_t, cutlass::half_t, float>(stream, warmup, repeat, m, n, k);
+  TestGemm<cutlass::bfloat16_t, cutlass::bfloat16_t, float>(stream, warmup, repeat, m, n, k);
+
+  // TestGemm<cutlass::half_t, float, float>(stream, warmup, repeat, m, n, k);
+  // TestGemm<cutlass::bfloat16_t, float, float>(stream, warmup, repeat, m, n, k);
 
   cudaStreamDestroy(stream);
   return 0;

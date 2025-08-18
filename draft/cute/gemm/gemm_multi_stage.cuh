@@ -11,7 +11,6 @@ template <typename InElementType_, typename OutElementType_, typename AccumEleme
 struct KernelTraits {
   using ElementInput = InElementType_;
   using ElementAccumulator = AccumElementType_;
-  using T = InElementType_;
 
   // tile configuration
   static constexpr int kTileM = size<0>(TileShape_{});
@@ -73,7 +72,7 @@ struct KernelTraits {
 
   using g2s_copy_op = SM80_CP_ASYNC_CACHEGLOBAL<cute::uint128_t>;
   using g2s_copy_traits = Copy_Traits<g2s_copy_op>;
-  using g2s_copy_atom = Copy_Atom<g2s_copy_traits, T>;
+  using g2s_copy_atom = Copy_Atom<g2s_copy_traits, ElementInput>;
 
   using G2SCopyA =
       decltype(make_tiled_copy(g2s_copy_atom{},
