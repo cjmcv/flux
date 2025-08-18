@@ -31,10 +31,10 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
   cutlass::HostTensor<ElementOutput, cutlass::layout::RowMajor> C_tensor(cutlass::MatrixCoord({m, n}));
   cutlass::HostTensor<ElementOutput, cutlass::layout::RowMajor> C_ref_tensor(cutlass::MatrixCoord({m, n}));
 
-  // cutlass::reference::host::TensorFillRandomUniform(A_tensor.host_view(), 0, -1, 1);
-  // cutlass::reference::host::TensorFillRandomUniform(B_tensor.host_view(), 0, -1, 1);
-  cutlass::reference::host::TensorFill(A_tensor.host_view(), ElementInput(1));
-  cutlass::reference::host::TensorFill(B_tensor.host_view(), ElementInput(1));
+  cutlass::reference::host::TensorFillRandomUniform(A_tensor.host_view(), 0, -1, 1);
+  cutlass::reference::host::TensorFillRandomUniform(B_tensor.host_view(), 0, -1, 1);
+  // cutlass::reference::host::TensorFill(A_tensor.host_view(), ElementInput(1));
+  // cutlass::reference::host::TensorFill(B_tensor.host_view(), ElementInput(1));
   A_tensor.sync_device();
   B_tensor.sync_device();
 
@@ -77,7 +77,7 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
   auto run_v0 = [&](auto kernel_traits, std::string kernel_name = "kernel") {
     using KT = decltype(kernel_traits);
     dim3 block(size(typename KT::TiledMma{}));
-    dim3 grid(ceil_div(n, KT::kTileN), ceil_div(m, KT::kTileM));
+    dim3 grid(ceil_div(m, KT::kTileM), ceil_div(n, KT::kTileN));
     auto kernel = [&] {
       gemm_no_smem::GemmSimpleKernel<KT><<<grid, block, 0, stream>>>(C_tensor.device_data(), A_tensor.device_data(), B_tensor.device_data(), m, n, k);        
     };
@@ -91,7 +91,7 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
   auto run_v1 = [&](auto kernel_traits, std::string kernel_name = "kernel") {
     using KT = decltype(kernel_traits);
     dim3 block(size(typename KT::TiledMma{}));
-    dim3 grid(ceil_div(n, KT::kTileN), ceil_div(m, KT::kTileM));
+    dim3 grid(ceil_div(m, KT::kTileM), ceil_div(n, KT::kTileN));
     auto kernel = [&] {
       int shm_size = KT::kShmSize;
       cudaFuncSetAttribute(gemm_v2::gemm_multi_stage<KT>,

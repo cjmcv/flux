@@ -8,11 +8,11 @@ namespace gemm_no_smem {
 
 using namespace cute;
 
-template <typename ElementType, typename OutElementType, typename AccumElementType, class CTA_tile>
+template <typename ElementType_, typename OutElementType_, typename AccumElementType_, class TileShape_>
 struct KernelTraits {
-  using ElementInput = ElementType;
-  using ElementOutput = OutElementType;
-  using ElementAccumulator = AccumElementType;
+  using ElementInput = ElementType_;
+  using ElementOutput = OutElementType_;
+  using ElementAccumulator = AccumElementType_;
 
   using MMA_Atom_SM80 = typename xop::traits::MMA_Atom_Selector<80, ElementInput, ElementAccumulator>::MMA_Atom_SMSP;
 
@@ -20,9 +20,9 @@ struct KernelTraits {
                                           make_layout(Shape<_2, _2, _1>{}), 
                                           make_layout(Shape<_1, _2, _1>{})));
 
-  static constexpr int kTileM = size<0>(CTA_tile{});
-  static constexpr int kTileN = size<1>(CTA_tile{});
-  static constexpr int kTileK = size<2>(CTA_tile{});
+  static constexpr int kTileM = size<0>(TileShape_{});
+  static constexpr int kTileN = size<1>(TileShape_{});
+  static constexpr int kTileK = size<2>(TileShape_{});
 };
 
 template <typename KT>
@@ -48,9 +48,9 @@ __global__ void GemmSimpleKernel(void *Cptr, const void *Aptr, const void *Bptr,
   // make_coord(iy, _)表示用iy去取行，列用“_”表示不拆分全部取出，
   // 所以对于block(iy,ix)会取出A中以[kTileM, kTileK]为单位的第iy行的所有tile。
   // 即gA[kTileM, kTileK, num_tile_k]
-  Tensor gA = local_tile(A, make_tile(Int<kTileM>{}, Int<kTileK>{}), make_coord(iy, _));  // (kTileM, kTileK, num_tile_k)
-  Tensor gB = local_tile(B, make_tile(Int<kTileN>{}, Int<kTileK>{}), make_coord(ix, _));  // (kTileN, kTileK, num_tile_k)
-  Tensor gC = local_tile(C, make_tile(Int<kTileM>{}, Int<kTileN>{}), make_coord(iy, ix)); // (kTileM, kTileN) 
+  Tensor gA = local_tile(A, make_tile(Int<kTileM>{}, Int<kTileK>{}), make_coord(ix, _));  // (kTileM, kTileK, num_tile_k)
+  Tensor gB = local_tile(B, make_tile(Int<kTileN>{}, Int<kTileK>{}), make_coord(iy, _));  // (kTileN, kTileK, num_tile_k)
+  Tensor gC = local_tile(C, make_tile(Int<kTileM>{}, Int<kTileN>{}), make_coord(ix, iy)); // (kTileM, kTileN) 
 
   // 基于线程，拿到warp级别的mma分块
   typename KT::TiledMma tiled_mma;
