@@ -1,4 +1,5 @@
 // reference: https://github.com/reed-lau/cute-gemm
+//            3rdparty/cutlass/include/cutlass/gemm/collective/sm80_mma_multistage.hpp
 #pragma once
 #include "common.h"
 #include "cute/tensor.hpp"
@@ -12,7 +13,6 @@ struct KernelTraits {
   using ElementInput = InElementType_;
   using ElementOutput = OutElementType_;
   using ElementAccumulator = AccumElementType_;
-  // using T = InElementType_;
 
   // tile configuration
   static constexpr int kTileM = size<0>(TileShape_{});
@@ -21,10 +21,11 @@ struct KernelTraits {
   static constexpr int kStage = kStage_;
   static constexpr int kSmemLayoutCBatch = kSmemLayoutCBatch_;
 
-  static constexpr int kShmLoadSwizzleM = 3;
-  static constexpr int kShmLoadSwizzleS = 3;
-  static constexpr int kShmLoadSwizzleB = 3;
-
+  // Swizzle: include/cute/swizzle.hpp 
+  static constexpr int kShmLoadSwizzleB = 3; // 8
+  static constexpr int kShmLoadSwizzleM = 3; // 8
+  static constexpr int kShmLoadSwizzleS = 3; // 8
+  
   using SmemLayoutAtom = decltype(composition(
       Swizzle<kShmLoadSwizzleB, kShmLoadSwizzleM, kShmLoadSwizzleS>{},
       make_layout(make_shape(Int<8>{}, Int<kTileK>{}), make_stride(Int<kTileK>{}, Int<1>{}))));
@@ -88,7 +89,6 @@ struct KernelTraits {
   static constexpr int kThreadNum = size(TiledMma{});
   static constexpr int shm_size_AB = cute::cosize(SmemLayoutA{}) + cute::cosize(SmemLayoutB{});
   static constexpr int shm_size_C  = cute::cosize(SmemLayoutC{});
-
   static constexpr int kShmSize = cute::max(shm_size_AB * sizeof(ElementInput), shm_size_C * sizeof(ElementOutput));
 };
 

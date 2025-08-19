@@ -106,7 +106,7 @@ void TestGemm(cudaStream_t stream, int warmup, int repeat, int m, int n, int k) 
 }
 
 int main(int argc, const char *argv[]) {
-  int m = 2048, n = 1024, k = 1024;
+  int m = 2048, n = 1024, k = 4096;
   int warmup = 10, repeat = 100;
 
   if (argc > 1) {
