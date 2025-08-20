@@ -35,6 +35,8 @@ GemmNormal = _get_xop_member("GemmNormal")
 marlin_fp16xint4_matmul = _get_xop_member("marlin_fp16xint4_matmul")
 helloABCM = _get_xop_member("helloABCM")
 
+GemmComm = _get_xop_member("GemmComm")
+
 # allreduce_normal
 helloABC = _get_xop_member("helloABC")
 init_custom_ar = _get_xop_member("init_custom_ar")

@@ -157,7 +157,7 @@ def perf_xop(
             )
             return output
     else:
-        op = xop.GemmNormal(
+        op = xop.GemmComm(
             input_dtype=inputs[0].dtype,
             output_dtype=output_dtype,
             transpose_weight=transpose_weight
@@ -186,16 +186,13 @@ def perf_xop(
 
 # return atol, rtol
 def get_allclose_threshold(args, k):
-    # print("aaa", DTYPE_MAP[args.dtype], args.dtype, torch.float8_e4m3fn)
     if (args.quant_bits == 8):
         return 2e-1*np.sqrt(k), 2e-2
     if (args.quant_bits == 4):
         return 2e-1*np.sqrt(k), 2e-2
-    if (args.dtype == "float8_e4m3fn" or args.dtype == "float8_e5m2"):
-        return 2e-1*np.sqrt(k), 2e-2
-    if (args.output_dtype == "s8" or args.output_dtype == "s32"):
+    if (args.output_dtype == torch.int8 or args.output_dtype == torch.int32):
         return 0, 0
-
+    
     return 2e-2, 2e-2
     
 THRESHOLD_MAP = {
@@ -346,7 +343,6 @@ def run(M, args, xop_perf, torch_perf):
     # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
     atol, rtol = get_allclose_threshold(args, K)
-    # print(atol, rtol)
     xutil.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
 
 def parse_args():
@@ -385,14 +381,14 @@ def parse_args():
 
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8 --dtype=float16 --output_dtype=float16
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_ms
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float16
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float16 --has_bias 
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float8_e4m3fn
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float8_e4m3fn --fast_accum
-# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
+# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --quant_bits=8 --dtype=float16 --output_dtype=float16
+# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --quant_bits=8
+# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --show_ms
+# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float16
+# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float16 --has_bias 
+# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float8_e4m3fn
+# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float8_e4m3fn --fast_accum
+# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
 if __name__ == "__main__":
     init_seed()
     args = parse_args()
@@ -437,74 +433,3 @@ if __name__ == "__main__":
     # plt.xticks(plot_x)
     plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
     plt.show()
-
-
-# # The usage within torch.compile of vllm.
-# # vllm/model_executor/layers/linear.py
-# # vllm/v1/attention/backends/flash_attn.py
-
-# from vllm.utils import direct_register_custom_op
-# from torch.library import Library
-# xop_lib = Library("xop", "FRAGMENT")
-# import xop
-
-# xop_gemm = xop.GemmNormal(
-#     input_dtype=torch.float16,
-#     output_dtype=torch.float16,
-#     transpose_weight=False
-# )
-# def xop_gemm_normal(
-#     input_tensor: torch.Tensor,
-#     weight_tensor: torch.Tensor,
-#     output_tensor: torch.Tensor,
-#     bias_tensor: Optional[torch.Tensor] = None,
-#     input_scale: Optional[torch.Tensor] = None,
-#     weight_scale: Optional[torch.Tensor] = None,
-#     output_scale: Optional[torch.Tensor] = None,
-#     tuning: Optional[torch.Tensor] = None,
-#     fast_accum: bool = False) -> None:
-#     xop_gemm.forward(
-#             input_tensor,
-#             weight_tensor,
-#             output_tensor,
-#             #None, 
-#             bias_tensor,
-#             input_scale,
-#             weight_scale,
-#             output_scale,
-#             tuning,
-#             fast_accum,
-#         )
-#     # if bias_tensor is not None:
-#     #     output_tensor += bias_tensor # output_tensor = output_tensor + bias_tensor is not allow in vllm torch compile
-# def xop_gemm_normal_fake(
-#     input_tensor: torch.Tensor,
-#     weight_tensor: torch.Tensor,
-#     output_tensor: torch.Tensor,
-#     bias_tensor: Optional[torch.Tensor] = None,
-#     input_scale: Optional[torch.Tensor] = None,
-#     weight_scale: Optional[torch.Tensor] = None,
-#     output_scale: Optional[torch.Tensor] = None,
-#     tuning: Optional[torch.Tensor] = None,
-#     fast_accum: bool = False) -> None:
-#     pass
-# direct_register_custom_op(
-#     op_name="xop_gemm_normal",
-#     op_func=xop_gemm_normal,
-#     mutates_args=["output_tensor"],
-#     fake_impl=xop_gemm_normal_fake,
-#     target_lib=xop_lib,
-# )
-
-# # Call
-# torch.ops.xop.xop_gemm_normal(
-#                 input_tensor = x,
-#                 weight_tensor = layer.weight,
-#                 output_tensor = output,
-#                 bias_tensor = bias,
-#                 input_scale = None,
-#                 weight_scale = None,
-#                 output_scale = None,
-#                 tuning = None,
-#                 fast_accum=False,
-#             )

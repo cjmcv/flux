@@ -61,12 +61,14 @@ class CheckFail {
 /////////////////////////////////////////////////////
 // Enum classes
 /////////////////////////////////////////////////////
+// 算子不区分v2/v3
 enum class UnifiedMetaEnum : int8_t {
   GemmNormal = 0, GemmNormalSimt, GemmBlockScaleFp8,   // gemm type
   GemmGroupedBlockScaleFp8, GemmLt, 
-  Void = 10, FP16, BF16, FP32, E4M3, E5M2, S8, S32,    // data type
-  Sm80 = 20, Sm89, Sm90,                               // arch
-  RRR = 30, RCR, RCC                                   // layout
+  GemmCommAr = 20,
+  Void = 50, FP16, BF16, FP32, E4M3, E5M2, S8, S32,    // data type
+  Sm80 = 60, Sm89, Sm90,                               // arch
+  RRR = 70, RCR, RCC                                   // layout
 };
 
 // inline std::string MetaEnumToString(UnifiedMetaEnum value) {

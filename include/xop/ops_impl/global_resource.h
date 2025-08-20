@@ -151,7 +151,8 @@ public:
 
 class TunedConfigRegister {
 private:
-  std::map<std::vector<int32_t>, std::vector<int16_t>> tuned_map;
+  std::map<std::vector<int32_t>, std::vector<int16_t>> normal_tuned_map;
+  std::map<std::vector<int32_t>, std::vector<int16_t>> comm_tuned_map;
 
   TunedConfigRegister() = default;
   TunedConfigRegister(const TunedConfigRegister&) = delete;
@@ -164,12 +165,11 @@ public:
   }
 
   void add(const std::vector<int32_t> &key, const std::vector<int16_t> &select_config) {
-    tuned_map[key] = select_config;
+    normal_tuned_map[key] = select_config;
   }
-
   void GetSelectedConfig(const std::vector<int32_t> &key, int16_t *selected_id, int16_t *schema_id, uint64_t *cublaslt_algo = nullptr) {
-    auto it = tuned_map.find(key);
-    if (it != tuned_map.end()) {
+    auto it = normal_tuned_map.find(key);
+    if (it != normal_tuned_map.end()) {
       *selected_id = it->second[0];
       *schema_id = it->second[1];
       if (cublaslt_algo != nullptr && *schema_id == (int16_t)UnifiedMetaEnum::GemmLt) {
@@ -177,8 +177,19 @@ public:
       }
       return;
     }
+  }  
+  
+  void Add2Comm(const std::vector<int32_t> &key, const std::vector<int16_t> &select_config) {
+    comm_tuned_map[key] = select_config;
   }
-
+  void GetCommSelectedConfig(const std::vector<int32_t> &key, int16_t *selected_id, int16_t *schema_id, uint64_t *cublaslt_algo = nullptr) {
+    auto it = comm_tuned_map.find(key);
+    if (it != comm_tuned_map.end()) {
+      *selected_id = it->second[0];
+      *schema_id = it->second[1];
+      return;
+    }
+  }
 
   ~TunedConfigRegister() {}
 };
