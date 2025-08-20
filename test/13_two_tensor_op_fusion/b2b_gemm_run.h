@@ -41,14 +41,13 @@
 #include "cutlass/util/reference/host/tensor_copy.h"
 #include "cutlass/util/reference/host/tensor_compare.h"
 #include "cutlass/util/reference/host/tensor_norm.h"
-#include "cutlass/util/host_reorder.h"
 #include "cutlass/util/reference/device/gemm.h"
 #include "cutlass/util/reference/device/gemm_complex.h"
 #include "cutlass/util/reference/device/tensor_relu.h"
 
 #include "reference/device/tensor_scale_bias.h"
 // #include "helper.h"
-#include "xop/common_cuda.h"
+#include "xop/ops_impl/common_cutlass.h"
 
 #define CHECK_GT(val1, val2) \
     if((val1) <= (val2)) \
@@ -57,8 +56,10 @@
     if(!(val)) \
         std::cerr << __FILE__ << " " << __LINE__ << ": CHECK_TRUE failed\n";
 
-template <typename Gemm0_, typename Gemm1_, int InterleavedK_>
-struct B2bInterleavedNonFusedGemmRun
+////////////////////////////////////////////////////////////////////////////////
+
+template <typename Gemm0_, typename Gemm1_>
+struct B2bNonFusedGemmRun
 {
 
   using Gemm0 = Gemm0_;
@@ -77,7 +78,7 @@ struct B2bInterleavedNonFusedGemmRun
   // Methods
   //
 
-  B2bInterleavedNonFusedGemmRun(
+  B2bNonFusedGemmRun(
     cutlass::Distribution::Kind init_A_ = cutlass::Distribution::Uniform,
     cutlass::Distribution::Kind init_B_ = cutlass::Distribution::Uniform,
     cutlass::Distribution::Kind init_C_ = cutlass::Distribution::Uniform,
@@ -153,15 +154,11 @@ struct B2bInterleavedNonFusedGemmRun
       typename Gemm0::LayoutB> tensor_B0(problem_size_0.kn());
 
     cutlass::HostTensor<
-      typename Gemm0::ElementB,
-      typename Gemm0::LayoutB> tensor_B0_reordered(problem_size_0.kn());
-
-    cutlass::HostTensor<
       typename Gemm0::ElementC,
       typename Gemm0::LayoutC> tensor_C0(problem_size_0.mn());
 
     cutlass::HostTensor<
-      typename Gemm0::ElementC,
+      ElementCompute,
       typename Gemm0::LayoutC> tensor_Bias0({1, problem_size_0.n()});
 
     cutlass::HostTensor<
@@ -177,15 +174,11 @@ struct B2bInterleavedNonFusedGemmRun
       typename Gemm1::LayoutB> tensor_B1(problem_size_1.kn());
 
     cutlass::HostTensor<
-      typename Gemm1::ElementB,
-      typename Gemm1::LayoutB> tensor_B1_reordered(problem_size_1.kn());
-
-    cutlass::HostTensor<
       typename Gemm1::ElementC,
       typename Gemm1::LayoutC> tensor_C1(problem_size_1.mn());
 
     cutlass::HostTensor<
-      typename Gemm0::ElementC,
+      ElementCompute,
       typename Gemm1::LayoutC> tensor_Bias1({1, problem_size_1.n()});
 
     cutlass::HostTensor<
@@ -196,6 +189,7 @@ struct B2bInterleavedNonFusedGemmRun
       typename Gemm1::ElementC,
       typename Gemm1::LayoutC> reference_D1(problem_size_1.mn());
 
+
     CHECK_TRUE(initialize_tensor(tensor_A0.host_view(), init_A, seed + 2019));
     CHECK_TRUE(initialize_tensor(tensor_B0.host_view(), init_B, seed + 2018));
     CHECK_TRUE(initialize_tensor(tensor_C0.host_view(), init_C, seed + 2017));
@@ -203,12 +197,6 @@ struct B2bInterleavedNonFusedGemmRun
     CHECK_TRUE(initialize_tensor(tensor_B1.host_view(), init_B, seed + 2016));
     CHECK_TRUE(initialize_tensor(tensor_C1.host_view(), init_C, seed + 2015));
     CHECK_TRUE(initialize_tensor(tensor_Bias1.host_view(), init_Bias, seed + 2013));
-
-    //Reorder B0 and B1
-    cutlass::reorder_column<InterleavedK_>(
-        tensor_B0_reordered.host_ref(), tensor_B0.host_ref(), problem_size_0);
-    cutlass::reorder_column<InterleavedK_>(
-        tensor_B1_reordered.host_ref(), tensor_B1.host_ref(), problem_size_1);
 
     cutlass::reference::host::TensorFill(
       tensor_D0.host_view());
@@ -221,12 +209,10 @@ struct B2bInterleavedNonFusedGemmRun
 
     tensor_A0.sync_device();
     tensor_B0.sync_device();
-    tensor_B0_reordered.sync_device();
     tensor_C0.sync_device();
     tensor_Bias0.sync_device();
     tensor_D0.sync_device();
     tensor_B1.sync_device();
-    tensor_B1_reordered.sync_device();
     tensor_C1.sync_device();
     tensor_Bias1.sync_device();
     tensor_D1.sync_device();
@@ -240,7 +226,7 @@ struct B2bInterleavedNonFusedGemmRun
     typename Gemm0::Arguments arguments_0{
       problem_size_0,
       tensor_A0.device_ref(),
-      tensor_B0_reordered.device_ref(),
+      tensor_B0.device_ref(),
       {tensor_Bias0.device_data(), typename Gemm0::LayoutC::Stride(0)},
       tensor_D0.device_ref(),
       {alpha0, beta0}
@@ -249,7 +235,7 @@ struct B2bInterleavedNonFusedGemmRun
     typename Gemm1::Arguments arguments_1{
       problem_size_1,
       tensor_D0.device_ref(),
-      tensor_B1_reordered.device_ref(),
+      tensor_B1.device_ref(),
       {tensor_Bias1.device_data(), typename Gemm1::LayoutC::Stride(0)},
       tensor_D1.device_ref(),
       {alpha1, beta1}
@@ -373,7 +359,7 @@ struct B2bInterleavedNonFusedGemmRun
 
       std::stringstream fname;
 
-      fname << "error_B2bGemm_device_interleaved_nonfused.txt";
+      fname << "error_B2bGemm_device_nonfused.txt";
       std::cerr << "Dumping results in " << fname.str() << "\n";
 
       std::ofstream file(fname.str());
@@ -381,12 +367,10 @@ struct B2bInterleavedNonFusedGemmRun
       file
         << "A0 =\n" << tensor_A0.host_view()
         << "\nB0 =\n" << tensor_B0.host_view()
-        << "\nB0_reordered =\n" << tensor_B0_reordered.host_view()
         << "\nC0 =\n" << tensor_C0.host_view()
         << "\nBias0:\n" << tensor_Bias0.host_view() << "\n"
         << "\nD0 =\n" << tensor_D0.host_view()
         << "\nB1 =\n" << tensor_B1.host_view()
-        << "\nB1_reordered =\n" << tensor_B1_reordered.host_view()
         << "\nC1 =\n" << tensor_C1.host_view()
         << "\nBias1:\n" << tensor_Bias1.host_view() << "\n"
         << "\n\nReference =\n" << reference_D1.host_view()
@@ -396,8 +380,8 @@ struct B2bInterleavedNonFusedGemmRun
   }
 };
 
-template <typename B2bGemm_, int InterleavedK_>
-struct B2bInterleavedFusedGemmRun
+template <typename B2bGemm_>
+struct B2bFusedGemmRun
 {
 
   using B2bGemm = B2bGemm_;
@@ -416,7 +400,7 @@ struct B2bInterleavedFusedGemmRun
   // Methods
   //
 
-  B2bInterleavedFusedGemmRun(
+  B2bFusedGemmRun(
     cutlass::Distribution::Kind init_A_ = cutlass::Distribution::Uniform,
     cutlass::Distribution::Kind init_B_ = cutlass::Distribution::Uniform,
     cutlass::Distribution::Kind init_C_ = cutlass::Distribution::Uniform,
@@ -483,7 +467,6 @@ struct B2bInterleavedFusedGemmRun
     // to the GemmUniversal interface
 
     int batch_count = 1,
-
     int64_t batch_stride_A0 = 0,
     int64_t batch_stride_B0 = 0,
     int64_t batch_stride_C0 = 0,
@@ -515,10 +498,6 @@ struct B2bInterleavedFusedGemmRun
       typename B2bGemm::LayoutB> tensor_B0(CoordB0.kn());
 
     cutlass::HostTensor<
-      typename B2bGemm::ElementB,
-      typename B2bGemm::LayoutB> tensor_B0_reordered(CoordB0.kn());
-
-    cutlass::HostTensor<
       typename B2bGemm::ElementC,
       typename B2bGemm::LayoutC> tensor_C0(CoordC0.mn());
 
@@ -544,10 +523,6 @@ struct B2bInterleavedFusedGemmRun
     cutlass::HostTensor<
       typename B2bGemm::ElementB,
       typename B2bGemm::LayoutB> tensor_B1(CoordB1.kn());
-
-    cutlass::HostTensor<
-      typename B2bGemm::ElementB,
-      typename B2bGemm::LayoutB> tensor_B1_reordered(CoordB1.kn());
 
     cutlass::HostTensor<
       typename B2bGemm::ElementC,
@@ -576,12 +551,6 @@ struct B2bInterleavedFusedGemmRun
     CHECK_TRUE(initialize_tensor(tensor_C1.host_view(), init_C, seed + 2015));
     CHECK_TRUE(initialize_tensor(tensor_Bias1.host_view(), init_Bias, seed + 2012));
 
-    //Reorder B0
-    cutlass::reorder_column<16>(
-        tensor_B0_reordered.host_ref(), tensor_B0.host_ref(), CoordB0);
-    cutlass::reorder_column<InterleavedK_>(
-        tensor_B1_reordered.host_ref(), tensor_B1.host_ref(), CoordB1);
-
     cutlass::reference::host::TensorFill(
       tensor_D1.host_view());
     cutlass::reference::host::TensorFill(
@@ -591,19 +560,16 @@ struct B2bInterleavedFusedGemmRun
 
     tensor_A0.sync_device();
     tensor_B0.sync_device();
-    tensor_B0_reordered.sync_device();
     tensor_C0.sync_device();
     if(alpha0 == ElementCompute(0)) //per-channel scale
         tensor_Scale0.sync_device();
     tensor_Bias0.sync_device();
     tensor_B1.sync_device();
-    tensor_B1_reordered.sync_device();
     tensor_C1.sync_device();
     tensor_Bias1.sync_device();
     tensor_D1.sync_device();
     reference_D0.sync_device();
     reference_D1.sync_device();
-    // tensor_Bias0_batched.sync_device();
 
     //
     // Initialize the GEMM operator
@@ -614,11 +580,11 @@ struct B2bInterleavedFusedGemmRun
       problem_size_0,
       problem_size_1,
       tensor_A0.device_ref(),
-      tensor_B0_reordered.device_ref(),
+      tensor_B0.device_ref(),
       tensor_C0.device_ref(),
       tensor_Scale0.device_ref(),
       tensor_Bias0.device_ref(),
-      tensor_B1_reordered.device_ref(),
+      tensor_B1.device_ref(),
       {tensor_Bias1.device_data(), typename B2bGemm::LayoutC::Stride(0)},
       tensor_D1.device_ref(),
       batch_stride_A0,
@@ -689,6 +655,7 @@ struct B2bInterleavedFusedGemmRun
       ElementAccumulator, typename B2bGemm::LayoutC,
       ElementAccumulator, ElementAccumulator
     >(
+
       problem_size_0,
       ElementAccumulator(1), //intermediate alpha=1
       tensor_A0.device_ref(),
@@ -772,7 +739,7 @@ struct B2bInterleavedFusedGemmRun
 
       std::stringstream fname;
 
-      fname << "error_B2bGemm_device_interleaved_fused.txt";
+      fname << "error_B2bGemm_device_fused.txt";
       std::cerr << "Dumping results in " << fname.str() << "\n";
 
       std::ofstream file(fname.str());
@@ -780,12 +747,10 @@ struct B2bInterleavedFusedGemmRun
       file
         << "A0 =\n" << tensor_A0.host_view()
         << "\nB0 =\n" << tensor_B0.host_view()
-        << "\nB0_reordered =\n" << tensor_B0_reordered.host_view()
         << "\nC0 =\n" << tensor_C0.host_view()
         << "\nScale0:\n" << tensor_Scale0.host_view() << "\n"
         << "\nBias0:\n" << tensor_Bias0.host_view() << "\n"
         << "\nB1 =\n" << tensor_B1.host_view()
-        << "\nB1_reordered =\n" << tensor_B1_reordered.host_view()
         << "\nC1 =\n" << tensor_C1.host_view()
         << "\nBias1:\n" << tensor_Bias1.host_view() << "\n"
         << "\n\nReference =\n" << reference_D1.host_view()

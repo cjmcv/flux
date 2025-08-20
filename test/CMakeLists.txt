@@ -19,23 +19,14 @@ include_directories(${COMMON_HEADER_DIRS})
 # add_executable(test_dual_gemm dual_gemm/dual_gemm.cu)
 # target_link_libraries(test_dual_gemm PUBLIC xop)
 
-# ## fused_two_gemms
-# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/two_tensor_op_fusion)
+# ## fused_two_gemms 对shape有严格限制，ThreadblockShape::kN = problem_size.N，不符合实际应用情况
+# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/13_two_tensor_op_fusion)
 
-# # add_executable(test_fused_two_gemms_grouped_f16_sm80_rf two_tensor_op_fusion/fused_two_gemms_grouped_f16_sm80_rf.cu)
-# # target_link_libraries(test_fused_two_gemms_grouped_f16_sm80_rf PUBLIC xop)
-
-# add_executable(test_fused_two_gemms_f16_sm80_rf two_tensor_op_fusion/fused_two_gemms_f16_sm80_rf.cu)
+# add_executable(test_fused_two_gemms_f16_sm80_rf 13_two_tensor_op_fusion/fused_two_gemms_f16_sm80_rf.cu)
 # target_link_libraries(test_fused_two_gemms_f16_sm80_rf PUBLIC xop)
 
-# add_executable(test_fused_two_gemms_f16_sm80_shmem two_tensor_op_fusion/fused_two_gemms_f16_sm80_shmem.cu)
+# add_executable(test_fused_two_gemms_f16_sm80_shmem 13_two_tensor_op_fusion/fused_two_gemms_f16_sm80_shmem.cu)
 # target_link_libraries(test_fused_two_gemms_f16_sm80_shmem PUBLIC xop)
-
-# # add_executable(test_fused_two_gemms_s8_sm80_rf two_tensor_op_fusion/fused_two_gemms_s8_sm80_rf.cu)
-# # target_link_libraries(test_fused_two_gemms_s8_sm80_rf PUBLIC xop)
-
-# # add_executable(test_fused_two_gemms_s8_sm80_shmem two_tensor_op_fusion/fused_two_gemms_s8_sm80_shmem.cu)
-# # target_link_libraries(test_fused_two_gemms_s8_sm80_shmem PUBLIC xop)
 # ## 
 
 # ##
@@ -75,8 +66,8 @@ include_directories(${COMMON_HEADER_DIRS})
 # add_executable(68_mini_test 68_hopper_fp8_warp_specialized_grouped_gemm_with_blockwise_scaling/68_mini_test.cu)
 # target_link_libraries(68_mini_test PUBLIC xop)
 # #
-# add_executable(37_gemm_layernorm_gemm_fusion 37_gemm_layernorm_gemm_fusion/gemm_layernorm.cu)
-# target_link_libraries(37_gemm_layernorm_gemm_fusion PUBLIC xop)
+add_executable(37_gemm_layernorm_gemm_fusion 37_gemm_layernorm_gemm_fusion/gemm_layernorm.cu)
+target_link_libraries(37_gemm_layernorm_gemm_fusion PUBLIC xop)
 ##
 
 # add_executable(pure_test pure_test.cu)# config_normal_gemm_sm89.cu

@@ -896,7 +896,7 @@ struct Testbed {
 int main(int argc, const char **argv) {
   
   // Define final layout
-  using LayoutOutput = cutlass::layout::ColumnMajor;
+  using LayoutOutput = cutlass::layout::RowMajor;
 
   // Options parsing
   Options<LayoutOutput> options;
