@@ -11,6 +11,8 @@ git clone
 # For Hopper(sm90) GPU
 ./build.sh --arch 90 --jobs 6
 
+# ./build.sh --arch 89 --jobs 1 2>&1 | tee full.log
+
 pdflatex a.tex
 compute-sanitizer --tool memcheck python tools/test*.py
 ncu --set full --section "SpeedOfLight_RooflineChart" -k "ada_blockwise_fp8_gemm_run_kernel" -o my_profile python3 tools/gemm/test_gemm_normal.py 100 4096 4096 --show_tflops --dtype=float8_e4m3fn

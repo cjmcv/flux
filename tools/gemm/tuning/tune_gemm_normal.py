@@ -44,7 +44,7 @@ class TuningConfig:
 
 class GemmNormalSchema:
     name = "GemmNormal"
-    sub_schema = [Meta.GemmNormal, Meta.GemmLt] # GemmNormalSimt
+    sub_schema = [Meta.GemmNormal] # GemmNormalSimt, Meta.GemmLt
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
     if is_use_fp16_acc:

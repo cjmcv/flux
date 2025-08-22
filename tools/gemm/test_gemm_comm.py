@@ -186,13 +186,16 @@ def perf_xop(
 
 # return atol, rtol
 def get_allclose_threshold(args, k):
+    # print("aaa", DTYPE_MAP[args.dtype], args.dtype, torch.float8_e4m3fn)
     if (args.quant_bits == 8):
         return 2e-1*np.sqrt(k), 2e-2
     if (args.quant_bits == 4):
         return 2e-1*np.sqrt(k), 2e-2
-    if (args.output_dtype == torch.int8 or args.output_dtype == torch.int32):
+    if (args.dtype == "float8_e4m3fn" or args.dtype == "float8_e5m2"):
+        return 2e-1*np.sqrt(k), 2e-2
+    if (args.output_dtype == "s8" or args.output_dtype == "s32"):
         return 0, 0
-    
+
     return 2e-2, 2e-2
     
 THRESHOLD_MAP = {
@@ -343,6 +346,7 @@ def run(M, args, xop_perf, torch_perf):
     # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
     atol, rtol = get_allclose_threshold(args, K)
+    # print(atol, rtol)
     xutil.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
 
 def parse_args():

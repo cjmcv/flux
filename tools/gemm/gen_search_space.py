@@ -124,6 +124,8 @@ class GemmNormalSchema:
             # Ignore special case.
             if (swizzle == 'SwizzleIdentity' and avail_sm == 1):
                 continue
+            if (swizzle == 'SwizzleIdentity' and stage == 4 and splitk_factor == 2):
+                continue
             hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
                 w.cstw(bshape), w.cstw(wshape), w.cstw(ishape), w.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
             

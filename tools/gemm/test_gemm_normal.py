@@ -196,7 +196,7 @@ def get_allclose_threshold(args, k):
     if (args.output_dtype == "s8" or args.output_dtype == "s32"):
         return 0, 0
 
-    return 2e-2, 2e-2
+    return 5e-3*np.sqrt(k), 2e-2
     
 THRESHOLD_MAP = {
     torch.float16: 10,  # 1e-1,

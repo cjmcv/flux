@@ -11,7 +11,8 @@ class Meta(IntEnum):
     GemmBlockScaleFp8 = auto()
     GemmGroupedBlockScaleFp8 = auto()
     GemmLt = auto()
-    Void = 10                # data type
+    GemmCommAr = 20
+    Void = 50                # data type
     FP16 = auto()   
     BF16 = auto()
     FP32 = auto()
@@ -19,10 +20,10 @@ class Meta(IntEnum):
     E5M2 = auto()
     S8 = auto()
     S32 = auto()
-    Sm80 = 20                # arch
+    Sm80 = 60                # arch
     Sm89 = auto()
     Sm90 = auto()
-    RRR = 30                 # layout
+    RRR = 70                 # layout
     RCR = auto()
     RCC = auto()
     def __str__(self):

@@ -1004,7 +1004,7 @@ protected:
   CUTLASS_DEVICE
   void gemm()
   {
-    printf("bbbbb kernel stream-k.\n");
+    printf("bbbbb kernel stream-k %d.\n", params.block_mapping.get_block_idx());
     // Initialize block's iteration range
     int tile_idx = 0;
     int block_iter_begin = 0;
