@@ -12,7 +12,7 @@ endfunction()
 #######################################################
 set(XOP_THS_OP_FILES "") # ths op source files of subdirectory
 
-add_subdirectory(ops/gemm_normal)
+# add_subdirectory(ops/gemm_normal)
 # add_subdirectory(ops/marlin)
 add_subdirectory(ops/gemm_comm)
 # add_subdirectory(ops/allreduce_normal)

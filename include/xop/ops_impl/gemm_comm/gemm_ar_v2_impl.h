@@ -3,7 +3,8 @@
 #include "xop/ops_impl/common_cutlass.h"
 
 #include "cutlass/epilogue/threadblock/fusion/visitors.hpp"
-#include "cutlass/gemm/kernel/default_gemm_universal_with_visitor.h"
+// #include "cutlass/gemm/kernel/default_gemm_universal_with_visitor.h"
+#include "gemm_ar_v2/kernel/default_gemm_universal_with_visitor_rs.h"
 #include "cutlass/gemm/device/gemm_universal_adapter.h"
 // #include "gemm_ar_v2/gemm_universal_rs.h"
 
@@ -85,7 +86,7 @@ class GemmArV2Impl : public GemmBase  {
       EVTCompute0>; // EVTCompute2
 
   using EVTKernelStreamK =
-      typename cutlass::gemm::kernel::DefaultGemmWithVisitor<
+      typename cutlass::gemm::kernel::DefaultGemmWithVisitorRs<
       ElementA, LayoutA, cutlass::ComplexTransform::kNone, 128 / cutlass::sizeof_bits<ElementA>::value,
       ElementB, LayoutB, cutlass::ComplexTransform::kNone, 128 / cutlass::sizeof_bits<ElementB>::value,
       ElementC, LayoutC, AlignmentC,
@@ -172,7 +173,7 @@ private:
     typename EVTD::Arguments callback_args{
       {
         {}, // Accum
-        {(ElementC *)rt_args->ptr_C, ElementC(0), {cute::_0{}, cute::_1{}, int32_t(problem_size.n())}},                 // Bias
+        {(ElementC *)rt_args->ptr_C, ElementC(0), {cute::_0{}, cute::_1{}, int32_t(problem_size.n())}},            // Bias
         {}  // Compute0
       },        // EVTCompute2
       {(ElementC *)rt_args->ptr_D, {problem_size.n(), cute::_1{}, problem_size.mn().product()}},                   // D
