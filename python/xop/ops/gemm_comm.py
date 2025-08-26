@@ -39,10 +39,11 @@ class GemmCommRs:
         tuning: Optional[torch.Tensor] = None,
         fast_accum: bool = False,
     ) -> int: 
-        return self.gemm_comm.forward(
+        gemm_out = torch.empty_like(output)
+        self.gemm_comm.forward(
             input,
             weight,
-            output=output,
+            output=gemm_out,
             bias=bias,
             input_scale=input_scale,
             weight_scale=weight_scale,
@@ -50,3 +51,4 @@ class GemmCommRs:
             tuning = tuning,
             fast_accum=fast_accum,
         )
+        self.ar.custom_all_reduce_t(gemm_out, output)

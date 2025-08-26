@@ -8,12 +8,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp
 
-import xop
-import xop.util as xutil
-
 import torch
 import torch.distributed as dist
 from torch.distributed import ProcessGroup
+
+import xop
+import xop.util as xutil
 
 DTYPE_MAP = {
     "bfloat16": torch.bfloat16,
@@ -88,7 +88,7 @@ def perf_xop(
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
 
     device = torch.device(f"cuda:{rank}")
-    torch.cuda.set_device(device)
+    # torch.cuda.set_device(device)
     # device = torch.cuda.current_device()
     distributed_init_method = f"tcp://localhost:{port}"
     dist.init_process_group(
@@ -99,7 +99,7 @@ def perf_xop(
     )
     group = dist.group.WORLD
 
-    new_group = torch.distributed.new_group(list(range(1)), backend="gloo")
+    new_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
     op = xop.GemmCommRs(
         input_dtype=inputs[0].dtype,
         output_dtype=output_dtype,
@@ -153,6 +153,9 @@ THRESHOLD_MAP = {
 }
 
 def run(world_size, rank, port, M, args, xop_perf, torch_perf):
+    device = torch.device(f"cuda:{rank}")
+    torch.cuda.set_device(device)
+    
     dtype = DTYPE_MAP[args.dtype]
     output_dtype = DTYPE_MAP[args.output_dtype]
 

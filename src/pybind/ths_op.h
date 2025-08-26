@@ -8,10 +8,11 @@
 #include <torch/csrc/utils/pybind.h>
 
 // #define ENABLE_GEMM_NORMAL 1
-#define ENABLE_GEMM_COMM 1
 // #define ENABLE_MARLIN_KERNEL 1
+#define ENABLE_GEMM_COMM 1
+#define ENABLE_ALLREDUCE_CUSTOM 1
 // #define ENABLE_FLASH_ATTEN 1
-// #define ENABLE_ALLREDUCE_CUSTOM 1
+
 
 #define XOP_TORCH_EXTENSION_NAME xop_pybind
 

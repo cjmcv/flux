@@ -380,6 +380,22 @@ class CustomAllreduce:
             # <NT> cuda graph的replay是已经被捕获到了，所以不会走这里。被捕获的将会是上面 registered=True 的
             return self.all_reduce(input, registered=False)
 
+    def custom_all_reduce_t(self, input: torch.Tensor, output: torch.Tensor):
+        """The main allreduce API that provides support for cuda graph."""
+        # When custom allreduce is disabled, this will be None.
+        if self.disabled or not self.should_custom_ar(input):
+            return 
+        if self._IS_CAPTURING:
+            if torch.cuda.is_current_stream_capturing():
+                return self.all_reduce(input, out=output, registered=True)
+            else:
+                # If warm up, mimic the allocation pattern since custom
+                # allreduce is out-of-place.
+                return 
+        else:
+            # <NT> cuda graph的replay是已经被捕获到了，所以不会走这里。被捕获的将会是上面 registered=True 的
+            return self.all_reduce(input, out=output, registered=False)
+        
     def close(self):
         if not self.disabled and self._ptr:
             xop.dispose(self._ptr)
