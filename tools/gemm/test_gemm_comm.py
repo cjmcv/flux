@@ -81,7 +81,10 @@ def perf_torch(
             if bias is not None:
                 output = output + bias
         else:
-            output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)
+            output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)#
+            # output2 = output + bias
+            # print(bias)
+            # print(output2)
         return output
 
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
@@ -282,8 +285,10 @@ def run(M, args, xop_perf, torch_perf):
             #     print(out_xop)
     else:
         for i in range(problem_count):
-            inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
-            weights.append(xutil.rand_tensor((N, K), dtype=dtype))
+            # inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
+            # weights.append(xutil.rand_tensor((N, K), dtype=dtype))
+            inputs.append(torch.ones((M, K), dtype=dtype).cuda())
+            weights.append(torch.ones((N, K), dtype=dtype).cuda())
             inputs_scale.append(None)
             weights_scale.append(None)
 
@@ -291,7 +296,8 @@ def run(M, args, xop_perf, torch_perf):
     if args.has_bias:
         bias_dtype = output_dtype
         bias_shape = (N) # (M, N)
-        bias = xutil.rand_tensor(bias_shape, bias_dtype)
+        # bias = xutil.rand_tensor(bias_shape, bias_dtype)
+        bias = torch.ones((N), dtype=dtype).cuda() * 12
 
     perf_result_xop = perf_xop(
         inputs,
@@ -343,6 +349,7 @@ def run(M, args, xop_perf, torch_perf):
     torch_output = perf_result_torch.output
     print(xop_output.dtype, torch_output.dtype)
 
+    print(xop_output)
     # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
     atol, rtol = get_allclose_threshold(args, K)
@@ -399,41 +406,45 @@ if __name__ == "__main__":
 
     xop_perf = []
     torch_perf = []
-    print(f"M: {1}, N: {args.N}, K: {args.K}")
-    run(1, args, xop_perf, torch_perf)
-
-    if 0:
-        for m in range(2, args.M, args.step):
-            print(f"M: {m}, N: {args.N}, K: {args.K}")
-            run(m, args, xop_perf, torch_perf)
-        plot_x = [1] + list(range(2, args.M, args.step))
-    else:
-        exponent = args.M # 65536: 17
-        for m in range(1, exponent):
-            m = 2**m
-            print(f"M: {m}, N: {args.N}, K: {args.K}")
-            run(m, args, xop_perf, torch_perf)
-        
-        plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
-        plot_x = range(len(plot_x_value))
-        plt.xticks(plot_x, plot_x_value, rotation=45)
-
-    print("xop_perf:", xop_perf)
-    plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
-    plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
     
-    # plt.ylim(bottom=0)  # 
+    print(f"M: {args.M}, N: {args.N}, K: {args.K}")
+    run(args.M, args, xop_perf, torch_perf)
 
-    plt.title(f'perf-N{args.N}-K{args.K}')
-    plt.xlabel('m_size')
-    if args.show_ms:
-        plt.ylabel('ms')
-    else:
-        plt.ylabel('tflops')
+    # print(f"M: {1}, N: {args.N}, K: {args.K}")
+    # run(1, args, xop_perf, torch_perf)
 
-    plt.legend()
-    plt.grid(True)
+    # if 0:
+    #     for m in range(2, args.M, args.step):
+    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
+    #         run(m, args, xop_perf, torch_perf)
+    #     plot_x = [1] + list(range(2, args.M, args.step))
+    # else:
+    #     exponent = args.M # 65536: 17
+    #     for m in range(1, exponent):
+    #         m = 2**m
+    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
+    #         run(m, args, xop_perf, torch_perf)
+        
+    #     plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
+    #     plot_x = range(len(plot_x_value))
+    #     plt.xticks(plot_x, plot_x_value, rotation=45)
 
-    # plt.xticks(plot_x)
-    plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
-    plt.show()
+    # print("xop_perf:", xop_perf)
+    # plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
+    # plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
+    
+    # # plt.ylim(bottom=0)  # 
+
+    # plt.title(f'perf-N{args.N}-K{args.K}')
+    # plt.xlabel('m_size')
+    # if args.show_ms:
+    #     plt.ylabel('ms')
+    # else:
+    #     plt.ylabel('tflops')
+
+    # plt.legend()
+    # plt.grid(True)
+
+    # # plt.xticks(plot_x)
+    # plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
+    # plt.show()

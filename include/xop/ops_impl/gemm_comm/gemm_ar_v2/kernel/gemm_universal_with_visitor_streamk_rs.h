@@ -608,13 +608,22 @@ protected:
       tile_work.tiled_coord.n(),
       tile_work.tiled_coord.k()
     };
-
+    // cute::print(accumulator_tile);
+    // printf("do_epilogue:\n");
+    // for (int i = 0; i < 128; ++i) {
+    //   printf("%f, ", accumulator_tile[i]);
+    // }
     // Execute the epilogue operator to update the destination tensor.
     epilogue(
       accumulator_tile,
       threadblock_tile_offset,
       params.problem_shape,
       thread_idx);
+
+    // printf("after do_epilogue:\n");
+    // for (int i = 0; i < 128; ++i) {
+    //   printf("%f, ", accumulator_tile[i]);
+    // }
   }
 
 
@@ -731,7 +740,7 @@ protected:
   CUTLASS_DEVICE
   void gemm()
   {
-    printf("rs run_with_streamk.\n");
+    // printf("rs run_with_streamk.\n");
     // Initialize block's iteration range
     int tile_idx = 0;
     int block_iter_begin = 0;

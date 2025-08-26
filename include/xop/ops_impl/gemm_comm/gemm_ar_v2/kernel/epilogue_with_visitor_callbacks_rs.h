@@ -264,7 +264,7 @@ public:
     ProblemShape problem_shape,
     int thread_idx
     ) {         ///< Threadblock tile coordinate in GEMM (in units of threadblock tiles)
-    // printf("rs_visitor s0.\n");
+    // printf("rs_visitor s0: %d.\n", thread_idx);
     auto callbacks = fusion_callbacks.get_callbacks(
       threadblock_tile_offset,
       thread_idx,
@@ -284,6 +284,7 @@ public:
     //
 
     if constexpr(Pipelined){
+      // printf("rs_visitor p0.\n");
       __syncthreads();
 
       //
@@ -362,7 +363,7 @@ public:
           if (!col_idx) {
             callbacks.begin_row(row_idx);
           }
-          printf("rs_visitor.\n");
+          // printf("rs_visitor loop.\n");
           callbacks.visit(
             iter_idx-1,
             row_idx,
@@ -389,7 +390,7 @@ public:
       #endif
 
     } else {
-
+      // printf("rs_visitor s1: %d.\n", kIterations);
       #ifdef __clang__
       #pragma clang diagnostic push
       #pragma clang diagnostic ignored "-Wcuda-compat"
@@ -398,7 +399,7 @@ public:
 
       #pragma unroll(IterationsUnroll ? kIterations : 1)
       for (int iter_idx = 0; iter_idx < kIterations; ++iter_idx) {
-
+        // printf("rs_visitor s2: %d.\n", iter_idx);
         //
         // Load the source
         //
@@ -425,7 +426,7 @@ public:
         shared_load_iterator_.load(aligned_accum_fragment[0]);
         // If the number of k-slices is > 1 - perform a reduction amongst the k-slices
         if (kPartitionsK > 1) {
-
+          // printf("rs_visitor s3\n");
           plus <typename SharedLoadIterator::Fragment> add_fragments;
 
           CUTLASS_PRAGMA_UNROLL
@@ -447,7 +448,7 @@ public:
 
         CUTLASS_PRAGMA_UNROLL
         for (int idx = 0; idx < kAccumulatorFragmentCount; ++idx) {
-
+          // printf("rs_visitor s4: %d\n", kAccumulatorFragmentCount);
           int row_idx = idx / SharedLoadIterator::ThreadMap::Iterations::kColumn;
           int col_idx = idx % SharedLoadIterator::ThreadMap::Iterations::kColumn;
 
@@ -455,7 +456,10 @@ public:
           if (!col_idx) {
             callbacks.begin_row(row_idx);
           }
-
+          // cute::print(accum_frag_ptr[idx]);
+          // for (int i = 0; i < 8; ++i) {
+          //   printf("%f, ", accum_frag_ptr[idx][i]);
+          // }
           callbacks.visit(
             iter_idx,
             row_idx,
@@ -463,7 +467,9 @@ public:
             idx,
             accum_frag_ptr[idx]
           );
-
+          // for (int i = 0; i < 8; ++i) {
+          //   printf("%f, ", accum_frag_ptr[idx][i]);
+          // }
           // End the row of the output fragment
           if (col_idx + 1 == SharedLoadIterator::ThreadMap::Iterations::kColumn) {
             callbacks.end_row(row_idx);

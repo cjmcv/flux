@@ -92,10 +92,7 @@ void all_reduce(fptr_t _fa, torch::Tensor& inp, torch::Tensor& out, fptr_t _reg_
 #if (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
     case at::ScalarType::BFloat16: {
       fa->allreduce<nv_bfloat16>(
-          stream,
-          reinterpret_cast<nv_bfloat16*>(reg_buffer),
-          reinterpret_cast<nv_bfloat16*>(out.data_ptr()),
-          out.numel());
+          stream, reinterpret_cast<nv_bfloat16*>(reg_buffer), reinterpret_cast<nv_bfloat16*>(out.data_ptr()), out.numel());
       break;
     }
 #endif

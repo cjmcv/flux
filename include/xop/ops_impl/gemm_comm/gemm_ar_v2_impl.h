@@ -6,6 +6,8 @@
 // #include "cutlass/gemm/kernel/default_gemm_universal_with_visitor.h"
 #include "gemm_ar_v2/kernel/default_gemm_universal_with_visitor_rs.h"
 #include "cutlass/gemm/device/gemm_universal_adapter.h"
+
+#include "gemm_ar_v2/kernel/visitor_store_rs.hpp"
 // #include "gemm_ar_v2/gemm_universal_rs.h"
 
 namespace xop {
@@ -56,27 +58,27 @@ class GemmArV2Impl : public GemmBase  {
       Accum,    // 0
       Bias>;    // 1
     
-  using Compute1 = cutlass::epilogue::threadblock::VisitorCompute<
-      cutlass::plus, ElementCompute, ElementCompute,
-      cutlass::FloatRoundStyle::round_to_nearest
-  >;
+  // using Compute1 = cutlass::epilogue::threadblock::VisitorCompute<
+  //     cutlass::plus, ElementCompute, ElementCompute,
+  //     cutlass::FloatRoundStyle::round_to_nearest
+  // >;
 
-  using EVTCompute1 = cutlass::epilogue::threadblock::Sm80EVT<
-      Compute1,
-      EVTCompute0,
-      C1>;
+  // using EVTCompute1 = cutlass::epilogue::threadblock::Sm80EVT<
+  //     Compute1,
+  //     EVTCompute0,
+  //     C1>;
 
-  using Compute2 = cutlass::epilogue::threadblock::VisitorCompute<
-      cutlass::plus, ElementOutput, ElementCompute,
-      cutlass::FloatRoundStyle::round_to_nearest
-  >;
+  // using Compute2 = cutlass::epilogue::threadblock::VisitorCompute<
+  //     cutlass::plus, ElementOutput, ElementCompute,
+  //     cutlass::FloatRoundStyle::round_to_nearest
+  // >;
 
-  using EVTCompute2 = cutlass::epilogue::threadblock::Sm80EVT<
-      Compute2,
-      EVTCompute1,
-      C2>;
+  // using EVTCompute2 = cutlass::epilogue::threadblock::Sm80EVT<
+  //     Compute2,
+  //     EVTCompute1,
+  //     C2>;
 
-  using D = cutlass::epilogue::threadblock::VisitorAuxStore<
+  using D = cutlass::epilogue::threadblock::VisitorAuxStoreRs<
       OutputTileThreadMap, ElementOutput, cutlass::FloatRoundStyle::round_to_nearest,
       cute::Stride<int64_t, cute::_1, int64_t> // StrideMNL
   >;
