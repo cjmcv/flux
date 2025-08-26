@@ -26,7 +26,10 @@ class GemmCommRs:
         device = torch.device(f"cuda:{rank}")
         self.ar = CustomAllreduce(group, device)
         self.rank = rank
-
+        
+    def capture(self):
+        self.ar.capture()
+        
     def forward(
         self,
         input: torch.Tensor,

@@ -50,6 +50,8 @@ def matmul_int8(a, b):
 
 
 def perf_torch(
+    rank: int,
+    group: ProcessGroup,
     inputs: list[torch.Tensor],
     weights: list[torch.Tensor],
     bias: Optional[torch.Tensor],
@@ -62,14 +64,15 @@ def perf_torch(
     def fn(iter_id):
         problem_idx = iter_id%problem_cnt
         output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)#
+        dist.all_reduce(output, group=group)
+        
         return output
 
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
 
 def perf_xop(
-    world_size: int, 
     rank: int,
-    port: int,
+    group: ProcessGroup,
     inputs: list[torch.Tensor],
     weights: list[torch.Tensor],
     bias: Optional[torch.Tensor],
@@ -86,47 +89,55 @@ def perf_xop(
     n = weights[0].size(0)
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
-
-    device = torch.device(f"cuda:{rank}")
-    # torch.cuda.set_device(device)
-    # device = torch.cuda.current_device()
-    distributed_init_method = f"tcp://localhost:{port}"
-    dist.init_process_group(
-        backend="nccl",
-        init_method=distributed_init_method,
-        rank=rank,
-        world_size=world_size,
-    )
-    group = dist.group.WORLD
-
-    new_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
     op = xop.GemmCommRs(
         input_dtype=inputs[0].dtype,
         output_dtype=output_dtype,
         transpose_weight=transpose_weight,
-        group=new_group,
+        group=group,
         rank=rank,
     )
-    def fn(iter_id):
-        problem_idx = iter_id % problem_cnt
-        op.forward(
-            inputs[problem_idx],
-            weights[problem_idx],
-            output=output,
-            bias=bias,
-            input_scale=inputs_scale[problem_idx],
-            weight_scale=weights_scale[problem_idx],
-            output_scale=None,
-            tuning = None,
-            fast_accum=fast_accum,
-        )
-        # print("bias:", bias, iter_id)
-        # print("inputs[problem_idx]:", inputs[problem_idx])
-        # print("weights[problem_idx]:", weights[problem_idx])
-        # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
-        # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
-        # print("output:", output)
-        return output
+    
+    if 1:
+        stream = torch.cuda.Stream()
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.stream(stream), op.capture():
+            with torch.cuda.graph(graph):
+                problem_idx = 0 % problem_cnt
+                op.forward(
+                    inputs[problem_idx],
+                    weights[problem_idx],
+                    output=output,
+                    bias=bias,
+                    input_scale=inputs_scale[problem_idx],
+                    weight_scale=weights_scale[problem_idx],
+                    output_scale=None,
+                    tuning = None,
+                    fast_accum=fast_accum,
+                )
+                
+        def fn(iter_id):
+            graph.replay()
+    else:       
+        def fn(iter_id):
+            problem_idx = iter_id % problem_cnt
+            op.forward(
+                inputs[problem_idx],
+                weights[problem_idx],
+                output=output,
+                bias=bias,
+                input_scale=inputs_scale[problem_idx],
+                weight_scale=weights_scale[problem_idx],
+                output_scale=None,
+                tuning = None,
+                fast_accum=fast_accum,
+            )
+            # print("bias:", bias, iter_id)
+            # print("inputs[problem_idx]:", inputs[problem_idx])
+            # print("weights[problem_idx]:", weights[problem_idx])
+            # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
+            # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
+            # print("output:", output)
+            return output
     return xutil.perf_gemm(warmup_iters, iters, "xop", fn)
 
 # return atol, rtol
@@ -155,6 +166,16 @@ THRESHOLD_MAP = {
 def run(world_size, rank, port, M, args, xop_perf, torch_perf):
     device = torch.device(f"cuda:{rank}")
     torch.cuda.set_device(device)
+    
+    distributed_init_method = f"tcp://localhost:{port}"
+    dist.init_process_group(
+        backend="nccl",
+        init_method=distributed_init_method,
+        rank=rank,
+        world_size=world_size,
+    )
+    nccl_group = dist.group.WORLD
+    xop_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
     
     dtype = DTYPE_MAP[args.dtype]
     output_dtype = DTYPE_MAP[args.output_dtype]
@@ -187,7 +208,7 @@ def run(world_size, rank, port, M, args, xop_perf, torch_perf):
         bias = torch.ones((N), dtype=output_dtype).cuda() * 12
 
     perf_result_xop = perf_xop(
-        world_size, rank, port,
+        rank, xop_group,
         inputs,
         weights,
         bias,
@@ -201,6 +222,7 @@ def run(world_size, rank, port, M, args, xop_perf, torch_perf):
     )
     
     perf_result_torch = perf_torch(
+        rank, nccl_group,
         inputs,
         weights,
         bias,
