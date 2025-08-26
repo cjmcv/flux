@@ -38,15 +38,15 @@ class GemmArV2Impl : public GemmBase  {
       cute::Stride<cute::_0, cute::_1, int32_t>  // StrideMNL
   >;
 
-  using C1 = cutlass::epilogue::threadblock::VisitorAuxLoad<
-      OutputTileThreadMap, ElementC, 
-      cute::Stride<int64_t, cute::_1, int64_t> // StrideMNL
-  >;
+  // using C1 = cutlass::epilogue::threadblock::VisitorAuxLoad<
+  //     OutputTileThreadMap, ElementC, 
+  //     cute::Stride<int64_t, cute::_1, int64_t> // StrideMNL
+  // >;
 
-  using C2 = cutlass::epilogue::threadblock::VisitorAuxLoad<
-      OutputTileThreadMap, ElementC, 
-      cute::Stride<int64_t, cute::_1, int64_t> // StrideMNL
-  >;
+  // using C2 = cutlass::epilogue::threadblock::VisitorAuxLoad<
+  //     OutputTileThreadMap, ElementC, 
+  //     cute::Stride<int64_t, cute::_1, int64_t> // StrideMNL
+  // >;
 
   using Compute0 = cutlass::epilogue::threadblock::VisitorCompute<
       cutlass::plus, ElementCompute, ElementCompute,

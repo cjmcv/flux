@@ -1,18 +1,17 @@
 
 import argparse
 import time
-from typing import Optional
-
-import torch
-
-import xop
-import xop.util as xutil
-
+from typing import Optional, Any
 import os
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+import multiprocessing as mp
 
+import xop
+import xop.util as xutil
+
+import torch
 import torch.distributed as dist
 from torch.distributed import ProcessGroup
 
@@ -68,6 +67,9 @@ def perf_torch(
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
 
 def perf_xop(
+    world_size: int, 
+    rank: int,
+    port: int,
     inputs: list[torch.Tensor],
     weights: list[torch.Tensor],
     bias: Optional[torch.Tensor],
@@ -85,12 +87,10 @@ def perf_xop(
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
 
-    world_size = 1
-    rank = 0
     device = torch.device(f"cuda:{rank}")
     torch.cuda.set_device(device)
     # device = torch.cuda.current_device()
-    distributed_init_method = f"tcp://localhost:{12345}"
+    distributed_init_method = f"tcp://localhost:{port}"
     dist.init_process_group(
         backend="nccl",
         init_method=distributed_init_method,
@@ -152,7 +152,7 @@ THRESHOLD_MAP = {
     torch.int32: 0,
 }
 
-def run(M, args, xop_perf, torch_perf):
+def run(world_size, rank, port, M, args, xop_perf, torch_perf):
     dtype = DTYPE_MAP[args.dtype]
     output_dtype = DTYPE_MAP[args.output_dtype]
 
@@ -184,6 +184,7 @@ def run(M, args, xop_perf, torch_perf):
         bias = torch.ones((N), dtype=output_dtype).cuda() * 12
 
     perf_result_xop = perf_xop(
+        world_size, rank, port,
         inputs,
         weights,
         bias,
@@ -259,14 +260,27 @@ def parse_args():
     )
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --quant_bits=8 --dtype=float16 --output_dtype=float16
-# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --quant_bits=8
-# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --show_ms
-# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float16
-# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float16 --has_bias 
-# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float8_e4m3fn
-# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float8_e4m3fn --fast_accum
-# python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
+def multi_process_parallel(
+    world_size: int, test_target: Any, target_args: tuple = ()
+) -> None:
+    mp.set_start_method("spawn", force=True)
+
+    procs = []
+    port = 12345
+    for i in range(world_size):
+        proc_args = (world_size, i, port) + target_args
+        proc = mp.Process(target=test_target, args=proc_args, name=f"Worker-{i}")
+        proc.daemon = True
+        proc.start()
+        procs.append(proc)
+
+    for i in range(world_size):
+        procs[i].join()
+        assert (
+            procs[i].exitcode == 0
+        ), f"Process {i} failed with exit code {procs[i].exitcode}"
+
+# python3 tools/gemm/test_gemm_comm.py --has_bias 1 256 256 --show_ms
 if __name__ == "__main__":
     init_seed()
     args = parse_args()
@@ -274,8 +288,25 @@ if __name__ == "__main__":
     xop_perf = []
     torch_perf = []
     
+    rank = 0
     print(f"M: {args.M}, N: {args.N}, K: {args.K}")
-    run(args.M, args, xop_perf, torch_perf)
+
+    world_sizes = [2] # [2,4,8]
+    for world_size in world_sizes:
+        available_gpus = torch.cuda.device_count()
+        if world_size > available_gpus:
+            print(
+                f"Skipping world_size={world_size}, requires {world_size} GPUs, found {available_gpus}"
+            )
+            continue
+
+        print(f"Running test for world_size={world_size}")
+        multi_process_parallel(
+            world_size, run, target_args=(args.M, args, xop_perf, torch_perf)
+        )
+        print(f"custom allreduce tp = {world_size}: OK")
+    
+    # run(rank, args.M, args, xop_perf, torch_perf)
 
     # print(f"M: {1}, N: {args.N}, K: {args.K}")
     # run(1, args, xop_perf, torch_perf)
