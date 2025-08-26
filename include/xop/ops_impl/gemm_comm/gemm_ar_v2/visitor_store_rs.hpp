@@ -171,7 +171,7 @@ struct VisitorAuxStoreRs{
         bool guard = elem_less(coord_v(i), problem_shape);
         // unpack_and_print(src_v(i));
         cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst_v(i), guard);
-        unpack_and_print(dst_v(i), guard);
+        // unpack_and_print(dst_v(i), guard);
       }
     }
 

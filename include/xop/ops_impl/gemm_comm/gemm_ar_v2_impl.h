@@ -4,10 +4,10 @@
 
 #include "cutlass/epilogue/threadblock/fusion/visitors.hpp"
 // #include "cutlass/gemm/kernel/default_gemm_universal_with_visitor.h"
-#include "gemm_ar_v2/kernel/default_gemm_universal_with_visitor_rs.h"
+#include "gemm_ar_v2/default_gemm_universal_with_visitor_rs.h"
 #include "cutlass/gemm/device/gemm_universal_adapter.h"
 
-#include "gemm_ar_v2/kernel/visitor_store_rs.hpp"
+#include "gemm_ar_v2/visitor_store_rs.hpp"
 // #include "gemm_ar_v2/gemm_universal_rs.h"
 
 namespace xop {

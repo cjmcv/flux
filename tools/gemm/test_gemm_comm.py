@@ -13,6 +13,9 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
+import torch.distributed as dist
+from torch.distributed import ProcessGroup
+
 DTYPE_MAP = {
     "bfloat16": torch.bfloat16,
     "float16": torch.float16,
@@ -51,40 +54,15 @@ def perf_torch(
     inputs: list[torch.Tensor],
     weights: list[torch.Tensor],
     bias: Optional[torch.Tensor],
-    input_scale: Optional[torch.Tensor],
-    weight_scale: Optional[torch.Tensor],
-    is_fp8: bool,
-    is_s8_dequant: bool,
     warmup_iters: int,
     iters: int,
     problem_cnt: int,
     output_dtype: torch.dtype,
 ):
     alpha_scale = 1.0
-    if is_fp8:
-        alpha_scale = input_scale * weight_scale
-        for i in range(len(inputs)):
-            inputs[i] = inputs[i].to(torch.bfloat16)
-        for i in range(len(weights)):
-            weights[i] = weights[i].to(torch.bfloat16)
-
     def fn(iter_id):
         problem_idx = iter_id%problem_cnt
-        if is_s8_dequant:
-            accum = matmul_int8(inputs[problem_idx], weights[problem_idx].t()).to(torch.float32)
-            output = input_scale * weight_scale * accum
-            output = output.to(torch.bfloat16)
-            if bias is not None:
-                output = output + bias
-        elif inputs[problem_idx].dtype == torch.int8:
-            output = matmul_int8(inputs[problem_idx], weights[problem_idx].t())
-            if bias is not None:
-                output = output + bias
-        else:
-            output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)#
-            # output2 = output + bias
-            # print(bias)
-            # print(output2)
+        output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)#
         return output
 
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
@@ -95,96 +73,60 @@ def perf_xop(
     bias: Optional[torch.Tensor],
     inputs_scale: Optional[torch.Tensor],
     weights_scale: Optional[torch.Tensor],
-    transpose_weight: bool,
-    is_fp8: bool,
-    is_s8_dequant: bool,
     warmup_iters: int, 
     iters: int,
     problem_cnt: int,
     output_dtype: torch.dtype,
     fast_accum: bool,
-    quant_bits: int,
 ):
+    transpose_weight = False
     m = inputs[0].size(0)
-    if transpose_weight:
-        assert (
-            is_fp8 == False and is_s8_dequant == False
-        ), "FP8/S8 GEMM does not support transpose weight (RRR layout)"
-        # weight = weight.t().contiguous()
-        n = weights[0].size(1)
-    else:
-        n = weights[0].size(0)
-
-    def _check_tensor_shape(tensor, shape):
-        if not isinstance(tensor, torch.Tensor):
-            return False
-        if len(tensor.size()) != len(shape):
-            return False
-        for x, y in zip(list(tensor.size()), shape):
-            if x != y:
-                return False
-        return True
-
-    if is_s8_dequant:
-        if not _check_tensor_shape(inputs_scale, (m, 1)):
-            raise ValueError("input_scale's shape should be (m, 1) for S8 GEMM")
-        if not _check_tensor_shape(weights_scale, (1, n)):
-            raise ValueError("weight_scale's shape should be (1, n) for S8 GEMM")
+    n = weights[0].size(0)
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
-    if (quant_bits != -1): #  and m > 256
-        op = xop.GemmQuant(
-            input_dtype=inputs[0].dtype,
-            output_dtype=output_dtype,
-            quant_bits=quant_bits
-        )
-        weights_fp8 = []
-        weights_fp8_scale = []
-        for i in range(problem_cnt):
-            weight_fp8, weight_fp8_scale = op.weight_preprocess(weights[i], fast_accum)
-            weights_fp8.append(weight_fp8)
-            weights_fp8_scale.append(weight_fp8_scale)
 
-        def fn(iter_id):
-            problem_idx = iter_id % problem_cnt
-            op.forward(
-                inputs[problem_idx],
-                weights_fp8[problem_idx],
-                output=output,
-                bias=bias,
-                input_scale=None,
-                weight_scale=weights_fp8_scale[problem_idx],
-                output_scale=None,
-                tuning = None,
-                fast_accum=fast_accum,
-            )
-            return output
-    else:
-        op = xop.GemmComm(
-            input_dtype=inputs[0].dtype,
-            output_dtype=output_dtype,
-            transpose_weight=transpose_weight
+    world_size = 1
+    rank = 0
+    device = torch.device(f"cuda:{rank}")
+    torch.cuda.set_device(device)
+    # device = torch.cuda.current_device()
+    distributed_init_method = f"tcp://localhost:{12345}"
+    dist.init_process_group(
+        backend="nccl",
+        init_method=distributed_init_method,
+        rank=rank,
+        world_size=world_size,
+    )
+    group = dist.group.WORLD
+
+    new_group = torch.distributed.new_group(list(range(1)), backend="gloo")
+    op = xop.GemmCommRs(
+        input_dtype=inputs[0].dtype,
+        output_dtype=output_dtype,
+        transpose_weight=transpose_weight,
+        group=new_group,
+        rank=rank,
+    )
+    def fn(iter_id):
+        problem_idx = iter_id % problem_cnt
+        op.forward(
+            inputs[problem_idx],
+            weights[problem_idx],
+            output=output,
+            bias=bias,
+            input_scale=inputs_scale[problem_idx],
+            weight_scale=weights_scale[problem_idx],
+            output_scale=None,
+            tuning = None,
+            fast_accum=fast_accum,
         )
-        def fn(iter_id):
-            problem_idx = iter_id % problem_cnt
-            op.forward(
-                inputs[problem_idx],
-                weights[problem_idx],
-                output=output,
-                bias=bias,
-                input_scale=inputs_scale[problem_idx],
-                weight_scale=weights_scale[problem_idx],
-                output_scale=None,
-                tuning = None,
-                fast_accum=fast_accum,
-            )
-            # print("bias:", bias, iter_id)
-            # print("inputs[problem_idx]:", inputs[problem_idx])
-            # print("weights[problem_idx]:", weights[problem_idx])
-            # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
-            # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
-            # print("output:", output)
-            return output
+        # print("bias:", bias, iter_id)
+        # print("inputs[problem_idx]:", inputs[problem_idx])
+        # print("weights[problem_idx]:", weights[problem_idx])
+        # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
+        # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
+        # print("output:", output)
+        return output
     return xutil.perf_gemm(warmup_iters, iters, "xop", fn)
 
 # return atol, rtol
@@ -212,16 +154,8 @@ THRESHOLD_MAP = {
 
 def run(M, args, xop_perf, torch_perf):
     dtype = DTYPE_MAP[args.dtype]
-    is_fp8 = xutil.is_fp8_dtype(dtype)
-    if args.output_dtype == "":
-        output_dtype = torch.bfloat16 if is_fp8 or dtype == torch.int8 else dtype
-    else:
-        output_dtype = DTYPE_MAP[args.output_dtype]
-    is_s8_dequant = dtype == torch.int8 and output_dtype == torch.bfloat16
+    output_dtype = DTYPE_MAP[args.output_dtype]
 
-    if is_s8_dequant:
-        if args.transpose_weight:
-            raise ValueError("s8 gemm with dequant must in RCR layout")
     #
     N = args.N
     K = args.K
@@ -236,68 +170,18 @@ def run(M, args, xop_perf, torch_perf):
     inputs_scale = []
     weights_scale = []
 
-    if is_s8_dequant:
-        inputs_scale.append(xutil.rand_tensor((M, 1), dtype=torch.float32))
-        weights_scale.append(xutil.rand_tensor((1, N), dtype=torch.float32))
-
-    if is_fp8:
-        fp8_org_inputs = []
-        fp8_org_weights = []
-        for i in range(problem_count):
-            x = xutil.rand_tensor((M, K), dtype=output_dtype)
-            y = xutil.rand_tensor((N, K), dtype=output_dtype)
-            # x = torch.ones((M, K), device="cuda", dtype=output_dtype)
-            # y = torch.ones((N, K), device="cuda", dtype=output_dtype)
-            # x = torch.arange(1, M*K+1, dtype=output_dtype, device="cuda").reshape(M, K)
-            # y = torch.arange(1, N*K+1, dtype=output_dtype, device="cuda").reshape(N, K)   
-            x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone(), args.fast_accum) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
-            y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone(), args.fast_accum)
-            # print("data_ptr: ", x_fp8.data_ptr(), y_fp8.data_ptr(), (x_fp8.data_ptr() % 128) == 0, (y_fp8.data_ptr() % 128) == 0)
-            x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
-
-            fp8_org_inputs.append(x)
-            fp8_org_weights.append(y)
-            inputs.append(x_fp8)
-            weights.append(y_fp8)
-
-            inputs_scale.append(x_scale)
-            weights_scale.append(y_scale.clone().contiguous())
-            
-            # for i in range(100):
-            #     xop_gemm = xop.GemmNormal(
-            #         input_dtype=torch.float8_e4m3fn,
-            #         output_dtype=output_dtype,
-            #         transpose_weight=False
-            #     )
-            #     out_xop = torch.empty((M, N), device="cuda", dtype=output_dtype)
-
-            #     xop_gemm.forward(
-            #         x_fp8.clone(),
-            #         y_fp8.clone(),
-            #         output=out_xop,
-            #         bias=None,
-            #         input_scale=xt_scale.clone(),
-            #         weight_scale=yt_scale.clone(),
-            #         output_scale=None,
-            #         tuning = None,
-            #         fast_accum=False,
-            #     )
-            #     print(out_xop)
-    else:
-        for i in range(problem_count):
-            # inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
-            # weights.append(xutil.rand_tensor((N, K), dtype=dtype))
-            inputs.append(torch.ones((M, K), dtype=dtype).cuda())
-            weights.append(torch.ones((N, K), dtype=dtype).cuda())
-            inputs_scale.append(None)
-            weights_scale.append(None)
+    for i in range(problem_count):
+        # inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
+        # weights.append(xutil.rand_tensor((N, K), dtype=dtype))
+        inputs.append(torch.ones((M, K), dtype=dtype).cuda())
+        weights.append(torch.ones((N, K), dtype=dtype).cuda())
+        inputs_scale.append(None)
+        weights_scale.append(None)
 
     bias = None
     if args.has_bias:
-        bias_dtype = output_dtype
-        bias_shape = (N) # (M, N)
-        # bias = xutil.rand_tensor(bias_shape, bias_dtype)
-        bias = torch.ones((N), dtype=dtype).cuda() * 12
+        # bias = xutil.rand_tensor((N), output_dtype)
+        bias = torch.ones((N), dtype=output_dtype).cuda() * 12
 
     perf_result_xop = perf_xop(
         inputs,
@@ -305,35 +189,22 @@ def run(M, args, xop_perf, torch_perf):
         bias,
         inputs_scale,
         weights_scale,
-        args.transpose_weight,
-        is_fp8,
-        is_s8_dequant,
         args.warmup_iters,
         args.iters,
         problem_count, 
         output_dtype,
         args.fast_accum,
-        args.quant_bits,
     )
     
-    if not is_fp8:
-        perf_result_torch = perf_torch(
-            inputs,
-            weights,
-            bias,
-            inputs_scale,
-            weights_scale,
-            is_fp8,
-            is_s8_dequant,
-            args.warmup_iters,
-            args.iters,
-            problem_count,
-            output_dtype,
-        )
-    else:
-        fp8_org_inputs[0] 
-        output = torch.nn.functional.linear(fp8_org_inputs[0] , fp8_org_weights[0])
-        perf_result_torch = xutil.PerfResult(name="torch.sim", output=output, gemm_time_ms=10000)
+    perf_result_torch = perf_torch(
+        inputs,
+        weights,
+        bias,
+        args.warmup_iters,
+        args.iters,
+        problem_count,
+        output_dtype,
+    )
 
     if args.show_ms:
         xop_perf.append(perf_result_xop.gemm_time_ms)
@@ -386,10 +257,6 @@ def parse_args():
     parser.add_argument(
         "--has_bias", default=False, action="store_true", help="whether to add bias"
     )
-    parser.add_argument(
-        "--transpose_weight", default=False, action="store_true", help="whether to transpose weight"
-    )
-
     return parser.parse_args()
 
 # python3 tools/gemm/test_gemm_comm.py 14 4096 4096 --quant_bits=8 --dtype=float16 --output_dtype=float16
