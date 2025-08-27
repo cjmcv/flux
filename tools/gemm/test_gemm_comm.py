@@ -354,7 +354,7 @@ def parse_args():
     )
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_comm.py --has_bias 1 256 256 --show_ms
+# python3 tools/gemm/test_gemm_comm.py --has_bias 12 4096 4096 --show_ms
 if __name__ == "__main__":
     init_seed()
     args = parse_args()

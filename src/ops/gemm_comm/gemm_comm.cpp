@@ -4,6 +4,11 @@
 #include "xop/common_torch.h"
 #include "xop/common_strategy.h"
 
+////////////////////////////////
+#include "xop/../../src/ops/allreduce_normal/custom_all_reduce.h"
+
+///////////////////////////////
+
 #include <ATen/core/jit_type.h>
 #include <ATen/core/List.h>
 #include <ATen/core/TensorBody.h>
@@ -81,8 +86,15 @@ public:
       c10::optional<torch::Tensor> weight_scale,
       c10::optional<torch::Tensor> output_scale,
       c10::optional<torch::Tensor> tuning,
-      bool fast_accum
+      bool fast_accum,
+      bool registered,
+      int64_t fa, 
+      int64_t reg_buffer, 
+      int64_t reg_buffer_sz_bytes
     ) {
+
+    torch::Tensor gemm_out = torch::zeros_like(output);
+
     // std::cout << "Tensor input:\n" << input << std::endl;
     std::vector<int16_t> id_meta = MakeDefaultMeta(fast_accum);       // id + meta
     std::unique_ptr<RtArguments> rt_args;
@@ -108,16 +120,16 @@ public:
       id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmCommAr; // TODO: ¼ì²éÊÇ·ñ¿ÉÉ¾³ý£¿
       rt_args = std::make_unique<RtArgumentsV2>();
     }
-    GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, rt_args.get());
+    GetBaseRtConf(input, weight, gemm_out, bias, input_scale, weight_scale, rt_args.get());
     
     if (tuning.has_value()) {
-      return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
+      return forward_tuning(input, weight, gemm_out, bias, input_scale, weight_scale, 
                             (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get());
     }
     else {
       // Misalignment case.
       if (rt_args->n%8 != 0 || rt_args->k%8 != 0) {
-        return RunTorch(input, weight, output, bias);
+        return RunTorch(input, weight, gemm_out, bias);
       }
       
       int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, 1);
@@ -140,6 +152,8 @@ public:
       op->initialize(rt_args.get());
       op->run(stream);        
     }
+
+    all_reduce(fa, gemm_out, output, reg_buffer, reg_buffer_sz_bytes);
     // ins.PrintRegistered("abc");
     // PRINTF("id_meta: ");
     // for(int i=0; i<id_meta.size(); i++) {
@@ -404,7 +418,11 @@ int GemmComm::forward(
     c10::optional<torch::Tensor> weight_scale,
     c10::optional<torch::Tensor> output_scale,
     c10::optional<torch::Tensor> tuning,
-    bool fast_accum) {
+    bool fast_accum,
+    bool registered,
+    int64_t fa, 
+    int64_t reg_buffer, 
+    int64_t reg_buffer_sz_bytes) {
   // XOP_CHECK(impl_ != nullptr) << "GemmComm is not initialized";
   return impl_->forward(
       std::move(input),
@@ -415,7 +433,11 @@ int GemmComm::forward(
       std::move(weight_scale),
       std::move(output_scale),
       std::move(tuning),
-      fast_accum);
+      fast_accum,
+      registered,
+      fa, 
+      reg_buffer, 
+      reg_buffer_sz_bytes);
 }
 
 int GemmComm::grouped_forward(

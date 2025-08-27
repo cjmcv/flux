@@ -43,15 +43,50 @@ class GemmCommRs:
         fast_accum: bool = False,
     ) -> int: 
         gemm_out = torch.empty_like(output)
-        self.gemm_comm.forward(
-            input,
-            weight,
-            output=gemm_out,
-            bias=bias,
-            input_scale=input_scale,
-            weight_scale=weight_scale,
-            output_scale=output_scale,
-            tuning = tuning,
-            fast_accum=fast_accum,
-        )
-        self.ar.custom_all_reduce_t(gemm_out, output)
+        
+        fa, reg_buffer, reg_buffer_sz_bytes = self.ar.address()
+        if self.ar.is_capturing():
+            if torch.cuda.is_current_stream_capturing():
+                # return self.all_reduce(input, out=output, registered=True)
+                self.gemm_comm.forward(
+                    input,
+                    weight,
+                    output=output,
+                    bias=bias,
+                    input_scale=input_scale,
+                    weight_scale=weight_scale,
+                    output_scale=output_scale,
+                    tuning = tuning,
+                    fast_accum=fast_accum,
+                    registered=True,
+                    fa=fa, reg_buffer=reg_buffer, reg_buffer_sz_bytes=reg_buffer_sz_bytes,
+                )
+        else:
+            # <NT> cuda graph?replay?????????????????????????? registered=True ?
+            # return self.all_reduce(input, out=output, registered=False)
+            self.gemm_comm.forward(
+                input,
+                weight,
+                output=output,
+                bias=bias,
+                input_scale=input_scale,
+                weight_scale=weight_scale,
+                output_scale=output_scale,
+                tuning = tuning,
+                fast_accum=fast_accum,
+                registered=False,
+                fa=fa, reg_buffer=reg_buffer, reg_buffer_sz_bytes=reg_buffer_sz_bytes,
+            )
+            
+        # self.gemm_comm.forward(
+        #     input,
+        #     weight,
+        #     output=gemm_out,
+        #     bias=bias,
+        #     input_scale=input_scale,
+        #     weight_scale=weight_scale,
+        #     output_scale=output_scale,
+        #     tuning = tuning,
+        #     fast_accum=fast_accum,
+        # )
+        # self.ar.custom_all_reduce_t(gemm_out, output)

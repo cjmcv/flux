@@ -21,7 +21,11 @@ public:
       c10::optional<torch::Tensor> weight_scale,
       c10::optional<torch::Tensor> output_scale,
       c10::optional<torch::Tensor> tuning,
-      bool fast_accum);
+      bool fast_accum,
+      bool registered,
+      int64_t fa, 
+      int64_t reg_buffer, 
+      int64_t reg_buffer_sz_bytes);
 
   int grouped_forward(
       std::vector<torch::Tensor> inputs,

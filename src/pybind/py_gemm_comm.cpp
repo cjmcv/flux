@@ -35,7 +35,11 @@ static int _register_single_gemm_ops [[maybe_unused]] = []() {
             py::arg("weight_scale") = py::none(),
             py::arg("output_scale") = py::none(),
             py::arg("tuning") = py::none(),
-            py::arg("fast_accum") = false)
+            py::arg("fast_accum") = false,
+            py::arg("registered") = false,
+            py::arg("fa"),
+            py::arg("reg_buffer"),
+            py::arg("reg_buffer_sz_bytes"))
         .def(
             "grouped_forward",
             &GemmCommCls::grouped_forward,
