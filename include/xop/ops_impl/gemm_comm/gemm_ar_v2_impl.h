@@ -134,7 +134,7 @@ class GemmArV2Impl : public GemmBase  {
   //     128 / cutlass::sizeof_bits<ElementB>::value>; // AlignmentB
 
 public:
-  void initialize(RtArguments *args, void *stream = nullptr) {
+  void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
     gemm_dev_ = DeviceGemmBasic();

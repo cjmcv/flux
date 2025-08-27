@@ -42,8 +42,6 @@ class GemmCommRs:
         tuning: Optional[torch.Tensor] = None,
         fast_accum: bool = False,
     ) -> int: 
-        gemm_out = torch.empty_like(output)
-        
         fa, reg_buffer, reg_buffer_sz_bytes = self.ar.address()
         if self.ar.is_capturing():
             if torch.cuda.is_current_stream_capturing():
@@ -59,7 +57,7 @@ class GemmCommRs:
                     tuning = tuning,
                     fast_accum=fast_accum,
                     registered=True,
-                    fa=fa, reg_buffer=reg_buffer, reg_buffer_sz_bytes=reg_buffer_sz_bytes,
+                    fa=fa, reg_buffer=0, reg_buffer_sz_bytes=0,
                 )
         else:
             # <NT> cuda graph?replay?????????????????????????? registered=True ?

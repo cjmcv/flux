@@ -107,7 +107,7 @@ class GemmPureV2Impl : public GemmBase  {
 #endif
 
 public:
-  void initialize(RtArguments *args, void *stream = nullptr) {
+  void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
     gemm_dev_ = DeviceGemmBasic();

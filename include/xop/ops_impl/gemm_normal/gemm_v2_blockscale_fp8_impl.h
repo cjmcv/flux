@@ -29,7 +29,7 @@ public:
       (float const* )rt_args->d_blockscale_B);
   }
   
-  void initialize(RtArguments *args, void *stream = nullptr) {
+  void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtBlockScaleFp8ArgumentsV3 *rt_args = dynamic_cast<RtBlockScaleFp8ArgumentsV3*>(args);
     gemm_dev_ = Gemm();
 

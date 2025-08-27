@@ -93,7 +93,7 @@ public:
   using StrideAux = StrideD;
 
 public:
-  void initialize(RtArguments *args, void *stream = nullptr) {
+  void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtBlockScaleFp8ArgumentsV3 *rt_args = dynamic_cast<RtBlockScaleFp8ArgumentsV3*>(args);
 
     static_assert(cute::is_same_v<ElementAccumulator, ElementBlockScale>,
