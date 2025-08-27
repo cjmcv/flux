@@ -185,10 +185,43 @@ def run_worker(world_size, rank, port, M, args, xop_perf, torch_perf):
     xop_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
     
     exponent = args.M  # 65536: 17
+    run(rank, 1, args, xop_group, nccl_group, xop_perf, torch_perf)
     for m in range(1, exponent):
         m = 2**m
         run(rank, m, args, xop_group, nccl_group, xop_perf, torch_perf)
         
+    dist.barrier(group=nccl_group)
+    dist.destroy_process_group(group=nccl_group)    
+    
+    #################  
+    # plot
+    plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
+    plot_x = range(len(plot_x_value))
+    plt.xticks(plot_x, plot_x_value, rotation=45)
+
+    print(f"xop_perf_rank{rank}:{xop_perf}")
+    print(f"torch_perf_rank{rank}:{torch_perf}")
+    
+    plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
+    plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
+    
+    # plt.ylim(bottom=0)  # 
+
+    title = f'perf-rank{rank}-N{args.N}-K{args.K}'
+    plt.title(title)
+    plt.xlabel('m_size')
+    if args.show_ms:
+        plt.ylabel('ms')
+    else:
+        plt.ylabel('tflops')
+
+    plt.legend()
+    plt.grid(True)
+
+    # plt.xticks(plot_x)
+    plt.savefig(title)
+    plt.show()
+    
 def run(rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
 
     dtype = DTYPE_MAP[args.dtype]
@@ -266,9 +299,6 @@ def run(rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
     atol, rtol = get_allclose_threshold(args, K)
     # print(atol, rtol)
     xutil.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
-    
-    dist.barrier(group=nccl_group)
-    dist.destroy_process_group(group=nccl_group)
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -344,47 +374,7 @@ if __name__ == "__main__":
 
         print(f"Running test for world_size={world_size}")
         multi_process_parallel(
-            world_size, run, target_args=(args.M, args, xop_perf, torch_perf)
+            world_size, run_worker, target_args=(args.M, args, xop_perf, torch_perf)
         )
         print(f"custom allreduce tp = {world_size}: OK")
-    
-    # run(rank, args.M, args, xop_perf, torch_perf)
-
-    # print(f"M: {1}, N: {args.N}, K: {args.K}")
-    # run(1, args, xop_perf, torch_perf)
-
-    # if 0:
-    #     for m in range(2, args.M, args.step):
-    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
-    #         run(m, args, xop_perf, torch_perf)
-    #     plot_x = [1] + list(range(2, args.M, args.step))
-    # else:
-    #     exponent = args.M # 65536: 17
-    #     for m in range(1, exponent):
-    #         m = 2**m
-    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
-    #         run(m, args, xop_perf, torch_perf)
         
-    #     plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
-    #     plot_x = range(len(plot_x_value))
-    #     plt.xticks(plot_x, plot_x_value, rotation=45)
-
-    # print("xop_perf:", xop_perf)
-    # plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
-    # plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
-    
-    # # plt.ylim(bottom=0)  # 
-
-    # plt.title(f'perf-N{args.N}-K{args.K}')
-    # plt.xlabel('m_size')
-    # if args.show_ms:
-    #     plt.ylabel('ms')
-    # else:
-    #     plt.ylabel('tflops')
-
-    # plt.legend()
-    # plt.grid(True)
-
-    # # plt.xticks(plot_x)
-    # plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
-    # plt.show()
