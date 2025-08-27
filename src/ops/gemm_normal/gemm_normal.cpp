@@ -2,6 +2,7 @@
 #include "gemm_normal.h"
 #include "xop/ops_impl/global_resource.h"
 #include "xop/common_torch.h"
+#include "xop/common_strategy.h"
 
 #include "xop/lt_coll/gemm_lt.h"
 
@@ -31,29 +32,6 @@
 #define PRINTF printf
 #define NOT_TUNING_SCHEMA "" // "TORCH"
 #define TUNING_WITH_CUBLASLT false
-
-int CoarseGrainedTuningM(int actual_m, int schema = 0) {
-  int tuned_m = 0;
-  if (schema == 0) {
-    return actual_m;
-  }
-  else if (schema == 1) {
-    if (actual_m <= 1) {
-      tuned_m = 1;
-    }
-    else if (actual_m >= 16384) { // 4096, 8192, 16384, 32768, 65536
-      tuned_m = 16384;
-    }
-    else {
-      int exponent = static_cast<int>(std::floor(std::log2(actual_m)));
-      tuned_m = std::pow(2, exponent);
-    }
-  }
-  else {
-    printf("Unsupported CoarseGrainedTuning schema: %d.\n", schema);
-  }
-  return tuned_m;
-}
 
 //////////////////////////////
 namespace xop {
@@ -160,7 +138,7 @@ public:
         return RunTorch(input, weight, output, bias);
       }
       
-      int tuned_m = CoarseGrainedTuningM(rt_args->m, 1);
+      int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, 1);
       PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
       std::vector<int32_t> shape_meta = {tuned_m, rt_args->n, rt_args->k, 1};       // mnkl + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)

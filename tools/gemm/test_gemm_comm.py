@@ -207,7 +207,7 @@ def run_worker(world_size, rank, port, M, args, xop_perf, torch_perf):
     
     # plt.ylim(bottom=0)  # 
 
-    title = f'perf-rank{rank}-N{args.N}-K{args.K}'
+    title = f'perf-N{args.N}-K{args.K}-rank{rank}'
     plt.title(title)
     plt.xlabel('m_size')
     if args.show_ms:
@@ -300,6 +300,28 @@ def run(rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
     # print(atol, rtol)
     xutil.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
 
+
+def multi_process_parallel(
+    world_size: int, test_target: Any, target_args: tuple = ()
+) -> None:
+    mp.set_start_method("spawn", force=True)
+
+    procs = []
+    port = 12345
+    for i in range(world_size):
+        proc_args = (world_size, i, port) + target_args
+        proc = mp.Process(target=test_target, args=proc_args, name=f"Worker-{i}")
+        proc.daemon = True
+        proc.start()
+        procs.append(proc)
+
+    for i in range(world_size):
+        procs[i].join()
+        assert (
+            procs[i].exitcode == 0
+        ), f"Process {i} failed with exit code {procs[i].exitcode}"
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -331,26 +353,6 @@ def parse_args():
         "--has_bias", default=False, action="store_true", help="whether to add bias"
     )
     return parser.parse_args()
-
-def multi_process_parallel(
-    world_size: int, test_target: Any, target_args: tuple = ()
-) -> None:
-    mp.set_start_method("spawn", force=True)
-
-    procs = []
-    port = 12345
-    for i in range(world_size):
-        proc_args = (world_size, i, port) + target_args
-        proc = mp.Process(target=test_target, args=proc_args, name=f"Worker-{i}")
-        proc.daemon = True
-        proc.start()
-        procs.append(proc)
-
-    for i in range(world_size):
-        procs[i].join()
-        assert (
-            procs[i].exitcode == 0
-        ), f"Process {i} failed with exit code {procs[i].exitcode}"
 
 # python3 tools/gemm/test_gemm_comm.py --has_bias 1 256 256 --show_ms
 if __name__ == "__main__":
