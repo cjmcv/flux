@@ -98,25 +98,32 @@ def perf_xop(
     )
     
     if 1:
+        problem_idx = 0
+        def forward_fn(problem_idx):
+            op.forward(inputs[problem_idx],
+                weights[problem_idx],
+                output=output,
+                bias=bias,
+                input_scale=inputs_scale[problem_idx],
+                weight_scale=weights_scale[problem_idx],
+                output_scale=None,
+                tuning = None,
+                fast_accum=fast_accum,
+            )
+            
+        # pre allocate for cuda graph
+        forward_fn(problem_idx)
+        
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
-        with torch.cuda.stream(stream), op.capture():
+        with torch.cuda.stream(stream), op.ar.capture():
             with torch.cuda.graph(graph):
-                problem_idx = 0 % problem_cnt
-                op.forward(
-                    inputs[problem_idx],
-                    weights[problem_idx],
-                    output=output,
-                    bias=bias,
-                    input_scale=inputs_scale[problem_idx],
-                    weight_scale=weights_scale[problem_idx],
-                    output_scale=None,
-                    tuning = None,
-                    fast_accum=fast_accum,
-                )
+                problem_idx = 0
+                forward_fn(problem_idx)
                 
         def fn(iter_id):
             graph.replay()
+            return output
     else:       
         def fn(iter_id):
             problem_idx = iter_id % problem_cnt
@@ -173,6 +180,7 @@ def run(world_size, rank, port, M, args, xop_perf, torch_perf):
         init_method=distributed_init_method,
         rank=rank,
         world_size=world_size,
+        device_id=device,
     )
     nccl_group = dist.group.WORLD
     xop_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
@@ -252,6 +260,9 @@ def run(world_size, rank, port, M, args, xop_perf, torch_perf):
     atol, rtol = get_allclose_threshold(args, K)
     # print(atol, rtol)
     xutil.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
+    
+    dist.barrier(group=nccl_group)
+    dist.destroy_process_group(group=nccl_group)
 
 def parse_args():
     parser = argparse.ArgumentParser()

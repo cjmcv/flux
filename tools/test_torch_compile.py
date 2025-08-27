@@ -21,17 +21,54 @@ def my_func(A, B, C):
             tuning = None,
             fast_accum=False,
         )
-
-def main():
-    M = 1000
-    N = 1000
-    K = 1000
-    A = torch.randn((M, K), device='cuda', dtype=torch.bfloat16, requires_grad=False)
-    B = torch.randn((N, K), device='cuda', dtype=torch.bfloat16, requires_grad=False)
-    C = torch.randn((N, K), device='cuda', dtype=torch.bfloat16, requires_grad=False)
+    
+def test_torch_compile(A, B, C):
+    print("Start testing torch compile")
     compiled_func = torch.compile(my_func, backend="inductor")
     compiled_func(A, B, C)
     print(C)
+    
+def test_cuda_graph(A, B, C):
+    print("Start testing cuda graph")
+    
+    def forward_fn():
+        op.forward(
+            A,
+            B,
+            output=C,
+            bias=None,
+            input_scale=None,
+            weight_scale=None,
+            output_scale=None,
+            tuning = None,
+            fast_accum=False,
+        )
+        
+    # pre allocate for cuda graph   
+    forward_fn()
+    
+    stream = torch.cuda.Stream()
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.stream(stream):
+        with torch.cuda.graph(graph):
+            forward_fn()
+            
+    print("Cuda graph replay")
+    graph.replay()
+    print(C)
+    
+# python tools/test_torch_compile.py
+def main():
+    M = 1
+    N = 4096
+    K = 4096
+    A = torch.randn((M, K), device='cuda', dtype=torch.bfloat16, requires_grad=False)
+    B = torch.randn((N, K), device='cuda', dtype=torch.bfloat16, requires_grad=False)
+    C = torch.randn((N, K), device='cuda', dtype=torch.bfloat16, requires_grad=False)
+    
+    test_cuda_graph(A, B, C)
+    print("\n#################\n")
+    test_torch_compile(A, B, C)
 
 if __name__ == '__main__':
     main()

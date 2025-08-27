@@ -30,7 +30,7 @@
 
 #define PRINTF printf
 #define NOT_TUNING_SCHEMA "" // "TORCH"
-#define TUNING_WITH_CUBLASLT true
+#define TUNING_WITH_CUBLASLT false
 
 int CoarseGrainedTuningM(int actual_m, int schema = 0) {
   int tuned_m = 0;
@@ -94,6 +94,9 @@ public:
       cublaslt_gemm_ = nullptr;
       CUBLASLT_CHECK(cublasLtCreate(&cublaslt_handle_));
     }
+    
+    // cuda graph里不允许有resize，1) 在创建时先按最大值分配；2）每次capture前先按对应数据规模正常推理一次。
+    // GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(5000000);
   } 
   ~GemmNormalImpl() {
     if (TUNING_WITH_CUBLASLT) {

@@ -1,10 +1,10 @@
-
+import numpy as np
 from typing import Optional, List, Tuple
 
 import torch
 from torch.distributed import ProcessGroup
+from contextlib import contextmanager
 
-import numpy as np
 import xop
 from xop.ops.custom_all_reduce import CustomAllreduce
 
@@ -27,8 +27,8 @@ class GemmCommRs:
         self.ar = CustomAllreduce(group, device)
         self.rank = rank
         
-    def capture(self):
-        self.ar.capture()
+    def ar(self):
+        return self.ar
         
     def forward(
         self,
