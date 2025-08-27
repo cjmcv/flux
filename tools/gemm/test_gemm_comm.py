@@ -48,7 +48,6 @@ def matmul_int8(a, b):
         return torch._int_mm(torch.nn.functional.pad(a, (0, 0, 0, 32 - M)), b)[:M, :]
     return torch._int_mm(a, b)
 
-
 def perf_torch(
     rank: int,
     group: ProcessGroup,
@@ -170,7 +169,7 @@ THRESHOLD_MAP = {
     torch.int32: 0,
 }
 
-def run(world_size, rank, port, M, args, xop_perf, torch_perf):
+def run_worker(world_size, rank, port, M, args, xop_perf, torch_perf):
     device = torch.device(f"cuda:{rank}")
     torch.cuda.set_device(device)
     
@@ -185,6 +184,13 @@ def run(world_size, rank, port, M, args, xop_perf, torch_perf):
     nccl_group = dist.group.WORLD
     xop_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
     
+    exponent = args.M  # 65536: 17
+    for m in range(1, exponent):
+        m = 2**m
+        run(rank, m, args, xop_group, nccl_group, xop_perf, torch_perf)
+        
+def run(rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
+
     dtype = DTYPE_MAP[args.dtype]
     output_dtype = DTYPE_MAP[args.output_dtype]
 
