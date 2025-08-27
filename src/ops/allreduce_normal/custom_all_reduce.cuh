@@ -29,7 +29,7 @@ constexpr int kMaxBlocks = 48;
 
 // Default number of blocks in allreduce kernel.
 const int defaultBlockLimit = 48;
-CUpointer_attribute rangeStartAddrAttr = CU_POINTER_ATTRIBUTE_RANGE_START_ADDR;
+const CUpointer_attribute rangeStartAddrAttr = CU_POINTER_ATTRIBUTE_RANGE_START_ADDR;
 
 // Counter may overflow, but it's fine since unsigned int overflow is
 // well-defined behavior.

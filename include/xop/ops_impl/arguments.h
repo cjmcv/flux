@@ -58,4 +58,15 @@ struct RtGroupedBlockScaleFp8ArgumentsV3 : public RtArguments {
   std::vector<void const *> ptr_blockscale_B;
 };
 
+///////////////////////////////////////
+
+struct RtCommArguments {
+  int64_t handle;
+  int64_t reg_buffer;
+  int64_t reg_buffer_sz_bytes;
+  void *gemm_out;
+  
+  virtual ~RtCommArguments() {}
+};
+
 } // namespace xop

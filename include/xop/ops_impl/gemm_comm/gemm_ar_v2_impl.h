@@ -10,6 +10,11 @@
 #include "gemm_ar_v2/visitor_store_rs.hpp"
 // #include "gemm_ar_v2/gemm_universal_rs.h"
 
+////////////////////////////////
+// #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.h"
+#include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
+///////////////////////////////
+
 namespace xop {
 
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator,
@@ -136,6 +141,11 @@ class GemmArV2Impl : public GemmBase  {
 public:
   void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
+    RtCommArguments *t_args = (RtCommArguments*)(fusion_args);
+    comm_args_.handle = t_args->handle;
+    comm_args_.reg_buffer = t_args->reg_buffer;
+    comm_args_.reg_buffer_sz_bytes = t_args->reg_buffer_sz_bytes;
+    comm_args_.gemm_out = t_args->gemm_out;
 
     gemm_dev_ = DeviceGemmBasic();
     // Using the arguments, query for extra workspace required for matrix multiplication computation
@@ -157,11 +167,56 @@ public:
     // Initialize CUTLASS kernel with arguments and workspace pointer
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_ptr, cu_stream));
+
+    ////
+    output_ = rt_args->ptr_D;
+    output_len_ = rt_args->m * rt_args->n;
   }
 
   void run(void *stream = nullptr) {
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
+
+    // all_reduce(comm_args_.handle, comm_args_.gemm_out, rt_args->ptr_D, comm_args_.reg_buffer, comm_args_.reg_buffer_sz_bytes);
+
+    {
+      auto fa = reinterpret_cast<vllm::CustomAllreduce*>(comm_args_.handle);
+      auto input = comm_args_.gemm_out;
+      // auto output = rt_args->ptr_D;
+      // const at::cuda::OptionalCUDAGuard device_guard(device_of(inp)); // 切换到inp所在的目标device
+      // auto stream = c10::cuda::getCurrentCUDAStream().stream();
+    
+      // TORCH_CHECK_EQ(inp.scalar_type(), out.scalar_type());
+      // TORCH_CHECK_EQ(inp.numel(), out.numel());
+      // TORCH_CHECK(_is_weak_contiguous(out));
+      // TORCH_CHECK(_is_weak_contiguous(inp));
+      // auto input_size = inp.numel() * inp.element_size();
+
+      auto input_size = output_len_ * sizeof(ElementOutput);
+      auto reg_buffer = reinterpret_cast<void*>(comm_args_.reg_buffer);
+      if (reg_buffer) {
+        // TORCH_CHECK_LE(input_size, comm_args_.reg_buffer_sz_bytes); !! todo
+        CUDA_CHECK(cudaMemcpyAsync(reg_buffer, input, input_size, cudaMemcpyDeviceToDevice, cu_stream));
+      } else {
+        reg_buffer = input;
+      }
+
+      if constexpr (cute::is_same_v<ElementOutput, float>) {
+        fa->allreduce<float>(
+          cu_stream, reinterpret_cast<float*>(reg_buffer), reinterpret_cast<float*>(output_), output_len_);
+      }
+      else if constexpr (cute::is_same_v<ElementOutput, cutlass::half_t>) {
+        fa->allreduce<half>(
+          cu_stream, reinterpret_cast<half*>(reg_buffer), reinterpret_cast<half*>(output_), output_len_);
+      }
+      else if constexpr (cute::is_same_v<ElementOutput, cutlass::bfloat16_t>) {
+        fa->allreduce<nv_bfloat16>(
+          cu_stream, reinterpret_cast<nv_bfloat16*>(reg_buffer), reinterpret_cast<nv_bfloat16*>(output_), output_len_);
+      }
+      else {
+        throw std::runtime_error("custom allreduce only supports float32, float16 and bfloat16");
+      }
+    }
   }
 
 private:
@@ -178,7 +233,7 @@ private:
         {(ElementC *)rt_args->ptr_C, ElementC(0), {cute::_0{}, cute::_1{}, int32_t(problem_size.n())}},            // Bias
         {}  // Compute0
       },        // EVTCompute2
-      {(ElementC *)rt_args->ptr_D, {problem_size.n(), cute::_1{}, problem_size.mn().product()}},                   // D
+      {(ElementC *)comm_args_.gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}},                   // D
     };   
     // typename EVTD::Arguments callback_args{
     //   {
@@ -240,6 +295,10 @@ private:
 
 private:
   DeviceGemmBasic gemm_dev_;
+
+  RtCommArguments comm_args_;
+  void *output_;
+  int output_len_;
 };
 
 } // namespace xop

@@ -93,7 +93,7 @@ public:
       int64_t reg_buffer_sz_bytes
     ) {
 
-    torch::Tensor gemm_out = torch::zeros_like(output);
+    // torch::Tensor gemm_out = torch::zeros_like(output);
 
     // std::cout << "Tensor input:\n" << input << std::endl;
     std::vector<int16_t> id_meta = MakeDefaultMeta(fast_accum);       // id + meta
@@ -120,16 +120,16 @@ public:
       id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmCommAr; // TODO: ¼ì²éÊÇ·ñ¿ÉÉ¾³ý£¿
       rt_args = std::make_unique<RtArgumentsV2>();
     }
-    GetBaseRtConf(input, weight, gemm_out, bias, input_scale, weight_scale, rt_args.get());
+    GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, rt_args.get());
     
     if (tuning.has_value()) {
-      return forward_tuning(input, weight, gemm_out, bias, input_scale, weight_scale, 
+      return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
                             (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get());
     }
     else {
       // Misalignment case.
       if (rt_args->n%8 != 0 || rt_args->k%8 != 0) {
-        return RunTorch(input, weight, gemm_out, bias);
+        return RunTorch(input, weight, output, bias);
       }
       
       int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, 1);
@@ -149,11 +149,16 @@ public:
       GemmBase *op = ins.GetOp(id_meta, false);
 
       cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-      op->initialize(rt_args.get());
+      
+      RtCommArguments comm_args;
+      comm_args.handle = fa;
+      comm_args.reg_buffer = reg_buffer;
+      comm_args.reg_buffer_sz_bytes = reg_buffer_sz_bytes;
+      torch::Tensor gemm_out = torch::zeros_like(output);
+      comm_args.gemm_out = gemm_out.data_ptr();
+      op->initialize(rt_args.get(), &comm_args);
       op->run(stream);        
     }
-
-    all_reduce(fa, gemm_out, output, reg_buffer, reg_buffer_sz_bytes);
     // ins.PrintRegistered("abc");
     // PRINTF("id_meta: ");
     // for(int i=0; i<id_meta.size(); i++) {
