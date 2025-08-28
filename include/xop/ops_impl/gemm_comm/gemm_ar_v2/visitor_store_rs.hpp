@@ -38,22 +38,6 @@
 #include "cutlass/epilogue/threadblock/fusion/visitor_2x.hpp"
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
 /////////////////////////////////////////////////////////////////////////////////////////////////
-struct AllReduceArguments {
-  bool is_capturing;
-  void *temp_input;
-
-  int world_size;
-  int rank;
-  int packed_array_num;
-  
-  void *reg_buffer;
-  vllm::RankData* rank_data;
-  vllm::RankSignals rank_signals;
-  vllm::Signal *self_signal;
-  
-  virtual ~AllReduceArguments() {}
-};
-
 namespace cutlass::epilogue::threadblock {
 
 using namespace cute;
@@ -79,7 +63,15 @@ struct VisitorAuxStoreRs{
   struct Arguments {
     Element* ptr_aux = nullptr;
     StrideMNL dAux = {};
-    AllReduceArguments* ar_args = nullptr;
+
+    int world_size;
+    int rank;
+    int packed_array_num;
+    
+    void *reg_buffer;
+    vllm::RankData* rank_data;
+    vllm::RankSignals rank_signals;
+    vllm::Signal *self_signal;
   };
 
   using Params = Arguments;
@@ -193,8 +185,7 @@ struct VisitorAuxStoreRs{
 
     CUTLASS_DEVICE void
     end_epilogue() {
-      AllReduceArguments *args = params_ptr->ar_args;
-      printf("hello end_epilogue.\n", args->world_size, args->rank, args->packed_array_num);
+      printf("hello end_epilogue: %d, %d, %d\n", params_ptr->world_size, params_ptr->rank, params_ptr->packed_array_num);
     }
   };
 
