@@ -156,7 +156,7 @@ public:
       comm_args.reg_buffer_sz_bytes = reg_buffer_sz_bytes;
       torch::Tensor gemm_out = torch::zeros_like(output);
       comm_args.gemm_out = gemm_out.data_ptr();
-      op->initialize(rt_args.get(), &comm_args);
+      op->initialize(rt_args.get(), &comm_args, stream);
       op->run(stream);        
     }
     // ins.PrintRegistered("abc");

@@ -17,6 +17,21 @@
 
 namespace xop {
 
+struct AllReduceArguments {
+  bool is_capturing;
+  void *temp_input;
+
+  int world_size;
+  int rank;
+  int packed_array_num;
+  
+  void *reg_buffer;
+  vllm::RankData* rank_data;
+  vllm::RankSignals rank_signals;
+  vllm::Signal *self_signal;
+  
+  virtual ~AllReduceArguments() {}
+};
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator,
           class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, 
@@ -141,11 +156,9 @@ class GemmArV2Impl : public GemmBase  {
 public:
   void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
-    RtCommArguments *t_args = (RtCommArguments*)(fusion_args);
-    comm_args_.handle = t_args->handle;
-    comm_args_.reg_buffer = t_args->reg_buffer;
-    comm_args_.reg_buffer_sz_bytes = t_args->reg_buffer_sz_bytes;
-    comm_args_.gemm_out = t_args->gemm_out;
+
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    fetch_comm_args(fusion_args, cu_stream);
 
     gemm_dev_ = DeviceGemmBasic();
     // Using the arguments, query for extra workspace required for matrix multiplication computation
@@ -165,7 +178,6 @@ public:
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
   
     // Initialize CUTLASS kernel with arguments and workspace pointer
-    auto cu_stream = static_cast<cudaStream_t>(stream);
     CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_ptr, cu_stream));
 
     ////
@@ -174,78 +186,54 @@ public:
   }
 
   void run(void *stream = nullptr) {
+
+    //////////////////////////////////////////////////////////
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
-    
+    //////////////////////////////////////////////////////////
+
     {
-      auto fa = reinterpret_cast<vllm::CustomAllreduce*>(comm_args_.handle);
-      auto input = comm_args_.gemm_out;
-
-      auto input_size = output_len_ * sizeof(ElementOutput);
-      auto reg_buffer = reinterpret_cast<void*>(comm_args_.reg_buffer);
-      // While capturing£¬reg_buffer is zero¡£
-      if (reg_buffer) {
+      if (ar_args_.is_capturing == false) {
         // TORCH_CHECK_LE(input_size, comm_args_.reg_buffer_sz_bytes); !! todo
-        CUDA_CHECK(cudaMemcpyAsync(reg_buffer, input, input_size, cudaMemcpyDeviceToDevice, cu_stream));
-      } else {
-        reg_buffer = input;
+        auto input_size = output_len_ * sizeof(ElementOutput);
+        CUDA_CHECK(cudaMemcpyAsync(ar_args_.reg_buffer, ar_args_.temp_input, input_size, cudaMemcpyDeviceToDevice, cu_stream));
       }
 
-      if constexpr (cute::is_same_v<ElementOutput, float> ||
-                    cute::is_same_v<ElementOutput, cutlass::half_t> ||
-                    cute::is_same_v<ElementOutput, cutlass::bfloat16_t>) {
-
-        int world_size;
-        int rank;
-        int packed_array_num;
-        
-        vllm::RankData* ptrs;
-        vllm::RankSignals sg;
-        vllm::Signal *self_sg;
+      int max_blocks = 48;
+      int threads = 1024;
+      int blocks = std::min(max_blocks, (ar_args_.packed_array_num + threads - 1) / threads);
       
-        fa->get_ptrs<to_cuda_type_t<ElementOutput>>(
-          cu_stream, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(reg_buffer), output_len_,
-          &world_size, &rank, &packed_array_num,
-          &ptrs, &sg, &self_sg);
-
-        int max_blocks = 48;
-        int threads = 1024;
-        int blocks = std::min(max_blocks, (packed_array_num + threads - 1) / threads);
-        
 #define KL(ngpus, name)                                                      \
-  name<to_cuda_type_t<ElementOutput>, ngpus><<<blocks, threads, 0, cu_stream>>>(ptrs, sg, self_sg, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(output_), \
-    rank, packed_array_num);
-        
-          if (world_size == 2) {                           
-            KL(2, vllm::cross_device_reduce_1stage);
-          }
-          else if (world_size == 4) {                                     
-            KL(4, vllm::cross_device_reduce_2stage);                                             
-          }  
-          else if (world_size == 6) {                                      
-            KL(6, vllm::cross_device_reduce_2stage);
-          } 
-          else if (world_size == 8) {
-            KL(8, vllm::cross_device_reduce_2stage);                                              
-          }
-          else {
-            throw std::runtime_error(
-                "custom allreduce only supports num gpus in (2,4,6,8). Actual "
-                "num "
-                "gpus = " +
-                std::to_string(world_size));
-          }
-        
-        #undef KL
-        // fa->allreduce2<to_cuda_type_t<ElementOutput>>(
-        //        cu_stream, 
-        //        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(reg_buffer), 
-        //        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(output_), 
-        //        output_len_);
-      }
-      else {
-        throw std::runtime_error("custom allreduce only supports float32, float16 and bfloat16");
-      }
+name<to_cuda_type_t<ElementOutput>, ngpus><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, \
+  reinterpret_cast<to_cuda_type_t<ElementOutput>*>(output_), \
+  ar_args_.rank, ar_args_.packed_array_num);
+      
+        if (ar_args_.world_size == 2) {                           
+          KL(2, vllm::cross_device_reduce_1stage);
+        }
+        else if (ar_args_.world_size == 4) {                                     
+          KL(4, vllm::cross_device_reduce_2stage);                                             
+        }  
+        else if (ar_args_.world_size == 6) {                                      
+          KL(6, vllm::cross_device_reduce_2stage);
+        } 
+        else if (ar_args_.world_size == 8) {
+          KL(8, vllm::cross_device_reduce_2stage);                                              
+        }
+        else {
+          throw std::runtime_error(
+              "custom allreduce only supports num gpus in (2,4,6,8). Actual "
+              "num "
+              "gpus = " +
+              std::to_string(ar_args_.world_size));
+        }
+      #undef KL
+
+      // fa->allreduce2<to_cuda_type_t<ElementOutput>>(
+      //        cu_stream, 
+      //        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(reg_buffer), 
+      //        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(output_), 
+      //        output_len_);
     }
   }
 
@@ -263,7 +251,7 @@ private:
         {(ElementC *)rt_args->ptr_C, ElementC(0), {cute::_0{}, cute::_1{}, int32_t(problem_size.n())}},            // Bias
         {}  // Compute0
       },        // EVTCompute2
-      {(ElementC *)comm_args_.gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}},                   // D
+      {(ElementC *)ar_args_.temp_input, {problem_size.n(), cute::_1{}, problem_size.mn().product()}},                   // D
     };   
     // typename EVTD::Arguments callback_args{
     //   {
@@ -323,10 +311,38 @@ private:
     }
   }
 
+  void fetch_comm_args(void *fusion_args, cudaStream_t stream) {
+    RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
+
+    if constexpr (!(cute::is_same_v<ElementOutput, float> ||
+      cute::is_same_v<ElementOutput, cutlass::half_t> ||
+      cute::is_same_v<ElementOutput, cutlass::bfloat16_t>)) {
+      throw std::runtime_error("custom allreduce only supports float32, float16 and bfloat16");
+    }
+
+    auto reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
+    if (reg_buffer == 0) {
+      // While capturing, reg_buffer is zero
+      ar_args_.is_capturing = true;
+      ar_args_.reg_buffer = rt_args->gemm_out;
+    }
+    else {
+      ar_args_.is_capturing = false;
+      ar_args_.reg_buffer = reg_buffer;
+      ar_args_.temp_input = rt_args->gemm_out;
+    }
+
+    auto fa = reinterpret_cast<vllm::CustomAllreduce*>(rt_args->handle);
+    fa->get_ptrs<to_cuda_type_t<ElementOutput>>(
+      stream, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.reg_buffer), output_len_,
+      &ar_args_.world_size, &ar_args_.rank, &ar_args_.packed_array_num,
+      &ar_args_.rank_data, &ar_args_.rank_signals, &ar_args_.self_signal);
+  }
+
 private:
   DeviceGemmBasic gemm_dev_;
 
-  RtCommArguments comm_args_;
+  AllReduceArguments ar_args_;
   void *output_;
   int output_len_;
 };

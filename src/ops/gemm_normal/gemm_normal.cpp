@@ -173,7 +173,7 @@ public:
         GemmBase *op = ins.GetOp(id_meta, false);
 
         cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-        op->initialize(rt_args.get());
+        op->initialize(rt_args.get(), nullptr, stream);
         op->run(stream);        
       }
     }
@@ -248,7 +248,7 @@ public:
       return -1;
 
     cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-    op->initialize(rt_args);
+    op->initialize(rt_args, nullptr, stream);
     op->run(stream);
 
     if (tuning.has_value()) {
@@ -409,7 +409,7 @@ private:
         return -1;        
       }
       cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-      op->initialize(rt_args);
+      op->initialize(rt_args, nullptr, stream);
       op->run(stream);
       
       tuning_data[0] = id_meta.size();

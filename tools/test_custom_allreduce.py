@@ -179,33 +179,36 @@ def multi_process_parallel(
 
 
 class TestCustomAllReduce():
-    param_size = 7168
-    test_sizes = [
-        1 * param_size,
-        50 * param_size,
-        100 * param_size,
-        200 * param_size,
-        400 * param_size,
-        600 * param_size,
-        800 * param_size,
-        1000 * param_size,
-        2000 * param_size,
-        3000 * param_size,
-        4000 * param_size,
-        6000 * param_size,
-        8192 * param_size,
-        # 512,
-        # 2560,
-        # 4096,
-        # 5120,
-        # 7680,
-        # 32768,
-        # 262144,
-        # 524288,
-        # 1048576,
-        # 2097152,
-        # 58720256,
-    ]
+    exponent = 14
+    test_sizes_index = [1] + list(2**x for x in list(range(1, exponent)))
+    test_sizes = list(4096*x for x in test_sizes_index)
+    
+    # test_sizes = [
+    #     1 * param_size,
+    #     50 * param_size,
+    #     100 * param_size,
+    #     200 * param_size,
+    #     400 * param_size,
+    #     600 * param_size,
+    #     800 * param_size,
+    #     1000 * param_size,
+    #     2000 * param_size,
+    #     3000 * param_size,
+    #     4000 * param_size,
+    #     6000 * param_size,
+    #     8192 * param_size,
+    #     # 512,
+    #     # 2560,
+    #     # 4096,
+    #     # 5120,
+    #     # 7680,
+    #     # 32768,
+    #     # 262144,
+    #     # 524288,
+    #     # 1048576,
+    #     # 2097152,
+    #     # 58720256,
+    # ]
     world_sizes = [2, 4, 8]
 
     def test_correctness(self):
