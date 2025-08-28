@@ -36,8 +36,23 @@
 #pragma once
 
 #include "cutlass/epilogue/threadblock/fusion/visitor_2x.hpp"
-
+#include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
 /////////////////////////////////////////////////////////////////////////////////////////////////
+struct AllReduceArguments {
+  bool is_capturing;
+  void *temp_input;
+
+  int world_size;
+  int rank;
+  int packed_array_num;
+  
+  void *reg_buffer;
+  vllm::RankData* rank_data;
+  vllm::RankSignals rank_signals;
+  vllm::Signal *self_signal;
+  
+  virtual ~AllReduceArguments() {}
+};
 
 namespace cutlass::epilogue::threadblock {
 
@@ -64,6 +79,7 @@ struct VisitorAuxStoreRs{
   struct Arguments {
     Element* ptr_aux = nullptr;
     StrideMNL dAux = {};
+    AllReduceArguments* ar_args = nullptr;
   };
 
   using Params = Arguments;
@@ -177,7 +193,8 @@ struct VisitorAuxStoreRs{
 
     CUTLASS_DEVICE void
     end_epilogue() {
-      // printf("hello end_epilogue.\n");
+      AllReduceArguments *args = params_ptr->ar_args;
+      printf("hello end_epilogue.\n", args->world_size, args->rank, args->packed_array_num);
     }
   };
 

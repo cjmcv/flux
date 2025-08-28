@@ -17,21 +17,6 @@
 
 namespace xop {
 
-struct AllReduceArguments {
-  bool is_capturing;
-  void *temp_input;
-
-  int world_size;
-  int rank;
-  int packed_array_num;
-  
-  void *reg_buffer;
-  vllm::RankData* rank_data;
-  vllm::RankSignals rank_signals;
-  vllm::Signal *self_signal;
-  
-  virtual ~AllReduceArguments() {}
-};
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator,
           class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, 
@@ -249,7 +234,7 @@ private:
         {(ElementC *)rt_args->ptr_C, ElementC(0), {cute::_0{}, cute::_1{}, int32_t(problem_size.n())}},            // Bias
         {}  // Compute0
       },        // EVTCompute2
-      {(ElementC *)ar_args_.temp_input, {problem_size.n(), cute::_1{}, problem_size.mn().product()}},                   // D
+      {(ElementC *)ar_args_.temp_input, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, &ar_args_},                   // D
     };   
     // typename EVTD::Arguments callback_args{
     //   {
