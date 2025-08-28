@@ -61,31 +61,28 @@ def perf_torch(
     problem_cnt: int,
     output_dtype: torch.dtype,
 ):
-    if GEMM_COMM_ENABLE_CUDA_GRAPH:
-        alpha_scale = 1.0
+    m = inputs[0].size(0)
+    n = weights[0].size(0)
+    output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
         
-        m = inputs[0].size(0)
-        n = weights[0].size(0)
-        output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
-        
+    # nccl is not support cuda graph, we should use pynccl instead !
+    if 0:
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.stream(stream):
             with torch.cuda.graph(graph):
                 problem_idx = 0
-                output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)#
+                torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias, out=output)#
                 dist.all_reduce(output, group=group)
                 
         def fn(iter_id):
             graph.replay()
             return output
     else:
-        alpha_scale = 1.0
         def fn(iter_id):
             problem_idx = iter_id%problem_cnt
-            output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)#
+            torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias, out=output)#
             dist.all_reduce(output, group=group)
-            
             return output
 
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
@@ -353,8 +350,8 @@ def parse_args():
     parser.add_argument("K", type=int)
     parser.add_argument("--quant_bits", default=-1, type=int, help="whether to use GemmQuant.")
     parser.add_argument("--step", default=5, type=int, help="m step")
-    parser.add_argument("--warmup_iters", default=0, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=1, type=int, help="perf iterations")
+    parser.add_argument("--warmup_iters", default=10, type=int, help="perf warmup iterations")
+    parser.add_argument("--iters", default=20, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16", # float16, float8_e4m3fn
