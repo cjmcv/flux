@@ -15,6 +15,8 @@ from torch.distributed import ProcessGroup
 import xop
 import xop.util as xutil
 
+GEMM_COMM_ENABLE_CUDA_GRAPH = 1
+
 DTYPE_MAP = {
     "bfloat16": torch.bfloat16,
     "float16": torch.float16,
@@ -59,13 +61,32 @@ def perf_torch(
     problem_cnt: int,
     output_dtype: torch.dtype,
 ):
-    alpha_scale = 1.0
-    def fn(iter_id):
-        problem_idx = iter_id%problem_cnt
-        output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)#
-        dist.all_reduce(output, group=group)
+    if GEMM_COMM_ENABLE_CUDA_GRAPH:
+        alpha_scale = 1.0
         
-        return output
+        m = inputs[0].size(0)
+        n = weights[0].size(0)
+        output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
+        
+        stream = torch.cuda.Stream()
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.stream(stream):
+            with torch.cuda.graph(graph):
+                problem_idx = 0
+                output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)#
+                dist.all_reduce(output, group=group)
+                
+        def fn(iter_id):
+            graph.replay()
+            return output
+    else:
+        alpha_scale = 1.0
+        def fn(iter_id):
+            problem_idx = iter_id%problem_cnt
+            output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)#
+            dist.all_reduce(output, group=group)
+            
+            return output
 
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
 
@@ -96,7 +117,7 @@ def perf_xop(
         rank=rank,
     )
     
-    if 1:
+    if GEMM_COMM_ENABLE_CUDA_GRAPH:
         problem_idx = 0
         def forward_fn(problem_idx):
             op.forward(inputs[problem_idx],

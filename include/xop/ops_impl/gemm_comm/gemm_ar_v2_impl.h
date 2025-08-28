@@ -183,6 +183,7 @@ public:
 
       auto input_size = output_len_ * sizeof(ElementOutput);
       auto reg_buffer = reinterpret_cast<void*>(comm_args_.reg_buffer);
+      // While capturing£¬reg_buffer is zero¡£
       if (reg_buffer) {
         // TORCH_CHECK_LE(input_size, comm_args_.reg_buffer_sz_bytes); !! todo
         CUDA_CHECK(cudaMemcpyAsync(reg_buffer, input, input_size, cudaMemcpyDeviceToDevice, cu_stream));
@@ -193,30 +194,27 @@ public:
       if constexpr (cute::is_same_v<ElementOutput, float> ||
                     cute::is_same_v<ElementOutput, cutlass::half_t> ||
                     cute::is_same_v<ElementOutput, cutlass::bfloat16_t>) {
-        int size_in;
+
+        int world_size;
         int rank;
+        int packed_array_num;
+        
         vllm::RankData* ptrs;
         vllm::RankSignals sg;
         vllm::Signal *self_sg;
       
-        int world_size;
         fa->get_ptrs<to_cuda_type_t<ElementOutput>>(
-          cu_stream, 
-          reinterpret_cast<to_cuda_type_t<ElementOutput>*>(reg_buffer), 
-          output_len_,
-          &world_size,
-          &rank,
-          &size_in,
-          &ptrs,
-          &sg,
-          &self_sg);
+          cu_stream, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(reg_buffer), output_len_,
+          &world_size, &rank, &packed_array_num,
+          &ptrs, &sg, &self_sg);
 
+        int max_blocks = 48;
         int threads = 1024;
-        int blocks = std::min(1024, (size_in + threads - 1) / threads);
+        int blocks = std::min(max_blocks, (packed_array_num + threads - 1) / threads);
         
 #define KL(ngpus, name)                                                      \
   name<to_cuda_type_t<ElementOutput>, ngpus><<<blocks, threads, 0, cu_stream>>>(ptrs, sg, self_sg, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(output_), \
-    rank, size_in);
+    rank, packed_array_num);
         
           if (world_size == 2) {                           
             KL(2, vllm::cross_device_reduce_1stage);

@@ -72,6 +72,10 @@ void all_reduce(fptr_t _fa, torch::Tensor& inp, torch::Tensor& out, fptr_t _reg_
   TORCH_CHECK(_is_weak_contiguous(inp));
   auto input_size = inp.numel() * inp.element_size();
   auto reg_buffer = reinterpret_cast<void*>(_reg_buffer);
+  // 在capture时，reg_buffer为0，输入tensor会直接输入到fa->allreduce，进而进入到graph_unreg_buffers_和d_rank_data_base_。
+  // 在capture结束后，会经过python/xop/ops/custom_all_reduce.py：capture -> self.register_graph_buffers(), 
+  // 针对capture中收集到的输入数据，使用cuda ipc补充与之对应的其他rank的ipc内存
+  //（当前rank的还是原来的普通本地内存，但会与其他rank的对应ipc内存一同绑定在d_rank_data_base_，可以用直接索引找到其他rank的内存） 
   if (reg_buffer) {
     TORCH_CHECK_LE(input_size, reg_buffer_sz_bytes);
     AT_CUDA_CHECK(cudaMemcpyAsync(reg_buffer, inp.data_ptr(), input_size, cudaMemcpyDeviceToDevice, stream));
