@@ -22,6 +22,23 @@
   
 namespace xop {
 
+////////// cutlass type to cuda type ///////////////
+template<class T>
+struct to_cuda_type { using type = T; };                // default
+
+template<>
+struct to_cuda_type<cutlass::bfloat16_t> {
+    using type = nv_bfloat16;                           // specialization mapping
+};
+template<>
+struct to_cuda_type<cutlass::half_t> {
+    using type = half;                                  // specialization mapping
+};
+template<class T>
+using to_cuda_type_t = typename to_cuda_type<T>::type;  // ∑Ω±„”√
+
+////////////////////////////////////////////
+
 template <class LayoutA, class LayoutB, class LayoutC>
 class ImplHelper {
 public:

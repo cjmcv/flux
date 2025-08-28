@@ -176,21 +176,10 @@ public:
   void run(void *stream = nullptr) {
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
-
-    // all_reduce(comm_args_.handle, comm_args_.gemm_out, rt_args->ptr_D, comm_args_.reg_buffer, comm_args_.reg_buffer_sz_bytes);
-
+    
     {
       auto fa = reinterpret_cast<vllm::CustomAllreduce*>(comm_args_.handle);
       auto input = comm_args_.gemm_out;
-      // auto output = rt_args->ptr_D;
-      // const at::cuda::OptionalCUDAGuard device_guard(device_of(inp)); // 切换到inp所在的目标device
-      // auto stream = c10::cuda::getCurrentCUDAStream().stream();
-    
-      // TORCH_CHECK_EQ(inp.scalar_type(), out.scalar_type());
-      // TORCH_CHECK_EQ(inp.numel(), out.numel());
-      // TORCH_CHECK(_is_weak_contiguous(out));
-      // TORCH_CHECK(_is_weak_contiguous(inp));
-      // auto input_size = inp.numel() * inp.element_size();
 
       auto input_size = output_len_ * sizeof(ElementOutput);
       auto reg_buffer = reinterpret_cast<void*>(comm_args_.reg_buffer);
@@ -201,17 +190,60 @@ public:
         reg_buffer = input;
       }
 
-      if constexpr (cute::is_same_v<ElementOutput, float>) {
-        fa->allreduce<float>(
-          cu_stream, reinterpret_cast<float*>(reg_buffer), reinterpret_cast<float*>(output_), output_len_);
-      }
-      else if constexpr (cute::is_same_v<ElementOutput, cutlass::half_t>) {
-        fa->allreduce<half>(
-          cu_stream, reinterpret_cast<half*>(reg_buffer), reinterpret_cast<half*>(output_), output_len_);
-      }
-      else if constexpr (cute::is_same_v<ElementOutput, cutlass::bfloat16_t>) {
-        fa->allreduce<nv_bfloat16>(
-          cu_stream, reinterpret_cast<nv_bfloat16*>(reg_buffer), reinterpret_cast<nv_bfloat16*>(output_), output_len_);
+      if constexpr (cute::is_same_v<ElementOutput, float> ||
+                    cute::is_same_v<ElementOutput, cutlass::half_t> ||
+                    cute::is_same_v<ElementOutput, cutlass::bfloat16_t>) {
+        int size_in;
+        int rank;
+        vllm::RankData* ptrs;
+        vllm::RankSignals sg;
+        vllm::Signal *self_sg;
+      
+        int world_size;
+        fa->get_ptrs<to_cuda_type_t<ElementOutput>>(
+          cu_stream, 
+          reinterpret_cast<to_cuda_type_t<ElementOutput>*>(reg_buffer), 
+          output_len_,
+          &world_size,
+          &rank,
+          &size_in,
+          &ptrs,
+          &sg,
+          &self_sg);
+
+        int threads = 1024;
+        int blocks = std::min(1024, (size_in + threads - 1) / threads);
+        
+#define KL(ngpus, name)                                                      \
+  name<to_cuda_type_t<ElementOutput>, ngpus><<<blocks, threads, 0, cu_stream>>>(ptrs, sg, self_sg, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(output_), \
+    rank, size_in);
+        
+          if (world_size == 2) {                           
+            KL(2, vllm::cross_device_reduce_1stage);
+          }
+          else if (world_size == 4) {                                     
+            KL(4, vllm::cross_device_reduce_2stage);                                             
+          }  
+          else if (world_size == 6) {                                      
+            KL(6, vllm::cross_device_reduce_2stage);
+          } 
+          else if (world_size == 8) {
+            KL(8, vllm::cross_device_reduce_2stage);                                              
+          }
+          else {
+            throw std::runtime_error(
+                "custom allreduce only supports num gpus in (2,4,6,8). Actual "
+                "num "
+                "gpus = " +
+                std::to_string(world_size));
+          }
+        
+        #undef KL
+        // fa->allreduce2<to_cuda_type_t<ElementOutput>>(
+        //        cu_stream, 
+        //        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(reg_buffer), 
+        //        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(output_), 
+        //        output_len_);
       }
       else {
         throw std::runtime_error("custom allreduce only supports float32, float16 and bfloat16");
