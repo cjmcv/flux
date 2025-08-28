@@ -185,7 +185,7 @@ struct VisitorAuxStoreRs{
 
     CUTLASS_DEVICE void
     end_epilogue() {
-      printf("hello end_epilogue: %d, %d, %d\n", params_ptr->world_size, params_ptr->rank, params_ptr->packed_array_num);
+      // printf("hello end_epilogue: %d, %d, %d\n", params_ptr->world_size, params_ptr->rank, params_ptr->packed_array_num);
     }
   };
 

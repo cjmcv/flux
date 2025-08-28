@@ -30,6 +30,7 @@ struct AllReduceArguments {
   vllm::RankSignals rank_signals;
   vllm::Signal *self_signal;
   
+  void *output;
   virtual ~AllReduceArguments() {}
 };
 
@@ -158,8 +159,8 @@ public:
   void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
-    output_ = rt_args->ptr_D;
     output_len_ = rt_args->m * rt_args->n;
+    ar_args_.output = rt_args->ptr_D;    
     auto cu_stream = static_cast<cudaStream_t>(stream);
     fetch_comm_args(fusion_args, cu_stream);
 
@@ -192,11 +193,11 @@ public:
     //////////////////////////////////////////////////////////
 
     {
-      if (ar_args_.is_capturing == false) {
-        // TORCH_CHECK_LE(input_size, comm_args_.reg_buffer_sz_bytes); !! todo
-        auto input_size = output_len_ * sizeof(ElementOutput);
-        CUDA_CHECK(cudaMemcpyAsync(ar_args_.reg_buffer, ar_args_.temp_input, input_size, cudaMemcpyDeviceToDevice, cu_stream));
-      }
+      // if (ar_args_.is_capturing == false) {
+      //   // TORCH_CHECK_LE(input_size, comm_args_.reg_buffer_sz_bytes); !! todo
+      //   auto input_size = output_len_ * sizeof(ElementOutput);
+      //   CUDA_CHECK(cudaMemcpyAsync(ar_args_.reg_buffer, ar_args_.temp_input, input_size, cudaMemcpyDeviceToDevice, cu_stream));
+      // }
 
       int max_blocks = 48;
       int threads = 1024;
@@ -204,7 +205,7 @@ public:
       
 #define KL(ngpus, name)                                                      \
 name<to_cuda_type_t<ElementOutput>, ngpus><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, \
-  reinterpret_cast<to_cuda_type_t<ElementOutput>*>(output_), \
+  reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), \
   ar_args_.rank, ar_args_.packed_array_num);
       
         if (ar_args_.world_size == 2) {                           
@@ -244,13 +245,18 @@ private:
     cutlass::gemm::GemmCoord problem_size = {rt_args->m, rt_args->n, rt_args->k};
     int batch_stride_C = rt_args->stride_c == 0 ? rt_args->n : problem_size.mn().product();
     printf("hello you");
+    ElementC *gemm_out = (ElementC *)ar_args_.temp_input;
+    if (ar_args_.is_capturing == false) {
+      gemm_out = ar_args_.reg_buffer;
+    }
+
     typename EVTD::Arguments callback_args{
       {
         {}, // Accum
         {(ElementC *)rt_args->ptr_C, ElementC(0), {cute::_0{}, cute::_1{}, int32_t(problem_size.n())}},            // Bias
         {}  // Compute0
       },        // EVTCompute2
-      {(ElementC *)ar_args_.temp_input, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
+      { gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
         ar_args_.world_size, ar_args_.rank, ar_args_.packed_array_num, ar_args_.reg_buffer, 
         ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal
       },                   // D
@@ -347,7 +353,6 @@ private:
   DeviceGemmBasic gemm_dev_;
 
   AllReduceArguments ar_args_;
-  void *output_;
   int output_len_;
 };
 
