@@ -157,6 +157,8 @@ public:
   void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
+    output_ = rt_args->ptr_D;
+    output_len_ = rt_args->m * rt_args->n;
     auto cu_stream = static_cast<cudaStream_t>(stream);
     fetch_comm_args(fusion_args, cu_stream);
 
@@ -179,10 +181,6 @@ public:
   
     // Initialize CUTLASS kernel with arguments and workspace pointer
     CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_ptr, cu_stream));
-
-    ////
-    output_ = rt_args->ptr_D;
-    output_len_ = rt_args->m * rt_args->n;
   }
 
   void run(void *stream = nullptr) {
@@ -325,6 +323,7 @@ private:
       // While capturing, reg_buffer is zero
       ar_args_.is_capturing = true;
       ar_args_.reg_buffer = rt_args->gemm_out;
+      ar_args_.temp_input = rt_args->gemm_out;
     }
     else {
       ar_args_.is_capturing = false;

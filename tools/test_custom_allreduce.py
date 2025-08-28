@@ -116,18 +116,18 @@ def _run_correctness_worker(world_size, rank, distributed_init_port, test_sizes,
         print("custom_perf: ", custom_perf)
         print("nccl_perf: ", nccl_perf)
         # plot
-        if (world_size == 2):
-            custom_perf_origin = [0.04506389328589042, 0.0240842666849494, 0.026055466656883557, 0.03120917337636153, 0.04178431982795398, 0.05187242661913236, 0.06435776012639205, 0.07417450641592344, 0.12251242662469546, 0.17372224013010662, 0.22252693345149357, 0.32198293288548785, 0.43082133372624715]
-        elif (world_size == 4):
-            custom_perf_origin = [0.02802005338172118, 0.03304234682271878, 0.038419413218895596, 0.04524309354523818, 0.056024746720989546, 0.07287104015549024, 0.09238165348768235, 0.10402666722734769, 0.1736887467900912, 0.2459135992328326, 0.3368354125817617, 0.48102805415789285, 0.632537602186203]
-        elif (world_size == 8):
-            custom_perf_origin = [0.04666730689505736, 0.04309738698105017, 0.04571775995194912, 0.058501119886835415, 0.07392362664143244, 0.08935231998562813, 0.11013461321592331, 0.12528213342030844, 0.20270783990621566, 0.28689322888851165, 0.3739895474910736, 0.5425996792316437, 0.7337467737992605]
+        # if (world_size == 2):
+        #     custom_perf_origin = [0.04506389328589042, 0.0240842666849494, 0.026055466656883557, 0.03120917337636153, 0.04178431982795398, 0.05187242661913236, 0.06435776012639205, 0.07417450641592344, 0.12251242662469546, 0.17372224013010662, 0.22252693345149357, 0.32198293288548785, 0.43082133372624715]
+        # elif (world_size == 4):
+        #     custom_perf_origin = [0.02802005338172118, 0.03304234682271878, 0.038419413218895596, 0.04524309354523818, 0.056024746720989546, 0.07287104015549024, 0.09238165348768235, 0.10402666722734769, 0.1736887467900912, 0.2459135992328326, 0.3368354125817617, 0.48102805415789285, 0.632537602186203]
+        # elif (world_size == 8):
+        #     custom_perf_origin = [0.04666730689505736, 0.04309738698105017, 0.04571775995194912, 0.058501119886835415, 0.07392362664143244, 0.08935231998562813, 0.11013461321592331, 0.12528213342030844, 0.20270783990621566, 0.28689322888851165, 0.3739895474910736, 0.5425996792316437, 0.7337467737992605]
 
         x_ticks = range(len(test_sizes))
-        plt.plot(x_ticks, custom_perf_origin, label='custom_origin', marker='o', markersize=3)
-        plt.plot(x_ticks, nccl_perf, label='nccl', marker='s', markersize=3)
+        # plt.plot(x_ticks, custom_perf_origin, label='custom_origin', marker='o', markersize=3)
         plt.plot(x_ticks, custom_perf, label='custom', marker='o', markersize=3)
-
+        plt.plot(x_ticks, nccl_perf, label='nccl', marker='s', markersize=3)
+        
         norm_test_sizes = [x // param_size for x in test_sizes]
         plt.xticks(x_ticks, norm_test_sizes)
 
@@ -178,38 +178,40 @@ def multi_process_parallel(
         ), f"Process {i} failed with exit code {procs[i].exitcode}"
 
 
-class TestCustomAllReduce():
-    exponent = 14
-    test_sizes_index = [1] + list(2**x for x in list(range(1, exponent)))
-    test_sizes = list(4096*x for x in test_sizes_index)
-    
-    # test_sizes = [
-    #     1 * param_size,
-    #     50 * param_size,
-    #     100 * param_size,
-    #     200 * param_size,
-    #     400 * param_size,
-    #     600 * param_size,
-    #     800 * param_size,
-    #     1000 * param_size,
-    #     2000 * param_size,
-    #     3000 * param_size,
-    #     4000 * param_size,
-    #     6000 * param_size,
-    #     8192 * param_size,
-    #     # 512,
-    #     # 2560,
-    #     # 4096,
-    #     # 5120,
-    #     # 7680,
-    #     # 32768,
-    #     # 262144,
-    #     # 524288,
-    #     # 1048576,
-    #     # 2097152,
-    #     # 58720256,
-    # ]
-    world_sizes = [2, 4, 8]
+class TestCustomAllReduce:
+    def __init__(self) -> None:
+        self.exponent = 14
+        self.param_size = 4096
+        self.test_sizes_index = [1] + list(2**x for x in list(range(1, self.exponent)))
+        self.test_sizes = list(self.param_size*x for x in self.test_sizes_index)
+        
+        # test_sizes = [
+        #     1 * param_size,
+        #     50 * param_size,
+        #     100 * param_size,
+        #     200 * param_size,
+        #     400 * param_size,
+        #     600 * param_size,
+        #     800 * param_size,
+        #     1000 * param_size,
+        #     2000 * param_size,
+        #     3000 * param_size,
+        #     4000 * param_size,
+        #     6000 * param_size,
+        #     8192 * param_size,
+        #     # 512,
+        #     # 2560,
+        #     # 4096,
+        #     # 5120,
+        #     # 7680,
+        #     # 32768,
+        #     # 262144,
+        #     # 524288,
+        #     # 1048576,
+        #     # 2097152,
+        #     # 58720256,
+        # ]
+        self.world_sizes = [2, 4, 8]
 
     def test_correctness(self):
         for world_size in self.world_sizes:
