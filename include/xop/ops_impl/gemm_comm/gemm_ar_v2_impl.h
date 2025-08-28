@@ -199,35 +199,39 @@ public:
       //   CUDA_CHECK(cudaMemcpyAsync(ar_args_.reg_buffer, ar_args_.temp_input, input_size, cudaMemcpyDeviceToDevice, cu_stream));
       // }
 
-      int max_blocks = 48;
-      int threads = 1024;
-      int blocks = std::min(max_blocks, (ar_args_.packed_array_num + threads - 1) / threads);
+      //////////////////////////////////////////////////////////////
+
+//       int max_blocks = 48;
+//       int threads = 1024;
+//       int blocks = std::min(max_blocks, (ar_args_.packed_array_num + threads - 1) / threads);
       
-#define KL(ngpus, name)                                                      \
-name<to_cuda_type_t<ElementOutput>, ngpus><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, \
-  reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), \
-  ar_args_.rank, ar_args_.packed_array_num);
+// #define KL(ngpus, name)                                                      \
+// name<to_cuda_type_t<ElementOutput>, ngpus><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, \
+//   reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), \
+//   ar_args_.rank, ar_args_.packed_array_num);
       
-        if (ar_args_.world_size == 2) {                           
-          KL(2, vllm::cross_device_reduce_1stage);
-        }
-        else if (ar_args_.world_size == 4) {                                     
-          KL(4, vllm::cross_device_reduce_2stage);                                             
-        }  
-        else if (ar_args_.world_size == 6) {                                      
-          KL(6, vllm::cross_device_reduce_2stage);
-        } 
-        else if (ar_args_.world_size == 8) {
-          KL(8, vllm::cross_device_reduce_2stage);                                              
-        }
-        else {
-          throw std::runtime_error(
-              "custom allreduce only supports num gpus in (2,4,6,8). Actual "
-              "num "
-              "gpus = " +
-              std::to_string(ar_args_.world_size));
-        }
-      #undef KL
+//         if (ar_args_.world_size == 2) {                           
+//           KL(2, vllm::cross_device_reduce_1stage);
+//         }
+//         else if (ar_args_.world_size == 4) {                                     
+//           KL(4, vllm::cross_device_reduce_2stage);                                             
+//         }  
+//         else if (ar_args_.world_size == 6) {                                      
+//           KL(6, vllm::cross_device_reduce_2stage);
+//         } 
+//         else if (ar_args_.world_size == 8) {
+//           KL(8, vllm::cross_device_reduce_2stage);                                              
+//         }
+//         else {
+//           throw std::runtime_error(
+//               "custom allreduce only supports num gpus in (2,4,6,8). Actual "
+//               "num "
+//               "gpus = " +
+//               std::to_string(ar_args_.world_size));
+//         }
+//       #undef KL
+      
+      //////////////////////////////////////////////////////////////
 
       // fa->allreduce2<to_cuda_type_t<ElementOutput>>(
       //        cu_stream, 
@@ -247,7 +251,7 @@ private:
     printf("hello you");
     ElementC *gemm_out = (ElementC *)ar_args_.temp_input;
     if (ar_args_.is_capturing == false) {
-      gemm_out = ar_args_.reg_buffer;
+      gemm_out = (ElementC *)ar_args_.reg_buffer;
     }
 
     typename EVTD::Arguments callback_args{
@@ -258,7 +262,7 @@ private:
       },        // EVTCompute2
       { gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
         ar_args_.world_size, ar_args_.rank, ar_args_.packed_array_num, ar_args_.reg_buffer, 
-        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal
+        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output
       },                   // D
     };   
 
