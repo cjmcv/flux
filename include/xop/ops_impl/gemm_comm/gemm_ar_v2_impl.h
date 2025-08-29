@@ -248,19 +248,23 @@ private:
   typename DeviceGemmBasic::Arguments args_from_options(const RtArgumentsV2 *rt_args) {
     cutlass::gemm::GemmCoord problem_size = {rt_args->m, rt_args->n, rt_args->k};
     int batch_stride_C = rt_args->stride_c == 0 ? rt_args->n : problem_size.mn().product();
-    printf("hello you");
+
+#ifdef ENABLE_ALLREDUCE
     ElementC *gemm_out = (ElementC *)ar_args_.temp_input;
     if (ar_args_.is_capturing == false) {
       gemm_out = (ElementC *)ar_args_.reg_buffer;
     }
-
+#else
+    ElementC *gemm_out = (ElementC *)rt_args->ptr_D;
+#endif
     typename EVTD::Arguments callback_args{
       {
         {}, // Accum
         {(ElementC *)rt_args->ptr_C, ElementC(0), {cute::_0{}, cute::_1{}, int32_t(problem_size.n())}},            // Bias
         {}  // Compute0
       },        // EVTCompute2
-      { gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
+      { 
+        gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
         ar_args_.world_size, ar_args_.rank, ar_args_.packed_array_num, ar_args_.reg_buffer, 
         ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output
       },                   // D
@@ -325,6 +329,7 @@ private:
   }
 
   void fetch_comm_args(void *fusion_args, cudaStream_t stream) {
+#ifdef ENABLE_ALLREDUCE
     RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
 
     if constexpr (!(cute::is_same_v<ElementOutput, float> ||
@@ -351,6 +356,7 @@ private:
       stream, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.reg_buffer), output_len_,
       &ar_args_.world_size, &ar_args_.rank, &ar_args_.packed_array_num,
       &ar_args_.rank_data, &ar_args_.rank_signals, &ar_args_.self_signal);
+#endif
   }
 
 private:

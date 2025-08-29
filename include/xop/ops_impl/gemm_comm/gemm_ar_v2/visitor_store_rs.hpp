@@ -39,6 +39,8 @@
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+// #define ENABLE_ALLREDUCE
+
 template <typename T, int ngpus>
 __device__ void cross_device_reduce_1stage_2(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
                                              T* __restrict__ result, int rank, int size) {
@@ -47,14 +49,20 @@ __device__ void cross_device_reduce_1stage_2(vllm::RankData* _dp, vllm::RankSign
   // note: we don't reorder the address so the accumulation order is the same
   // for all ranks, ensuring bitwise identical results
   auto dp = *_dp;
+
+  int max_block_num = 48;
+  if (gridDim.x < max_block_num)
+    max_block_num = gridDim.x;
+  if (blockIdx.x >= max_block_num) 
+    return;
+
   vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
   // do the actual reduction
-  if (blockIdx.x < 50) {
-    for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size;
-        idx += gridDim.x * blockDim.x) {
-      ((P*)result)[idx] = vllm::packed_reduce<P, ngpus, A>((const P**)&dp.ptrs[0], idx);
-    }    
-  }
+  for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size;
+      idx += max_block_num * blockDim.x) {
+    ((P*)result)[idx] = vllm::packed_reduce<P, ngpus, A>((const P**)&dp.ptrs[0], idx);
+  }    
+  
   vllm::barrier_at_end<ngpus, true>(sg, self_sg, rank);
 }
 
@@ -207,11 +215,13 @@ struct VisitorAuxStoreRs{
 
     CUTLASS_DEVICE void
     end_epilogue() {
+      #ifdef ENABLE_ALLREDUCE
       // printf("hello end_epilogue: %d, %d, %d\n", params_ptr->world_size, params_ptr->rank, params_ptr->packed_array_num);
-
       cross_device_reduce_1stage_2<nv_bfloat16, 2>(params_ptr->rank_data, params_ptr->rank_signals, params_ptr->self_signal,
         reinterpret_cast<nv_bfloat16*>(params_ptr->output),
         params_ptr->rank, params_ptr->packed_array_num);
+
+      #endif
     }
   };
 
