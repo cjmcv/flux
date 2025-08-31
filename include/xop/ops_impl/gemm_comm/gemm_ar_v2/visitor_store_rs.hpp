@@ -37,6 +37,7 @@
 
 #include "cutlass/epilogue/threadblock/fusion/visitor_2x.hpp"
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
+#include "xop/ops_impl/debug_util.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // #define ENABLE_ALLREDUCE
@@ -211,6 +212,10 @@ struct VisitorAuxStoreRs{
         cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst_v(i), guard);
         // unpack_and_print(dst_v(i), guard);
       }
+
+      // test
+      nv_bfloat16 *test = (nv_bfloat16 *)params_ptr->reg_buffer;
+      test[step_idx] = 100;
     }
 
     CUTLASS_DEVICE void

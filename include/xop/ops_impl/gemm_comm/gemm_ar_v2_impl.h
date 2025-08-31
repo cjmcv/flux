@@ -356,6 +356,11 @@ private:
       stream, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.reg_buffer), output_len_,
       &ar_args_.world_size, &ar_args_.rank, &ar_args_.packed_array_num,
       &ar_args_.rank_data, &ar_args_.rank_signals, &ar_args_.self_signal);
+
+#else
+    // ÓÃÓÚÊÔÑé²âÊÔ
+    RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
+    ar_args_.reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
 #endif
   }
 

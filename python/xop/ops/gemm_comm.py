@@ -78,6 +78,7 @@ class GemmCommRs:
                 )
         else:
             fa, reg_buffer, reg_buffer_sz_bytes = 0,0,0
+            reg_buffer = torch.ones((output.shape[0], output.shape[1]), dtype=output.dtype).cuda()
             self.gemm_comm.forward(
                 input,
                 weight,
@@ -89,5 +90,6 @@ class GemmCommRs:
                 tuning = tuning,
                 fast_accum=fast_accum,
                 registered=False,
-                fa=fa, reg_buffer=reg_buffer, reg_buffer_sz_bytes=reg_buffer_sz_bytes,
+                fa=fa, reg_buffer=reg_buffer.data_ptr(), reg_buffer_sz_bytes=reg_buffer_sz_bytes,
             )
+            print("reg_buffer", reg_buffer)
