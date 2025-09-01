@@ -308,13 +308,13 @@ struct VisitorAuxStoreRs{
         // printf("i: %d, guard: %d \n", i, guard);
         // unpack_and_print(src_v(i));
         cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst_v(i), guard);
-      
+
+        int block_id = threadblock_tile_offset.m() * (get<1>(problem_shape) / 128) + threadblock_tile_offset.n();
+        xop_barrier_at_start<2>(params_ptr->rank_signals, params_ptr->self_signal, params_ptr->rank, block_id);
+        // printf("block_id: %d", block_id);
+
 #ifdef ENABLE_ALLREDUCE
         if (guard != 0) {
-          int block_id = threadblock_tile_offset.m() * (get<1>(problem_shape) / 128) + threadblock_tile_offset.n();
-          xop_barrier_at_start<2>(params_ptr->rank_signals, params_ptr->self_signal, params_ptr->rank, block_id);
-          printf("block_id: %d", block_id);
-
           using T = nv_bfloat16;
           nv_bfloat16 const *rank0_data = reinterpret_cast<nv_bfloat16 const *>(&rank0_v(i));
           nv_bfloat16 const *rank1_data = reinterpret_cast<nv_bfloat16 const *>(&rank1_v(i));
