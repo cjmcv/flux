@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Optional, List, Tuple
+import ctypes
 
 import torch
 from torch.distributed import ProcessGroup
@@ -7,7 +8,7 @@ from torch.distributed import ProcessGroup
 import xop
 from xop.ops.custom_all_reduce import CustomAllreduce
 
-ENABLE_ALLREDUCE = 0
+ENABLE_ALLREDUCE = 1
 
 class GemmCommRs:
     def __init__(
@@ -79,6 +80,7 @@ class GemmCommRs:
         else:
             fa, reg_buffer, reg_buffer_sz_bytes = 0,0,0
             reg_buffer = torch.ones((output.shape[0], output.shape[1]), dtype=output.dtype).cuda()
+            
             self.gemm_comm.forward(
                 input,
                 weight,
@@ -92,4 +94,4 @@ class GemmCommRs:
                 registered=False,
                 fa=fa, reg_buffer=reg_buffer.data_ptr(), reg_buffer_sz_bytes=reg_buffer_sz_bytes,
             )
-            print("reg_buffer", reg_buffer)
+            print(reg_buffer)

@@ -192,6 +192,10 @@ public:
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
     //////////////////////////////////////////////////////////
 
+// #ifndef ENABLE_ALLREDUCE
+//     cudaMemcpy(ar_args_.reg_buffer, ar_args_.rank_data->ptrs[0], sizeof(ElementOutput) * output_len_, cudaMemcpyDeviceToDevice);
+// #endif
+
     {
       // if (ar_args_.is_capturing == false) {
       //   // TORCH_CHECK_LE(input_size, comm_args_.reg_buffer_sz_bytes); !! todo
@@ -361,6 +365,24 @@ private:
     // ”√”⁄ ‘—È≤‚ ‘
     RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
     ar_args_.reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
+    ar_args_.world_size = 2;
+    ar_args_.rank = 1;
+
+    // vllm::RankData data;
+    // for (int i = 0; i < ar_args_.world_size; i++) {
+    //   cudaMalloc(&data.ptrs[i], sizeof(ElementOutput) * output_len_);
+    // }
+    // cudaMalloc(&ar_args_.rank_data, sizeof(vllm::RankData));
+    // cudaMemcpy(ar_args_.rank_data, &data, sizeof(vllm::RankData), cudaMemcpyHostToDevice);
+
+    // ar_args_.rank_data = new vllm::RankData;
+    // for (int i = 0; i < ar_args_.world_size; i++) {
+    //   cudaMalloc(&ar_args_.rank_data->ptrs[i], sizeof(ElementOutput) * output_len_);
+    // }
+
+    // cudaMalloc(&ar_args_.rank_data, sizeof(vllm::RankData));
+    // cudaMemcpy(ar_args_.rank_data, &data, sizeof(vllm::RankData), cudaMemcpyHostToDevice);
+    printf("finish malloc.\n");
 #endif
   }
 
@@ -369,6 +391,8 @@ private:
 
   AllReduceArguments ar_args_;
   int output_len_;
+
+  vllm::RankData* temp_ptrs_ = nullptr;
 };
 
 } // namespace xop

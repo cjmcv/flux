@@ -40,7 +40,7 @@
 #include "xop/ops_impl/debug_util.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #define ENABLE_ALLREDUCE
+#define ENABLE_ALLREDUCE
 
 template <typename T, int ngpus>
 __device__ void cross_device_reduce_1stage_2(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
@@ -134,25 +134,34 @@ struct VisitorAuxStoreRs{
 
   Params const* params_ptr;
 
-  template <class GTensor, class RTensor, class CTensor, class ProblemShape>
+  template <class GTensor, class G2Tensor, class RTensor, class CTensor, class ProblemShape>
   struct Callbacks : EmptyCallbacks {
     CUTLASS_DEVICE
     Callbacks(
       GTensor&& tC_gAux,
+      G2Tensor&& tC_gRankData,
       RTensor&& tC_rAux,
       CTensor&& tC_cAux,
+      gemm::GemmCoord threadblock_tile_offset,
+      int thread_idx,
       ProblemShape problem_shape,
       Params const* params_ptr
     ):
       tC_gAux(cute::forward<GTensor>(tC_gAux)),
+      tC_gRankData(cute::forward<G2Tensor>(tC_gRankData)),
       tC_rAux(cute::forward<RTensor>(tC_rAux)),
       tC_cAux(cute::forward<CTensor>(tC_cAux)),
+      threadblock_tile_offset(threadblock_tile_offset),
+      thread_idx(thread_idx),
       problem_shape(problem_shape),
       params_ptr(params_ptr) { }
 
     GTensor tC_gAux;
+    G2Tensor tC_gRankData;
     RTensor tC_rAux;
     CTensor tC_cAux;
+    gemm::GemmCoord threadblock_tile_offset;
+    int thread_idx;
     Params const* params_ptr;
     ProblemShape problem_shape;
 
@@ -200,22 +209,61 @@ struct VisitorAuxStoreRs{
 
     CUTLASS_DEVICE void
     end_step(int step_idx) {
+
+      Tensor mReg = make_tensor(make_gmem_ptr((Element*)params_ptr->reg_buffer), problem_shape, params_ptr->dAux);
+      Tensor tC_gRankData2 = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mReg, thread_idx, threadblock_tile_offset)));
+      auto dst2_v = filter(tC_gRankData2(_,_,_,step_idx));
+
       auto src_v = filter(tC_rAux);
       auto coord_v = filter(tC_cAux(_,_,_,step_idx));
       auto dst_v = filter(tC_gAux(_,_,_,step_idx));
-      // if (thread0())
-      //   cute::print(src_v);
+      
+      // printf("offset: %d - %d, %d, %d - %d, %p, %d.\n", thread_idx, (int)threadblock_tile_offset.m(), (int)threadblock_tile_offset.n(), (int)threadblock_tile_offset.k(), step_idx, (void*)&dst_v(0), elem_less(coord_v(0), problem_shape));
+      // if (thread0()) {
+      //   // cute::print(size(src_v));
+      //   printf("offset: %d.\n", thread_idx);
+      //   // cute::print(threadblock_tile_offset.m());
+      //   // cute::print(threadblock_tile_offset.n());
+      //   // cute::print(threadblock_tile_offset.k());
+      //   // printf("\n");
+      //   // printf("offset: %d, %d, %d.\n", (int)threadblock_tile_offset.m(), (int)threadblock_tile_offset.n(), (int)threadblock_tile_offset.k());
+      // }
+
+      Tensor mOut = make_tensor(make_gmem_ptr((Element*)params_ptr->output), problem_shape, params_ptr->dAux);
+      Tensor tC_gOutput = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mOut, thread_idx, threadblock_tile_offset)));
+      auto out_v = filter(tC_gOutput(_,_,_,step_idx));
+
+      Tensor mRank1 = make_tensor(make_gmem_ptr((Element*)params_ptr->rank_data->ptrs[1]), problem_shape, params_ptr->dAux);
+      Tensor tC_gRankData1 = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mRank1, thread_idx, threadblock_tile_offset)));
+      auto rank1_v = filter(tC_gRankData1(_,_,_,step_idx));
+
       CUTLASS_PRAGMA_UNROLL
       for (int i = 0; i < size(src_v); ++i) {
         bool guard = elem_less(coord_v(i), problem_shape);
+        // printf("i: %d, guard: %d \n", i, guard);
         // unpack_and_print(src_v(i));
         cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst_v(i), guard);
+
+        // Í¬²½
+
+        if (guard != 0) {
+          using T = nv_bfloat16;
+          nv_bfloat16 const *src_data = reinterpret_cast<nv_bfloat16 const *>(&src_v(i));
+          nv_bfloat16 const *rank1_data = reinterpret_cast<nv_bfloat16 const *>(&rank1_v(i));
+          nv_bfloat16 *output_data = reinterpret_cast<nv_bfloat16 *>(&out_v(i));
+
+          int cnt = 8; // 128/8/2
+          for (int j=0; j<cnt; j++) {
+            output_data[j] = __hadd(src_data[j], rank1_data[j]);
+          }
+        }
+        // cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void *)&dst2_v(i), guard);
         // unpack_and_print(dst_v(i), guard);
       }
 
-      // test
-      nv_bfloat16 *test = (nv_bfloat16 *)params_ptr->reg_buffer;
-      test[step_idx] = 100;
+      // // test
+      // nv_bfloat16 *test = (nv_bfloat16 *)params_ptr->reg_buffer;
+      // test[step_idx] = 100;
     }
 
     CUTLASS_DEVICE void
@@ -245,6 +293,59 @@ struct VisitorAuxStoreRs{
     Tensor tC_gAux = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mAux, thread_idx, threadblock_tile_offset)));
     Tensor tC_rAux = make_tensor_like(take<0,3>(tC_gAux));
 
+    // Tensor mReg = make_tensor(make_gmem_ptr((Element*)(params_ptr->rank_data->ptrs[0])), problem_shape, params_ptr->dAux);
+    // Tensor tC_gRankData = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mReg, thread_idx, threadblock_tile_offset)));
+
+  
+    Tensor mReg = make_tensor(make_gmem_ptr((Element*)params_ptr->reg_buffer), problem_shape, params_ptr->dAux);
+    Tensor tC_gRankData = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mReg, thread_idx, threadblock_tile_offset)));
+
+    // auto make_tC_gAux_view = [&](void* base_ptr) {
+    //   auto m = make_tensor(make_gmem_ptr(static_cast<Element*>(base_ptr)),
+    //                        problem_shape,
+    //                        params_ptr->dAux);                 // (M,N,L)
+    //   return recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
+    // };
+    // std::array<decltype(make_tC_gAux_view(nullptr)), params_ptr->world_size> tC_gRankData;
+    // for (int i = 0; i < params_ptr->world_size; ++i) {
+    //   tC_gRankData[i] = make_tC_gAux_view(params_ptr->rank_data->ptr[i]);
+    // }
+
+    // Tensor mReg = make_tensor(make_gmem_ptr((Element*)(params_ptr->rank_data->ptrs[0])), problem_shape, params_ptr->dAux);
+    // Tensor tC_gRankData = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mReg, thread_idx, threadblock_tile_offset)));
+
+    ////
+    // int t_world_size = 2;
+    // // // std::vector<Element *> ptrs;
+    // // // ptrs.resize(t_world_size);
+    // void** buffers = (void**)params_ptr->reg_buffer;
+    // // for (int i=0; i<t_world_size; i++) {
+    //   Tensor mReg = make_tensor(make_gmem_ptr((Element*)buffers[0]), problem_shape, params_ptr->dAux);
+    //   Tensor tC_gRankData = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mReg, thread_idx, threadblock_tile_offset)));
+    //   ptrs[i] = tC_gRankData.data();
+    // }
+    // Tensor tC_gRankData = make_tensor(ptrs.data(), make_shape(t_world_size));
+    //
+    // std::vector<Tensor> tC_gRankData;
+    // for (int i=0; i<t_world_size; i++) {
+    //   Tensor mReg = make_tensor(make_gmem_ptr((Element*)buffers[i]), problem_shape, params_ptr->dAux);
+    //   Tensor tC_gRankData = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mReg, thread_idx, threadblock_tile_offset)));
+    //   tC_gRankData.push_back(tC_gRankData);
+    // }
+
+    // //
+    // using TensorView = decltype(make_tensor(static_cast<Element*>(nullptr),
+    //                                         make_shape(0, 0, 0),
+    //                                         GenRowMajor{}));
+    // using TensorView = decltype(make_tC_gAux_view(nullptr));
+    // std::vector<TensorView> tC_gRankData;
+    // tC_gRankData.resize(params_ptr->world_size);
+    // // for (int i=0; i<params_ptr->world_size; i++) {
+    //   Tensor mReg = make_tensor(make_gmem_ptr((Element*)(params_ptr->rank_data->ptr[0])), problem_shape, params_ptr->dAux);
+    //   Tensor tC_g = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mReg, thread_idx, threadblock_tile_offset)));
+    //   tC_gRankData[0] = tC_g;
+    // // }
+
     // Generate the pred tensor
     Tensor cAux = make_identity_tensor(mAux.shape());
     Tensor tC_cAux = outer_partition(
@@ -254,11 +355,14 @@ struct VisitorAuxStoreRs{
     );
 
     return Callbacks<
-      decltype(tC_gAux), decltype(tC_rAux),
+      decltype(tC_gAux), decltype(tC_gRankData), decltype(tC_rAux),
       decltype(tC_cAux), ProblemShape>(
       cute::move(tC_gAux),
+      cute::move(tC_gRankData),
       cute::move(tC_rAux),
       cute::move(tC_cAux),
+      threadblock_tile_offset,
+      thread_idx,
       problem_shape,
       params_ptr
     );
