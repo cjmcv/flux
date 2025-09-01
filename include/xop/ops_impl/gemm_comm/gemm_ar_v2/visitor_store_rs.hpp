@@ -229,13 +229,21 @@ struct VisitorAuxStoreRs{
       //   // printf("offset: %d, %d, %d.\n", (int)threadblock_tile_offset.m(), (int)threadblock_tile_offset.n(), (int)threadblock_tile_offset.k());
       // }
 
-      Tensor mOut = make_tensor(make_gmem_ptr((Element*)params_ptr->output), problem_shape, params_ptr->dAux);
-      Tensor tC_gOutput = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mOut, thread_idx, threadblock_tile_offset)));
-      auto out_v = filter(tC_gOutput(_,_,_,step_idx));
+      auto make_tCg_view = [&](const void* base_ptr) {
+        Tensor m = make_tensor(make_gmem_ptr((Element*)base_ptr), problem_shape, params_ptr->dAux);                 // (M,N,L)
+        Tensor g = recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
+        return filter(g(_,_,_,step_idx));
+      };
 
-      Tensor mRank1 = make_tensor(make_gmem_ptr((Element*)params_ptr->rank_data->ptrs[1]), problem_shape, params_ptr->dAux);
-      Tensor tC_gRankData1 = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mRank1, thread_idx, threadblock_tile_offset)));
-      auto rank1_v = filter(tC_gRankData1(_,_,_,step_idx));
+      auto out_v = make_tCg_view(params_ptr->output);
+      auto rank0_v = make_tCg_view(params_ptr->rank_data->ptrs[0]);
+      auto rank1_v = make_tCg_view(params_ptr->rank_data->ptrs[1]);
+      auto rank2_v = make_tCg_view(params_ptr->rank_data->ptrs[2]);
+      auto rank3_v = make_tCg_view(params_ptr->rank_data->ptrs[3]);
+      auto rank4_v = make_tCg_view(params_ptr->rank_data->ptrs[4]);
+      auto rank5_v = make_tCg_view(params_ptr->rank_data->ptrs[5]);
+      auto rank6_v = make_tCg_view(params_ptr->rank_data->ptrs[6]);
+      auto rank7_v = make_tCg_view(params_ptr->rank_data->ptrs[7]);
 
       CUTLASS_PRAGMA_UNROLL
       for (int i = 0; i < size(src_v); ++i) {
@@ -248,13 +256,54 @@ struct VisitorAuxStoreRs{
 
         if (guard != 0) {
           using T = nv_bfloat16;
-          nv_bfloat16 const *src_data = reinterpret_cast<nv_bfloat16 const *>(&src_v(i));
+          nv_bfloat16 const *rank0_data = reinterpret_cast<nv_bfloat16 const *>(&rank0_v(i));
           nv_bfloat16 const *rank1_data = reinterpret_cast<nv_bfloat16 const *>(&rank1_v(i));
+          nv_bfloat16 const *rank2_data = reinterpret_cast<nv_bfloat16 const *>(&rank2_v(i));
+          nv_bfloat16 const *rank3_data = reinterpret_cast<nv_bfloat16 const *>(&rank3_v(i));
+          nv_bfloat16 const *rank4_data = reinterpret_cast<nv_bfloat16 const *>(&rank4_v(i));
+          nv_bfloat16 const *rank5_data = reinterpret_cast<nv_bfloat16 const *>(&rank5_v(i));
+          nv_bfloat16 const *rank6_data = reinterpret_cast<nv_bfloat16 const *>(&rank6_v(i));
+          nv_bfloat16 const *rank7_data = reinterpret_cast<nv_bfloat16 const *>(&rank7_v(i));
           nv_bfloat16 *output_data = reinterpret_cast<nv_bfloat16 *>(&out_v(i));
 
           int cnt = 8; // 128/8/2
-          for (int j=0; j<cnt; j++) {
-            output_data[j] = __hadd(src_data[j], rank1_data[j]);
+          if (params_ptr->world_size == 2) {
+            for (int j=0; j<cnt; j++) {
+              output_data[j] = __hadd(rank0_data[j], rank1_data[j]);
+            }
+          }
+          else if (params_ptr->world_size == 4) {
+            for (int j=0; j<cnt; j++) {
+              nv_bfloat16 temp = rank0_data[j];
+              temp = __hadd(temp, rank1_data[j]);
+              temp = __hadd(temp, rank2_data[j]);
+              temp = __hadd(temp, rank3_data[j]);
+              output_data[j] = temp;
+            }
+          }
+          else if (params_ptr->world_size == 6) {
+            for (int j=0; j<cnt; j++) {
+              nv_bfloat16 temp = rank0_data[j];
+              temp = __hadd(temp, rank1_data[j]);
+              temp = __hadd(temp, rank2_data[j]);
+              temp = __hadd(temp, rank3_data[j]);
+              temp = __hadd(temp, rank4_data[j]);
+              temp = __hadd(temp, rank5_data[j]);
+              output_data[j] = temp;
+            }
+          }
+          if (params_ptr->world_size == 8) {
+            for (int j=0; j<cnt; j++) {
+              nv_bfloat16 temp = rank0_data[j];
+              temp = __hadd(temp, rank1_data[j]);
+              temp = __hadd(temp, rank2_data[j]);
+              temp = __hadd(temp, rank3_data[j]);
+              temp = __hadd(temp, rank4_data[j]);
+              temp = __hadd(temp, rank5_data[j]);
+              temp = __hadd(temp, rank6_data[j]);
+              temp = __hadd(temp, rank7_data[j]);
+              output_data[j] = temp;
+            }
           }
         }
         // cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void *)&dst2_v(i), guard);
@@ -268,13 +317,13 @@ struct VisitorAuxStoreRs{
 
     CUTLASS_DEVICE void
     end_epilogue() {
-      #ifdef ENABLE_ALLREDUCE
-      // printf("hello end_epilogue: %d, %d, %d\n", params_ptr->world_size, params_ptr->rank, params_ptr->packed_array_num);
-      cross_device_reduce_1stage_2<nv_bfloat16, 2>(params_ptr->rank_data, params_ptr->rank_signals, params_ptr->self_signal,
-        reinterpret_cast<nv_bfloat16*>(params_ptr->output),
-        params_ptr->rank, params_ptr->packed_array_num);
+      // #ifdef ENABLE_ALLREDUCE
+      // // printf("hello end_epilogue: %d, %d, %d\n", params_ptr->world_size, params_ptr->rank, params_ptr->packed_array_num);
+      // cross_device_reduce_1stage_2<nv_bfloat16, 2>(params_ptr->rank_data, params_ptr->rank_signals, params_ptr->self_signal,
+      //   reinterpret_cast<nv_bfloat16*>(params_ptr->output),
+      //   params_ptr->rank, params_ptr->packed_array_num);
 
-      #endif
+      // #endif
     }
   };
 
