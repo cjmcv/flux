@@ -344,7 +344,8 @@ private:
 
     auto reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
     if (reg_buffer == 0) {
-      // While capturing, reg_buffer is zero
+      // While capturing, reg_buffer is zero.
+      // Use your own memory to open the ipc handle.
       ar_args_.is_capturing = true;
       ar_args_.reg_buffer = rt_args->gemm_out;
       ar_args_.temp_input = rt_args->gemm_out;

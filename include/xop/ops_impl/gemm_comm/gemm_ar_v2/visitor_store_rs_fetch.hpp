@@ -40,33 +40,7 @@
 #include "xop/ops_impl/debug_util.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define ENABLE_ALLREDUCE
-#define ENABLE_ALLREDUCE_SCHEMA_PUSH
-
-template <typename T, int ngpus>
-__device__ void Add(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
-                    T* __restrict__ result, int rank, int size) {
-  using P = typename vllm::packed_t<T>::P;
-  using A = typename vllm::packed_t<T>::A;
-  // note: we don't reorder the address so the accumulation order is the same
-  // for all ranks, ensuring bitwise identical results
-  auto dp = *_dp;
-
-  int max_block_num = 48;
-  if (gridDim.x < max_block_num)
-    max_block_num = gridDim.x;
-  if (blockIdx.x >= max_block_num) 
-    return;
-
-  vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
-  // do the actual reduction
-  for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size;
-      idx += max_block_num * blockDim.x) {
-    ((P*)result)[idx] = vllm::packed_reduce<P, ngpus, A>((const P**)&dp.ptrs[0], idx);
-  }    
-  
-  vllm::barrier_at_end<ngpus, true>(sg, self_sg, rank);
-}
+// #define ENABLE_ALLREDUCE
 
 template <typename T, int ngpus>
 __device__ void cross_device_reduce_1stage_2(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
@@ -267,13 +241,45 @@ struct VisitorAuxStoreRs{
       return frg_input;
     }
 
+    __device__ void unpack_and_print(VecType v, bool guard) {
+        // 1. 先把 128 bit 视为 4×32 bit 容器
+        union {
+            VecType   u128;
+            uint32_t  u32[4];
+        } tmp = {v};
+
+        // 2. 每 32 bit 再解释成 2×bfloat16（高位/低位各 16 bit）
+        __nv_bfloat16 bf[4];
+        #pragma unroll
+        for (int i = 0; i < 4; ++i) {
+            uint32_t word = tmp.u32[i];
+            bf[i] = *reinterpret_cast<__nv_bfloat16*>(&word);   // 直接按位拷
+        }
+
+        // 3. 打印（device printf 需 %f，会自动把 bfloat16 提升成 float）
+        printf("bf16: %f %f %f %f (%d)\n",
+              __bfloat162float(bf[0]),
+              __bfloat162float(bf[1]),
+              __bfloat162float(bf[2]),
+              __bfloat162float(bf[3]), guard);
+    }
+
     CUTLASS_DEVICE void
     end_step(int step_idx) {
       auto src_v = filter(tC_rAux);
       auto coord_v = filter(tC_cAux(_,_,_,step_idx));
       auto dst_v = filter(tC_gAux(_,_,_,step_idx));
       
-      // printf("rank<%d>: %d - (%d, %d)(%d, %d) - %d, %d, %d - %d, %p, %d.\n", params_ptr->rank, thread_idx, gridDim.x, gridDim.y, blockIdx.x, blockIdx.y, (int)threadblock_tile_offset.m(), (int)threadblock_tile_offset.n(), (int)threadblock_tile_offset.k(), step_idx, (void*)&dst_v(0), elem_less(coord_v(0), problem_shape));
+      printf("rank<%d>: %d - (%d, %d)(%d, %d) - %d, %d, %d - %d, %p, %d.\n", params_ptr->rank, thread_idx, gridDim.x, gridDim.y, blockIdx.x, blockIdx.y, (int)threadblock_tile_offset.m(), (int)threadblock_tile_offset.n(), (int)threadblock_tile_offset.k(), step_idx, (void*)&dst_v(0), elem_less(coord_v(0), problem_shape));
+      // if (thread0()) {
+      //   // cute::print(size(src_v));
+      //   printf("offset: %d.\n", thread_idx);
+      //   // cute::print(threadblock_tile_offset.m());
+      //   // cute::print(threadblock_tile_offset.n());
+      //   // cute::print(threadblock_tile_offset.k());
+      //   // printf("\n");
+      //   // printf("offset: %d, %d, %d.\n", (int)threadblock_tile_offset.m(), (int)threadblock_tile_offset.n(), (int)threadblock_tile_offset.k());
+      // }
 
       auto make_tCg_view = [&](const void* base_ptr) {
         Tensor m = make_tensor(make_gmem_ptr((Element*)base_ptr), problem_shape, params_ptr->dAux);                 // (M,N,L)
@@ -282,57 +288,102 @@ struct VisitorAuxStoreRs{
       };
 
       auto out_v = make_tCg_view(params_ptr->output);
-
-      int target_rank = (params_ptr->rank + 1) % 2;
-      auto target_rank_v = make_tCg_view(params_ptr->rank_data->ptrs[target_rank]);
+      auto rank0_v = make_tCg_view(params_ptr->rank_data->ptrs[0]);
+      auto rank1_v = make_tCg_view(params_ptr->rank_data->ptrs[1]);
+      auto rank2_v = make_tCg_view(params_ptr->rank_data->ptrs[2]);
+      auto rank3_v = make_tCg_view(params_ptr->rank_data->ptrs[3]);
+      auto rank4_v = make_tCg_view(params_ptr->rank_data->ptrs[4]);
+      auto rank5_v = make_tCg_view(params_ptr->rank_data->ptrs[5]);
+      auto rank6_v = make_tCg_view(params_ptr->rank_data->ptrs[6]);
+      auto rank7_v = make_tCg_view(params_ptr->rank_data->ptrs[7]);
 
       CUTLASS_PRAGMA_UNROLL
       for (int i = 0; i < size(src_v); ++i) {
         bool guard = elem_less(coord_v(i), problem_shape);
+        // printf("i: %d, guard: %d \n", i, guard);
         // unpack_and_print(src_v(i));
-        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&out_v(i), guard);
-        
+        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst_v(i), guard);
+
 #ifdef ENABLE_ALLREDUCE
-        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&target_rank_v(i), guard);
+        //    y
+        // x
+        int block_id = blockIdx.x * gridDim.y + blockIdx.y; // threadblock_tile_offset.m() * (get<1>(problem_shape) / 128) + threadblock_tile_offset.n();
+        xop_barrier_at_start<2>(params_ptr->rank_signals, params_ptr->self_signal, params_ptr->rank, block_id);
+        // printf("block_id: %d", block_id);
+        if (guard != 0) {
+          using T = nv_bfloat16;
+          nv_bfloat16 const *rank0_data = reinterpret_cast<nv_bfloat16 const *>(&rank0_v(i));
+          nv_bfloat16 const *rank1_data = reinterpret_cast<nv_bfloat16 const *>(&rank1_v(i));
+          nv_bfloat16 const *rank2_data = reinterpret_cast<nv_bfloat16 const *>(&rank2_v(i));
+          nv_bfloat16 const *rank3_data = reinterpret_cast<nv_bfloat16 const *>(&rank3_v(i));
+          nv_bfloat16 const *rank4_data = reinterpret_cast<nv_bfloat16 const *>(&rank4_v(i));
+          nv_bfloat16 const *rank5_data = reinterpret_cast<nv_bfloat16 const *>(&rank5_v(i));
+          nv_bfloat16 const *rank6_data = reinterpret_cast<nv_bfloat16 const *>(&rank6_v(i));
+          nv_bfloat16 const *rank7_data = reinterpret_cast<nv_bfloat16 const *>(&rank7_v(i));
+          nv_bfloat16 *output_data = reinterpret_cast<nv_bfloat16 *>(&out_v(i));
+
+          int cnt = 8; // 128/8/2
+          if (params_ptr->world_size == 2) {
+            for (int j=0; j<cnt; j++) {
+              output_data[j] = __hadd(rank0_data[j], rank1_data[j]);
+            }
+          }
+          else if (params_ptr->world_size == 4) {
+            for (int j=0; j<cnt; j++) {
+              nv_bfloat16 temp = rank0_data[j];
+              temp = __hadd(temp, rank1_data[j]);
+              temp = __hadd(temp, rank2_data[j]);
+              temp = __hadd(temp, rank3_data[j]);
+              output_data[j] = temp;
+            }
+          }
+          else if (params_ptr->world_size == 6) {
+            for (int j=0; j<cnt; j++) {
+              nv_bfloat16 temp = rank0_data[j];
+              temp = __hadd(temp, rank1_data[j]);
+              temp = __hadd(temp, rank2_data[j]);
+              temp = __hadd(temp, rank3_data[j]);
+              temp = __hadd(temp, rank4_data[j]);
+              temp = __hadd(temp, rank5_data[j]);
+              output_data[j] = temp;
+            }
+          }
+          if (params_ptr->world_size == 8) {
+            for (int j=0; j<cnt; j++) {
+              nv_bfloat16 temp = rank0_data[j];
+              temp = __hadd(temp, rank1_data[j]);
+              temp = __hadd(temp, rank2_data[j]);
+              temp = __hadd(temp, rank3_data[j]);
+              temp = __hadd(temp, rank4_data[j]);
+              temp = __hadd(temp, rank5_data[j]);
+              temp = __hadd(temp, rank6_data[j]);
+              temp = __hadd(temp, rank7_data[j]);
+              output_data[j] = temp;
+            }
+          }
+        }
+        xop_barrier_at_end<2>(params_ptr->rank_signals, params_ptr->self_signal, params_ptr->rank, block_id);
 #else
         Tensor mReg = make_tensor(make_gmem_ptr((Element*)params_ptr->reg_buffer), problem_shape, params_ptr->dAux);
         Tensor tC_gRankData2 = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mReg, thread_idx, threadblock_tile_offset)));
         auto dst2_v = filter(tC_gRankData2(_,_,_,step_idx));
 
         cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst2_v(i), guard);
+        // unpack_and_print(dst2_v(i), guard);
 #endif
       }
     }
 
     CUTLASS_DEVICE void
     end_epilogue() {
-#ifdef ENABLE_ALLREDUCE_SCHEMA_PUSH
-      auto make_tCg_view = [&](const void* base_ptr) {
-        Tensor m = make_tensor(make_gmem_ptr((Element*)base_ptr), problem_shape, params_ptr->dAux);                 // (M,N,L)
-        return recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
-      };
-      
-      CUTLASS_PRAGMA_UNROLL
-      for (int step_idx=0; step_idx < 8; step_idx++) {
-        auto coord_v = filter(tC_cAux(_,_,_,step_idx));
-        auto out_v = filter(make_tCg_view(params_ptr->output)(_,_,_,step_idx));
-        auto cur_rank_v = make_tCg_view(params_ptr->rank_data->ptrs[params_ptr->rank]);
+      // #ifdef ENABLE_ALLREDUCE
+      // // printf("hello end_epilogue: %d, %d, %d\n", params_ptr->world_size, params_ptr->rank, params_ptr->packed_array_num);
+      // cross_device_reduce_1stage_2<nv_bfloat16, 2>(params_ptr->rank_data, params_ptr->rank_signals, params_ptr->self_signal,
+      //   reinterpret_cast<nv_bfloat16*>(params_ptr->output),
+      //   params_ptr->rank, params_ptr->packed_array_num);
 
-        CUTLASS_PRAGMA_UNROLL
-        for (int i = 0; i < size(out_v); ++i) {
-          bool guard = elem_less(coord_v(i), problem_shape);
-          nv_bfloat16 *output_data = reinterpret_cast<nv_bfloat16 *>(&out_v(i));
-          nv_bfloat16 *cur_rank_data = reinterpret_cast<nv_bfloat16 *>(&cur_rank_v(i));
-
-          int cnt = 8; // 1 vector == 128bit == 8*bf16
-          for (int j=0; j<cnt; j++) {
-            // output_data[j] = __hadd(output_data[j], output_data[j]);
-            output_data[j] = __hadd(output_data[j], cur_rank_data[j]);
-          }
-        }
-      }
+      // #endif
     }
-#endif // ENABLE_ALLREDUCE_SCHEMA_PUSH
   };
 
   template <class ProblemShape>
