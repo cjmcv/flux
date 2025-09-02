@@ -40,7 +40,7 @@
 #include "xop/ops_impl/debug_util.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #define ENABLE_ALLREDUCE
+#define ENABLE_ALLREDUCE
 
 template <typename T, int ngpus>
 __device__ void cross_device_reduce_1stage_2(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
