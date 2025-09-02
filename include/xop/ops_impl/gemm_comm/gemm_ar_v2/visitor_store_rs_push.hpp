@@ -44,31 +44,6 @@
 #define ENABLE_ALLREDUCE_SCHEMA_PUSH
 
 template <typename T, int ngpus>
-__device__ void Add(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
-                    T* __restrict__ result, int rank, int size) {
-  using P = typename vllm::packed_t<T>::P;
-  using A = typename vllm::packed_t<T>::A;
-  // note: we don't reorder the address so the accumulation order is the same
-  // for all ranks, ensuring bitwise identical results
-  auto dp = *_dp;
-
-  int max_block_num = 48;
-  if (gridDim.x < max_block_num)
-    max_block_num = gridDim.x;
-  if (blockIdx.x >= max_block_num) 
-    return;
-
-  vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
-  // do the actual reduction
-  for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size;
-      idx += max_block_num * blockDim.x) {
-    ((P*)result)[idx] = vllm::packed_reduce<P, ngpus, A>((const P**)&dp.ptrs[0], idx);
-  }    
-  
-  vllm::barrier_at_end<ngpus, true>(sg, self_sg, rank);
-}
-
-template <typename T, int ngpus>
 __device__ void cross_device_reduce_1stage_2(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
                                              T* __restrict__ result, int rank, int size) {
   using P = typename vllm::packed_t<T>::P;
@@ -267,24 +242,29 @@ struct VisitorAuxStoreRs{
       return frg_input;
     }
 
+    // s0: 在end_step中完成通信与相加全流程：存结果到self rank_data, 使用block_id堵塞同步，获取其他rank的data，并进行累加操作。
+    //     问题：每个step中都有堵塞等待操作，同步时间过长。
+    // s1：在end_step中完成通信：存结果到本地output内存，同时存结果到对方rank data内存上(通信)，该过程不需要任何同步操作。
+    //     在end_epilogue中完成累加：全局堵塞同步后，执行两份本地内存的累加。
+    //     问题：end_step中发起通信的sm数量过多，通信资源竞争大，效率偏低。
     CUTLASS_DEVICE void
     end_step(int step_idx) {
       auto src_v = filter(tC_rAux);
       auto coord_v = filter(tC_cAux(_,_,_,step_idx));
       auto dst_v = filter(tC_gAux(_,_,_,step_idx));
       
-      // printf("rank<%d>: %d - (%d, %d)(%d, %d) - %d, %d, %d - %d, %p, %d.\n", params_ptr->rank, thread_idx, gridDim.x, gridDim.y, blockIdx.x, blockIdx.y, (int)threadblock_tile_offset.m(), (int)threadblock_tile_offset.n(), (int)threadblock_tile_offset.k(), step_idx, (void*)&dst_v(0), elem_less(coord_v(0), problem_shape));
+      printf("rank<%d>: %d - (%d, %d)(%d, %d) - %d, %d, %d - %d, %p, %d.\n", params_ptr->rank, thread_idx, gridDim.x, gridDim.y, blockIdx.x, blockIdx.y, (int)threadblock_tile_offset.m(), (int)threadblock_tile_offset.n(), (int)threadblock_tile_offset.k(), step_idx, (void*)&dst_v(0), elem_less(coord_v(0), problem_shape));
 
-      auto make_tCg_view = [&](const void* base_ptr) {
+      auto make_tCg_view = [&](const void* base_ptr, int step_idx, gemm::GemmCoord threadblock_tile_offset) {
         Tensor m = make_tensor(make_gmem_ptr((Element*)base_ptr), problem_shape, params_ptr->dAux);                 // (M,N,L)
         Tensor g = recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
         return filter(g(_,_,_,step_idx));
       };
 
-      auto out_v = make_tCg_view(params_ptr->output);
+      auto out_v = make_tCg_view(params_ptr->output, step_idx, threadblock_tile_offset);
 
-      int target_rank = (params_ptr->rank + 1) % 2;
-      auto target_rank_v = make_tCg_view(params_ptr->rank_data->ptrs[target_rank]);
+      // int target_rank = (params_ptr->rank + 1) % 2;
+      // auto target_rank_v = make_tCg_view(params_ptr->rank_data->ptrs[target_rank], step_idx, threadblock_tile_offset);
 
       CUTLASS_PRAGMA_UNROLL
       for (int i = 0; i < size(src_v); ++i) {
@@ -292,16 +272,85 @@ struct VisitorAuxStoreRs{
         // unpack_and_print(src_v(i));
         cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&out_v(i), guard);
         
-#ifdef ENABLE_ALLREDUCE
-        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&target_rank_v(i), guard);
-#else
-        Tensor mReg = make_tensor(make_gmem_ptr((Element*)params_ptr->reg_buffer), problem_shape, params_ptr->dAux);
-        Tensor tC_gRankData2 = recast<VecType>(group_modes<3,6>(ThreadMap::partition(mReg, thread_idx, threadblock_tile_offset)));
-        auto dst2_v = filter(tC_gRankData2(_,_,_,step_idx));
-
-        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst2_v(i), guard);
-#endif
+// #ifdef ENABLE_ALLREDUCE
+//         cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&target_rank_v(i), guard);
+// #else
+//         // auto dst2_v = make_tCg_view(params_ptr->reg_buffer, step_idx, threadblock_tile_offset);
+//         // cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst2_v(i), guard);
+// #endif
       }
+      
+      // 每个blockIdx.x为单位记录blockIdx.y方向的填充情况，当次数达到 gridDim.y/128 * 8(step) 的次数时，说明blockIdx.y方向已经填充完毕。
+     
+#ifdef ENABLE_ALLREDUCE
+      using T = int;
+      T *flag = (T*)params_ptr->self_signal;
+#else
+      using T = nv_bfloat16;
+      T *flag = (T*)params_ptr->reg_buffer;
+#endif
+      if (threadIdx.x == 0) {  
+        atomicAdd(&flag[blockIdx.x], 1);
+      }
+      
+      int target_rank = (params_ptr->rank + 1) % 2;
+      // mnk => blockIdx.x, blockIdx.y, l
+      T cnt = gridDim.y/128 * 8;
+      if (blockIdx.y == 0) {
+        if (flag[blockIdx.x] >= cnt) {
+          for (int by=0; by<gridDim.y; by++) {
+            for (int si=0; si<8; si++) {
+
+              Tensor _mAux = make_tensor(make_gmem_ptr(params_ptr->ptr_aux), problem_shape, params_ptr->dAux);   // (M,N,L)
+              // Generate the pred tensor
+              Tensor _cAux = make_identity_tensor(_mAux.shape());
+              Tensor _tC_cAux = outer_partition(
+                group_modes<3,6>(ThreadMap::partition(_cAux, thread_idx, {blockIdx.x, by, 0})),
+                Shape<Int<VecLength>>{},
+                (_0{}));
+              auto _coord_v = filter(_tC_cAux(_,_,_,si));
+                
+              auto out_v = make_tCg_view(params_ptr->output, si, {blockIdx.x, by, 0});
+
+            #ifdef ENABLE_ALLREDUCE
+              auto target_rank_v = make_tCg_view(params_ptr->rank_data->ptrs[target_rank], si, {blockIdx.x, by, 0});
+              CUTLASS_PRAGMA_UNROLL
+              for (int i = 0; i < size(out_v); ++i) {
+                bool guard = elem_less(_coord_v(i), problem_shape);
+                cutlass::arch::global_store<VecType, sizeof(VecType)>(out_v(i), (void*)&target_rank_v(i), guard);
+              }
+            #else
+              auto mask = make_tCg_view(params_ptr->reg_buffer, si, {blockIdx.x, by, 0});
+              CUTLASS_PRAGMA_UNROLL
+              for (int i = 0; i < size(out_v); ++i) {
+                bool guard = elem_less(_coord_v(i), problem_shape);
+                cutlass::arch::global_store<VecType, sizeof(VecType)>(mask(i), (void*)&out_v(i), guard);
+              }
+            #endif
+              
+            }            
+          }
+        }
+      }
+      // /////////////////////////////////////////////////////////////
+      // if (step_idx > 0 && blockIdx.y == 0) {
+
+      //   int si = step_idx-1;
+      //   auto coord_v = filter(tC_cAux(_,_,_,si));
+      //   auto dst_v = filter(tC_gAux(_,_,_,si));
+      //   auto dst2_v = make_tCg_view(params_ptr->reg_buffer, si, {M, N, K});
+
+      //   for (int bidy=0; bidy<gridDim.y; bidy++) {
+      //     auto out_v = make_tCg_view(params_ptr->output, si);
+      //     int target_rank = (params_ptr->rank + 1) % 2;
+      //     auto target_rank_v = make_tCg_view(params_ptr->rank_data->ptrs[target_rank], step_idx);
+    
+      //     CUTLASS_PRAGMA_UNROLL
+      //     for (int i = 0; i < size(src_v); ++i) {
+            
+      //     }
+      //   }
+      // }
     }
 
     CUTLASS_DEVICE void
@@ -311,7 +360,7 @@ struct VisitorAuxStoreRs{
         Tensor m = make_tensor(make_gmem_ptr((Element*)base_ptr), problem_shape, params_ptr->dAux);                 // (M,N,L)
         return recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
       };
-      
+      // 大同步
       CUTLASS_PRAGMA_UNROLL
       for (int step_idx=0; step_idx < 8; step_idx++) {
         auto coord_v = filter(tC_cAux(_,_,_,step_idx));
@@ -331,8 +380,8 @@ struct VisitorAuxStoreRs{
           }
         }
       }
-    }
 #endif // ENABLE_ALLREDUCE_SCHEMA_PUSH
+    }
   };
 
   template <class ProblemShape>
