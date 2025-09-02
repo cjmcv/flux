@@ -25,7 +25,7 @@ namespace vllm {
   } while (0)
 
 // Maximal number of blocks in allreduce kernel.
-constexpr int kMaxBlocks = 128*64; // fused gemm: 16384/128, 8192/128; only allreduce: 48;
+constexpr int kMaxBlocks = 128*64*8; // fused gemm: 16384/128, 8192/128, step; only allreduce: 48;
 
 // Default number of blocks in allreduce kernel.
 const int defaultBlockLimit = 48;

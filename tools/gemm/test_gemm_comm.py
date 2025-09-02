@@ -329,7 +329,7 @@ def multi_process_parallel(
     mp.set_start_method("spawn", force=True)
 
     procs = []
-    port = 12345
+    port = 12355
     for i in range(world_size):
         proc_args = (world_size, i, port) + target_args
         proc = mp.Process(target=test_target, args=proc_args, name=f"Worker-{i}")
