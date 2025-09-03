@@ -15,154 +15,8 @@
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
 ///////////////////////////////
 
-// 实现cuda kernel，填充4096*4096的矩阵，输入int* 类型的flag / result, 以及int类型的flag_len ：
-// 1）kernel内一个block有128个线程，每个block一次负责一个128*128的tile的数值填充为1；
-// 2）每个线程一次需要连续填充8个元素。
-// 3）输入还有一个一维数组flag，数组flag里每个元素是对应的是tile id号，以行优先。
-//    数组flag内0号/32号/64号/96号等下标对应的tile交由blockIdx.x为0的线程负责，使用for循环按顺序进行；
-//    同理，1号/33号/65号/97号等由blockIdx.x为1的线程负责。
-// 4）在4096*4096的目标矩阵下，tile的数量是32*32个。
-//    则对应数组flag中的tile id号，如flag[0]==10，即表示为第0行第10列的tile。如为32，则表示为第1行第0列的tile。
-
-
-template <typename T, int ngpus>
-__global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, vllm::Signal* self_sg,
-                                     T* __restrict__ out, int rank, int m, int n) {
-  // vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
-
-#ifdef ENABLE_ALLREDUCE
-  T *rank_data0 = (T *)dp->ptrs[0];
-#else
-  int *flag = (int *)dp;
-#endif
-                              
-  const int OUT_M   = m;
-  const int OUT_N   = n;
-  constexpr int TILE    = 128;
-  const int NTILE_M = OUT_M / TILE;   // 32
-  const int NTILE_N = OUT_N / TILE;   // 32
-  constexpr int THREADS = 128;
-  constexpr int ELE_PER_THREAD = 8;
-
-  const int bx = blockIdx.x;   // 0..31
-  const int tx = threadIdx.x;  // 0..127
-
-  int flagSize = NTILE_M * NTILE_N;
-  for (int k = bx; k < flagSize; k += gridDim.x) {
-    int tileId = flag[k+1] - 1;
-    
-    // printf("(%d, %d, %d, %d)\n", OUT_M, OUT_N, NTILE_M, NTILE_N);
-    int tile_m    = tileId / NTILE_N;   // tile 行号
-    int tile_n    = tileId % NTILE_N;   // tile 列号
-
-    // 每个 tile 128*128，起始坐标
-    int base_m = tile_m * TILE;
-    int base_n = tile_n * TILE;
-
-    int global_m = base_m + tx;     // 本线程负责 tile 内的第 tx 行
-
-    printf("tileId %d, %d, %d, %d\n", k, tileId, tile_m, global_m);
-    // 128 列 / 8 = 16 段，每段 8 个连续元素
-    for (int seg = 0; seg < TILE / ELE_PER_THREAD; ++seg) {
-        int colOffset = seg * ELE_PER_THREAD;   // 0,8,16,...,120
-        T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
-
-        #pragma unroll
-        for (int i = 0; i < ELE_PER_THREAD; ++i) {
-            ptr[i] = 1;   // 填充 1
-        }
-    }
-  }
-
-  // const int kM = 128;
-  // const int kN = 128;
-  // const int M = 512;
-  // const int N = 512;
-
-  // int block_num_m = M/KM;
-  // int block_num_n = N/KN;
-  // int block_num = block_num_m * block_num_n;
-
-  // // for 循环逐个访问下标0~block_num，每个下标存放的是已完成计算的blockid，每当一个数值置位非-1，则开始对该block做通信。
-  // // 每个block的通信由整个通信kernel的所有资源进行，不再切分。
-  // // 通信的一个block对应计算的一个block tile，
-  // if (rank_data0[0] != 0) { // blocking
-
-  //   int tid = threadIdx.x;
-  //   int bid = blockIdx.x;
-
-  //   for (int tileIdx = 0; tileIdx < 32; ++tileIdx) {
-  //     int globalTileId = bx * 32 + tileIdx;
-  //     int tileRow = globalTileId / (OUT_N / TILE);   // 0..31
-  //     int tileCol = globalTileId % (OUT_N / TILE);   // 0..31
-
-  //     // 每个 tile 128×128，按行主序
-  //     // 每个线程负责 16 行 × 8 列 的小条带
-  //     for (int strip = 0; strip < 16; ++strip) {
-  //       int localRow = tx / 8 * 16 + strip;   // 0..127
-  //       int localCol = (tx % 8) * ELE_PER_THREAD;
-
-  //       int globalRow = tileRow * TILE + localRow;
-  //       int globalCol = tileCol * TILE + localCol;
-
-  //       int* ptr = out + globalRow * pitch + globalCol;
-  //       #pragma unroll
-  //       for (int k = 0; k < ELE_PER_THREAD; ++k) {
-  //         if (globalCol + k < OUT_N) {
-  //           ptr[k] = (globalRow << 16) | (globalCol + k);
-  //         }
-  //       }
-  //     }
-  //   }
-
-    // for (int bid=1; bid<block_num+1; bid++) { // blocking
-    //   if (rank_data0[bid] > 0) {
-    //     int cur_block_id = rank_data0[bid] - 1;
-
-    //     int bid_m = cur_block_id / block_num_n;
-    //     int bid_n = cur_block_id % block_num_n;
-        
-    //     int pid_m = bid_m * kM;
-    //     int pid_n = bid_n * kN;
-
-    //     for (int i=pid_m; i<pid_m+kM; i++) {
-    //       for (int j=pid_n; j<pid_n+kN; j++) {
-    //         for (int pi=0; pi<8; pi++) {
-    //           result[i*N + j] = 2;              
-    //         }
-    //       }
-    //     }
-    //     // do the actual reduction
-    //     for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < len/p;
-    //         idx += gridDim.x * blockDim.x) {
-    //       for (int i=0; i<p; i++) {
-    //         result[idx*p+i] = 2; // + dp->ptrs[1][idx+i];
-    //       }
-    //     }          
-    //   }
-   
-    // }    
-  // }
-
-   
-  
-  // vllm::barrier_at_end<ngpus, true>(sg, self_sg, rank);
-}
-
-
 namespace xop {
 
-// s0: 在end_step中完成通信与相加全流程：存结果到self rank_data, 使用block_id堵塞同步，获取其他rank的data，并进行累加操作。
-//     问题：每个step中都有堵塞等待操作，同步时间过长。
-// s1：在end_step中完成通信：存结果到本地output内存，同时存结果到对方rank data内存上(通信)，该过程不需要任何同步操作。
-//     在end_epilogue中完成累加：全局堵塞同步后，执行两份本地内存的累加。
-//     问题：end_step中发起通信的sm数量过多，L2 Cache 争用，效率偏低。
-// s2: 基于s1，使用flag tensor结合atomicAdd，在bidx==0下所有bidy的数据都已经写到本地buffer后，以bidx==0下的block来处理通信，
-//     一次处理一整行，这样可以限制通信所使用的sm数量。
-//     问题: 负责通信的sm负载严重失衡。
-// s3: 限制计算所使用的sm数量，预留几个给通信。分两个kernel两个stream，二者使用对称内存互联。
-//     stream0 启动计算kernel，同时新建stream1 启动通信kernel。计算ep中每回写一个tile到本地内存，置位共享内存所有GPU的对应区域标志位；
-//     在通信中堵塞访问标志位，拉取该rank对应区域的数据到本地，完成reduce后，存放数据到本地输出内存。先等待stream0结束，而后等待stream1结束，得到最终结果。
 struct AllReduceArguments {
   bool is_capturing;
   void *temp_input;
@@ -206,6 +60,16 @@ class GemmArV2Impl : public GemmBase  {
       cute::Stride<cute::_0, cute::_1, int32_t>  // StrideMNL
   >;
 
+  // using C1 = cutlass::epilogue::threadblock::VisitorAuxLoad<
+  //     OutputTileThreadMap, ElementC, 
+  //     cute::Stride<int64_t, cute::_1, int64_t> // StrideMNL
+  // >;
+
+  // using C2 = cutlass::epilogue::threadblock::VisitorAuxLoad<
+  //     OutputTileThreadMap, ElementC, 
+  //     cute::Stride<int64_t, cute::_1, int64_t> // StrideMNL
+  // >;
+
   using Compute0 = cutlass::epilogue::threadblock::VisitorCompute<
       cutlass::plus, ElementCompute, ElementCompute,
       cutlass::FloatRoundStyle::round_to_nearest
@@ -215,6 +79,26 @@ class GemmArV2Impl : public GemmBase  {
       Compute0, // 2
       Accum,    // 0
       Bias>;    // 1
+    
+  // using Compute1 = cutlass::epilogue::threadblock::VisitorCompute<
+  //     cutlass::plus, ElementCompute, ElementCompute,
+  //     cutlass::FloatRoundStyle::round_to_nearest
+  // >;
+
+  // using EVTCompute1 = cutlass::epilogue::threadblock::Sm80EVT<
+  //     Compute1,
+  //     EVTCompute0,
+  //     C1>;
+
+  // using Compute2 = cutlass::epilogue::threadblock::VisitorCompute<
+  //     cutlass::plus, ElementOutput, ElementCompute,
+  //     cutlass::FloatRoundStyle::round_to_nearest
+  // >;
+
+  // using EVTCompute2 = cutlass::epilogue::threadblock::Sm80EVT<
+  //     Compute2,
+  //     EVTCompute1,
+  //     C2>;
 
   using D = cutlass::epilogue::threadblock::VisitorAuxStoreRs<
       OutputTileThreadMap, ElementOutput, cutlass::FloatRoundStyle::round_to_nearest,
@@ -246,20 +130,39 @@ class GemmArV2Impl : public GemmBase  {
 
   using DeviceGemmBasic = cutlass::gemm::device::GemmUniversalAdapter<EVTKernelStreamK>;
 
+  // // Epilogue output operator
+  // using EpilogueOp = cutlass::epilogue::thread::LinearCombination<
+  //     ElementC,               // Element type for C and D matrix operands
+  //     128 / cutlass::sizeof_bits<ElementC>::value, // Memory access granularity of C and D matrix in units of elements
+  //     ElementAccumulator,     // Element type from internal accumaccumulation
+  //     ElementAccumulator,     // Data type used to compute linear combination
+  //     cutlass::epilogue::thread::ScaleType::NoBetaScaling>;    // bias 
+
+  // // Classic data-parallel device GEMM implementation type
+  // using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<
+  //     ElementA, LayoutA,
+  //     ElementB, LayoutB,
+  //     ElementC, LayoutC,
+  //     ElementAccumulator,
+  //     cutlass::arch::OpClassTensorOp,
+  //     ArchTag,
+  //     ThreadblockShape,
+  //     WarpShape,
+  //     InstructionShape,
+  //     EpilogueOp,
+  //     ThreadBlockSwizzle, // cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<> / cutlass::gemm::threadblock::ThreadblockSwizzleStreamK
+  //     NumStages,
+  //     128 / cutlass::sizeof_bits<ElementA>::value,  // AlignmentA, Memory access granularity/alignment of A matrix in units of elements (up to 16 bytes)
+  //     128 / cutlass::sizeof_bits<ElementB>::value>; // AlignmentB
+
 public:
   void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
-    ////
-    cudaEventCreate(&event_);
-    cudaStreamCreate(&rs_stream_);
-    m_ = rt_args->m;
-    n_ = rt_args->n;
     output_len_ = rt_args->m * rt_args->n;
     ar_args_.output = rt_args->ptr_D;    
     auto cu_stream = static_cast<cudaStream_t>(stream);
     fetch_comm_args(fusion_args, cu_stream);
-    ////
 
     gemm_dev_ = DeviceGemmBasic();
     // Using the arguments, query for extra workspace required for matrix multiplication computation
@@ -284,43 +187,62 @@ public:
 
   void run(void *stream = nullptr) {
 
+    //////////////////////////////////////////////////////////
     auto cu_stream = static_cast<cudaStream_t>(stream);
-    CUDA_CHECK(cudaEventRecord(event_, cu_stream));      // 记录计算流
-    CUDA_CHECK(cudaStreamWaitEvent(rs_stream_, event_)); // 使rs流等待计算流之前的任务都结束
-    
-    //////////////////////////////////////////////////////////
-    
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
-
-#ifdef ENABLE_ALLREDUCE
-    int max_blocks = 48;
-    int threads = 512;
-    int blocks = std::min(max_blocks, (ar_args_.packed_array_num + threads - 1) / threads);
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, \
-        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), 
-        ar_args_.rank, ar_args_.packed_array_num);
     //////////////////////////////////////////////////////////
-    // wait for reduce_scatter done
-    CUDA_CHECK(cudaEventRecord(event_, rs_stream_)); // 记录通信流
-    CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); // 使计算流等待event中通信流之前的任务都结束
 
-#else
-    CUDA_CHECK(cudaEventRecord(event_, cu_stream));
-    CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_));
+// #ifndef ENABLE_ALLREDUCE
+//     cudaMemcpy(ar_args_.reg_buffer, ar_args_.rank_data->ptrs[0], sizeof(ElementOutput) * output_len_, cudaMemcpyDeviceToDevice);
+// #endif
 
-    // vllm::RankData *rank_data;
-    // cudaMalloc(&rank_data, sizeof(vllm::RankData));
-    // cudaMemcpy(&rank_data->ptrs[0], ar_args_.reg_buffer, sizeof(void*), cudaMemcpyHostToDevice);
+    {
+      // if (ar_args_.is_capturing == false) {
+      //   // TORCH_CHECK_LE(input_size, comm_args_.reg_buffer_sz_bytes); !! todo
+      //   auto input_size = output_len_ * sizeof(ElementOutput);
+      //   CUDA_CHECK(cudaMemcpyAsync(ar_args_.reg_buffer, ar_args_.temp_input, input_size, cudaMemcpyDeviceToDevice, cu_stream));
+      // }
 
-    // printf("out %p \n", ar_args_.reg_buffer);
-    int max_blocks = 32;
-    int threads = 128;
-    int blocks = std::min(max_blocks, n_ / 128); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
-    //////////////////////////////////////////////////////////
-    CUDA_CHECK(cudaEventRecord(event_, rs_stream_));
-    CUDA_CHECK(cudaStreamWaitEvent(rs_stream_, event_));
-#endif
+      //////////////////////////////////////////////////////////////
+
+//       int max_blocks = 48;
+//       int threads = 1024;
+//       int blocks = std::min(max_blocks, (ar_args_.packed_array_num + threads - 1) / threads);
+      
+// #define KL(ngpus, name)                                                      \
+// name<to_cuda_type_t<ElementOutput>, ngpus><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, \
+//   reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), \
+//   ar_args_.rank, ar_args_.packed_array_num);
+      
+//         if (ar_args_.world_size == 2) {                           
+//           KL(2, vllm::cross_device_reduce_1stage);
+//         }
+//         else if (ar_args_.world_size == 4) {                                     
+//           KL(4, vllm::cross_device_reduce_2stage);                                             
+//         }  
+//         else if (ar_args_.world_size == 6) {                                      
+//           KL(6, vllm::cross_device_reduce_2stage);
+//         } 
+//         else if (ar_args_.world_size == 8) {
+//           KL(8, vllm::cross_device_reduce_2stage);                                              
+//         }
+//         else {
+//           throw std::runtime_error(
+//               "custom allreduce only supports num gpus in (2,4,6,8). Actual "
+//               "num "
+//               "gpus = " +
+//               std::to_string(ar_args_.world_size));
+//         }
+//       #undef KL
+      
+      //////////////////////////////////////////////////////////////
+
+      // fa->allreduce2<to_cuda_type_t<ElementOutput>>(
+      //        cu_stream, 
+      //        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(reg_buffer), 
+      //        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(output_), 
+      //        output_len_);
+    }
   }
 
 private:
@@ -352,6 +274,23 @@ private:
       },                   // D
     };   
 
+    // typename EVTD::Arguments callback_args{
+    //   {
+    //     {
+    //       {
+    //         {}, // Accum
+    //         {tensor_Vector.device_data(), ElementC(0), {_0{}, _1{}, int32_t(options.problem_size.n())}},                 // Bias
+    //         {}  // Compute0
+    //       },    // EVTCompute0
+    //       {tensor_c1.device_data(), ElementC(0), {options.problem_size.n(), _1{}, options.problem_size.mn().product()}}, // C1
+    //       {}    // Compute1
+    //     },      // EVTCompute1
+    //     {tensor_c2.device_data(), ElementC(0), {options.problem_size.n(), _1{}, options.problem_size.mn().product()}},   // C2
+    //     {}      // Compute2
+    //   },        // EVTCompute2
+    //   {tensor_d.device_data(), {options.problem_size.n(), _1{}, options.problem_size.mn().product()}},                   // D
+    // };   
+    
     if constexpr (cute::is_same_v<ThreadBlockSwizzle, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>>) {  
       return typename DeviceGemmBasic::Arguments(
         cutlass::gemm::GemmUniversalMode::kGemm,  // universal mode
@@ -429,6 +368,21 @@ private:
     ar_args_.reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
     ar_args_.world_size = 2;
     ar_args_.rank = 1;
+
+    // vllm::RankData data;
+    // for (int i = 0; i < ar_args_.world_size; i++) {
+    //   cudaMalloc(&data.ptrs[i], sizeof(ElementOutput) * output_len_);
+    // }
+    // cudaMalloc(&ar_args_.rank_data, sizeof(vllm::RankData));
+    // cudaMemcpy(ar_args_.rank_data, &data, sizeof(vllm::RankData), cudaMemcpyHostToDevice);
+
+    // ar_args_.rank_data = new vllm::RankData;
+    // for (int i = 0; i < ar_args_.world_size; i++) {
+    //   cudaMalloc(&ar_args_.rank_data->ptrs[i], sizeof(ElementOutput) * output_len_);
+    // }
+
+    // cudaMalloc(&ar_args_.rank_data, sizeof(vllm::RankData));
+    // cudaMemcpy(ar_args_.rank_data, &data, sizeof(vllm::RankData), cudaMemcpyHostToDevice);
     printf("finish malloc.\n");
 #endif
   }
@@ -437,12 +391,9 @@ private:
   DeviceGemmBasic gemm_dev_;
 
   AllReduceArguments ar_args_;
-
-  cudaEvent_t event_;      // 需要跟前一次关联，不能临时创建
-  cudaStream_t rs_stream_;
-  int m_;
-  int n_;
   int output_len_;
+
+  vllm::RankData* temp_ptrs_ = nullptr;
 };
 
 } // namespace xop

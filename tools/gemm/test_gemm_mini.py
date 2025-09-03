@@ -77,6 +77,8 @@ if __name__ == "__main__":
         group=None,
         rank=0,
     )
+    
+    # 
     op.forward(
         input,
         weight,
@@ -88,4 +90,7 @@ if __name__ == "__main__":
         tuning = None,
         fast_accum=False,
     )
+    # torch.set_printoptions(threshold=float('inf'))
     print(output)
+    all_ones = output.sub(1).abs().max() < 1e-6
+    print("all_ones", all_ones)

@@ -40,9 +40,7 @@
 #include "xop/ops_impl/debug_util.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define ENABLE_ALLREDUCE
-#define ENABLE_ALLREDUCE_SCHEMA_S1
-// #define ENABLE_ALLREDUCE_SCHEMA_S2
+// #define ENABLE_ALLREDUCE
 
 template <typename T, int ngpus>
 __device__ void cross_device_reduce_1stage_2(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
@@ -245,6 +243,12 @@ struct VisitorAuxStoreRs{
 
     CUTLASS_DEVICE void
     end_step(int step_idx) {
+      // if (step_idx > 1) {
+      //   return;
+      // }
+      // if (blockIdx.x != 0 || blockIdx.y != 0) {
+      //   return;
+      // }
       auto src_v = filter(tC_rAux);
       auto coord_v = filter(tC_cAux(_,_,_,step_idx));
       auto dst_v = filter(tC_gAux(_,_,_,step_idx));
@@ -256,108 +260,31 @@ struct VisitorAuxStoreRs{
         Tensor g = recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
         return filter(g(_,_,_,step_idx));
       };
-
       auto out_v = make_tCg_view(params_ptr->output, step_idx, threadblock_tile_offset);
-
-      int target_rank = (params_ptr->rank + 1) % 2;
-      auto target_rank_v = make_tCg_view(params_ptr->rank_data->ptrs[target_rank], step_idx, threadblock_tile_offset);
 
       CUTLASS_PRAGMA_UNROLL
       for (int i = 0; i < size(src_v); ++i) {
         bool guard = elem_less(coord_v(i), problem_shape);
-        // unpack_and_print(src_v(i));
         cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&out_v(i), guard);
-        
-#ifdef ENABLE_ALLREDUCE_SCHEMA_S1
-#ifdef ENABLE_ALLREDUCE
-        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&target_rank_v(i), guard);
-#else
-        auto dst2_v = make_tCg_view(params_ptr->reg_buffer, step_idx, threadblock_tile_offset);
-        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst2_v(i), guard);
-#endif
-#endif
       }
-      
-#ifdef ENABLE_ALLREDUCE_SCHEMA_S2
-      // 每个blockIdx.x为单位记录blockIdx.y方向的填充情况，当次数达到 gridDim.y/128 * 8(step) 的次数时，说明blockIdx.y方向已经填充完毕。
-#ifdef ENABLE_ALLREDUCE
-      using T = int;
-      T *flag = (T*)params_ptr->self_signal;
-#else
-      using T = nv_bfloat16;
-      T *flag = (T*)params_ptr->reg_buffer;
-#endif
-      if (threadIdx.x == 0) {  
-        atomicAdd(&flag[blockIdx.x], 1);
-      }
-      
-      int target_rank = (params_ptr->rank + 1) % 2;
-      // mnk => blockIdx.x, blockIdx.y, l
-      T cnt = gridDim.y/128 * 8;
-      if (blockIdx.y == 0) {
-        if (flag[blockIdx.x] >= cnt) {
-          for (int by=0; by<gridDim.y; by++) {
-            for (int si=0; si<8; si++) {
 
-              Tensor _mAux = make_tensor(make_gmem_ptr(params_ptr->ptr_aux), problem_shape, params_ptr->dAux);   // (M,N,L)
-              // Generate the pred tensor
-              Tensor _cAux = make_identity_tensor(_mAux.shape());
-              Tensor _tC_cAux = outer_partition(
-                group_modes<3,6>(ThreadMap::partition(_cAux, thread_idx, {blockIdx.x, by, 0})),
-                Shape<Int<VecLength>>{},
-                (_0{}));
-              auto _coord_v = filter(_tC_cAux(_,_,_,si));
-                
-              auto out_v = make_tCg_view(params_ptr->output, si, {blockIdx.x, by, 0});
-
-            #ifdef ENABLE_ALLREDUCE
-              auto target_rank_v = make_tCg_view(params_ptr->rank_data->ptrs[target_rank], si, {blockIdx.x, by, 0});
-              CUTLASS_PRAGMA_UNROLL
-              for (int i = 0; i < size(out_v); ++i) {
-                bool guard = elem_less(_coord_v(i), problem_shape);
-                cutlass::arch::global_store<VecType, sizeof(VecType)>(out_v(i), (void*)&target_rank_v(i), guard);
-              }
-            #else
-              auto mask = make_tCg_view(params_ptr->reg_buffer, si, {blockIdx.x, by, 0});
-              CUTLASS_PRAGMA_UNROLL
-              for (int i = 0; i < size(out_v); ++i) {
-                bool guard = elem_less(_coord_v(i), problem_shape);
-                cutlass::arch::global_store<VecType, sizeof(VecType)>(mask(i), (void*)&out_v(i), guard);
-              }
-            #endif
-              
-            }            
-          }
-        }
-      }
-#endif // #ifdef ENABLE_ALLREDUCE_SCHEMA_S2
+      // // auto flag_v = filter(tC_gRankData(_,_,_,step_idx));
+      // int *flag_v = (int*)params_ptr->reg_buffer;
+      // flag_v[0] = 
     }
 
     CUTLASS_DEVICE void
     end_epilogue() {
-      auto make_tCg_view = [&](const void* base_ptr) {
-        Tensor m = make_tensor(make_gmem_ptr((Element*)base_ptr), problem_shape, params_ptr->dAux);                 // (M,N,L)
-        return recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
-      };
-      // todo: 大同步
-      CUTLASS_PRAGMA_UNROLL
-      for (int step_idx=0; step_idx < 8; step_idx++) {
-        auto coord_v = filter(tC_cAux(_,_,_,step_idx));
-        auto out_v = filter(make_tCg_view(params_ptr->output)(_,_,_,step_idx));
-        auto cur_rank_v = make_tCg_view(params_ptr->rank_data->ptrs[params_ptr->rank]);
+      // 确认一个block完成的数据是否是一个完整tile的。
+      // blockIdx.x => m, blockIdx.y => n;
+      int32_t *flag_v = (int32_t*)params_ptr->reg_buffer;
+      int32_t tileIdx = blockIdx.x * gridDim.y + blockIdx.y;
+      __syncthreads();
 
-        CUTLASS_PRAGMA_UNROLL
-        for (int i = 0; i < size(out_v); ++i) {
-          bool guard = elem_less(coord_v(i), problem_shape);
-          nv_bfloat16 *output_data = reinterpret_cast<nv_bfloat16 *>(&out_v(i));
-          nv_bfloat16 *cur_rank_data = reinterpret_cast<nv_bfloat16 *>(&cur_rank_v(i));
-
-          int cnt = 8; // 1 vector == 128bit == 8*bf16
-          for (int j=0; j<cnt; j++) {
-            // output_data[j] = __hadd(output_data[j], output_data[j]);
-            output_data[j] = __hadd(output_data[j], cur_rank_data[j]);
-          }
-        }
+      printf("tileIdx: %d - (%d, %d), (%d, %d).\n", tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n());
+      if (threadIdx.x == 0) {
+        atomicAdd(&flag_v[0], 1);
+        flag_v[flag_v[0]] = tileIdx+1;
       }
     }
   };
