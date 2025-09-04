@@ -118,6 +118,26 @@ DINLINE void xop_barrier_at_end(const vllm::RankSignals& sg, vllm::Signal* self_
   if (threadIdx.x == 0) self_sg->_flag[blockIdx.x] = flag;
 }
 
+
+template <typename T, int ngpus>
+__global__ void cross_device_reduce_1stage_tmp(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
+                                             T* __restrict__ result, int rank, int size) {
+  using P = typename vllm::packed_t<T>::P;
+  using A = typename vllm::packed_t<T>::A;
+  // note: we don't reorder the address so the accumulation order is the same
+  // for all ranks, ensuring bitwise identical results
+  auto dp = *_dp;
+
+  vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
+  // do the actual reduction
+  for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size;
+      idx += gridDim.x * blockDim.x) {
+    ((P*)result)[idx] = vllm::packed_reduce<P, ngpus, A>((const P**)&dp.ptrs[0], idx);
+  }    
+  
+  vllm::barrier_at_end<ngpus, true>(sg, self_sg, rank);
+}
+
 namespace cutlass::epilogue::threadblock {
 
 using namespace cute;

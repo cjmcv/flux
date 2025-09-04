@@ -67,7 +67,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
     // 堵塞操作使用一个线程即可，以免增加不必要负担。
     if (threadIdx.x == 0) {  
       if (ref.load(cuda::memory_order_acquire) == 0) {
-        while (ref.load(cuda::memory_order_relaxed) == 0) { printf("id:%d,", k); __nanosleep(40); }
+        while (ref.load(cuda::memory_order_relaxed) == 0) { __nanosleep(40); } // printf("id:%d,", k); 
       }
     }
     // 需要同步，否则其他非0号线程因不经过信号量而直接往下执行。
@@ -276,10 +276,11 @@ public:
 
     int cal_block_tile = 128;
     int max_blocks = 32;
-    constexpr int threads = 512;
+    constexpr int threads = 128;
     int blocks = std::min(max_blocks, n_ / cal_block_tile); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
 #ifdef ENABLE_ALLREDUCE
     disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    // cross_device_reduce_1stage_tmp<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
 #else    
     disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
