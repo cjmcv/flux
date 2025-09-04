@@ -243,17 +243,18 @@ struct VisitorAuxStoreRs{
       
       // printf("rank<%d>: %d - (%d, %d)(%d, %d) - %d, %d, %d - %d, %p, %d.\n", params_ptr->rank, thread_idx, gridDim.x, gridDim.y, blockIdx.x, blockIdx.y, (int)threadblock_tile_offset.m(), (int)threadblock_tile_offset.n(), (int)threadblock_tile_offset.k(), step_idx, (void*)&dst_v(0), elem_less(coord_v(0), problem_shape));
 
-      auto make_tCg_view = [&](const void* base_ptr, int step_idx, gemm::GemmCoord threadblock_tile_offset) {
-        Tensor m = make_tensor(make_gmem_ptr((Element*)base_ptr), problem_shape, params_ptr->dAux);                 // (M,N,L)
-        Tensor g = recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
-        return filter(g(_,_,_,step_idx));
-      };
-      auto out_v = make_tCg_view(params_ptr->output, step_idx, threadblock_tile_offset);
+      // auto make_tCg_view = [&](const void* base_ptr, int step_idx, gemm::GemmCoord threadblock_tile_offset) {
+      //   Tensor m = make_tensor(make_gmem_ptr((Element*)base_ptr), problem_shape, params_ptr->dAux);                 // (M,N,L)
+      //   Tensor g = recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
+      //   return filter(g(_,_,_,step_idx));
+      // };
+      // auto out_v = make_tCg_view(params_ptr->output, step_idx, threadblock_tile_offset);
 
       CUTLASS_PRAGMA_UNROLL
       for (int i = 0; i < size(src_v); ++i) {
         bool guard = elem_less(coord_v(i), problem_shape);
-        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&out_v(i), guard);
+        // cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&out_v(i), guard);
+        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst_v(i), guard); // 存放的本地的rank_data上
       }
     }
 
@@ -266,22 +267,17 @@ struct VisitorAuxStoreRs{
       
 #ifdef ENABLE_ALLREDUCE
       uint32_t *flag_v = (uint32_t*)params_ptr->rank_signals.signals[params_ptr->rank]->_flag;
-      if (threadIdx.x == 0) {
-        atomicAdd(&flag_v[0], 1);
-        // flag_v[flag_v[0]] = tileIdx+1;
-        xop_st_flag_volatile(&(flag_v[flag_v[0]]), tileIdx+1);
-      }
 #else
+      uint32_t *flag_v = (uint32_t*)params_ptr->reg_buffer;
+#endif
       // 确认一个block完成的数据是否是一个完整tile的。
       // blockIdx.x => m, blockIdx.y => n;
-      uint32_t *flag_v = (uint32_t*)params_ptr->reg_buffer;
       if (threadIdx.x == 0) {
         atomicAdd(&flag_v[0], 1);
         xop_st_flag_volatile(&(flag_v[flag_v[0]]), tileIdx+1);
         // printf("set(%d,%d),", flag_v[0], flag_v[flag_v[0]]);
         // flag_v[flag_v[0]] = tileIdx+1;
       }
-#endif
     }
   };
 

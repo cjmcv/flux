@@ -32,7 +32,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
 #ifdef ENABLE_ALLREDUCE
   int world_size = 2;
   int target_rank = (rank+1) % world_size;
-  uint32_t *flag = (uint32_t*)params_ptr->rank_signals.signals[target_rank]->_flag;
+  uint32_t *flag = (uint32_t*)sg.signals[target_rank]->_flag;
   T *rank_data = (T *)dp->ptrs[target_rank];
 #else
   uint32_t *flag = (uint32_t *)dp;
@@ -41,8 +41,8 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
   const int OUT_M   = m;
   const int OUT_N   = n;
   constexpr int TILE    = 128;
-  const int NTILE_M = OUT_M / TILE;   // 32
-  const int NTILE_N = OUT_N / TILE;   // 32
+  const int NTILE_M = (OUT_M+TILE-1) / TILE;   // 32
+  const int NTILE_N = (OUT_N+TILE-1) / TILE;   // 32
   constexpr int THREADS = 128;
   constexpr int ELE_PER_THREAD = 8;
 
@@ -84,7 +84,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
 #ifdef ENABLE_ALLREDUCE
         #pragma unroll
         for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          ptr[i] = __hadd(ptr[i], rank_data[i]);
+          ptr[i] = rank_data[i]; // __hadd(ptr[i], rank_data[i]); 只将对方的数据拉取过来，但是本地的数据不一定计算好了。
         }
 #else
         #pragma unroll
@@ -92,80 +92,6 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
 #endif
     }
   }
-
-  // const int kM = 128;
-  // const int kN = 128;
-  // const int M = 512;
-  // const int N = 512;
-
-  // int block_num_m = M/KM;
-  // int block_num_n = N/KN;
-  // int block_num = block_num_m * block_num_n;
-
-  // // for 循环逐个访问下标0~block_num，每个下标存放的是已完成计算的blockid，每当一个数值置位非-1，则开始对该block做通信。
-  // // 每个block的通信由整个通信kernel的所有资源进行，不再切分。
-  // // 通信的一个block对应计算的一个block tile，
-  // if (rank_data0[0] != 0) { // blocking
-
-  //   int tid = threadIdx.x;
-  //   int bid = blockIdx.x;
-
-  //   for (int tileIdx = 0; tileIdx < 32; ++tileIdx) {
-  //     int globalTileId = bx * 32 + tileIdx;
-  //     int tileRow = globalTileId / (OUT_N / TILE);   // 0..31
-  //     int tileCol = globalTileId % (OUT_N / TILE);   // 0..31
-
-  //     // 每个 tile 128×128，按行主序
-  //     // 每个线程负责 16 行 × 8 列 的小条带
-  //     for (int strip = 0; strip < 16; ++strip) {
-  //       int localRow = tx / 8 * 16 + strip;   // 0..127
-  //       int localCol = (tx % 8) * ELE_PER_THREAD;
-
-  //       int globalRow = tileRow * TILE + localRow;
-  //       int globalCol = tileCol * TILE + localCol;
-
-  //       int* ptr = out + globalRow * pitch + globalCol;
-  //       #pragma unroll
-  //       for (int k = 0; k < ELE_PER_THREAD; ++k) {
-  //         if (globalCol + k < OUT_N) {
-  //           ptr[k] = (globalRow << 16) | (globalCol + k);
-  //         }
-  //       }
-  //     }
-  //   }
-
-    // for (int bid=1; bid<block_num+1; bid++) { // blocking
-    //   if (rank_data0[bid] > 0) {
-    //     int cur_block_id = rank_data0[bid] - 1;
-
-    //     int bid_m = cur_block_id / block_num_n;
-    //     int bid_n = cur_block_id % block_num_n;
-        
-    //     int pid_m = bid_m * kM;
-    //     int pid_n = bid_n * kN;
-
-    //     for (int i=pid_m; i<pid_m+kM; i++) {
-    //       for (int j=pid_n; j<pid_n+kN; j++) {
-    //         for (int pi=0; pi<8; pi++) {
-    //           result[i*N + j] = 2;              
-    //         }
-    //       }
-    //     }
-    //     // do the actual reduction
-    //     for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < len/p;
-    //         idx += gridDim.x * blockDim.x) {
-    //       for (int i=0; i<p; i++) {
-    //         result[idx*p+i] = 2; // + dp->ptrs[1][idx+i];
-    //       }
-    //     }          
-    //   }
-   
-    // }    
-  // }
-
-   
-  
-  // vllm::barrier_at_end<ngpus, true>(sg, self_sg, rank);
 }
 
 
@@ -310,13 +236,14 @@ public:
     //////////////////////////////////////////////////////////
     
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
-
+    CUDA_CHECK(cudaEventRecord(event_, cu_stream)); // 记录通信流
+    CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); 
 
     int max_blocks = 32;
     int threads = 128;
     int blocks = std::min(max_blocks, n_ / 128); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
 #ifdef ENABLE_ALLREDUCE
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #else    
     disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
