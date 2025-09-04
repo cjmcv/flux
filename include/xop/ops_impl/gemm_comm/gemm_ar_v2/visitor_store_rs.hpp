@@ -285,13 +285,11 @@ struct VisitorAuxStoreRs{
     end_epilogue() {
       if (params_ptr->is_serial) return;
 
-      __syncthreads();
       uint32_t tileIdx = blockIdx.x * gridDim.y + blockIdx.y;
       // printf("tileIdx: %d - (%d, %d), (%d, %d).\n", tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n());
-      // using ar_t = cuda::atomic_ref<int, cuda::thread_scope_system>;
 #ifdef ENABLE_ALLREDUCE
       int *flag_v = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->_flag;
-      int *flag_c = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->start[params_ptr->rank];
+      int *flag_c = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->start;
 #else
       int *flag_v = (int*)params_ptr->reg_buffer;
       int *flag_c = (int*)params_ptr->reg_buffer + 10000;
@@ -311,6 +309,8 @@ struct VisitorAuxStoreRs{
         // xop_st_flag_volatile(&(flag_v[flag_v[0]]), tileIdx+1);
         // printf("set(%d,%d),", flag_v[0], flag_v[flag_v[0]]);
         // flag_v[flag_v[0]] = tileIdx+1;
+
+        __threadfence_system();
       }
     }
   };

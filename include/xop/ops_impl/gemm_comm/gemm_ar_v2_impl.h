@@ -66,15 +66,15 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
     atomic_ref_sys<int> ref(flag[k]);
     // 堵塞操作使用一个线程即可，以免增加不必要负担。
     if (threadIdx.x == 0) {  
-      if (ref.load(cuda::memory_order_acquire) == 0) {
-        while (ref.load(cuda::memory_order_relaxed) == 0) { __nanosleep(40); } // printf("id:%d,", k); 
-      }
+      while (ref.load(cuda::memory_order_relaxed) == 0) { __nanosleep(40); } // printf("id:%d,", k); 
     }
     // 需要同步，否则其他非0号线程因不经过信号量而直接往下执行。
     __syncthreads();
 
     int fv = ref.load(cuda::memory_order_relaxed);
-
+    if (threadIdx.x == 0) {
+      ref.store(0, cuda::memory_order_relaxed); // 用完复位
+    }
     int tileId = fv - 1;
     if (tileId < 0) tileId = 0; // catch
     
@@ -100,23 +100,11 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
         }
       }      
     }
-    else if (THREADS == 256) {
-      int global_m = base_m + tx/2;     // 两个线程负责 tile 内的一行
-      int bias_n = tx%2 * TILE / 2;
-      for (int seg = 0; seg < TILE / ELE_PER_THREAD / 2; ++seg) {
-        int colOffset = bias_n + seg * ELE_PER_THREAD;   // 0,8,16,...,120
-        T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
-        #pragma unroll
-        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          // ptr[i] = rank_data[i];  // __hadd(ptr[i], rank_data[i]); 只将对方的数据拉取过来，但是本地的数据不一定计算好了。
-          ptr[i] = 1;
-        }
-      }
-    }
-    else if (THREADS == 512) {
-      int global_m = base_m + tx/4;     // 两个线程负责 tile 内的一行
-      int bias_n = tx%4 * TILE / 4;
-      for (int seg = 0; seg < TILE / ELE_PER_THREAD / 4; ++seg) {
+    else if constexpr (THREADS == 256 || THREADS == 512) {
+      int sp = THREADS / 128;
+      int global_m = base_m + tx/sp;     // 两个线程负责 tile 内的一行
+      int bias_n = tx%sp * TILE / sp;
+      for (int seg = 0; seg < TILE / ELE_PER_THREAD / sp; ++seg) {
         int colOffset = bias_n + seg * ELE_PER_THREAD;   // 0,8,16,...,120
         T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
         #pragma unroll
@@ -127,6 +115,28 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
       }
     }
   }
+
+  if (threadIdx.x == 0 && blockIdx.x == 0) {
+    // 复位标志
+    int *flag_c = (int*)sg.signals[rank]->start;
+    atomic_ref_sys<int> ref(*flag_c);
+    ref.store(0, cuda::memory_order_release);
+
+    // gpu轮次同步
+    auto self_end = &sg.signals[rank]->end;
+    auto target_end = &sg.signals[target_rank]->end;
+
+    atomic_ref_sys<int> self_ref(self_end);
+    int cnt = self_ref.load(cuda::memory_order_relaxed) + 1;
+    // 通知
+    self_ref.store(cnt, cuda::memory_order_release);
+    // 同步
+    atomic_ref_sys<int> target_ref(target_end);
+    while (target_ref.load(cuda::memory_order_relaxed) == cnt) {}
+    // 更新，end标志位会一直使用
+    self_ref.store(cnt, cuda::memory_order_release);
+  }
+  __syncthreads();
 }
 
 
@@ -264,6 +274,7 @@ public:
   }
 
   void run(void *stream = nullptr) {
+    cudaMemset(ar_args_.rank_signals.signals[]);
 
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUDA_CHECK(cudaEventRecord(event_, cu_stream));      // 记录计算流
