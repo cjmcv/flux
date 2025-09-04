@@ -174,6 +174,7 @@ struct VisitorAuxStoreRs{
     vllm::Signal *self_signal;
 
     void *output;
+    bool is_serial;
   };
 
   using Params = Arguments;
@@ -257,12 +258,8 @@ struct VisitorAuxStoreRs{
 
     CUTLASS_DEVICE void
     end_step(int step_idx) {
-      // if (step_idx > 1) {
-      //   return;
-      // }
-      // if (blockIdx.x != 0 || blockIdx.y != 0) {
-      //   return;
-      // }
+      // if (step_idx > 1) { return; }
+      // if (blockIdx.x != 0 || blockIdx.y != 0) { return; }
       auto src_v = filter(tC_rAux);
       auto coord_v = filter(tC_cAux(_,_,_,step_idx));
       auto dst_v = filter(tC_gAux(_,_,_,step_idx));
@@ -286,7 +283,8 @@ struct VisitorAuxStoreRs{
 
     CUTLASS_DEVICE void
     end_epilogue() {
-      
+      if (params_ptr->is_serial) return;
+
       __syncthreads();
       uint32_t tileIdx = blockIdx.x * gridDim.y + blockIdx.y;
       // printf("tileIdx: %d - (%d, %d), (%d, %d).\n", tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n());

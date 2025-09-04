@@ -231,6 +231,7 @@ public:
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
     ////
+    is_serial_ = true;
     cudaEventCreate(&event_);
     cudaStreamCreate(&rs_stream_);
     m_ = rt_args->m;
@@ -279,8 +280,10 @@ public:
     constexpr int threads = 128;
     int blocks = std::min(max_blocks, n_ / cal_block_tile); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
 #ifdef ENABLE_ALLREDUCE
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
-    // cross_device_reduce_1stage_tmp<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
+    if (is_serial_)
+      cross_device_reduce_1stage_tmp<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
+    else
+      disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #else    
     disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
@@ -328,7 +331,7 @@ private:
       { 
         gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
         ar_args_.world_size, ar_args_.rank, ar_args_.packed_array_num, ar_args_.reg_buffer, 
-        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output
+        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, is_serial_
       },                   // D
     };   
 
@@ -416,6 +419,7 @@ private:
 private:
   DeviceGemmBasic gemm_dev_;
 
+  bool is_serial_;
   AllReduceArguments ar_args_;
 
   cudaEvent_t event_;      // 需要跟前一次关联，不能临时创建
