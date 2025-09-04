@@ -42,50 +42,38 @@
 
 // #define ENABLE_ALLREDUCE
 
-template <typename T, int ngpus>
-__device__ void cross_device_reduce_1stage_2(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
-                                             T* __restrict__ result, int rank, int size) {
-  using P = typename vllm::packed_t<T>::P;
-  using A = typename vllm::packed_t<T>::A;
-  // note: we don't reorder the address so the accumulation order is the same
-  // for all ranks, ensuring bitwise identical results
-  auto dp = *_dp;
-
-  int max_block_num = 48;
-  if (gridDim.x < max_block_num)
-    max_block_num = gridDim.x;
-  if (blockIdx.x >= max_block_num) 
-    return;
-
-  vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
-  // do the actual reduction
-  for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size;
-      idx += max_block_num * blockDim.x) {
-    ((P*)result)[idx] = vllm::packed_reduce<P, ngpus, A>((const P**)&dp.ptrs[0], idx);
-  }    
-  
-  vllm::barrier_at_end<ngpus, true>(sg, self_sg, rank);
+static DINLINE void xop_st_flag_volatile(uint32_t* flag_addr, uint32_t flag) {
+  asm volatile("st.volatile.global.u32 [%1], %0;" ::"r"(flag), "l"(flag_addr));
 }
 
+static DINLINE uint32_t xop_ld_flag_volatile(uint32_t* flag_addr) {
+  uint32_t flag;
+  asm volatile("ld.volatile.global.u32 %0, [%1];"
+               : "=r"(flag)
+               : "l"(flag_addr));
+  return flag;
+}
+
+
 template <int ngpus>
-DINLINE void xop_barrier_at_start(const vllm::RankSignals& sg, vllm::Signal* self_sg, int rank, int block_id, int bias=0) {
-  uint32_t flag = self_sg->_flag[block_id] + 1;
-  // printf("self_sg: %p - (%p, %p), rank %d: block: %d, flag: %d\n", self_sg, sg.signals[0], sg.signals[1], rank, block_id, flag);
+DINLINE void xop_barrier_at_start(const vllm::RankSignals& sg, vllm::Signal* self_sg, int rank, int bias=0) {
+  uint32_t flag = self_sg->_flag[blockIdx.x] + 1;
+  // printf("self_sg: %p - (%p, %p), rank %d: block: %d, flag: %d\n", self_sg, sg.signals[0], sg.signals[1], rank, blockIdx.x, flag);
   if (threadIdx.x < ngpus) {
-    auto peer_counter_ptr = &sg.signals[threadIdx.x+bias]->start[block_id][rank+bias];
-    auto self_counter_ptr = &self_sg->start[block_id][threadIdx.x+bias];
-    // printf("a<%d> sg.signals: [%d][%d], [%d][%d] => [%p][%p], [%p][%p]\n", rank, sg.signals[0]->start[block_id][0], sg.signals[1]->start[block_id][0], sg.signals[0]->start[block_id][1], sg.signals[1]->start[block_id][1],
-    //                                                                             &sg.signals[0]->start[block_id][0], &sg.signals[1]->start[block_id][0], &sg.signals[0]->start[block_id][1], &sg.signals[1]->start[block_id][1]);
-    // printf("a<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[block_id][0], self_sg->start[block_id][1], &self_sg->start[block_id][0], &self_sg->start[block_id][1]);
-    // printf("flag: %d. (%d[tid%d][bid%d][rank%d], %d[bid%d][tid%d])", flag, *peer_counter_ptr, threadIdx.x, block_id, rank, *self_counter_ptr, block_id, threadIdx.x);
+    auto peer_counter_ptr = &sg.signals[threadIdx.x+bias]->start[blockIdx.x][rank+bias];
+    auto self_counter_ptr = &self_sg->start[blockIdx.x][threadIdx.x+bias];
+    // printf("a<%d> sg.signals: [%d][%d], [%d][%d] => [%p][%p], [%p][%p]\n", rank, sg.signals[0]->start[blockIdx.x][0], sg.signals[1]->start[blockIdx.x][0], sg.signals[0]->start[blockIdx.x][1], sg.signals[1]->start[blockIdx.x][1],
+    //                                                                             &sg.signals[0]->start[blockIdx.x][0], &sg.signals[1]->start[blockIdx.x][0], &sg.signals[0]->start[blockIdx.x][1], &sg.signals[1]->start[blockIdx.x][1]);
+    // printf("a<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[blockIdx.x][0], self_sg->start[blockIdx.x][1], &self_sg->start[blockIdx.x][0], &self_sg->start[blockIdx.x][1]);
+    // printf("flag: %d. (%d[tid%d][bid%d][rank%d], %d[bid%d][tid%d])", flag, *peer_counter_ptr, threadIdx.x, blockIdx.x, rank, *self_counter_ptr, blockIdx.x, threadIdx.x);
     // Write the expected counter value to peer and wait for correct value
     // from peer.
     // printf("a(%d vs %d) %d\n", *peer_counter_ptr, flag, rank);
     vllm::st_flag_volatile(peer_counter_ptr, flag);
     // printf("b(%d vs %d)\n", *peer_counter_ptr, flag);
-    // printf("b<%d> sg.signals: [%d][%d], [%d][%d] => [%p][%p], [%p][%p]\n", rank, sg.signals[0]->start[block_id][0], sg.signals[1]->start[block_id][0], sg.signals[0]->start[block_id][1], sg.signals[1]->start[block_id][1],
-    //   &sg.signals[0]->start[block_id][0], &sg.signals[1]->start[block_id][0], &sg.signals[0]->start[block_id][1], &sg.signals[1]->start[block_id][1]);
-    // printf("b<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[block_id][0], self_sg->start[block_id][1], &self_sg->start[block_id][0], &self_sg->start[block_id][1]);
+    // printf("b<%d> sg.signals: [%d][%d], [%d][%d] => [%p][%p], [%p][%p]\n", rank, sg.signals[0]->start[blockIdx.x][0], sg.signals[1]->start[blockIdx.x][0], sg.signals[0]->start[blockIdx.x][1], sg.signals[1]->start[blockIdx.x][1],
+    //   &sg.signals[0]->start[blockIdx.x][0], &sg.signals[1]->start[blockIdx.x][0], &sg.signals[0]->start[blockIdx.x][1], &sg.signals[1]->start[blockIdx.x][1]);
+    // printf("b<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[blockIdx.x][0], self_sg->start[blockIdx.x][1], &self_sg->start[blockIdx.x][0], &self_sg->start[blockIdx.x][1]);
 
     while (vllm::ld_flag_volatile(self_counter_ptr) != flag);
     // while (ld_flag_volatile(self_counter_ptr) != flag) {
@@ -94,7 +82,7 @@ DINLINE void xop_barrier_at_start(const vllm::RankSignals& sg, vllm::Signal* sel
   }
   __syncthreads();
   // use one thread to update flag
-  if (threadIdx.x == 0) self_sg->_flag[block_id] = flag;
+  if (threadIdx.x == 0) self_sg->_flag[blockIdx.x] = flag;
 }
 
 // This function is meant to be used as the second or the final
@@ -102,12 +90,12 @@ DINLINE void xop_barrier_at_start(const vllm::RankSignals& sg, vllm::Signal* sel
 // synchronization barrier, we don't need to make any visibility guarantees
 // for prior memory accesses.
 template <int ngpus, bool final_sync = false>
-DINLINE void xop_barrier_at_end(const vllm::RankSignals& sg, vllm::Signal* self_sg, int rank, int block_id, int bias=0) {
+DINLINE void xop_barrier_at_end(const vllm::RankSignals& sg, vllm::Signal* self_sg, int rank, int bias=0) {
   __syncthreads();
-  uint32_t flag = self_sg->_flag[block_id] + 1;
+  uint32_t flag = self_sg->_flag[blockIdx.x] + 1;
   if (threadIdx.x < ngpus) {
-    auto peer_counter_ptr = &sg.signals[threadIdx.x+bias]->end[block_id][rank+bias];
-    auto self_counter_ptr = &self_sg->end[block_id][threadIdx.x+bias];
+    auto peer_counter_ptr = &sg.signals[threadIdx.x+bias]->end[blockIdx.x][rank+bias];
+    auto self_counter_ptr = &self_sg->end[blockIdx.x][threadIdx.x+bias];
     // Write the expected counter value to peer and wait for correct value from
     // peer.
     if constexpr (!final_sync) {
@@ -121,7 +109,7 @@ DINLINE void xop_barrier_at_end(const vllm::RankSignals& sg, vllm::Signal* self_
   if constexpr (!final_sync) __syncthreads();
 
   // use one thread to update flag
-  if (threadIdx.x == 0) self_sg->_flag[block_id] = flag;
+  if (threadIdx.x == 0) self_sg->_flag[blockIdx.x] = flag;
 }
 
 namespace cutlass::epilogue::threadblock {
@@ -267,25 +255,33 @@ struct VisitorAuxStoreRs{
         bool guard = elem_less(coord_v(i), problem_shape);
         cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&out_v(i), guard);
       }
-
-      // // auto flag_v = filter(tC_gRankData(_,_,_,step_idx));
-      // int *flag_v = (int*)params_ptr->reg_buffer;
-      // flag_v[0] = 
     }
 
     CUTLASS_DEVICE void
     end_epilogue() {
-      // 确认一个block完成的数据是否是一个完整tile的。
-      // blockIdx.x => m, blockIdx.y => n;
-      int32_t *flag_v = (int32_t*)params_ptr->reg_buffer;
-      int32_t tileIdx = blockIdx.x * gridDim.y + blockIdx.y;
+      
       __syncthreads();
-
-      printf("tileIdx: %d - (%d, %d), (%d, %d).\n", tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n());
+      uint32_t tileIdx = blockIdx.x * gridDim.y + blockIdx.y;
+      // printf("tileIdx: %d - (%d, %d), (%d, %d).\n", tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n());
+      
+#ifdef ENABLE_ALLREDUCE
+      uint32_t *flag_v = (uint32_t*)params_ptr->rank_signals.signals[params_ptr->rank]->_flag;
       if (threadIdx.x == 0) {
         atomicAdd(&flag_v[0], 1);
-        flag_v[flag_v[0]] = tileIdx+1;
+        // flag_v[flag_v[0]] = tileIdx+1;
+        xop_st_flag_volatile(&(flag_v[flag_v[0]]), tileIdx+1);
       }
+#else
+      // 确认一个block完成的数据是否是一个完整tile的。
+      // blockIdx.x => m, blockIdx.y => n;
+      uint32_t *flag_v = (uint32_t*)params_ptr->reg_buffer;
+      if (threadIdx.x == 0) {
+        atomicAdd(&flag_v[0], 1);
+        xop_st_flag_volatile(&(flag_v[flag_v[0]]), tileIdx+1);
+        // printf("set(%d,%d),", flag_v[0], flag_v[flag_v[0]]);
+        // flag_v[flag_v[0]] = tileIdx+1;
+      }
+#endif
     }
   };
 

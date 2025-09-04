@@ -24,16 +24,18 @@
 // 4）在4096*4096的目标矩阵下，tile的数量是32*32个。
 //    则对应数组flag中的tile id号，如flag[0]==10，即表示为第0行第10列的tile。如为32，则表示为第1行第0列的tile。
 
-
 template <typename T, int ngpus>
 __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, vllm::Signal* self_sg,
                                      T* __restrict__ out, int rank, int m, int n) {
   // vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
 
 #ifdef ENABLE_ALLREDUCE
-  T *rank_data0 = (T *)dp->ptrs[0];
+  int world_size = 2;
+  int target_rank = (rank+1) % world_size;
+  uint32_t *flag = (uint32_t*)params_ptr->rank_signals.signals[target_rank]->_flag;
+  T *rank_data = (T *)dp->ptrs[target_rank];
 #else
-  int *flag = (int *)dp;
+  uint32_t *flag = (uint32_t *)dp;
 #endif
                               
   const int OUT_M   = m;
@@ -48,7 +50,20 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
   const int tx = threadIdx.x;  // 0..127
 
   int flagSize = NTILE_M * NTILE_N;
+
+// #ifdef ENABLE_ALLREDUCE
+  while (xop_ld_flag_volatile(&flag[0]) == 0) { __nanosleep(40); }
+// #else
+//   while (flag[0] == 0) { printf("0"); }
+// #endif
+
   for (int k = bx; k < flagSize; k += gridDim.x) {
+// #ifdef ENABLE_ALLREDUCE
+    // while (xop_ld_flag_volatile(&flag[k+1]) == 0) { __nanosleep(40); printf("(%d,%d)", k+1, flag[k+1]); }
+// #else
+//     while (flag[k+1] == 0) { printf("(%d,%d)", k+1, flag[k+1]); }
+// #endif
+
     int tileId = flag[k+1] - 1;
     
     // printf("(%d, %d, %d, %d)\n", OUT_M, OUT_N, NTILE_M, NTILE_N);
@@ -61,16 +76,20 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
 
     int global_m = base_m + tx;     // 本线程负责 tile 内的第 tx 行
 
-    printf("tileId %d, %d, %d, %d\n", k, tileId, tile_m, global_m);
+    // printf("tileId %d, %d, %d, %d\n", k, tileId, tile_m, global_m);
     // 128 列 / 8 = 16 段，每段 8 个连续元素
     for (int seg = 0; seg < TILE / ELE_PER_THREAD; ++seg) {
         int colOffset = seg * ELE_PER_THREAD;   // 0,8,16,...,120
         T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
-
+#ifdef ENABLE_ALLREDUCE
         #pragma unroll
-        for (int i = 0; i < ELE_PER_THREAD; ++i) {
-            ptr[i] = 1;   // 填充 1
+        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
+          ptr[i] = __hadd(ptr[i], rank_data[i]);
         }
+#else
+        #pragma unroll
+        for (int i = 0; i < ELE_PER_THREAD; ++i) { ptr[i] = 1; }
+#endif
     }
   }
 
@@ -292,35 +311,32 @@ public:
     
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
 
+
+    int max_blocks = 32;
+    int threads = 128;
+    int blocks = std::min(max_blocks, n_ / 128); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
 #ifdef ENABLE_ALLREDUCE
-    int max_blocks = 48;
-    int threads = 512;
-    int blocks = std::min(max_blocks, (ar_args_.packed_array_num + threads - 1) / threads);
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, \
-        reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), 
-        ar_args_.rank, ar_args_.packed_array_num);
+    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+#else    
+    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+#endif
     //////////////////////////////////////////////////////////
     // wait for reduce_scatter done
     CUDA_CHECK(cudaEventRecord(event_, rs_stream_)); // 记录通信流
     CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); // 使计算流等待event中通信流之前的任务都结束
 
-#else
-    CUDA_CHECK(cudaEventRecord(event_, cu_stream));
-    CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_));
 
-    // vllm::RankData *rank_data;
-    // cudaMalloc(&rank_data, sizeof(vllm::RankData));
-    // cudaMemcpy(&rank_data->ptrs[0], ar_args_.reg_buffer, sizeof(void*), cudaMemcpyHostToDevice);
+    // CUDA_CHECK(cudaEventRecord(event_, cu_stream));
+    // CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_));
 
-    // printf("out %p \n", ar_args_.reg_buffer);
-    int max_blocks = 32;
-    int threads = 128;
-    int blocks = std::min(max_blocks, n_ / 128); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
-    //////////////////////////////////////////////////////////
-    CUDA_CHECK(cudaEventRecord(event_, rs_stream_));
-    CUDA_CHECK(cudaStreamWaitEvent(rs_stream_, event_));
-#endif
+    // // printf("out %p \n", ar_args_.reg_buffer);
+    // int max_blocks = 32;
+    // int threads = 128;
+    // int blocks = std::min(max_blocks, n_ / 128); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
+    // disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    // //////////////////////////////////////////////////////////
+    // CUDA_CHECK(cudaEventRecord(event_, rs_stream_));
+    // CUDA_CHECK(cudaStreamWaitEvent(rs_stream_, event_));
   }
 
 private:
