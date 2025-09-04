@@ -24,7 +24,7 @@
 // 4）在4096*4096的目标矩阵下，tile的数量是32*32个。
 //    则对应数组flag中的tile id号，如flag[0]==10，即表示为第0行第10列的tile。如为32，则表示为第1行第0列的tile。
 
-template <typename T, int ngpus>
+template <typename T, int ngpus, int THREADS>
 __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, vllm::Signal* self_sg,
                                      T* __restrict__ out, int rank, int m, int n) {
   // vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
@@ -43,7 +43,6 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
   constexpr int TILE    = 128;
   const int NTILE_M = (OUT_M+TILE-1) / TILE;   // 32
   const int NTILE_N = (OUT_N+TILE-1) / TILE;   // 32
-  constexpr int THREADS = 128;
   constexpr int ELE_PER_THREAD = 8;
 
   const int bx = blockIdx.x;   // 0..31
@@ -87,24 +86,45 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
     int base_m = tile_m * TILE;
     int base_n = tile_n * TILE;
 
-    int global_m = base_m + tx;     // 本线程负责 tile 内的第 tx 行
-
-    // printf("tileId %d, %d, %d, %d\n", k, tileId, tile_m, global_m);
-    // 128 列 / 8 = 16 段，每段 8 个连续元素
-    for (int seg = 0; seg < TILE / ELE_PER_THREAD; ++seg) {
+    if constexpr (THREADS == 128) {
+      // 128 列 / 8 = 16 段，每段 8 个连续元素
+      int global_m = base_m + tx;     // 本线程负责 tile 内的第 tx 行
+      for (int seg = 0; seg < TILE / ELE_PER_THREAD; ++seg) {
         int colOffset = seg * ELE_PER_THREAD;   // 0,8,16,...,120
         T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
-#ifdef ENABLE_ALLREDUCE
+        
         #pragma unroll
         for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          ptr[i] = rank_data[i]; // __hadd(ptr[i], rank_data[i]); 只将对方的数据拉取过来，但是本地的数据不一定计算好了。
+          // ptr[i] = rank_data[i];  // __hadd(ptr[i], rank_data[i]); 只将对方的数据拉取过来，但是本地的数据不一定计算好了。
+          ptr[i] = 1;
         }
-#else
+      }      
+    }
+    else if (THREADS == 256) {
+      int global_m = base_m + tx/2;     // 两个线程负责 tile 内的一行
+      int bias_n = tx%2 * TILE / 2;
+      for (int seg = 0; seg < TILE / ELE_PER_THREAD / 2; ++seg) {
+        int colOffset = bias_n + seg * ELE_PER_THREAD;   // 0,8,16,...,120
+        T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
         #pragma unroll
         for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          ptr[i] = 1; 
+          // ptr[i] = rank_data[i];  // __hadd(ptr[i], rank_data[i]); 只将对方的数据拉取过来，但是本地的数据不一定计算好了。
+          ptr[i] = 1;
         }
-#endif
+      }
+    }
+    else if (THREADS == 512) {
+      int global_m = base_m + tx/4;     // 两个线程负责 tile 内的一行
+      int bias_n = tx%4 * TILE / 4;
+      for (int seg = 0; seg < TILE / ELE_PER_THREAD / 4; ++seg) {
+        int colOffset = bias_n + seg * ELE_PER_THREAD;   // 0,8,16,...,120
+        T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
+        #pragma unroll
+        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
+          // ptr[i] = rank_data[i];  // __hadd(ptr[i], rank_data[i]); 只将对方的数据拉取过来，但是本地的数据不一定计算好了。
+          ptr[i] = 1;
+        }
+      }
     }
   }
 }
@@ -254,13 +274,14 @@ public:
     // CUDA_CHECK(cudaEventRecord(event_, cu_stream)); // 记录通信流
     // CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); 
 
+    int cal_block_tile = 128;
     int max_blocks = 32;
-    int threads = 128;
-    int blocks = std::min(max_blocks, n_ / 128); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
+    constexpr int threads = 512;
+    int blocks = std::min(max_blocks, n_ / cal_block_tile); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
 #ifdef ENABLE_ALLREDUCE
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #else    
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
     //////////////////////////////////////////////////////////
     // wait for reduce_scatter done

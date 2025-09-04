@@ -273,7 +273,7 @@ struct VisitorAuxStoreRs{
       // using ar_t = cuda::atomic_ref<int, cuda::thread_scope_system>;
 #ifdef ENABLE_ALLREDUCE
       int *flag_v = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->_flag;
-      int *flag_c = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->->start[params_ptr->rank];
+      int *flag_c = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->start[params_ptr->rank];
 #else
       int *flag_v = (int*)params_ptr->reg_buffer;
       int *flag_c = (int*)params_ptr->reg_buffer + 10000;
