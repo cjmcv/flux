@@ -273,17 +273,20 @@ struct VisitorAuxStoreRs{
       // using ar_t = cuda::atomic_ref<int, cuda::thread_scope_system>;
 #ifdef ENABLE_ALLREDUCE
       int *flag_v = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->_flag;
+      int *flag_c = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->->start[params_ptr->rank];
 #else
       int *flag_v = (int*)params_ptr->reg_buffer;
+      int *flag_c = (int*)params_ptr->reg_buffer + 10000;
 #endif
       // 确认一个block完成的数据是否是一个完整tile的。
       // blockIdx.x => m, blockIdx.y => n;
+      __syncthreads();
       if (threadIdx.x == 0) {
-        atomicAdd(&flag_v[0], 1);
-
-        atomic_ref_sys<int> ref(flag_v[flag_v[0]]);
+        // 应使用旧数据idx，如使用新数据*flag_c，在取ref(flag_v[*flag_c])时，可能其他线程也刚好完成了原子加，使填数据时下标跳了两次，导致部分下标空缺。
+        int idx = atomicAdd(flag_c, 1); 
+        atomic_ref_sys<int> ref(flag_v[idx]);
         ref.store(tileIdx+1, cuda::memory_order_release);
-        // printf("set");
+        // printf("set(%d,%d,%d), ", idx, flag_v[0], tileIdx+1);
         // cuda::atomic_ref<int32_t, cuda::thread_scope_system> barrier(params.barrier_ptr[lane_idx]);
         // flag_v[flag_v[0]].store(tileIdx+1, cuda::memory_order_release);
 

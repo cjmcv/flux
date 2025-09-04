@@ -32,7 +32,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
 #ifdef ENABLE_ALLREDUCE
   int world_size = 2;
   int target_rank = (rank+1) % world_size;
-  uint32_t *flag = (uint32_t*)sg.signals[target_rank]->_flag;
+  int *flag = (int*)sg.signals[target_rank]->_flag;
   T *rank_data = (T *)dp->ptrs[target_rank];
 #else
   int *flag = (int *)dp;
@@ -64,22 +64,20 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
 // #endif
 
   for (int k = bx; k < flagSize; k += gridDim.x) {
-    atomic_ref_sys<int> ref(flag[k+1]);
-    // if (threadIdx.x == 0) {  
-    //   if (ref.load(cuda::memory_order_acquire) == 0) {
-    //     while (ref.load(cuda::memory_order_relaxed) == 0) { printf("id:%d,", k+1); __nanosleep(40); }
-    //   }
-    // }
+    atomic_ref_sys<int> ref(flag[k]);
+    // 堵塞操作使用一个线程即可，以免增加不必要负担。
+    if (threadIdx.x == 0) {  
+      if (ref.load(cuda::memory_order_acquire) == 0) {
+        while (ref.load(cuda::memory_order_relaxed) == 0) { printf("id:%d,", k); __nanosleep(40); }
+      }
+    }
+    // 需要同步，否则其他非0号线程因不经过信号量而直接往下执行。
+    __syncthreads();
+
     int fv = ref.load(cuda::memory_order_relaxed);
-    // printf("fv:(%d, %d)", k+1, fv);
-    // if (threadIdx.x == 0) printf("\n");
-// #ifdef ENABLE_ALLREDUCE
-    // while (xop_ld_flag_volatile(&flag[k+1]) == 0) { __nanosleep(40); printf("(%d,%d)", k+1, flag[k+1]); }
-// #else
-//     while (flag[k+1] == 0) { printf("(%d,%d)", k+1, flag[k+1]); }
-// #endif
 
     int tileId = fv - 1;
+    if (tileId < 0) tileId = 0; // catch
     
     // printf("(%d, %d, %d, %d)\n", OUT_M, OUT_N, NTILE_M, NTILE_N);
     int tile_m    = tileId / NTILE_N;   // tile 行号
