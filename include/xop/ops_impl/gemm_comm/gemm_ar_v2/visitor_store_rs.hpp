@@ -35,12 +35,18 @@
 
 #pragma once
 
+#include <cuda/atomic>
 #include "cutlass/epilogue/threadblock/fusion/visitor_2x.hpp"
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
 #include "xop/ops_impl/debug_util.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // #define ENABLE_ALLREDUCE
+
+template <typename T = int>
+using atomic_ref_sys = cuda::atomic_ref<T, cuda::thread_scope_system>;
+template <typename T = int>
+using atomic_ref_dev = cuda::atomic_ref<T, cuda::thread_scope_device>;
 
 static DINLINE void xop_st_flag_volatile(uint32_t* flag_addr, uint32_t flag) {
   asm volatile("st.volatile.global.u32 [%1], %0;" ::"r"(flag), "l"(flag_addr));
@@ -264,17 +270,24 @@ struct VisitorAuxStoreRs{
       __syncthreads();
       uint32_t tileIdx = blockIdx.x * gridDim.y + blockIdx.y;
       // printf("tileIdx: %d - (%d, %d), (%d, %d).\n", tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n());
-      
+      // using ar_t = cuda::atomic_ref<int, cuda::thread_scope_system>;
 #ifdef ENABLE_ALLREDUCE
-      uint32_t *flag_v = (uint32_t*)params_ptr->rank_signals.signals[params_ptr->rank]->_flag;
+      int *flag_v = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->_flag;
 #else
-      uint32_t *flag_v = (uint32_t*)params_ptr->reg_buffer;
+      int *flag_v = (int*)params_ptr->reg_buffer;
 #endif
       // 确认一个block完成的数据是否是一个完整tile的。
       // blockIdx.x => m, blockIdx.y => n;
       if (threadIdx.x == 0) {
         atomicAdd(&flag_v[0], 1);
-        xop_st_flag_volatile(&(flag_v[flag_v[0]]), tileIdx+1);
+
+        atomic_ref_sys<int> ref(flag_v[flag_v[0]]);
+        ref.store(tileIdx+1, cuda::memory_order_release);
+        // printf("set");
+        // cuda::atomic_ref<int32_t, cuda::thread_scope_system> barrier(params.barrier_ptr[lane_idx]);
+        // flag_v[flag_v[0]].store(tileIdx+1, cuda::memory_order_release);
+
+        // xop_st_flag_volatile(&(flag_v[flag_v[0]]), tileIdx+1);
         // printf("set(%d,%d),", flag_v[0], flag_v[flag_v[0]]);
         // flag_v[flag_v[0]] = tileIdx+1;
       }

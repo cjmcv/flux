@@ -35,7 +35,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
   uint32_t *flag = (uint32_t*)sg.signals[target_rank]->_flag;
   T *rank_data = (T *)dp->ptrs[target_rank];
 #else
-  uint32_t *flag = (uint32_t *)dp;
+  int *flag = (int *)dp;
 #endif
                               
   const int OUT_M   = m;
@@ -51,20 +51,35 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
 
   int flagSize = NTILE_M * NTILE_N;
 
+  // atomic_ref_sys<int> ref(*ptr);
+  //       if (ref.load(cuda::memory_order_acquire) != 1) {
+  //         while (ref.load(cuda::memory_order_relaxed) != 1) {
+  //         }
+  //       }
+
 // #ifdef ENABLE_ALLREDUCE
-  while (xop_ld_flag_volatile(&flag[0]) == 0) { __nanosleep(40); }
+  // while (xop_ld_flag_volatile(&flag[0]) == 0) { __nanosleep(40); }
 // #else
 //   while (flag[0] == 0) { printf("0"); }
 // #endif
 
   for (int k = bx; k < flagSize; k += gridDim.x) {
+    atomic_ref_sys<int> ref(flag[k+1]);
+    // if (threadIdx.x == 0) {  
+    //   if (ref.load(cuda::memory_order_acquire) == 0) {
+    //     while (ref.load(cuda::memory_order_relaxed) == 0) { printf("id:%d,", k+1); __nanosleep(40); }
+    //   }
+    // }
+    int fv = ref.load(cuda::memory_order_relaxed);
+    // printf("fv:(%d, %d)", k+1, fv);
+    // if (threadIdx.x == 0) printf("\n");
 // #ifdef ENABLE_ALLREDUCE
     // while (xop_ld_flag_volatile(&flag[k+1]) == 0) { __nanosleep(40); printf("(%d,%d)", k+1, flag[k+1]); }
 // #else
 //     while (flag[k+1] == 0) { printf("(%d,%d)", k+1, flag[k+1]); }
 // #endif
 
-    int tileId = flag[k+1] - 1;
+    int tileId = fv - 1;
     
     // printf("(%d, %d, %d, %d)\n", OUT_M, OUT_N, NTILE_M, NTILE_N);
     int tile_m    = tileId / NTILE_N;   // tile 行号
@@ -88,7 +103,9 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
         }
 #else
         #pragma unroll
-        for (int i = 0; i < ELE_PER_THREAD; ++i) { ptr[i] = 1; }
+        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
+          ptr[i] = 1; 
+        }
 #endif
     }
   }
@@ -236,8 +253,8 @@ public:
     //////////////////////////////////////////////////////////
     
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
-    CUDA_CHECK(cudaEventRecord(event_, cu_stream)); // 记录通信流
-    CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); 
+    // CUDA_CHECK(cudaEventRecord(event_, cu_stream)); // 记录通信流
+    // CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); 
 
     int max_blocks = 32;
     int threads = 128;

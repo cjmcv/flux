@@ -94,4 +94,8 @@ class GemmCommRs:
                 registered=False,
                 fa=fa, reg_buffer=reg_buffer.data_ptr(), reg_buffer_sz_bytes=reg_buffer_sz_bytes,
             )
-            print(reg_buffer)
+            # print(reg_buffer)
+            # print(reg_buffer.flatten()[:32*32])
+            
+            for i, v in enumerate(reg_buffer.flatten()[:32*32+1]):
+                print(f'{i:3d}  {v.item()}')
