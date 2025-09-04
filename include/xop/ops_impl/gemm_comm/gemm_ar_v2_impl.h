@@ -116,6 +116,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
     }
   }
 
+#ifdef ENABLE_ALLREDUCE
   if (threadIdx.x == 0 && blockIdx.x == 0) {
     // 复位标志
     int *flag_c = (int*)sg.signals[rank]->start;
@@ -136,7 +137,8 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
     // 更新，end标志位会一直使用
     self_ref.store(cnt, cuda::memory_order_release);
   }
-  __syncthreads();
+  // __syncthreads();
+#endif
 }
 
 
@@ -274,7 +276,6 @@ public:
   }
 
   void run(void *stream = nullptr) {
-    cudaMemset(ar_args_.rank_signals.signals[]);
 
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUDA_CHECK(cudaEventRecord(event_, cu_stream));      // 记录计算流
