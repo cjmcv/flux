@@ -110,6 +110,7 @@ if __name__ == "__main__":
             tuning = None,
             fast_accum=False,
         )
+        print("all_ones for", output.sub(1).abs().max() < 1e-6)
     torch.cuda.synchronize()
     end = time.time()
     total_time = end - start

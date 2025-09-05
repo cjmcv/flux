@@ -84,6 +84,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
   int world_size = 2;
   int target_rank = (rank+1) % world_size;
   T *rank_data = (T *)dp->ptrs[target_rank];
+  T *self_data = (T *)dp->ptrs[rank];
 #endif
                               
   const int OUT_M   = m;
@@ -128,7 +129,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
         
         #pragma unroll
         for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          // ptr[i] = rank_data[i];  // __hadd(ptr[i], rank_data[i]); 只将对方的数据拉取过来，但是本地的数据不一定计算好了。
+          // ptr[i] = self_data[i] + rank_data[i];  // __hadd(ptr[i], rank_data[i]); 只将对方的数据拉取过来，但是本地的数据不一定计算好了。
           ptr[i] = 1;
         }
       }      
@@ -316,6 +317,7 @@ public:
 #endif
     //////////////////////////////////////////////////////////
     // wait for reduce_scatter done
+    // CUDA_CHECK(cudaMemsetAsync((void *)(ar_args_.rank_data->ptrs[ar_args_.rank]), 0, output_len_*sizeof(short), rs_stream_));
     CUDA_CHECK(cudaEventRecord(event_, rs_stream_)); // 记录通信流
     CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); // 使计算流等待event中通信流之前的任务都结束
 
