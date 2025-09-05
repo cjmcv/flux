@@ -75,17 +75,15 @@ __global__ void merge_result(vllm::RankData* dp, vllm::RankSignals sg, vllm::Sig
 }
 
 template <typename T, int ngpus, int THREADS>
-__global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, vllm::Signal* self_sg,
+__global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, int *aux_flag_buffer,
                                      T* __restrict__ out, int rank, int m, int n) {
   // vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
+  int *flag = &aux_flag_buffer[1]; // 第一位是下标计数器
 
 #ifdef ENABLE_ALLREDUCE
   int world_size = 2;
   int target_rank = (rank+1) % world_size;
-  int *flag = (int*)sg.signals[rank]->_flag;
   T *rank_data = (T *)dp->ptrs[target_rank];
-#else
-  int *flag = (int *)dp;
 #endif
                               
   const int OUT_M   = m;
@@ -180,8 +178,8 @@ struct AllReduceArguments {
   vllm::Signal *self_signal;
   
   void *output;
-  int *aux_flag_cnt;
-  size_t aux_flag_cnt_size;
+  int *aux_flag_buffer;
+  size_t aux_flag_size;
   virtual ~AllReduceArguments() {}
 };
 
@@ -266,10 +264,10 @@ public:
     auto cu_stream = static_cast<cudaStream_t>(stream);
     fetch_comm_args(fusion_args, cu_stream);
 
-    ar_args_.aux_flag_cnt_size = sizeof(int);
-    ar_args_.aux_flag_cnt = (int*)GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_flag_cnt_size);
-    CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_flag_cnt, 0, ar_args_.aux_flag_cnt_size, cu_stream));
-    // printf("ar_args_.aux_flag_cnt: %p.\n", ar_args_.aux_flag_cnt);
+    ar_args_.aux_flag_size = sizeof(int) + (m_+127)/128 * (n_+127)/128 * sizeof(int);
+    ar_args_.aux_flag_buffer = (int*)GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_flag_size);
+    CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_flag_buffer, 0, ar_args_.aux_flag_size, cu_stream));
+    // printf("ar_args_.aux_flag_buffer: %p.\n", ar_args_.aux_flag_buffer);
     ////
 
     gemm_dev_ = DeviceGemmBasic();
@@ -310,11 +308,11 @@ public:
     int blocks = std::min(max_blocks, n_ / cal_block_tile); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
 #ifdef ENABLE_ALLREDUCE
     if (!is_serial_)
-      disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+      disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
     else
       cross_device_reduce_1stage_tmp<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
 #else    
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
     //////////////////////////////////////////////////////////
     // wait for reduce_scatter done
@@ -367,7 +365,7 @@ private:
       { 
         gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
         ar_args_.world_size, ar_args_.rank, ar_args_.packed_array_num, ar_args_.reg_buffer, 
-        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, is_serial_, ar_args_.aux_flag_cnt
+        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, is_serial_, ar_args_.aux_flag_buffer
       },                   // D
     };   
 
