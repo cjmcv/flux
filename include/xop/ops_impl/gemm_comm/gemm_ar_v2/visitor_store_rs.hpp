@@ -313,7 +313,7 @@ struct VisitorAuxStoreRs{
         // __threadfence_system();
 
         atomic_ref_sys<int> target_ref_e(target_flag_e[tileIdx]);
-        while (target_ref_e.load(cuda::memory_order_relaxed) == flag) {}
+        while (target_ref_e.load(cuda::memory_order_acquire) == flag) {}
         // 至此，tileIdx的数据均已就绪
 
         // 应使用旧数据idx，如使用新数据*flag_c，在取ref(flag_v[*flag_c])时，可能其他线程也刚好完成了原子加，使填数据时下标跳了两次，导致部分下标空缺。

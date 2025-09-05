@@ -321,13 +321,13 @@ public:
     CUDA_CHECK(cudaEventRecord(event_, rs_stream_)); // 记录通信流
     CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); // 使计算流等待event中通信流之前的任务都结束
 
-#ifdef ENABLE_ALLREDUCE
-    if (!is_serial_) {
-      merge_result<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
-      // cudaMemsetAsync(ar_args_.rank_signals.signals[ar_args_.rank]->start, 0, sizeof(int), cu_stream);
-      // cudaMemsetAsync(ar_args_.rank_signals.signals[ar_args_.rank]->_flag, 0, sizeof(int) * 2048, cu_stream);
-    }
-#endif
+// #ifdef ENABLE_ALLREDUCE
+//     if (!is_serial_) {
+//       merge_result<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+//       // cudaMemsetAsync(ar_args_.rank_signals.signals[ar_args_.rank]->start, 0, sizeof(int), cu_stream);
+//       // cudaMemsetAsync(ar_args_.rank_signals.signals[ar_args_.rank]->_flag, 0, sizeof(int) * 2048, cu_stream);
+//     }
+// #endif
 
     // CUDA_CHECK(cudaEventRecord(event_, cu_stream));
     // CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_));
