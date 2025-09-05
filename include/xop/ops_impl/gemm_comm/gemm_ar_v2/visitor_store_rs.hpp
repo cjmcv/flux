@@ -175,6 +175,7 @@ struct VisitorAuxStoreRs{
 
     void *output;
     bool is_serial;
+    int *aux_flag_cnt;
   };
 
   using Params = Arguments;
@@ -286,22 +287,41 @@ struct VisitorAuxStoreRs{
       if (params_ptr->is_serial) return;
 
       uint32_t tileIdx = blockIdx.x * gridDim.y + blockIdx.y;
+      uint32_t rank = params_ptr->rank;
+      uint32_t target_rank = (rank+1) % 2;
+
+      int *flag_c = (int*)params_ptr->aux_flag_cnt;
       // printf("tileIdx: %d - (%d, %d), (%d, %d).\n", tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n());
 #ifdef ENABLE_ALLREDUCE
-      int *flag_v = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->_flag;
-      int *flag_c = (int*)params_ptr->rank_signals.signals[params_ptr->rank]->start;
+      int *self_flag_e = (int*)params_ptr->rank_signals.signals[rank]->end;
+      int *target_flag_e = (int*)params_ptr->rank_signals.signals[target_rank]->end;
+      
+      int *flag_v = (int*)params_ptr->rank_signals.signals[rank]->_flag;
 #else
+      int *self_flag_e = (int*)params_ptr->reg_buffer + 10100;
+      int *target_flag_e = (int*)params_ptr->reg_buffer + 10100 + 1024;
       int *flag_v = (int*)params_ptr->reg_buffer;
-      int *flag_c = (int*)params_ptr->reg_buffer + 10000;
 #endif
       // 确认一个block完成的数据是否是一个完整tile的。
       // blockIdx.x => m, blockIdx.y => n;
+      // 写标志前加同步，确保该block上面的数据都已经处理完。否则置位了数据也不一定有效
       __syncthreads();
       if (threadIdx.x == 0) {
+        int flag = self_flag_e[tileIdx] + 1;
+        atomic_ref_sys<int> self_ref_e(self_flag_e[tileIdx]);
+        self_ref_e.store(flag, cuda::memory_order_release);
+        // __threadfence_system();
+
+        atomic_ref_sys<int> target_ref_e(target_flag_e[tileIdx]);
+        while (target_ref_e.load(cuda::memory_order_relaxed) == flag) {}
+        // 至此，tileIdx的数据均已就绪
+
         // 应使用旧数据idx，如使用新数据*flag_c，在取ref(flag_v[*flag_c])时，可能其他线程也刚好完成了原子加，使填数据时下标跳了两次，导致部分下标空缺。
         int idx = atomicAdd(flag_c, 1); 
         atomic_ref_sys<int> ref(flag_v[idx]);
         ref.store(tileIdx+1, cuda::memory_order_release);
+        // __threadfence_system();
+
         // printf("set(%d,%d,%d), ", idx, flag_v[0], tileIdx+1);
         // cuda::atomic_ref<int32_t, cuda::thread_scope_system> barrier(params.barrier_ptr[lane_idx]);
         // flag_v[flag_v[0]].store(tileIdx+1, cuda::memory_order_release);
@@ -309,8 +329,6 @@ struct VisitorAuxStoreRs{
         // xop_st_flag_volatile(&(flag_v[flag_v[0]]), tileIdx+1);
         // printf("set(%d,%d),", flag_v[0], flag_v[flag_v[0]]);
         // flag_v[flag_v[0]] = tileIdx+1;
-
-        __threadfence_system();
       }
     }
   };

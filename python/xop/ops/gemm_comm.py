@@ -97,5 +97,5 @@ class GemmCommRs:
             # print(reg_buffer)
             # print(reg_buffer.flatten()[:32*32])
             
-            for i, v in enumerate(reg_buffer.flatten()[:32*32+1]):
-                print(f'{i:3d}  {v.item()}')
+            # for i, v in enumerate(reg_buffer.flatten()[:32*32+1]):
+            #     print(f'{i:3d}  {v.item()}  {v.item()%16+1}')

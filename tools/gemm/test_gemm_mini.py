@@ -1,5 +1,6 @@
 
 import argparse
+import time
 
 import torch
 import xop
@@ -94,3 +95,23 @@ if __name__ == "__main__":
     print(output)
     all_ones = output.sub(1).abs().max() < 1e-6
     print("all_ones", all_ones)
+
+    torch.cuda.synchronize()
+    start = time.time()
+    for i in range(10):
+        op.forward(
+            input,
+            weight,
+            output=output,
+            bias=bias,
+            input_scale=None,
+            weight_scale=None,
+            output_scale=None,
+            tuning = None,
+            fast_accum=False,
+        )
+    torch.cuda.synchronize()
+    end = time.time()
+    total_time = end - start
+
+    # print("total time:", total_time * 1000)

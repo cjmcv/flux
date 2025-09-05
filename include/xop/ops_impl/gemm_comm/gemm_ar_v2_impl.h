@@ -82,7 +82,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, v
 #ifdef ENABLE_ALLREDUCE
   int world_size = 2;
   int target_rank = (rank+1) % world_size;
-  int *flag = (int*)sg.signals[target_rank]->_flag;
+  int *flag = (int*)sg.signals[rank]->_flag;
   T *rank_data = (T *)dp->ptrs[target_rank];
 #else
   int *flag = (int *)dp;
@@ -180,6 +180,8 @@ struct AllReduceArguments {
   vllm::Signal *self_signal;
   
   void *output;
+  int *aux_flag_cnt;
+  size_t aux_flag_cnt_size;
   virtual ~AllReduceArguments() {}
 };
 
@@ -263,6 +265,11 @@ public:
     ar_args_.output = rt_args->ptr_D;    
     auto cu_stream = static_cast<cudaStream_t>(stream);
     fetch_comm_args(fusion_args, cu_stream);
+
+    ar_args_.aux_flag_cnt_size = sizeof(int);
+    ar_args_.aux_flag_cnt = (int*)GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_flag_cnt_size);
+    CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_flag_cnt, 0, ar_args_.aux_flag_cnt_size, cu_stream));
+    // printf("ar_args_.aux_flag_cnt: %p.\n", ar_args_.aux_flag_cnt);
     ////
 
     gemm_dev_ = DeviceGemmBasic();
@@ -293,13 +300,12 @@ public:
     CUDA_CHECK(cudaStreamWaitEvent(rs_stream_, event_)); // 使rs流等待计算流之前的任务都结束
     
     //////////////////////////////////////////////////////////
-    
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
     // CUDA_CHECK(cudaEventRecord(event_, cu_stream)); // 记录通信流
     // CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); 
 
     int cal_block_tile = 128;
-    int max_blocks = 32;
+    int max_blocks = 16;
     constexpr int threads = 128;
     int blocks = std::min(max_blocks, n_ / cal_block_tile); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
 #ifdef ENABLE_ALLREDUCE
@@ -361,7 +367,7 @@ private:
       { 
         gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
         ar_args_.world_size, ar_args_.rank, ar_args_.packed_array_num, ar_args_.reg_buffer, 
-        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, is_serial_
+        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, is_serial_, ar_args_.aux_flag_cnt
       },                   // D
     };   
 
@@ -442,7 +448,7 @@ private:
     ar_args_.reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
     ar_args_.world_size = 2;
     ar_args_.rank = 1;
-    printf("finish malloc.\n");
+    // printf("finish malloc.\n");
 #endif
   }
 
