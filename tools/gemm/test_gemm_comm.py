@@ -165,19 +165,21 @@ def perf_xop(
     return xutil.perf_gemm(warmup_iters, iters, "xop", fn)
 
 # return atol, rtol
-def get_allclose_threshold(args, k):
+def get_allclose_threshold(args, k, world_size):
     # print("aaa", DTYPE_MAP[args.dtype], args.dtype, torch.float8_e4m3fn)
     if (args.quant_bits == 8):
-        return 2e-1*np.sqrt(k), 2e-2
-    if (args.quant_bits == 4):
-        return 2e-1*np.sqrt(k), 2e-2
-    if (args.dtype == "float8_e4m3fn" or args.dtype == "float8_e5m2"):
-        return 2e-1*np.sqrt(k), 2e-2
-    if (args.output_dtype == "s8" or args.output_dtype == "s32"):
-        return 0, 0
+        atol = 2e-1*np.sqrt(k), rtol = 2e-2
+    elif (args.quant_bits == 4):
+        atol = 2e-1*np.sqrt(k), rtol = 2e-2
+    elif (args.dtype == "float8_e4m3fn" or args.dtype == "float8_e5m2"):
+        atol = 2e-1*np.sqrt(k), rtol = 2e-2
+    elif (args.output_dtype == "s8" or args.output_dtype == "s32"):
+        atol = 0, 0
+    else:
+        atol = 1e-2*np.sqrt(k), rtol = 2e-2
+        
+    return atol*world_size, rtol*world_size
 
-    return 1e-2*np.sqrt(k), 2e-2
-    
 THRESHOLD_MAP = {
     torch.float16: 10,  # 1e-1,
     torch.bfloat16: 2e-2,
@@ -187,60 +189,7 @@ THRESHOLD_MAP = {
     torch.int32: 0,
 }
 
-def run_worker(world_size, rank, port, M, args, xop_perf, torch_perf):
-    device = torch.device(f"cuda:{rank}")
-    torch.cuda.set_device(device)
-    
-    distributed_init_method = f"tcp://localhost:{port}"
-    dist.init_process_group(
-        backend="nccl",
-        init_method=distributed_init_method,
-        rank=rank,
-        world_size=world_size,
-        device_id=device,
-    )
-    nccl_group = dist.group.WORLD
-    xop_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
-    
-    exponent = args.M  # 65536: 17
-    run(rank, 1, args, xop_group, nccl_group, xop_perf, torch_perf)
-    for m in range(1, exponent):
-        m = 2**m
-        run(rank, m, args, xop_group, nccl_group, xop_perf, torch_perf)
-        
-    dist.barrier(group=nccl_group)
-    dist.destroy_process_group(group=nccl_group)    
-    
-    #################  
-    # plot
-    plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
-    plot_x = range(len(plot_x_value))
-    plt.xticks(plot_x, plot_x_value, rotation=45)
-
-    print(f"xop_perf_rank{rank}:{xop_perf}")
-    print(f"torch_perf_rank{rank}:{torch_perf}")
-    
-    plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
-    plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
-    
-    # plt.ylim(bottom=0)  # 
-
-    title = f'perf-N{args.N}-K{args.K}-rank{rank}'
-    plt.title(title)
-    plt.xlabel('m_size')
-    if args.show_ms:
-        plt.ylabel('ms')
-    else:
-        plt.ylabel('tflops')
-
-    plt.legend()
-    plt.grid(True)
-
-    # plt.xticks(plot_x)
-    plt.savefig(title)
-    plt.show()
-    
-def run(rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
+def run(world_size, rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
 
     dtype = DTYPE_MAP[args.dtype]
     output_dtype = DTYPE_MAP[args.output_dtype]
@@ -315,14 +264,69 @@ def run(rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
     torch_output = perf_result_torch.output
     print(xop_output.dtype, torch_output.dtype)
 
-    print(xop_output)
+    print("xop_output: ", xop_output)
+    print("torch_output: ", torch_output)
     # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
-    atol, rtol = get_allclose_threshold(args, K)
+    atol, rtol = get_allclose_threshold(args, K, world_size)
     # print(atol, rtol)
     xutil.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
 
 
+def run_worker(world_size, rank, port, M, args, xop_perf, torch_perf):
+    device = torch.device(f"cuda:{rank}")
+    torch.cuda.set_device(device)
+    
+    distributed_init_method = f"tcp://localhost:{port}"
+    dist.init_process_group(
+        backend="nccl",
+        init_method=distributed_init_method,
+        rank=rank,
+        world_size=world_size,
+        device_id=device,
+    )
+    nccl_group = dist.group.WORLD
+    xop_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
+    
+    exponent = args.M  # 65536: 17
+    run(world_size, rank, 1, args, xop_group, nccl_group, xop_perf, torch_perf)
+    for m in range(1, exponent):
+        m = 2**m
+        run(world_size, rank, m, args, xop_group, nccl_group, xop_perf, torch_perf)
+        
+    dist.barrier(group=nccl_group)
+    dist.destroy_process_group(group=nccl_group)    
+    
+    #################  
+    # plot
+    plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
+    plot_x = range(len(plot_x_value))
+    plt.xticks(plot_x, plot_x_value, rotation=45)
+
+    print(f"xop_perf_rank{rank}:{xop_perf}")
+    print(f"torch_perf_rank{rank}:{torch_perf}")
+    
+    plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
+    plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
+    
+    # plt.ylim(bottom=0)  # 
+
+    title = f'perf-N{args.N}-K{args.K}-rank{rank}'
+    plt.title(title)
+    plt.xlabel('m_size')
+    if args.show_ms:
+        plt.ylabel('ms')
+    else:
+        plt.ylabel('tflops')
+
+    plt.legend()
+    plt.grid(True)
+
+    # plt.xticks(plot_x)
+    plt.savefig(title)
+    plt.show()
+    
+    
 def multi_process_parallel(
     world_size: int, test_target: Any, target_args: tuple = ()
 ) -> None:

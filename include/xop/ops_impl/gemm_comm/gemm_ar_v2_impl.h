@@ -77,16 +77,21 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
       if (global_m > m) return;
       for (int seg = 0; seg < TILE / ELE_PER_THREAD; ++seg) {
         int colOffset = seg * ELE_PER_THREAD;   // 0,8,16,...,120
-        T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
-        
+        int total_offset = global_m * OUT_N + (base_n + colOffset);
+        T* ptr      = out + total_offset;
+      #ifdef ENABLE_ALLREDUCE
+        T* self_ptr = self_data + total_offset;
+        T* rank_ptr = rank_data + total_offset;
         #pragma unroll
         for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          #ifdef ENABLE_ALLREDUCE
-          ptr[i] = __hadd(self_data[i], rank_data[i]);
-          #else
-          ptr[i] = 1;
-          #endif // ENABLE_ALLREDUCE
+          ptr[i] = __hadd(self_ptr[i], rank_ptr[i]);
         }
+      #else
+        #pragma unroll
+        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
+          ptr[i] = 1;
+        }
+      #endif // ENABLE_ALLREDUCE
       }      
     }
     else if constexpr (THREADS == 256 || THREADS == 512) {
@@ -96,14 +101,19 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
       for (int seg = 0; seg < TILE / ELE_PER_THREAD / sp; ++seg) {
         int colOffset = bias_n + seg * ELE_PER_THREAD;   // 0,8,16,...,120
         T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
+      #ifdef ENABLE_ALLREDUCE
+        T* self_ptr = self_data + total_offset;
+        T* rank_ptr = rank_data + total_offset;
         #pragma unroll
         for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          #ifdef ENABLE_ALLREDUCE
-          ptr[i] = __hadd(self_data[i], rank_data[i]);
-          #else
-          ptr[i] = 1;
-          #endif // ENABLE_ALLREDUCE
+          ptr[i] = __hadd(self_ptr[i], rank_ptr[i]);
         }
+      #else
+        #pragma unroll
+        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
+          ptr[i] = 1;
+        }
+      #endif // ENABLE_ALLREDUCE
       }
     }
   }
