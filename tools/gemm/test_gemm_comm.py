@@ -128,7 +128,7 @@ def perf_xop(
                 fast_accum=fast_accum,
             )
             
-        # pre allocate for cuda graph
+        # pre allocate workspace for cuda graph
         forward_fn(problem_idx)
         
         stream = torch.cuda.Stream()
