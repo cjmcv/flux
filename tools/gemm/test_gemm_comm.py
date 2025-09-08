@@ -168,15 +168,20 @@ def perf_xop(
 def get_allclose_threshold(args, k, world_size):
     # print("aaa", DTYPE_MAP[args.dtype], args.dtype, torch.float8_e4m3fn)
     if (args.quant_bits == 8):
-        atol = 2e-1*np.sqrt(k), rtol = 2e-2
+        atol = 2e-1*np.sqrt(k)
+        rtol = 2e-2
     elif (args.quant_bits == 4):
-        atol = 2e-1*np.sqrt(k), rtol = 2e-2
+        atol = 2e-1*np.sqrt(k)
+        rtol = 2e-2
     elif (args.dtype == "float8_e4m3fn" or args.dtype == "float8_e5m2"):
-        atol = 2e-1*np.sqrt(k), rtol = 2e-2
+        atol = 2e-1*np.sqrt(k)
+        rtol = 2e-2
     elif (args.output_dtype == "s8" or args.output_dtype == "s32"):
-        atol = 0, 0
+        atol = 0
+        rtol = 0
     else:
-        atol = 1e-2*np.sqrt(k), rtol = 2e-2
+        atol = 1e-2*np.sqrt(k)
+        rtol = 2e-2
         
     return atol*world_size, rtol*world_size
 

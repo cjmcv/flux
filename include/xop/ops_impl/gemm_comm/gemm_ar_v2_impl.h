@@ -100,7 +100,8 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
       int bias_n = tx%sp * TILE / sp;
       for (int seg = 0; seg < TILE / ELE_PER_THREAD / sp; ++seg) {
         int colOffset = bias_n + seg * ELE_PER_THREAD;   // 0,8,16,...,120
-        T* ptr      = out + global_m * OUT_N + (base_n + colOffset);
+        int total_offset = global_m * OUT_N + (base_n + colOffset);
+        T* ptr      = out + total_offset;
       #ifdef ENABLE_ALLREDUCE
         T* self_ptr = self_data + total_offset;
         T* rank_ptr = rank_data + total_offset;
