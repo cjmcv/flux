@@ -9,7 +9,7 @@ import xop
 from xop.ops.custom_all_reduce import CustomAllreduce
 
 ENABLE_ALLREDUCE = 0
-
+ALLREDUCE_GPUID_OFFSET = 6
 class GemmCommRs:
     def __init__(
         self,
@@ -26,7 +26,7 @@ class GemmCommRs:
         )
 
         if ENABLE_ALLREDUCE:
-            device = torch.device(f"cuda:{rank}")
+            device = torch.device(f"cuda:{rank + ALLREDUCE_GPUID_OFFSET}")
             self.ar = CustomAllreduce(group, device)
             self.rank = rank
         

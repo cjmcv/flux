@@ -280,7 +280,7 @@ def run(world_size, rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
 
 
 def run_worker(world_size, rank, port, M, args, xop_perf, torch_perf):
-    device = torch.device(f"cuda:{rank}")
+    device = torch.device(f"cuda:{rank + xop.ALLREDUCE_GPUID_OFFSET}")
     torch.cuda.set_device(device)
     
     distributed_init_method = f"tcp://localhost:{port}"
