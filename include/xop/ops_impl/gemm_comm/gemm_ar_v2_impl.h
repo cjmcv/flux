@@ -40,16 +40,16 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
   const int OUT_M   = m;
   const int OUT_N   = n;
   constexpr int TILE    = 128;
-  const int NTILE_M = (OUT_M+TILE-1) / TILE;   // 32
-  const int NTILE_N = (OUT_N+TILE-1) / TILE;   // 32
+  const int TILE_NUM_M = (OUT_M+TILE-1) / TILE;   // 32
+  const int TILE_NUM_N = (OUT_N+TILE-1) / TILE;   // 32
   constexpr int ELE_PER_THREAD = 4;
 
-  const int bx = blockIdx.x;   // 0..31
+  const int bx = blockIdx.x;
   const int tx = threadIdx.x;  // 0..127
 
-  int flagSize = NTILE_M * NTILE_N;
+  int flagSize = TILE_NUM_M * TILE_NUM_N;
 
-  for (int k = bx; k < flagSize; k += gridDim.x) {
+  for (int k = bx; k < flagSize; k += gridDim.x) { // note: 需要被整除！
     atomic_ref_sys<int> ref(flag[k]);
     // A single thread is sufficient for the blocking operation to avoid unnecessary overhead.
     if (threadIdx.x == 0) {  
@@ -62,9 +62,9 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
     int tileId = fv - 1;
     if (tileId < 0) tileId = 0; // catch
     
-    // printf("(%d, %d, %d, %d)\n", OUT_M, OUT_N, NTILE_M, NTILE_N);
-    int tile_m    = tileId / NTILE_N;   // tile rows
-    int tile_n    = tileId % NTILE_N;   // tile cols
+    // printf("(%d, %d, %d, %d)\n", OUT_M, OUT_N, TILE_NUM_M, TILE_NUM_N);
+    int tile_m    = tileId / TILE_NUM_N;   // tile rows
+    int tile_n    = tileId % TILE_NUM_N;   // tile cols
 
     // the top-left corner of the tile 128*128
     int base_m = tile_m * TILE;
@@ -76,7 +76,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
 
       for (int row_in_tile = warp_id; row_in_tile < 128; row_in_tile += 4) {
         int global_m = base_m + row_in_tile;
-        if (global_m > m) return;
+        if (global_m >= m) return;
       
         int global_n = base_n + lane_id * ELE_PER_THREAD;
         int total_offset = global_m * OUT_N + global_n;
@@ -86,11 +86,14 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
         T* rank_ptr = rank_data + total_offset;
         #pragma unroll
         for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          ptr[i] = 1; // __hadd(self_ptr[i], rank_ptr[i]);
+          // printf("(%f,%f), ", __bfloat162float(self_ptr[i]), __bfloat162float(rank_ptr[i]));
+          ptr[i] = __hadd(self_ptr[i], rank_ptr[i]);
         }
       #else
         #pragma unroll
-        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
+        for (int i = 0; i < ELE_PER_THREAD; ++i) {
+          // if (i==0)
+          //   printf("(%.0f[%d,%d]%d): (%d,%d) (%d,%d), \n", __bfloat162float(ptr[i]), tile_m, tile_n, total_offset, base_m, base_n, global_m, global_n);
           ptr[i] = 1;
         }
       #endif // ENABLE_ALLREDUCE
@@ -252,7 +255,7 @@ public:
     // CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); 
 
     int cal_block_tile = 128;
-    int max_blocks = 16;
+    int max_blocks = 32;
     constexpr int threads = 128;
     int blocks = std::min(max_blocks, n_ / cal_block_tile); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
 #ifdef ENABLE_ALLREDUCE

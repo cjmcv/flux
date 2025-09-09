@@ -269,6 +269,7 @@ def run(world_size, rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
     torch_output = perf_result_torch.output
     print(xop_output.dtype, torch_output.dtype)
 
+    # torch.set_printoptions(threshold=float('inf'))
     print("xop_output: ", xop_output)
     print("torch_output: ", torch_output)
     # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
