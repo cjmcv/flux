@@ -24,7 +24,7 @@
 // 4）在4096*4096的目标矩阵下，tile的数量是32*32个。
 //    则对应数组flag中的tile id号，如flag[0]==10，即表示为第0行第10列的tile。如为32，则表示为第1行第0列的tile。
 
-template <typename T, int ngpus, int THREADS>
+template <class GemmTileShape, typename T, int ngpus, int THREADS>
 __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, int *aux_flag_buffer,
                                      T* __restrict__ out, int rank, int m, int n) {
 
@@ -36,13 +36,15 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
   T *rank_data = (T *)dp->ptrs[target_rank];
   T *self_data = (T *)dp->ptrs[rank];
 #endif
-                              
+  // One block for One gemm tile(128x128 / 64*256)
+  // One block == 128 threads == 4 warp
   const int OUT_M   = m;
   const int OUT_N   = n;
-  constexpr int TILE    = 128;
-  const int TILE_NUM_M = (OUT_M+TILE-1) / TILE;   // 32
-  const int TILE_NUM_N = (OUT_N+TILE-1) / TILE;   // 32
-  constexpr int ELE_PER_THREAD = 4;
+  constexpr int TILE_M    = GemmTileShape::kM; // 128;
+  constexpr int TILE_N    = GemmTileShape::kN;
+  const int TILE_NUM_M = (OUT_M+TILE_M-1) / TILE_M;   // 32
+  const int TILE_NUM_N = (OUT_N+TILE_N-1) / TILE_N;   // 32
+  constexpr int ELE_PER_THREAD = GemmTileShape::kN / 32; // one warp for one row: 128 / 32 = 4
 
   const int bx = blockIdx.x;
   const int tx = threadIdx.x;  // 0..127
@@ -67,14 +69,14 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
     int tile_n    = tileId % TILE_NUM_N;   // tile cols
 
     // the top-left corner of the tile 128*128
-    int base_m = tile_m * TILE;
-    int base_n = tile_n * TILE;
+    int base_m = tile_m * TILE_M;
+    int base_n = tile_n * TILE_N;
 
     if constexpr (THREADS == 128) {
       int lane_id = tx & 31;            // 0..31
       int warp_id = tx >> 5;            // 0..3（一个 block 4 个 warp）
 
-      for (int row_in_tile = warp_id; row_in_tile < 128; row_in_tile += 4) {
+      for (int row_in_tile = warp_id; row_in_tile < GemmTileShape::kM; row_in_tile += 4) {
         int global_m = base_m + row_in_tile;
         if (global_m >= m) continue; // 不能使用return，因为 for (int k = bx; k < flagSize; k += gridDim.x) 可能还需要处理下一组
       
@@ -254,17 +256,16 @@ public:
     // CUDA_CHECK(cudaEventRecord(event_, cu_stream)); // 记录通信流
     // CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); 
 
-    int cal_block_tile = 128;
     int max_blocks = 32;
     constexpr int threads = 128;
-    int blocks = std::min(max_blocks, n_ / cal_block_tile); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
+    int blocks = std::min(max_blocks, n_ / ThreadblockShape::kN); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
 #ifdef ENABLE_ALLREDUCE
     if (!is_serial_)
-      disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
     else
       cross_device_reduce_1stage_tmp<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
 #else
-    disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
     //////////////////////////////////////////////////////////
     // wait for reduce_scatter done

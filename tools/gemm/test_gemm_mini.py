@@ -99,7 +99,7 @@ if __name__ == "__main__":
     
     torch.cuda.synchronize()
     start = time.time()
-    for i in range(5):
+    for i in range(50):
         op.forward(
             input,
             weight,
@@ -112,7 +112,7 @@ if __name__ == "__main__":
             fast_accum=False,
         )
         # print(output)
-        print("all_ones for", output.sub(1).abs().max() < 1e-6)
+        # print("all_ones for", output.sub(1).abs().max() < 1e-6)
     torch.cuda.synchronize()
     end = time.time()
     total_time = end - start
