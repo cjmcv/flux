@@ -42,7 +42,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
   constexpr int TILE    = 128;
   const int NTILE_M = (OUT_M+TILE-1) / TILE;   // 32
   const int NTILE_N = (OUT_N+TILE-1) / TILE;   // 32
-  constexpr int ELE_PER_THREAD = 8;
+  constexpr int ELE_PER_THREAD = 4;
 
   const int bx = blockIdx.x;   // 0..31
   const int tx = threadIdx.x;  // 0..127
@@ -71,43 +71,22 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
     int base_n = tile_n * TILE;
 
     if constexpr (THREADS == 128) {
-      // 128 columns / 8 = 16 segments, each with 8 consecutive elements.
-      // This thread is responsible for row tx within the tile.
-      int global_m = base_m + tx;     
-      if (global_m > m) return;
-      for (int seg = 0; seg < TILE / ELE_PER_THREAD; ++seg) {
-        int colOffset = seg * ELE_PER_THREAD;   // 0,8,16,...,120
-        int total_offset = global_m * OUT_N + (base_n + colOffset);
+      int lane_id = tx & 31;            // 0..31
+      int warp_id = tx >> 5;            // 0..3£¨Ò»¸ö block 4 ¸ö warp£©
+
+      for (int row_in_tile = warp_id; row_in_tile < 128; row_in_tile += 4) {
+        int global_m = base_m + row_in_tile;
+        if (global_m > m) return;
+      
+        int global_n = base_n + lane_id * ELE_PER_THREAD;
+        int total_offset = global_m * OUT_N + global_n;
         T* ptr      = out + total_offset;
       #ifdef ENABLE_ALLREDUCE
         T* self_ptr = self_data + total_offset;
         T* rank_ptr = rank_data + total_offset;
         #pragma unroll
         for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          ptr[i] = __hadd(self_ptr[i], rank_ptr[i]);
-        }
-      #else
-        #pragma unroll
-        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          ptr[i] = 1;
-        }
-      #endif // ENABLE_ALLREDUCE
-      }      
-    }
-    else if constexpr (THREADS == 256 || THREADS == 512) {
-      int sp = THREADS / 128;
-      int global_m = base_m + tx/sp;
-      int bias_n = tx%sp * TILE / sp;
-      for (int seg = 0; seg < TILE / ELE_PER_THREAD / sp; ++seg) {
-        int colOffset = bias_n + seg * ELE_PER_THREAD;   // 0,8,16,...,120
-        int total_offset = global_m * OUT_N + (base_n + colOffset);
-        T* ptr      = out + total_offset;
-      #ifdef ENABLE_ALLREDUCE
-        T* self_ptr = self_data + total_offset;
-        T* rank_ptr = rank_data + total_offset;
-        #pragma unroll
-        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          ptr[i] = __hadd(self_ptr[i], rank_ptr[i]);
+          ptr[i] = 1; // __hadd(self_ptr[i], rank_ptr[i]);
         }
       #else
         #pragma unroll
@@ -281,7 +260,7 @@ public:
       disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
     else
       cross_device_reduce_1stage_tmp<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
-#else    
+#else
     disaggregated_reduce<to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
     //////////////////////////////////////////////////////////
