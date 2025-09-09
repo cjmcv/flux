@@ -95,6 +95,7 @@ if __name__ == "__main__":
     print(output)
     all_ones = output.sub(1).abs().max() < 1e-6
     print("all_ones", all_ones)
+    torch.set_printoptions(threshold=1000)
     
     torch.cuda.synchronize()
     start = time.time()

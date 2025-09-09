@@ -49,7 +49,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
 
   int flagSize = TILE_NUM_M * TILE_NUM_N;
 
-  for (int k = bx; k < flagSize; k += gridDim.x) { // note: 需要被整除！
+  for (int k = bx; k < flagSize; k += gridDim.x) {
     atomic_ref_sys<int> ref(flag[k]);
     // A single thread is sufficient for the blocking operation to avoid unnecessary overhead.
     if (threadIdx.x == 0) {  
@@ -76,7 +76,7 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, i
 
       for (int row_in_tile = warp_id; row_in_tile < 128; row_in_tile += 4) {
         int global_m = base_m + row_in_tile;
-        if (global_m >= m) return;
+        if (global_m >= m) continue; // 不能使用return，因为 for (int k = bx; k < flagSize; k += gridDim.x) 可能还需要处理下一组
       
         int global_n = base_n + lane_id * ELE_PER_THREAD;
         int total_offset = global_m * OUT_N + global_n;
