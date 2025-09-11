@@ -3,10 +3,15 @@ import argparse
 import os
 from functools import partial
 from typing import List
+import multiprocessing as mp
+from typing import Any
+
 import time
 
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 import torch
+import torch.distributed as dist
+from torch.distributed import ProcessGroup
 
 import xop
 import xop.util as xutil
@@ -20,6 +25,27 @@ warmup_iters = 20
 pref_iters = 20
 is_use_fp16_acc = False # True
 
+class GemmAllreduceV2Schema:
+    name = "GemmAllreduceV2"
+    sub_schema = [Meta.GemmAllreduce]
+    # test_input_dtype = torch.float16
+    # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
+    if is_use_fp16_acc:
+        test_input_dtype = torch.float16
+        space_dtype = [(torch.float16,torch.float16,torch.float16)]
+    else:
+        test_input_dtype = torch.bfloat16
+        space_dtype = [(torch.bfloat16,torch.bfloat16,torch.bfloat16)]
+    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
+        return input, None, weight, None
+    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
+                       input_scale: torch.Tensor, weight_scale: torch.Tensor,
+                       bias: torch.Tensor):
+        output = torch.matmul(input, weight.t())
+        if (bias != None):
+            output += bias
+        return output.cpu()
+    
 class GemmNormalSchema:
     name = "GemmNormal"
     sub_schema = [Meta.GemmNormal] # GemmNormalSimt, Meta.GemmLt
@@ -113,6 +139,7 @@ def str2schema(schema_name):
         "GemmV2BlockScaleFp8": GemmV2BlockScaleFp8Schema(),
         "GemmBlockScaleFp8": GemmBlockScaleFp8Schema(),
         "GemmGroupedBlockScaleFp8": GemmGroupedBlockScaleFp8Schema(),
+        "GemmAllreduceV2": GemmAllreduceV2Schema(),
     }
     return string_to_schema.get(schema_name, None)
 
@@ -201,22 +228,25 @@ def tune_one_config(schema, config: TuningConfig, fp):
             atol, rtol = 0.1, 0.1
         xutil.torch_allclose(xop_output, ref_output, atol=atol, rtol=rtol)
     
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--schema", type=str, default="None")
-    parser.add_argument("--output_path", default="./tools/", type=str, help="Directory to store generated files")
-    args = parser.parse_args()
-
-    if (args.schema == "None"):
-        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmNormal (GemmNormal(GemmNormalSimt) / GemmV2BlockScaleFp8 / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
-        exit()
-
-    if args.output_path and not os.path.isdir(args.output_path):
-        raise Exception(f"{args.output_path} not exist")
-
+def run_worker(world_size, rank, port, args):
+    device = torch.device(f"cuda:{rank + xop.ALLREDUCE_GPUID_OFFSET}")
+    torch.cuda.set_device(device)
+    
+    distributed_init_method = f"tcp://localhost:{port}"
+    dist.init_process_group(
+        backend="nccl",
+        init_method=distributed_init_method,
+        rank=rank,
+        world_size=world_size,
+        device_id=device,
+    )
+    nccl_group = dist.group.WORLD
+    xop_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
+    
+    #################################
     tag = args.schema
     fp = {}
-    fp[tag] = open(args.output_path+"/tuned_config_{0}.cu".format(tag.lower()), "w")
+    fp[tag] = open(args.output_path+"/tuned_config_{0}_rank{1}.cu".format(tag.lower(), rank), "w")
     common.gen_tuning_file_head(fp[tag], tag)
     
     schema = str2schema(args.schema)
@@ -226,3 +256,63 @@ if __name__ == "__main__":
         tune_one_config(schema, config=config, fp=fp[tag])
 
     common.gen_tuning_file_tail(fp[tag])
+    #################################
+    # exponent = args.M  # 65536: 17
+    # run(world_size, rank, 1, args, xop_group, nccl_group, xop_perf, torch_perf)
+    # for m in range(1, exponent):
+    #     m = 2**m
+    #     run(world_size, rank, m, args, xop_group, nccl_group, xop_perf, torch_perf)
+        
+    dist.barrier(group=nccl_group)
+    dist.destroy_process_group(group=nccl_group)    
+
+    
+    
+def multi_process_parallel(
+    world_size: int, test_target: Any, target_args: tuple = ()
+) -> None:
+    mp.set_start_method("spawn", force=True)
+
+    procs = []
+    port = 12355
+    for i in range(world_size):
+        proc_args = (world_size, i, port) + target_args
+        proc = mp.Process(target=test_target, args=proc_args, name=f"Worker-{i}")
+        proc.daemon = True
+        proc.start()
+        procs.append(proc)
+
+    for i in range(world_size):
+        procs[i].join()
+        assert (
+            procs[i].exitcode == 0
+        ), f"Process {i} failed with exit code {procs[i].exitcode}"
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--schema", type=str, default="None")
+    parser.add_argument("--output_path", default="./tools/", type=str, help="Directory to store generated files")
+    args = parser.parse_args()
+
+    if (args.schema == "None"):
+        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmAllreduceV2 (GemmAllreduceV2 / GemmV2BlockScaleFp8 / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
+        exit()
+
+    if args.output_path and not os.path.isdir(args.output_path):
+        raise Exception(f"{args.output_path} not exist")
+
+    world_sizes = [2] # [2,4,8]
+    for world_size in world_sizes:
+        available_gpus = torch.cuda.device_count()
+        if world_size > available_gpus:
+            print(
+                f"Skipping world_size={world_size}, requires {world_size} GPUs, found {available_gpus}"
+            )
+            continue
+
+        print(f"Running test for world_size={world_size}")
+        multi_process_parallel(
+            world_size, run_worker, target_args=(args)
+        )
+        print(f"custom allreduce tp = {world_size}: OK")
+        
