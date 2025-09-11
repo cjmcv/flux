@@ -222,7 +222,8 @@ struct VisitorAuxStoreRs{
       gemm::GemmCoord threadblock_tile_offset,
       int thread_idx,
       ProblemShape problem_shape,
-      Params const* params_ptr
+      Params const* params_ptr,
+      int tile_idx
     ):
       tC_gAux(cute::forward<GTensor>(tC_gAux)),
       tC_gRankData(cute::forward<G2Tensor>(tC_gRankData)),
@@ -231,7 +232,8 @@ struct VisitorAuxStoreRs{
       threadblock_tile_offset(threadblock_tile_offset),
       thread_idx(thread_idx),
       problem_shape(problem_shape),
-      params_ptr(params_ptr) { }
+      params_ptr(params_ptr),
+      tile_idx(tile_idx) { }
 
     GTensor tC_gAux;
     G2Tensor tC_gRankData;
@@ -241,7 +243,8 @@ struct VisitorAuxStoreRs{
     int thread_idx;
     Params const* params_ptr;
     ProblemShape problem_shape;
-
+    int tile_idx;
+    
     CUTLASS_DEVICE void
     begin_step(int step_idx) {
       clear(tC_rAux);
@@ -282,7 +285,7 @@ struct VisitorAuxStoreRs{
       for (int i = 0; i < size(src_v); ++i) {
         bool guard = elem_less(coord_v(i), problem_shape);
         // cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&out_v(i), guard);
-        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst_v(i), guard); // 存放的本地的rank_data上
+        cutlass::arch::global_store<VecType, sizeof(VecType)>(src_v(i), (void*)&dst_v(i), guard); // Store it in the local rank_data.
       }
       // if (threadIdx.x == 0) {
       //   printf("rank step<%d> (%d, %d), (%d, %d).\n", params_ptr->rank, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n());
@@ -294,8 +297,6 @@ struct VisitorAuxStoreRs{
       if (params_ptr->is_serial) return;
 
       // printf("(%d, %d)\n", get<1>(problem_shape), blockDim.x);
-      uint32_t tiled_n = (get<1>(problem_shape) + blockDim.x - 1) / blockDim.x;
-      uint32_t tileIdx = threadblock_tile_offset.m() * tiled_n + threadblock_tile_offset.n();
       uint32_t rank = params_ptr->rank;
       uint32_t target_rank = (rank+1) % 2;
 
@@ -310,33 +311,34 @@ struct VisitorAuxStoreRs{
       int *self_flag_e = (int*)params_ptr->reg_buffer + 10100;
       int *target_flag_e = self_flag_e;
 #endif
-      // 确认一个block完成的数据是否是一个完整tile的。
       // blockIdx.x => m, blockIdx.y => n;
-      // 写标志前加同步，确保该block上面的数据都已经处理完。否则置位了数据也不一定有效
+      // Add __syncthreads before writing the flag to ensure that all data above this block has been processed. 
+      // Otherwise, even if the flag is set, the data may not be valid.
       __syncthreads();
       if (threadIdx.x == 0) {
-        // 被标记为需要reduce的tile，应连续进入8次后才结束
-        if (params_ptr->is_streamk && flag_s[tileIdx] != 0) {
-          atomicAdd(&flag_s2[tileIdx], 1);
-          if (flag_s2[tileIdx] != 8)
+        // A tile marked as requiring reduction shall end only after it has entered consecutively 8 times.
+        // Use the old data of atomicAdd to ensure that it is unique.
+        if (params_ptr->is_streamk && flag_s[tile_idx] != 0) {
+          int cnt = atomicAdd(&flag_s2[tile_idx], 1);
+          if (cnt != 7)
             return;
         }
 
         // printf("streamk: %d.\n", params_ptr->is_streamk);
-        // printf("rank<%d> tileIdx<%d> - (%d, %d), (%d, %d), %d.\n", rank, tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n(), tiled_n);
-        int flag = self_flag_e[tileIdx] + 1;
-        atomic_ref_sys<int> self_ref_e(self_flag_e[tileIdx]);
+        // printf("rank<%d> tile_idx<%d> - (%d, %d), (%d, %d), %d.\n", rank, tile_idx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n(), tiled_n);
+        int flag = self_flag_e[tile_idx] + 1;
+        atomic_ref_sys<int> self_ref_e(self_flag_e[tile_idx]);
         self_ref_e.store(flag, cuda::memory_order_release);
         // __threadfence_system();
 
-        atomic_ref_sys<int> target_ref_e(target_flag_e[tileIdx]);
+        atomic_ref_sys<int> target_ref_e(target_flag_e[tile_idx]);
         while (target_ref_e.load(cuda::memory_order_acquire) != flag) {}
-        // 至此，tileIdx的数据均已就绪
+        // So far, all data of tile_idx is ready.
 
         // 应使用旧数据idx，如使用新数据*flag_c，在取ref(flag_v[*flag_c])时，可能其他线程也刚好完成了原子加，使填数据时下标跳了两次，导致部分下标空缺。
         int idx = atomicAdd(flag_c, 1); 
         atomic_ref_sys<int> ref(flag_v[idx]);
-        ref.store(tileIdx+1, cuda::memory_order_release);   
+        ref.store(tile_idx+1, cuda::memory_order_release);   
       }
     }
   };
@@ -368,6 +370,10 @@ struct VisitorAuxStoreRs{
       (_0{})
     );
 
+    //
+    int tiled_n = (get<1>(problem_shape) + blockDim.x - 1) / blockDim.x;
+    int tile_idx = threadblock_tile_offset.m() * tiled_n + threadblock_tile_offset.n();
+    //
     return Callbacks<
       decltype(tC_gAux), decltype(tC_gRankData), decltype(tC_rAux),
       decltype(tC_cAux), ProblemShape>(
@@ -378,7 +384,8 @@ struct VisitorAuxStoreRs{
       threadblock_tile_offset,
       thread_idx,
       problem_shape,
-      params_ptr
+      params_ptr,
+      tile_idx
     );
   }
 };
