@@ -12,6 +12,8 @@ class TypeWarpper:
     def tag_unify(self, tag):
         if (tag == "GemmV2BlockScaleFp8"):
             return "GemmBlockScaleFp8"
+        if (tag == "GemmAllreduceV2"):
+            return "GemmAllreduce"
         return tag
     # xop type warp
     def xtw(self, type):
@@ -76,6 +78,8 @@ def make_meta_space(w, data_type, layout, arch):
 
         res.append((meta_xop_str, meta_cutlass_str))
     return res
+
+#### GemmNormal
 
 class GemmNormalSchema:
     impl = "GemmPureV2Impl"
@@ -250,7 +254,46 @@ class GemmGroupedBolckScaleFp8Schema:
                 w.xop_to_cutlasstype(raster_order), str(swizzle))
             res.append(hparam_str)
         return res
-        
+
+#### GemmComm
+class GemmAllreduceV2Schema:
+    impl = "GemmAllreduceV2Impl"
+    impl_header = "gemm_comm/gemm_ar_v2_impl.h"
+    
+    def get_meta_space(self, w):
+        # ('BF16', 'BF16', 'BF16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP16')
+        data_type = [('BF16', 'BF16', 'BF16', 'FP32')] # a,b,cd,acc
+        layout = ['RCR'] # , 'RRR'
+        arch = ['Sm80'] # , 'Sm89'
+
+        res = make_meta_space(w, data_type, layout, arch)
+        return res
+
+    def get_hparam_space(self, w):
+        bwi_shapes = [((128, 128, 32), (64, 64, 32), (16, 8, 16)),
+                      ((128, 256, 32), (64, 64, 32), (16, 8, 16))]
+        swizzles = ['SwizzleIdentity', 'SwizzleStreamK']
+        stages = [3, 4]
+        splitk_factors = [1, 2]
+        avail_smss = [-1, 1]
+
+        res = []
+        for bwi_shape, swizzle, stage, splitk_factor, avail_sm in itertools.product(
+            bwi_shapes, swizzles, stages, splitk_factors, avail_smss):
+            bshape = bwi_shape[0]
+            wshape = bwi_shape[1]
+            ishape = bwi_shape[2]
+            # Ignore special case.
+            if (swizzle == 'SwizzleIdentity' and avail_sm == 1):
+                continue
+            if (swizzle == 'SwizzleIdentity' and stage == 4 and splitk_factor == 2):
+                continue
+            hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
+                w.cstw(bshape), w.cstw(wshape), w.cstw(ishape), w.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
+            
+            res.append(hparam_str)
+        return res
+            
 def str2schema(schema_name):
     string_to_schema = {
         "GemmNormal": GemmNormalSchema(),
@@ -258,6 +301,7 @@ def str2schema(schema_name):
         "GemmV2BlockScaleFp8": GemmV2BlockScaleFp8Schema(),
         "GemmBlockScaleFp8": GemmBlockScaleFp8Schema(),
         "GemmGroupedBlockScaleFp8": GemmGroupedBolckScaleFp8Schema(),
+        "GemmAllreduceV2": GemmAllreduceV2Schema(),
     }
     return string_to_schema.get(schema_name, None)
 
@@ -295,7 +339,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmNormal (GemmNormal/GemmNormalSimt/GemmV2BlockScaleFp8/GemmBlockScaleFp8/GemmGroupedBlockScaleFp8)")
+        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmNormal (GemmNormal/GemmNormalSimt/GemmV2BlockScaleFp8/GemmBlockScaleFp8/GemmGroupedBlockScaleFp8 // GemmAllreduceV2)")
         exit()
     generator = SearchSpaceGenerator()
     generator.run(args.schema, args.output_path) 

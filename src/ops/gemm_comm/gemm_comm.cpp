@@ -117,7 +117,7 @@ public:
       // PRINTF("\n");
     }
     else {
-      id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmCommAr; // TODO: 检查是否可删除？
+      id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmAllreduce; // TODO: 检查是否可删除？
       rt_args = std::make_unique<RtArgumentsV2>();
     }
     GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, rt_args.get());
@@ -251,7 +251,7 @@ private:
     meta.resize(8);
     meta[IdMetaEnum::Id] = -1;                                  // id
     // (GemmComm / GemmNormalSimt / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)
-    meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmCommAr; // schema type 
+    meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmAllreduce; // schema type 
 
     meta[IdMetaEnum::TypeA] = from_torch_dtype(this->input_dtype);  // type A
     meta[IdMetaEnum::TypeB] = from_torch_dtype(this->input_dtype);  // type B

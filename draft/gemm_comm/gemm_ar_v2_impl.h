@@ -11,7 +11,7 @@ template <class ElementA, class ElementB, class ElementC, class ElementAccumulat
           class ArchTag, 
           class ThreadblockShape, class WarpShape, class InstructionShape,
           class ThreadBlockSwizzle, int NumStages, int SplitKFactor, int AvailSms>
-class GemmArV2Impl : public GemmBase  {
+class GemmAllreduceV2Impl : public GemmBase  {
 
   // Epilogue output operator
   using EpilogueOp = cutlass::epilogue::thread::LinearCombination<
