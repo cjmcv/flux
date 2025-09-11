@@ -166,16 +166,20 @@ struct VisitorAuxStoreRs{
 
     int world_size;
     int rank;
-    int packed_array_num;
-    
+
     void *reg_buffer;
     vllm::RankData* rank_data;
     vllm::RankSignals rank_signals;
     vllm::Signal *self_signal;
 
     void *output;
-    bool is_serial;
-    int *aux_flag_buffer;
+
+    bool is_serial;    
+    bool is_streamk;
+
+    int *aux_local_buffer;
+    int streamk_flag_step;
+    int streamk_flag_step2;
   };
 
   using Params = Arguments;
@@ -295,8 +299,10 @@ struct VisitorAuxStoreRs{
       uint32_t rank = params_ptr->rank;
       uint32_t target_rank = (rank+1) % 2;
 
-      int *flag_c = (int*)params_ptr->aux_flag_buffer;
-      int *flag_v = &flag_c[1];
+      int *flag_c = params_ptr->aux_local_buffer;
+      int *flag_v = params_ptr->aux_local_buffer + 1;
+      int *flag_s = params_ptr->aux_local_buffer + params_ptr->streamk_flag_step;
+      int *flag_s2 = params_ptr->aux_local_buffer + params_ptr->streamk_flag_step2;
 #ifdef ENABLE_ALLREDUCE
       int *self_flag_e = (int*)params_ptr->rank_signals.signals[rank]->end;
       int *target_flag_e = (int*)params_ptr->rank_signals.signals[target_rank]->end;
@@ -309,7 +315,15 @@ struct VisitorAuxStoreRs{
       // 写标志前加同步，确保该block上面的数据都已经处理完。否则置位了数据也不一定有效
       __syncthreads();
       if (threadIdx.x == 0) {
-        printf("rank<%d> tileIdx<%d> - (%d, %d), (%d, %d), %d.\n", rank, tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n(), tiled_n);
+        // 被标记为需要reduce的tile，应连续进入8次后才结束
+        if (params_ptr->is_streamk && flag_s[tileIdx] != 0) {
+          atomicAdd(&flag_s2[tileIdx], 1);
+          if (flag_s2[tileIdx] != 8)
+            return;
+        }
+
+        // printf("streamk: %d.\n", params_ptr->is_streamk);
+        // printf("rank<%d> tileIdx<%d> - (%d, %d), (%d, %d), %d.\n", rank, tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n(), tiled_n);
         int flag = self_flag_e[tileIdx] + 1;
         atomic_ref_sys<int> self_ref_e(self_flag_e[tileIdx]);
         self_ref_e.store(flag, cuda::memory_order_release);
@@ -322,16 +336,7 @@ struct VisitorAuxStoreRs{
         // 应使用旧数据idx，如使用新数据*flag_c，在取ref(flag_v[*flag_c])时，可能其他线程也刚好完成了原子加，使填数据时下标跳了两次，导致部分下标空缺。
         int idx = atomicAdd(flag_c, 1); 
         atomic_ref_sys<int> ref(flag_v[idx]);
-        ref.store(tileIdx+1, cuda::memory_order_release);
-        // __threadfence_system();
-
-        // printf("set(%d,%d,%d), ", idx, flag_v[0], tileIdx+1);
-        // cuda::atomic_ref<int32_t, cuda::thread_scope_system> barrier(params.barrier_ptr[lane_idx]);
-        // flag_v[flag_v[0]].store(tileIdx+1, cuda::memory_order_release);
-
-        // xop_st_flag_volatile(&(flag_v[flag_v[0]]), tileIdx+1);
-        // printf("set(%d,%d),", flag_v[0], flag_v[flag_v[0]]);
-        // flag_v[flag_v[0]] = tileIdx+1;
+        ref.store(tileIdx+1, cuda::memory_order_release);   
       }
     }
   };

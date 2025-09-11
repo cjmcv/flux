@@ -25,10 +25,10 @@
 //    则对应数组flag中的tile id号，如flag[0]==10，即表示为第0行第10列的tile。如为32，则表示为第1行第0列的tile。
 
 template <class GemmTileShape, typename T, int ngpus, int THREADS>
-__global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, int *aux_flag_buffer,
+__global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, int *aux_local_buffer,
                                      T* __restrict__ out, int rank, int m, int n) {
 
-  int *flag = &aux_flag_buffer[1]; // The first element is the index counter.
+  int *flag = &aux_local_buffer[1]; // The first element is the index counter.
 
 #ifdef ENABLE_ALLREDUCE
   int world_size = 2;
@@ -132,8 +132,10 @@ struct AllReduceArguments {
   vllm::Signal *self_signal;
   
   void *output;
-  int *aux_flag_buffer;
-  size_t aux_flag_size;
+  int *aux_local_buffer;
+  size_t aux_buffer_streamk_flag_step;
+  size_t aux_buffer_streamk_flag_step2;
+  size_t aux_local_size;
   virtual ~AllReduceArguments() {}
 };
 
@@ -218,10 +220,14 @@ public:
     auto cu_stream = static_cast<cudaStream_t>(stream);
     fetch_comm_args(fusion_args, cu_stream);
 
-    ar_args_.aux_flag_size = sizeof(int) + (m_+127)/128 * (n_+127)/128 * sizeof(int);
-    ar_args_.aux_flag_buffer = (int*)GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_flag_size);
-    CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_flag_buffer, 0, ar_args_.aux_flag_size, cu_stream));
-    // printf("ar_args_.aux_flag_buffer: %p.\n", ar_args_.aux_flag_buffer);
+    size_t done_flag_idx_size = sizeof(int);
+    size_t done_flag_size = (m_+ThreadblockShape::kM-1)/ThreadblockShape::kM * (n_+ThreadblockShape::kN-1)/ThreadblockShape::kN * sizeof(int);
+    ar_args_.aux_local_size = done_flag_idx_size + done_flag_size * 3;
+    ar_args_.aux_local_buffer = (int*)GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
+    ar_args_.aux_buffer_streamk_flag_step = done_flag_idx_size + done_flag_size;
+    ar_args_.aux_buffer_streamk_flag_step2 = done_flag_idx_size + done_flag_size + done_flag_size;
+    CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_local_buffer, 0, ar_args_.aux_local_size, cu_stream));
+    printf("ar_args_.aux_local_buffer: %p, %p.\n", ar_args_.aux_local_buffer, ar_args_.aux_local_buffer + ar_args_.aux_buffer_streamk_flag_step);
     ////
 
     gemm_dev_ = DeviceGemmBasic();
@@ -248,29 +254,27 @@ public:
   void run(void *stream = nullptr) {
 
     auto cu_stream = static_cast<cudaStream_t>(stream);
-    CUDA_CHECK(cudaEventRecord(event_, cu_stream));      // 记录计算流
-    CUDA_CHECK(cudaStreamWaitEvent(rs_stream_, event_)); // 使rs流等待计算流之前的任务都结束
+    CUDA_CHECK(cudaEventRecord(event_, cu_stream));      // Record computation stream
+    CUDA_CHECK(cudaStreamWaitEvent(rs_stream_, event_)); // Make the rs_stream_ wait for all tasks before the computation stream to complete.
     
     //////////////////////////////////////////////////////////
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
-    // CUDA_CHECK(cudaEventRecord(event_, cu_stream)); // 记录通信流
-    // CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); 
 
     int max_blocks = 32;
     constexpr int threads = 128;
-    int blocks = std::min(max_blocks, n_ / ThreadblockShape::kN); // 一个线程8个元素，1 tile 对应 128*128，按n维度的block数量算。
+    int blocks = std::min(max_blocks, n_ / ThreadblockShape::kN);
 #ifdef ENABLE_ALLREDUCE
     if (!is_serial_)
-      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
     else
       cross_device_reduce_1stage_tmp<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
 #else
-    disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_flag_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
     //////////////////////////////////////////////////////////
     // wait for reduce_scatter done
-    CUDA_CHECK(cudaEventRecord(event_, rs_stream_)); // 记录通信流
-    CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); // 使计算流等待event中通信流之前的任务都结束
+    CUDA_CHECK(cudaEventRecord(event_, rs_stream_)); // Record rs_stream_
+    CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); // Make the computation stream wait for all tasks before the communication stream in the event to complete.
   }
 
 private:
@@ -289,6 +293,10 @@ private:
 #else
     ElementC *gemm_out = (ElementC *)rt_args->ptr_D;
 #endif
+    bool is_streamk = true;
+    if constexpr (cute::is_same_v<ThreadBlockSwizzle, cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>>) {
+      is_streamk = false;
+    }
     typename EVTD::Arguments callback_args{
       {
         {}, // Accum
@@ -297,8 +305,9 @@ private:
       },        // EVTCompute2
       { 
         gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
-        ar_args_.world_size, ar_args_.rank, ar_args_.packed_array_num, ar_args_.reg_buffer, 
-        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, is_serial_, ar_args_.aux_flag_buffer
+        ar_args_.world_size, ar_args_.rank, ar_args_.reg_buffer, 
+        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, 
+        is_serial_, is_streamk, ar_args_.aux_local_buffer, ar_args_.aux_buffer_streamk_flag_step, ar_args_.aux_buffer_streamk_flag_step2
       },                   // D
     };   
 
@@ -339,7 +348,8 @@ private:
         rt_args->stride_b,              // stride_b
         0,              // stride_c
         0,              // stride_d
-        AvailSms);                                // avail_sms
+        ar_args_.aux_local_buffer + ar_args_.aux_buffer_streamk_flag_step,
+        AvailSms);       // avail_sms
     }
   }
 

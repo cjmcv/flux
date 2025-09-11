@@ -118,8 +118,132 @@ public:
   // Structures
   //
 
-  using Arguments = typename Base::Arguments;
+  // using Arguments = typename Base::Arguments;
+  struct Arguments {
 
+    //
+    // Data members
+    //
+
+    GemmUniversalMode mode = GemmUniversalMode::kGemm;
+    GemmCoord problem_size {};
+    int batch_count {1};        // Either (mode == GemmUniversalMode::kBatched) the batch count, or (mode == GemmUniversalMode::kGemm) the tile-splitting factor
+
+    typename EpilogueOutputOp::Params epilogue{};
+
+    void const * ptr_A = nullptr;
+    void const * ptr_B = nullptr;
+    void const * ptr_C = nullptr;
+    void * ptr_D = nullptr;
+
+    int64_t batch_stride_A{0};
+    int64_t batch_stride_B{0};
+    int64_t batch_stride_C{0};
+    int64_t batch_stride_D{0};
+
+    typename LayoutA::Stride stride_a{0};
+    typename LayoutB::Stride stride_b{0};
+    typename LayoutC::Stride stride_c{0};
+    typename LayoutC::Stride stride_d{0};
+
+    typename LayoutA::Stride::LongIndex lda{0};
+    typename LayoutB::Stride::LongIndex ldb{0};
+    typename LayoutC::Stride::LongIndex ldc{0};
+    typename LayoutC::Stride::LongIndex ldd{0};
+
+    int avail_sms{-1};          /// The number of SMs that StreamK dispatch heuristics will attempt to load-balance across (-1 defaults to device width, 1 implies classic data-parallel scheduling)
+    
+    int *aux_local_buffer;
+
+    //
+    // Methods
+    //
+
+    /// Default Constructor
+    Arguments() = default;
+
+    /// Constructor
+    Arguments(
+      GemmUniversalMode mode,
+      GemmCoord problem_size,
+      int batch_split,                              /// Either (mode == GemmUniversalMode::kBatched) the batch count, or (mode == GemmUniversalMode::kGemm) the tile-splitting factor (1 defaults to StreamK, >1 emulates Split-K)
+      typename EpilogueOutputOp::Params epilogue,
+      void const * ptr_A,
+      void const * ptr_B,
+      void const * ptr_C,
+      void * ptr_D,
+      int64_t batch_stride_A,
+      int64_t batch_stride_B,
+      int64_t batch_stride_C,
+      int64_t batch_stride_D,
+      typename LayoutA::Stride stride_a,
+      typename LayoutB::Stride stride_b,
+      typename LayoutC::Stride stride_c,
+      typename LayoutC::Stride stride_d,
+      int *aux_local_buffer,
+      int avail_sms = -1                           /// The number of SMs that StreamK dispatch heuristics will attempt to load-balance across (-1 defaults to device width, 1 implies classic data-parallel scheduling)
+    ):
+      mode(mode),
+      problem_size(problem_size),
+      batch_count(batch_split),
+      epilogue(epilogue),
+      ptr_A(ptr_A), ptr_B(ptr_B), ptr_C(ptr_C), ptr_D(ptr_D),
+      batch_stride_A(batch_stride_A), batch_stride_B(batch_stride_B), batch_stride_C(batch_stride_C), batch_stride_D(batch_stride_D),
+      stride_a(stride_a), stride_b(stride_b), stride_c(stride_c), stride_d(stride_d), avail_sms(avail_sms), aux_local_buffer(aux_local_buffer)
+    {
+      CUTLASS_TRACE_HOST("GemmUniversalStreamk::Arguments::Arguments() - problem_size: " << problem_size);
+    }
+
+    /// Constructor
+    Arguments(
+      GemmUniversalMode mode,
+      GemmCoord problem_size,
+      int batch_split,                              /// Either (mode == GemmUniversalMode::kBatched) the batch count, or (mode == GemmUniversalMode::kGemm) the tile-splitting factor (1 defaults to StreamK, >1 emulates Split-K)
+      typename EpilogueOutputOp::Params epilogue,
+      void const * ptr_A,
+      void const * ptr_B,
+      void const * ptr_C,
+      void * ptr_D,
+      int64_t batch_stride_A,
+      int64_t batch_stride_B,
+      int64_t batch_stride_C,
+      int64_t batch_stride_D,
+      typename LayoutA::Stride::LongIndex lda,
+      typename LayoutB::Stride::LongIndex ldb,
+      typename LayoutC::Stride::LongIndex ldc,
+      typename LayoutC::Stride::LongIndex ldd,
+      int *aux_local_buffer,
+      int avail_sms = -1                            /// The number of SMs that StreamK dispatch heuristics will attempt to load-balance across (-1 defaults to device width, 1 implies classic data-parallel scheduling)
+    ):
+      mode(mode),
+      problem_size(problem_size),
+      batch_count(batch_split),
+      epilogue(epilogue),
+      ptr_A(ptr_A), ptr_B(ptr_B), ptr_C(ptr_C), ptr_D(ptr_D),
+      batch_stride_A(batch_stride_A), batch_stride_B(batch_stride_B), batch_stride_C(batch_stride_C), batch_stride_D(batch_stride_D),
+      lda(lda), ldb(ldb), ldc(ldc), ldd(ldd), avail_sms(avail_sms), aux_local_buffer(aux_local_buffer)
+    {
+      stride_a = make_Coord(lda);
+      stride_b = make_Coord(ldb);
+      stride_c = make_Coord(ldc);
+      stride_d = make_Coord(ldd);
+      CUTLASS_TRACE_HOST("GemmUniversalStreamk::Arguments::Arguments() - problem_size: " << problem_size);
+    }
+
+    /// Returns arguments for the transposed problem
+    Arguments transposed_problem() const
+    {
+      Arguments args(*this);
+
+      std::swap(args.problem_size.m(), args.problem_size.n());
+      std::swap(args.ptr_A, args.ptr_B);
+      std::swap(args.lda, args.ldb);
+      std::swap(args.stride_a, args.stride_b);
+      std::swap(args.batch_stride_A, args.batch_stride_B);
+
+      return args;
+    }
+  };
 
   /// Parameters structure
   struct Params
@@ -159,6 +283,7 @@ public:
     int64_t batch_stride_D{0};
     int64_t batch_stride_C{0};
 
+    int * aux_local_buffer;
 
   protected:
 
@@ -244,6 +369,8 @@ public:
         sizeof(ElementB),
         sizeof(ElementC),
         Epilogue::kAccumulatorFragments);
+
+      aux_local_buffer = args.aux_local_buffer;
     }
 
 
@@ -654,7 +781,22 @@ protected:
     /// The location of this tile (in threadblock-tile coordinates) in the output matrix
     GemmCoord tiled_coord = params.block_mapping.get_tile_offset(reduce_tile_idx);
 
-    // printf("reduce (%d,%d).\n", tiled_coord.m(), tiled_coord.n());
+    // 标记进入reduce的tile
+    int *streamk_flag = params.aux_local_buffer;
+    uint32_t tiled_n = (get<1>(params.problem_shape) + blockDim.x - 1) / blockDim.x;
+    uint32_t tileIdx = tiled_coord.m() * tiled_n + tiled_coord.n();
+    if (threadIdx.x == 0 && streamk_flag[tileIdx] == 0) {
+      streamk_flag[tileIdx] = 1;
+    }
+    // atomic_ref_sys<int> sf(streamk_flag[tileIdx]);
+    // int flag = sf.load(cuda::memory_order_relax);
+    // if (threadIdx.x == 0 && flag == 0) {
+    //   sf.store(1, cuda::memory_order_release);
+    // }
+    // printf("reduce (%d,%d, %p), (%d).\n", tiled_coord.m(), tiled_coord.n(), params.aux_local_buffer, tileIdx);
+    //
+
+
     // Execute the epilogue operator to update the destination tensor.
     epilogue.reduce(
         peer_idx_begin,
