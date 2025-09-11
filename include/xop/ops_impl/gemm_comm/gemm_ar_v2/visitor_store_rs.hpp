@@ -289,7 +289,9 @@ struct VisitorAuxStoreRs{
     end_epilogue() {
       if (params_ptr->is_serial) return;
 
-      uint32_t tileIdx = threadblock_tile_offset.m() * gridDim.y + threadblock_tile_offset.n();
+      // printf("(%d, %d)\n", get<1>(problem_shape), blockDim.x);
+      uint32_t tiled_n = (get<1>(problem_shape) + blockDim.x - 1) / blockDim.x;
+      uint32_t tileIdx = threadblock_tile_offset.m() * tiled_n + threadblock_tile_offset.n();
       uint32_t rank = params_ptr->rank;
       uint32_t target_rank = (rank+1) % 2;
 
@@ -307,7 +309,7 @@ struct VisitorAuxStoreRs{
       // 写标志前加同步，确保该block上面的数据都已经处理完。否则置位了数据也不一定有效
       __syncthreads();
       if (threadIdx.x == 0) {
-        // printf("rank<%d> %d - (%d, %d), (%d, %d).\n", rank, tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n());
+        printf("rank<%d> tileIdx<%d> - (%d, %d), (%d, %d), %d.\n", rank, tileIdx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n(), tiled_n);
         int flag = self_flag_e[tileIdx] + 1;
         atomic_ref_sys<int> self_ref_e(self_flag_e[tileIdx]);
         self_ref_e.store(flag, cuda::memory_order_release);

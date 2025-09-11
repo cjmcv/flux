@@ -654,6 +654,7 @@ protected:
     /// The location of this tile (in threadblock-tile coordinates) in the output matrix
     GemmCoord tiled_coord = params.block_mapping.get_tile_offset(reduce_tile_idx);
 
+    // printf("reduce (%d,%d).\n", tiled_coord.m(), tiled_coord.n());
     // Execute the epilogue operator to update the destination tensor.
     epilogue.reduce(
         peer_idx_begin,

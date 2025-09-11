@@ -91,30 +91,30 @@ if __name__ == "__main__":
         tuning = None,
         fast_accum=False,
     )
-    torch.set_printoptions(threshold=float('inf'))
+    # torch.set_printoptions(threshold=float('inf'))
     print(output)
     all_ones = output.sub(1).abs().max() < 1e-6
     print("all_ones", all_ones)
-    torch.set_printoptions(threshold=1000)
+    # torch.set_printoptions(threshold=1000)
     
-    torch.cuda.synchronize()
-    start = time.time()
-    for i in range(50):
-        op.forward(
-            input,
-            weight,
-            output=output,
-            bias=bias,
-            input_scale=None,
-            weight_scale=None,
-            output_scale=None,
-            tuning = None,
-            fast_accum=False,
-        )
-        # print(output)
-        # print("all_ones for", output.sub(1).abs().max() < 1e-6)
-    torch.cuda.synchronize()
-    end = time.time()
-    total_time = end - start
+    # torch.cuda.synchronize()
+    # start = time.time()
+    # for i in range(50):
+    #     op.forward(
+    #         input,
+    #         weight,
+    #         output=output,
+    #         bias=bias,
+    #         input_scale=None,
+    #         weight_scale=None,
+    #         output_scale=None,
+    #         tuning = None,
+    #         fast_accum=False,
+    #     )
+    #     # print(output)
+    #     print("all_ones for", output.sub(1).abs().max() < 1e-6)
+    # torch.cuda.synchronize()
+    # end = time.time()
+    # total_time = end - start
 
-    print("total time:", total_time * 1000)
+    # print("total time:", total_time * 1000)
