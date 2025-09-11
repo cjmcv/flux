@@ -153,7 +153,7 @@ public:
 
     int avail_sms{-1};          /// The number of SMs that StreamK dispatch heuristics will attempt to load-balance across (-1 defaults to device width, 1 implies classic data-parallel scheduling)
     
-    int *aux_local_buffer;
+    uint8_t *aux_local_buffer;
 
     //
     // Methods
@@ -180,7 +180,7 @@ public:
       typename LayoutB::Stride stride_b,
       typename LayoutC::Stride stride_c,
       typename LayoutC::Stride stride_d,
-      int *aux_local_buffer,
+      uint8_t *aux_local_buffer,
       int avail_sms = -1                           /// The number of SMs that StreamK dispatch heuristics will attempt to load-balance across (-1 defaults to device width, 1 implies classic data-parallel scheduling)
     ):
       mode(mode),
@@ -212,7 +212,7 @@ public:
       typename LayoutB::Stride::LongIndex ldb,
       typename LayoutC::Stride::LongIndex ldc,
       typename LayoutC::Stride::LongIndex ldd,
-      int *aux_local_buffer,
+      uint8_t *aux_local_buffer,
       int avail_sms = -1                            /// The number of SMs that StreamK dispatch heuristics will attempt to load-balance across (-1 defaults to device width, 1 implies classic data-parallel scheduling)
     ):
       mode(mode),
@@ -283,7 +283,7 @@ public:
     int64_t batch_stride_D{0};
     int64_t batch_stride_C{0};
 
-    int * aux_local_buffer;
+    uint8_t * aux_local_buffer;
 
   protected:
 
@@ -782,7 +782,7 @@ protected:
     GemmCoord tiled_coord = params.block_mapping.get_tile_offset(reduce_tile_idx);
 
     // 标记进入reduce的tile
-    int *streamk_flag = params.aux_local_buffer;
+    int *streamk_flag = (int*)params.aux_local_buffer;
     uint32_t tiled_n = (get<1>(params.problem_shape) + blockDim.x - 1) / blockDim.x;
     uint32_t tileIdx = tiled_coord.m() * tiled_n + tiled_coord.n();
     if (threadIdx.x == 0 && streamk_flag[tileIdx] == 0) {

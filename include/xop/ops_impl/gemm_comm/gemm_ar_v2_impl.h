@@ -25,10 +25,10 @@
 //    则对应数组flag中的tile id号，如flag[0]==10，即表示为第0行第10列的tile。如为32，则表示为第1行第0列的tile。
 
 template <class GemmTileShape, typename T, int ngpus, int THREADS>
-__global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, int *aux_local_buffer,
+__global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, uint8_t *aux_local_buffer,
                                      T* __restrict__ out, int rank, int m, int n) {
 
-  int *flag = &aux_local_buffer[1]; // The first element is the index counter.
+  int *flag = (int*)(aux_local_buffer + sizeof(int)); // The first element is the index counter.
 
 #ifdef ENABLE_ALLREDUCE
   int world_size = 2;
@@ -132,9 +132,9 @@ struct AllReduceArguments {
   vllm::Signal *self_signal;
   
   void *output;
-  int *aux_local_buffer;
-  size_t aux_buffer_streamk_flag_step;
-  size_t aux_buffer_streamk_flag_step2;
+  uint8_t *aux_local_buffer;
+  int aux_buffer_streamk_flag_step;
+  int aux_buffer_streamk_flag_step2;
   size_t aux_local_size;
   virtual ~AllReduceArguments() {}
 };
@@ -223,7 +223,7 @@ public:
     size_t done_flag_idx_size = sizeof(int);
     size_t done_flag_size = (m_+ThreadblockShape::kM-1)/ThreadblockShape::kM * (n_+ThreadblockShape::kN-1)/ThreadblockShape::kN * sizeof(int);
     ar_args_.aux_local_size = done_flag_idx_size + done_flag_size * 3;
-    ar_args_.aux_local_buffer = (int*)GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
+    ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
     ar_args_.aux_buffer_streamk_flag_step = done_flag_idx_size + done_flag_size;
     ar_args_.aux_buffer_streamk_flag_step2 = done_flag_idx_size + done_flag_size + done_flag_size;
     CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_local_buffer, 0, ar_args_.aux_local_size, cu_stream));

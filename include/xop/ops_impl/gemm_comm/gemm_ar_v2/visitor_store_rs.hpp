@@ -177,7 +177,7 @@ struct VisitorAuxStoreRs{
     bool is_serial;    
     bool is_streamk;
 
-    int *aux_local_buffer;
+    uint8_t *aux_local_buffer;
     int streamk_flag_step;
     int streamk_flag_step2;
   };
@@ -299,10 +299,10 @@ struct VisitorAuxStoreRs{
       uint32_t rank = params_ptr->rank;
       uint32_t target_rank = (rank+1) % 2;
 
-      int *flag_c = params_ptr->aux_local_buffer;
-      int *flag_v = params_ptr->aux_local_buffer + 1;
-      int *flag_s = params_ptr->aux_local_buffer + params_ptr->streamk_flag_step;
-      int *flag_s2 = params_ptr->aux_local_buffer + params_ptr->streamk_flag_step2;
+      int *flag_c = (int *)params_ptr->aux_local_buffer;
+      int *flag_v = (int *)(params_ptr->aux_local_buffer + sizeof(int));
+      int *flag_s = (int *)(params_ptr->aux_local_buffer + params_ptr->streamk_flag_step);
+      int *flag_s2 = (int *)(params_ptr->aux_local_buffer + params_ptr->streamk_flag_step2);
 #ifdef ENABLE_ALLREDUCE
       int *self_flag_e = (int*)params_ptr->rank_signals.signals[rank]->end;
       int *target_flag_e = (int*)params_ptr->rank_signals.signals[target_rank]->end;

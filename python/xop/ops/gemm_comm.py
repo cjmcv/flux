@@ -9,7 +9,7 @@ import xop
 from xop.ops.custom_all_reduce import CustomAllreduce
 
 ENABLE_ALLREDUCE = 0
-ALLREDUCE_GPUID_OFFSET = 6
+ALLREDUCE_GPUID_OFFSET = 5
 class GemmCommRs:
     def __init__(
         self,
