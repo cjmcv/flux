@@ -46,7 +46,7 @@ def parse_args():
     )
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_mini.py --has_bias 12 4096 4096
+# python3 tools/gemm/test_gemm_mini.py --has_bias 256 4096 4096
 if __name__ == "__main__":
     args = parse_args()
 

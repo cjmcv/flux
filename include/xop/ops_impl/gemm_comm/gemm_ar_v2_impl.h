@@ -133,8 +133,8 @@ struct AllReduceArguments {
   
   void *output;
   uint8_t *aux_local_buffer;
-  int aux_buffer_streamk_flag_step;
-  int aux_buffer_streamk_flag_step2;
+  int aux_buffer_streamk_reduce_mark_step;   // Used to mark the tiles that require reduction in Stream-K
+  int aux_buffer_reduce_arrival_step; // Used to count the number of arrivals of reduce epi
   size_t aux_local_size;
   virtual ~AllReduceArguments() {}
 };
@@ -224,10 +224,10 @@ public:
     size_t done_flag_size = (m_+ThreadblockShape::kM-1)/ThreadblockShape::kM * (n_+ThreadblockShape::kN-1)/ThreadblockShape::kN * sizeof(int);
     ar_args_.aux_local_size = done_flag_idx_size + done_flag_size * 3;
     ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
-    ar_args_.aux_buffer_streamk_flag_step = done_flag_idx_size + done_flag_size;
-    ar_args_.aux_buffer_streamk_flag_step2 = done_flag_idx_size + done_flag_size + done_flag_size;
+    ar_args_.aux_buffer_streamk_reduce_mark_step = done_flag_idx_size + done_flag_size;
+    ar_args_.aux_buffer_reduce_arrival_step = done_flag_idx_size + done_flag_size + done_flag_size;
     CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_local_buffer, 0, ar_args_.aux_local_size, cu_stream));
-    printf("ar_args_.aux_local_buffer: %p, %p.\n", ar_args_.aux_local_buffer, ar_args_.aux_local_buffer + ar_args_.aux_buffer_streamk_flag_step);
+    printf("ar_args_.aux_local_buffer: %p, %p.\n", ar_args_.aux_local_buffer, ar_args_.aux_local_buffer + ar_args_.aux_buffer_streamk_reduce_mark_step);
     ////
 
     gemm_dev_ = DeviceGemmBasic();
@@ -307,7 +307,7 @@ private:
         gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
         ar_args_.world_size, ar_args_.rank, ar_args_.reg_buffer, 
         ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, 
-        is_serial_, is_streamk, ar_args_.aux_local_buffer, ar_args_.aux_buffer_streamk_flag_step, ar_args_.aux_buffer_streamk_flag_step2
+        is_serial_, is_streamk, SplitKFactor, ar_args_.aux_local_buffer, ar_args_.aux_buffer_streamk_reduce_mark_step, ar_args_.aux_buffer_reduce_arrival_step
       },                   // D
     };   
 
@@ -348,7 +348,7 @@ private:
         rt_args->stride_b,              // stride_b
         0,              // stride_c
         0,              // stride_d
-        ar_args_.aux_local_buffer + ar_args_.aux_buffer_streamk_flag_step,
+        ar_args_.aux_local_buffer + ar_args_.aux_buffer_streamk_reduce_mark_step,
         AvailSms);       // avail_sms
     }
   }

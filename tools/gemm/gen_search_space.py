@@ -271,7 +271,8 @@ class GemmAllreduceV2Schema:
 
     def get_hparam_space(self, w):
         bwi_shapes = [((128, 128, 32), (64, 64, 32), (16, 8, 16)),
-                      ((128, 256, 32), (64, 64, 32), (16, 8, 16))]
+                      ((128, 256, 32), (64, 64, 32), (16, 8, 16)),
+                      ((64, 128, 32), (32, 64, 32), (16, 8, 16))]
         swizzles = ['SwizzleIdentity', 'SwizzleStreamK']
         stages = [3, 4]
         splitk_factors = [1, 2]
@@ -284,9 +285,13 @@ class GemmAllreduceV2Schema:
             wshape = bwi_shape[1]
             ishape = bwi_shape[2]
             # Ignore special case.
+            # Without avail_sm in SwizzleIdentity
             if (swizzle == 'SwizzleIdentity' and avail_sm == 1):
                 continue
             if (swizzle == 'SwizzleIdentity' and stage == 4 and splitk_factor == 2):
+                continue
+            # SwizzleStreamK only support splitk_factor == 1
+            if (swizzle == 'SwizzleStreamK' and splitk_factor == 2):
                 continue
             hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
                 w.cstw(bshape), w.cstw(wshape), w.cstw(ishape), w.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))

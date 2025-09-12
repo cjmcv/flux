@@ -176,10 +176,11 @@ struct VisitorAuxStoreRs{
 
     bool is_serial;    
     bool is_streamk;
+    int split_k_factor;
 
     uint8_t *aux_local_buffer;
-    int streamk_flag_step;
-    int streamk_flag_step2;
+    int streamk_reduce_mark_step;
+    int reduce_arrival_step;
   };
 
   using Params = Arguments;
@@ -302,13 +303,13 @@ struct VisitorAuxStoreRs{
 
       int *flag_c = (int *)params_ptr->aux_local_buffer;
       int *flag_v = (int *)(params_ptr->aux_local_buffer + sizeof(int));
-      int *flag_s = (int *)(params_ptr->aux_local_buffer + params_ptr->streamk_flag_step);
-      int *flag_s2 = (int *)(params_ptr->aux_local_buffer + params_ptr->streamk_flag_step2);
+      int *flag_s = (int *)(params_ptr->aux_local_buffer + params_ptr->streamk_reduce_mark_step);
+      int *flag_s_cnt = (int *)(params_ptr->aux_local_buffer + params_ptr->reduce_arrival_step);
 #ifdef ENABLE_ALLREDUCE
       int *self_flag_e = (int*)params_ptr->rank_signals.signals[rank]->end;
       int *target_flag_e = (int*)params_ptr->rank_signals.signals[target_rank]->end;
 #else
-      int *self_flag_e = (int*)params_ptr->reg_buffer + 10100;
+      int *self_flag_e = (int*)params_ptr->reg_buffer;
       int *target_flag_e = self_flag_e;
 #endif
       // blockIdx.x => m, blockIdx.y => n;
@@ -316,16 +317,21 @@ struct VisitorAuxStoreRs{
       // Otherwise, even if the flag is set, the data may not be valid.
       __syncthreads();
       if (threadIdx.x == 0) {
+        // printf("rank0<%d> tile_idx<%d> - (%d, %d), (%d, %d, %d).\n", rank, tile_idx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n(), threadblock_tile_offset.k());
         // A tile marked as requiring reduction shall end only after it has entered consecutively 8 times.
         // Use the old data of atomicAdd to ensure that it is unique.
         if (params_ptr->is_streamk && flag_s[tile_idx] != 0) {
-          int cnt = atomicAdd(&flag_s2[tile_idx], 1);
+          int cnt = atomicAdd(&flag_s_cnt[tile_idx], 1);
           if (cnt != 7)
             return;
         }
-
-        // printf("streamk: %d.\n", params_ptr->is_streamk);
-        // printf("rank<%d> tile_idx<%d> - (%d, %d), (%d, %d), %d.\n", rank, tile_idx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n(), tiled_n);
+        if (params_ptr->split_k_factor != 1 && params_ptr->is_streamk == false) {
+          int cnt = atomicAdd(&flag_s_cnt[tile_idx], 1);
+          // printf("split: %d, %d, %d.\n", params_ptr->split_k_factor, flag_s_cnt[tile_idx], cnt);
+          if (cnt != params_ptr->split_k_factor-1)
+            return;
+        }
+        // printf("rank1<%d> tile_idx<%d> - (%d, %d), (%d, %d, %d).\n", rank, tile_idx, blockIdx.x, blockIdx.y, threadblock_tile_offset.m(), threadblock_tile_offset.n(), threadblock_tile_offset.k());
         int flag = self_flag_e[tile_idx] + 1;
         atomic_ref_sys<int> self_ref_e(self_flag_e[tile_idx]);
         self_ref_e.store(flag, cuda::memory_order_release);
