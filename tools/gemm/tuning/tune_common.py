@@ -91,7 +91,7 @@ def gen_tuning_space(space_dtype, space_G, space_M, space_NK, space_has_bias):
         space.append(config)
     return space
 
-def write_tuning_result(fp, fn, shape, tuning, tuning_data, pref_iters):
+def write_tuning_result(fp, add_func_name, fn, shape, tuning, tuning_data, pref_iters):
     m = shape[0]
     n = shape[1]
     k = shape[2]
@@ -125,7 +125,8 @@ def write_tuning_result(fp, fn, shape, tuning, tuning_data, pref_iters):
             selected_res = "{0}, {1}, {2}".format(str(tuning_data[sid][1]), "(int16_t)ME::"+str(tuning_data[sid][2]), cublas_algo_str)
         else: # cutlass
             selected_res = "{0}, {1}".format(str(tuning_data[sid][1]), "(int16_t)ME::"+str(tuning_data[sid][2]))
-        message = "  {0}tins.add({{{1},{2},{3},{4},{5}}}, /*config*/{{{6}}}); // {7}ms\n".format(prefix, m, n, k, g, meta_str, selected_res, str(round(tuning_data[sid][0] * 1000 / pref_iters, 3)))
+            
+        message = "  {0}tins.{1}({{{2},{3},{4},{5},{6}}}, /*config*/{{{7}}}); // {8}ms\n".format(prefix, add_func_name, m, n, k, g, meta_str, selected_res, str(round(tuning_data[sid][0] * 1000 / pref_iters, 3)))
         fp.write(message)
         fp.flush()
         print(message)
@@ -137,7 +138,7 @@ def write_tuning_result(fp, fn, shape, tuning, tuning_data, pref_iters):
         print("fastest_config is not matched: {0},{1} vs {2},{3}".format(str(fastest_id), str(fastest_schema), str(tuning[1].item()), str(tuning[2].item())))
         raise RuntimeError
  
-def profiling_core(fn: callable, shape, schema, warmup_iters, pref_iters, fp):
+def profiling_core(fn: callable, add_func_name, shape, schema, warmup_iters, pref_iters, fp):
     tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
 
     tuning_data = []
@@ -165,7 +166,7 @@ def profiling_core(fn: callable, shape, schema, warmup_iters, pref_iters, fp):
             elapsed_time = time.time() - start
             tuning_data.append((elapsed_time, id, sub_schema))
 
-    write_tuning_result(fp, fn, shape, tuning, tuning_data, pref_iters)
+    write_tuning_result(fp, add_func_name, fn, shape, tuning, tuning_data, pref_iters)
        
 def gen_tuning_file_head(fp, tag):
     fp.write('#include "xop/xop.h"\n')

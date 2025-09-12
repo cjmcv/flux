@@ -148,7 +148,7 @@ def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
                           input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
                           tuning=tuning, fast_accum=is_use_fp16_acc)
 
-    common.profiling_core(fn, [m,n,k,g], schema, warmup_iters, pref_iters, fp)
+    common.profiling_core(fn, "add", [m,n,k,g], schema, warmup_iters, pref_iters, fp)
     return output.cpu()
 
 def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[torch.Tensor], 
@@ -169,7 +169,7 @@ def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[
         return op.grouped_forward(inputs, weights, outputs=outputs, 
                                   inputs_scale=inputs_scale, weights_scale=weights_scale, 
                                   tuning=tuning)
-    common.profiling_core((fn, [m,n,k,g], schema, warmup_iters, pref_iters, fp))
+    common.profiling_core((fn, "add", [m,n,k,g], schema, warmup_iters, pref_iters, fp))
 
     return torch.cat(outputs, dim=0).cpu()
 

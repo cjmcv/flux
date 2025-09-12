@@ -49,8 +49,8 @@ class GemmCommRs:
             fa, reg_buffer, reg_buffer_sz_bytes = self.ar.address()
             
             if self.ar.is_capturing():
-                return if torch.cuda.is_current_stream_capturing():
-                    self.gemm_comm.forward(
+                if torch.cuda.is_current_stream_capturing():
+                    return self.gemm_comm.forward(
                         input,
                         weight,
                         output=output,
