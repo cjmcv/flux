@@ -21,6 +21,7 @@ import tune_common as common
 common.init_test_env(3)
 print = partial(print, flush=True)
 
+GEMM_COMM_ENABLE_CUDA_GRAPH = 0
 warmup_iters = 20
 pref_iters = 20
 is_use_fp16_acc = False # True
@@ -38,12 +39,12 @@ class GemmAllreduceV2Schema:
         space_dtype = [(torch.bfloat16,torch.bfloat16,torch.bfloat16)]
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
         return input, None, weight, None
-    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
+    def get_ref_output(self, rank: int, group: ProcessGroup, 
+                       input: torch.Tensor, weight: torch.Tensor, 
                        input_scale: torch.Tensor, weight_scale: torch.Tensor,
                        bias: torch.Tensor):
-        output = torch.matmul(input, weight.t())
-        if (bias != None):
-            output += bias
+        output = torch.nn.functional.linear(input, weight, bias) #, out=output
+        dist.all_reduce(output, group=group)
         return output.cpu()
     
 class GemmNormalSchema:
@@ -154,10 +155,10 @@ def get_tuning_space(schema):
     # space_NK = [(576, 7168)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     return common.gen_tuning_space(schema.space_dtype, space_G, space_M, space_NK, space_has_bias)
     
-def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor, 
-                        input_scale: torch.Tensor, weight_scale: torch.Tensor,
-                        bias: torch.Tensor,
-                        config: TuningConfig, fp):
+def run_xop_profiling(rank: int, group: ProcessGroup, 
+                      schema, input: torch.Tensor, weight: torch.Tensor, 
+                      input_scale: torch.Tensor, weight_scale: torch.Tensor,
+                      bias: torch.Tensor, config: TuningConfig, fp):
     m = input.size(0)
     k = input.size(1)
     if config.transpose_weight:
@@ -168,12 +169,67 @@ def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
     g = 1
 
     output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
-    op = xop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
 
-    def fn(tuning):
-        return op.forward(input, weight, output=output, bias=bias, 
-                          input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
-                          tuning=tuning, fast_accum=is_use_fp16_acc)
+    op = xop.GemmCommRs(
+        input_dtype=config.dtypeA,
+        output_dtype=config.dtypeC,
+        transpose_weight=config.transpose_weight,
+        group=group,
+        rank=rank,
+    )
+    
+    if GEMM_COMM_ENABLE_CUDA_GRAPH:
+        def forward_fn(tuning):
+            op.forward(
+                input,
+                weight,
+                output=output,
+                bias=bias,
+                input_scale=input_scale,
+                weight_scale=weight_scale,
+                output_scale=None,
+                tuning = tuning,
+                fast_accum=is_use_fp16_acc,
+            )
+            
+        # pre allocate workspace for cuda graph
+        forward_fn(problem_idx)
+        
+        stream = torch.cuda.Stream()
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.stream(stream), op.ar.capture():
+            with torch.cuda.graph(graph):
+                problem_idx = 0
+                forward_fn(problem_idx)
+                
+        def fn(iter_id):
+            graph.replay()
+            return output
+    else:       
+        def fn(tuning):
+            op.forward(
+                input,
+                weight,
+                output=output,
+                bias=bias,
+                input_scale=input_scale,
+                weight_scale=weight_scale,
+                output_scale=None,
+                tuning = tuning,
+                fast_accum=is_use_fp16_acc,
+            )
+            # print("bias:", bias, iter_id)
+            # print("inputs[problem_idx]:", inputs[problem_idx])
+            # print("weights[problem_idx]:", weights[problem_idx])
+            # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
+            # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
+            # print("output:", output)
+            return output
+        
+    # def fn(tuning):
+    #     return op.forward(input, weight, output=output, bias=bias, 
+    #                       input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
+    #                       tuning=tuning, fast_accum=is_use_fp16_acc)
 
     common.profiling_core(fn, [m,n,k,g], schema, warmup_iters, pref_iters, fp)
     return output.cpu()
@@ -200,7 +256,7 @@ def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[
 
     return torch.cat(outputs, dim=0).cpu()
 
-def tune_one_config(schema, config: TuningConfig, fp):
+def tune_one_config(rank: int, xop_group: ProcessGroup, nccl_group: ProcessGroup, schema, config: TuningConfig, fp):
     input = torch.rand((config.M, config.K), dtype=schema.test_input_dtype).cuda() # torch.bfloat16
     weight = torch.rand((config.N, config.K), dtype=schema.test_input_dtype).cuda()
     # start_time = time.time()
@@ -215,8 +271,8 @@ def tune_one_config(schema, config: TuningConfig, fp):
         bias = None
         if config.has_bias:
             bias = torch.zeros([y.size(0)], dtype=x.dtype, device=x.device, requires_grad=False)
-        ref_output = schema.get_ref_output(x, y, x_scale, y_scale, bias)
-        xop_output = run_xop_profiling(schema, x, y, x_scale, y_scale, bias, config, fp)
+        ref_output = schema.get_ref_output(rank, nccl_group, x, y, x_scale, y_scale, bias)
+        xop_output = run_xop_profiling(rank, xop_group, schema, x, y, x_scale, y_scale, bias, config, fp)
 
     if ref_output is not None:
         if config.dtypeC == torch.bfloat16:
@@ -228,7 +284,7 @@ def tune_one_config(schema, config: TuningConfig, fp):
             atol, rtol = 0.1, 0.1
         xutil.torch_allclose(xop_output, ref_output, atol=atol, rtol=rtol)
     
-def run_worker(world_size, rank, port, args):
+def run_worker(world_size, rank, port, args, a):
     device = torch.device(f"cuda:{rank + xop.ALLREDUCE_GPUID_OFFSET}")
     torch.cuda.set_device(device)
     
@@ -253,7 +309,7 @@ def run_worker(world_size, rank, port, args):
     config_space = get_tuning_space(schema)
     for i, config in enumerate(config_space):
         print(f"==== #{i + 1}/{len(config_space)} Tuning for {config}")
-        tune_one_config(schema, config=config, fp=fp[tag])
+        tune_one_config(rank, xop_group, nccl_group, schema, config=config, fp=fp[tag])
 
     common.gen_tuning_file_tail(fp[tag])
     #################################
@@ -295,7 +351,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmAllreduceV2 (GemmAllreduceV2 / GemmV2BlockScaleFp8 / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
+        print("usage: python3 tools/gemm/tuning/tune_gemm_comm.py --schema=GemmAllreduceV2 (GemmAllreduceV2 / GemmV2BlockScaleFp8 / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
         exit()
 
     if args.output_path and not os.path.isdir(args.output_path):
@@ -312,7 +368,7 @@ if __name__ == "__main__":
 
         print(f"Running test for world_size={world_size}")
         multi_process_parallel(
-            world_size, run_worker, target_args=(args)
+            world_size, run_worker, target_args=(args, 1)
         )
         print(f"custom allreduce tp = {world_size}: OK")
         
