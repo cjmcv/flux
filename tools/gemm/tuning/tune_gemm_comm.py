@@ -169,8 +169,6 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
     g = 1
 
     output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
-    tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
-    
     op = xop.GemmCommRs(
         input_dtype=config.dtypeA,
         output_dtype=config.dtypeC,
@@ -180,8 +178,11 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
     )
     
     if GEMM_COMM_ENABLE_CUDA_GRAPH:
-        def forward_fn(tuning):
-            op.forward(
+        graph_ret = -1
+        tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
+        tuning_placeholder = torch.empty_like(tuning)
+        def forward_fn():
+            return op.forward(
                 input,
                 weight,
                 output=output,
@@ -189,22 +190,32 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
                 input_scale=input_scale,
                 weight_scale=weight_scale,
                 output_scale=None,
-                tuning = tuning,
+                tuning = tuning_placeholder,
                 fast_accum=is_use_fp16_acc,
             )
             
         # pre allocate workspace for cuda graph
-        forward_fn(tuning)
+        tuning[0], tuning[1], tuning[2] = 1, id, schema.sub_schema[0]
+        tuning_placeholder.copy_(tuning)
+        forward_fn()
+        tuning[0], tuning[1], tuning[2] = 1, id, schema.sub_schema[0]
+        tuning_placeholder.copy_(tuning)
         
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.stream(stream), op.ar.capture():
             with torch.cuda.graph(graph):
-                forward_fn(tuning)
+                graph_ret = forward_fn()
                 
-        def fn(tuning):
-            return graph.replay()
-            # return output
+        def fn():
+            graph.replay()
+        
+        tuning[0], tuning[1], tuning[2] = 1, 999, schema.sub_schema[0]
+        tuning_placeholder.copy_(tuning)
+        graph.replay()
+        print("graph_ret:", graph_ret)
+        
+        common.profiling_core_cudagraph(fn, tuning, graph_ret, "Add2Comm", [m,n,k,g], schema, warmup_iters, pref_iters, fp)
     else:       
         def fn(tuning):
             return op.forward(
@@ -218,19 +229,8 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
                 tuning = tuning,
                 fast_accum=is_use_fp16_acc,
             )
-            # print("bias:", bias, iter_id)
-            # print("inputs[problem_idx]:", inputs[problem_idx])
-            # print("weights[problem_idx]:", weights[problem_idx])
-            # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
-            # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
-            # print("output:", output)
-            # return output
+        common.profiling_core(fn, "Add2Comm", [m,n,k,g], schema, warmup_iters, pref_iters, fp)
         
-    # def fn(tuning):
-    #     return op.forward(input, weight, output=output, bias=bias, 
-    #                       input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
-    #                       tuning=tuning, fast_accum=is_use_fp16_acc)
-    common.profiling_core(fn, tuning, "Add2Comm", [m,n,k,g], schema, warmup_iters, pref_iters, fp)
     return output.cpu()
 
 def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[torch.Tensor], 
