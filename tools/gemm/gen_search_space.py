@@ -270,13 +270,13 @@ class GemmAllreduceV2Schema:
         return res
 
     def get_hparam_space(self, w):
+        # ((64, 128, 32), (32, 64, 32), (16, 8, 16))
         bwi_shapes = [((128, 128, 32), (64, 64, 32), (16, 8, 16)),
-                      ((128, 256, 32), (64, 64, 32), (16, 8, 16)),
-                      ((64, 128, 32), (32, 64, 32), (16, 8, 16))]
+                      ((128, 256, 32), (64, 64, 32), (16, 8, 16))]
         swizzles = ['SwizzleIdentity', 'SwizzleStreamK']
         stages = [3, 4]
-        splitk_factors = [1, 2]
-        avail_smss = [-1, 1]
+        splitk_factors = [1] # , 2 暂不支持？4096x4096x4096有异常
+        avail_smss = [-1] # , 1 退化为dp，不用选
 
         res = []
         for bwi_shape, swizzle, stage, splitk_factor, avail_sm in itertools.product(

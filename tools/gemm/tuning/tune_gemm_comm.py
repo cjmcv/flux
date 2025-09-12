@@ -21,7 +21,7 @@ import tune_common as common
 common.init_test_env(3)
 print = partial(print, flush=True)
 
-GEMM_COMM_ENABLE_CUDA_GRAPH = 0
+GEMM_COMM_ENABLE_CUDA_GRAPH = 1
 warmup_iters = 20
 pref_iters = 20
 is_use_fp16_acc = False # True
@@ -169,7 +169,8 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
     g = 1
 
     output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
-
+    tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
+    
     op = xop.GemmCommRs(
         input_dtype=config.dtypeA,
         output_dtype=config.dtypeC,
@@ -193,16 +194,15 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
             )
             
         # pre allocate workspace for cuda graph
-        forward_fn(problem_idx)
+        forward_fn(tuning)
         
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.stream(stream), op.ar.capture():
             with torch.cuda.graph(graph):
-                problem_idx = 0
-                forward_fn(problem_idx)
+                forward_fn(tuning)
                 
-        def fn(iter_id):
+        def fn(tuning):
             return graph.replay()
             # return output
     else:       
@@ -230,8 +230,7 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
     #     return op.forward(input, weight, output=output, bias=bias, 
     #                       input_scale=input_scale, weight_scale=weight_scale, output_scale=None, 
     #                       tuning=tuning, fast_accum=is_use_fp16_acc)
-
-    common.profiling_core(fn, "Add2Comm", [m,n,k,g], schema, warmup_iters, pref_iters, fp)
+    common.profiling_core(fn, tuning, "Add2Comm", [m,n,k,g], schema, warmup_iters, pref_iters, fp)
     return output.cpu()
 
 def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[torch.Tensor], 
@@ -246,13 +245,14 @@ def run_xop_grouped_profiling(schema, inputs: List[torch.Tensor], weights: List[
     for i in range(0, g):
         outputs.append(torch.empty([m, n], dtype=config.dtypeC, device=inputs[0].device, requires_grad=False))
     
+    tuning = torch.zeros(100, dtype=torch.int16, device='cpu')    
     op = xop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)
-
+    
     def fn(tuning):
         return op.grouped_forward(inputs, weights, outputs=outputs, 
                                   inputs_scale=inputs_scale, weights_scale=weights_scale, 
                                   tuning=tuning)
-    common.profiling_core((fn, "Add2Comm", [m,n,k,g], schema, warmup_iters, pref_iters, fp))
+    common.profiling_core((fn, tuning, "Add2Comm", [m,n,k,g], schema, warmup_iters, pref_iters, fp))
 
     return torch.cat(outputs, dim=0).cpu()
 

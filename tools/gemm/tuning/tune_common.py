@@ -138,9 +138,7 @@ def write_tuning_result(fp, add_func_name, fn, shape, tuning, tuning_data, pref_
         print("fastest_config is not matched: {0},{1} vs {2},{3}".format(str(fastest_id), str(fastest_schema), str(tuning[1].item()), str(tuning[2].item())))
         raise RuntimeError
  
-def profiling_core(fn: callable, add_func_name, shape, schema, warmup_iters, pref_iters, fp):
-    tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
-
+def profiling_core(fn: callable, tuning, add_func_name, shape, schema, warmup_iters, pref_iters, fp):
     tuning_data = []
     for sub_schema in schema.sub_schema:
         for id in range(500):
