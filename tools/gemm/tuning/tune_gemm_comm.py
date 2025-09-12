@@ -203,11 +203,11 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
                 forward_fn(problem_idx)
                 
         def fn(iter_id):
-            graph.replay()
-            return output
+            return graph.replay()
+            # return output
     else:       
         def fn(tuning):
-            op.forward(
+            return op.forward(
                 input,
                 weight,
                 output=output,
@@ -224,7 +224,7 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
             # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
             # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
             # print("output:", output)
-            return output
+            # return output
         
     # def fn(tuning):
     #     return op.forward(input, weight, output=output, bias=bias, 

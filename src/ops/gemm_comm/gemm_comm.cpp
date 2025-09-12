@@ -124,7 +124,8 @@ public:
     
     if (tuning.has_value()) {
       return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
-                            (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get());
+                            (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get(),
+                            fa, reg_buffer, reg_buffer_sz_bytes);
     }
     else {
       // Misalignment case.
@@ -340,7 +341,10 @@ private:
                     c10::optional<torch::Tensor> weight_scale,
                     int16_t *tuning_data, 
                     std::vector<int16_t>& id_meta, 
-                    RtArguments *rt_args) {
+                    RtArguments *rt_args,
+                    int64_t fa, 
+                    int64_t reg_buffer, 
+                    int64_t reg_buffer_sz_bytes) {
     XOP_CHECK_EQ(tuning_data[0], 1);
     id_meta[IdMetaEnum::Id] = tuning_data[1];
     id_meta[IdMetaEnum::Schema] = tuning_data[2];
@@ -358,10 +362,20 @@ private:
       // ins.PrintRegistered("abc:");
       return -1;        
     }
-    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-    op->initialize(rt_args);
-    op->run(stream);
+    // cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
+    // op->initialize(rt_args);
+    // op->run(stream);
     
+    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
+    RtCommArguments comm_args;
+    comm_args.handle = fa;
+    comm_args.reg_buffer = reg_buffer;
+    comm_args.reg_buffer_sz_bytes = reg_buffer_sz_bytes;
+    torch::Tensor gemm_out = torch::zeros_like(output);
+    comm_args.gemm_out = gemm_out.data_ptr();
+    op->initialize(rt_args, &comm_args, stream);
+    op->run(stream);
+
     tuning_data[0] = id_meta.size();
     for (int i=0; i<id_meta.size(); i++) {
       tuning_data[i+1] = id_meta[i];

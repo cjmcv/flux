@@ -37,6 +37,7 @@ class Meta(IntEnum):
             Meta.GemmBlockScaleFp8: "GemmBlockScaleFp8",
             Meta.GemmGroupedBlockScaleFp8: "GemmGroupedBlockScaleFp8",
             Meta.GemmLt: "GemmLt",
+            Meta.GemmAllreduce: "GemmAllreduce",
             Meta.Void: "Void",
             Meta.FP16: "FP16",
             Meta.BF16: "BF16",
