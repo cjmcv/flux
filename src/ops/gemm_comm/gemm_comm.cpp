@@ -123,9 +123,21 @@ public:
     GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, rt_args.get());
     
     if (tuning.has_value()) {
-      return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
-                            (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get(),
-                            fa, reg_buffer, reg_buffer_sz_bytes);
+      torch::Tensor t = tuning.value();
+      torch::Device dev = t.device();
+      if (dev.is_cpu()) {
+        return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
+          (int16_t *)t.data_ptr(), id_meta, rt_args.get(),
+          fa, reg_buffer, reg_buffer_sz_bytes);
+      }
+      else { // (dev.is_cuda()) 
+        torch::Tensor t_cpu = t.cpu();
+        int ret = forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
+                              (int16_t *)t_cpu.data_ptr(), id_meta, rt_args.get(),
+                              fa, reg_buffer, reg_buffer_sz_bytes);
+        t = t_cpu.to(t.device()); 
+        return ret;
+      }
     }
     else {
       // Misalignment case.

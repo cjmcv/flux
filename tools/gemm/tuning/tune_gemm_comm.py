@@ -213,7 +213,8 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
         tuning[0], tuning[1], tuning[2] = 1, 999, schema.sub_schema[0]
         tuning_placeholder.copy_(tuning)
         graph.replay()
-        print("graph_ret:", graph_ret)
+        tuning.copy_(tuning_placeholder)
+        print("graph_ret:", graph_ret, tuning[0], tuning[1], tuning[2])
         
         common.profiling_core_cudagraph(fn, tuning, graph_ret, "Add2Comm", [m,n,k,g], schema, warmup_iters, pref_iters, fp)
     else:       

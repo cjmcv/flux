@@ -86,7 +86,7 @@ def is_weak_contiguous(inp: torch.Tensor):
 
 class CustomAllreduce:
     _SUPPORTED_WORLD_SIZES = [2, 4, 6, 8]
-    _MAX_CAR_SIZE = 1024 * 1024 * 115
+    _MAX_CAR_SIZE = 1024 * 1024 * 600 
 
     # max_size: max supported allreduce size
     def __init__(
