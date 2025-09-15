@@ -135,11 +135,11 @@ public:
           fa, reg_buffer, reg_buffer_sz_bytes);
       }
       else { // (dev.is_cuda()) 
-        tuning_cpu_.copy_(t);
+        tuning_cpu_.copy_(t, true);
         int ret = forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
                               (int16_t *)tuning_cpu_.data_ptr(), id_meta, rt_args.get(),
                               fa, reg_buffer, reg_buffer_sz_bytes);
-        t.copy_(tuning_cpu_);
+        t.copy_(tuning_cpu_, true);
         return ret;
       }
     }
