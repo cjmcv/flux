@@ -70,9 +70,9 @@ public:
       arch_ = UnifiedMetaEnum::Sm80;
     // printf("sm: %d%d.\n", device_properties.major, device_properties.minor);
 
-    tuning_cpu_ = torch::zeros({100}, torch::TensorOptions()
-          .dtype(torch::kInt16)
-          .device(torch::kCPU));
+    // tuning_cpu_ = torch::zeros({100}, torch::TensorOptions()
+    //       .dtype(torch::kInt16)
+    //       .device(torch::kCPU));
   } 
   ~GemmCommImpl() {}
   // tuning：tensor进入，先构建meta，依次添加序号充当key，取获取op，计算性能，并进行排序，取top5, 保留整个meta。获取不到新op时表示结束。
@@ -127,21 +127,9 @@ public:
     GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, rt_args.get());
     
     if (tuning.has_value()) {
-      torch::Tensor t = tuning.value();
-      torch::Device dev = t.device();
-      if (dev.is_cpu()) {
-        return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
-          (int16_t *)t.data_ptr(), id_meta, rt_args.get(),
-          fa, reg_buffer, reg_buffer_sz_bytes);
-      }
-      else { // (dev.is_cuda()) 
-        tuning_cpu_.copy_(t, true);
-        int ret = forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
-                              (int16_t *)tuning_cpu_.data_ptr(), id_meta, rt_args.get(),
-                              fa, reg_buffer, reg_buffer_sz_bytes);
-        t.copy_(tuning_cpu_, true);
-        return ret;
-      }
+      return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
+        (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get(),
+        fa, reg_buffer, reg_buffer_sz_bytes);
     }
     else {
       // Misalignment case.
@@ -434,7 +422,6 @@ private:
   UnifiedMetaEnum arch_;
 
   torch::Tensor padded_input_;
-  torch::Tensor tuning_cpu_;
 };
 
 GemmComm::GemmComm(
