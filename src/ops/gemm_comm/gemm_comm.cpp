@@ -69,6 +69,10 @@ public:
     else
       arch_ = UnifiedMetaEnum::Sm80;
     // printf("sm: %d%d.\n", device_properties.major, device_properties.minor);
+
+    tuning_cpu_ = torch::zeros({100}, torch::TensorOptions()
+          .dtype(torch::kInt16)
+          .device(torch::kCPU));
   } 
   ~GemmCommImpl() {}
   // tuning：tensor进入，先构建meta，依次添加序号充当key，取获取op，计算性能，并进行排序，取top5, 保留整个meta。获取不到新op时表示结束。
@@ -131,11 +135,11 @@ public:
           fa, reg_buffer, reg_buffer_sz_bytes);
       }
       else { // (dev.is_cuda()) 
-        torch::Tensor t_cpu = t.cpu();
+        tuning_cpu_.copy_(t);
         int ret = forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
-                              (int16_t *)t_cpu.data_ptr(), id_meta, rt_args.get(),
+                              (int16_t *)tuning_cpu_.data_ptr(), id_meta, rt_args.get(),
                               fa, reg_buffer, reg_buffer_sz_bytes);
-        t = t_cpu.to(t.device()); 
+        t.copy_(tuning_cpu_);
         return ret;
       }
     }
@@ -430,6 +434,7 @@ private:
   UnifiedMetaEnum arch_;
 
   torch::Tensor padded_input_;
+  torch::Tensor tuning_cpu_;
 };
 
 GemmComm::GemmComm(

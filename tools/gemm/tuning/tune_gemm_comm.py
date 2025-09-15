@@ -21,7 +21,7 @@ import tune_common as common
 common.init_test_env(3)
 print = partial(print, flush=True)
 
-GEMM_COMM_ENABLE_CUDA_GRAPH = 1
+GEMM_COMM_ENABLE_CUDA_GRAPH = 0 # Not supported for now
 warmup_iters = 20
 pref_iters = 20
 is_use_fp16_acc = False # True
@@ -180,7 +180,7 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
     if GEMM_COMM_ENABLE_CUDA_GRAPH:
         graph_ret = -1
         tuning = torch.zeros(100, dtype=torch.int16, device='cpu')
-        tuning_placeholder = torch.empty_like(tuning)
+        tuning_placeholder = torch.empty_like(tuning, device=input.device)
         def forward_fn():
             return op.forward(
                 input,
@@ -195,10 +195,10 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
             )
             
         # pre allocate workspace for cuda graph
-        tuning[0], tuning[1], tuning[2] = 1, id, schema.sub_schema[0]
+        tuning[0], tuning[1], tuning[2] = 1, 2, schema.sub_schema[0]
         tuning_placeholder.copy_(tuning)
         forward_fn()
-        tuning[0], tuning[1], tuning[2] = 1, id, schema.sub_schema[0]
+        tuning[0], tuning[1], tuning[2] = 1, 2, schema.sub_schema[0]
         tuning_placeholder.copy_(tuning)
         
         stream = torch.cuda.Stream()
@@ -214,6 +214,7 @@ def run_xop_profiling(rank: int, group: ProcessGroup,
         tuning_placeholder.copy_(tuning)
         graph.replay()
         tuning.copy_(tuning_placeholder)
+        torch.cuda.synchronize()
         print("graph_ret:", graph_ret, tuning[0], tuning[1], tuning[2])
         
         common.profiling_core_cudagraph(fn, tuning, graph_ret, "Add2Comm", [m,n,k,g], schema, warmup_iters, pref_iters, fp)
