@@ -12,6 +12,17 @@ ENABLE_ALLREDUCE = 1
 ALLREDUCE_GPUID_OFFSET = 5
 IS_SPLIT_M = 1
 
+def split_rows(x: torch.Tensor, stride: int = 1024):
+    M = x.size(0)
+    n_full, rem = divmod(M, stride)
+    if rem == 0:
+        return [x[i*stride : (i+1)*stride] for i in range(n_full)]
+    
+    # Remainder > 0: the second-to-last chunk takes 1024 rows, and the last chunk takes 1024 + rem rows.
+    chunks = [x[i*stride : (i+1)*stride] for i in range(n_full - 1)]
+    chunks.append(x[(n_full - 1)*stride : ]) 
+    return chunks
+
 def split_rows(x: torch.Tensor, stride=1024):
     n_full, rem = divmod(x.size(0), stride)
     chunks = [x[i*stride : (i+1)*stride] for i in range(n_full)]
@@ -97,13 +108,14 @@ class GemmCommRs:
         fast_accum: bool = False,
     ) -> int: 
         if (input.size(0) > 2048 and IS_SPLIT_M == True):
+            # TODO: 普通gemm正常，serial也正常，不使用cuda graph也正常。但是使用cudagraph且非serial则不正常。使用4096测试
             input_chunks = split_rows(input, 1024)
             output_chunks = split_rows(output, 1024)
             for i in range(len(input_chunks)):
                 self.forward_inner(input_chunks[i], weight, output_chunks[i], bias=bias,
                                   input_scale=input_scale, weight_scale=weight_scale, output_scale=output_scale,
                                   tuning = tuning, fast_accum=fast_accum)
-                return 0
+            return 0
         else:
             return self.forward_inner(input, weight, output, bias=bias,
                                     input_scale=input_scale, weight_scale=weight_scale, output_scale=output_scale,
