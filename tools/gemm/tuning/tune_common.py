@@ -91,14 +91,14 @@ def gen_tuning_space(space_dtype, space_G, space_M, space_NK, space_has_bias):
         space.append(config)
     return space
 
-def write_tuning_result(fp, add_func_name, fn, shape, tuning, tuning_data, pref_iters):
+def write_tuning_result(fp, add_func_name, fn, shape, tuning, tuning_data, pref_iters, mode=1):
     m = shape[0]
     n = shape[1]
     k = shape[2]
     g = shape[3]
     
     tuning_data.sort()
-    tuning[0], tuning[1], tuning[2] = 1, tuning_data[0][1], tuning_data[0][2]
+    tuning[0], tuning[1], tuning[2] = mode, tuning_data[0][1], tuning_data[0][2]
     fn(tuning)  # Run it once to retrieve the metadata.
 
     # tuning: 0:meta_end_idx, 1:id, 2:schema, 3:~meta

@@ -21,7 +21,7 @@ import tune_common as common
 common.init_test_env(3)
 print = partial(print, flush=True)
 
-GEMM_COMM_ENABLE_CUDA_GRAPH = 0 
+GEMM_COMM_ENABLE_CUDA_GRAPH = 1
 warmup_iters = 20
 pref_iters = 20
 is_use_fp16_acc = False # True
@@ -212,7 +212,7 @@ def run_xop_profiling_graph(rank: int, group: ProcessGroup,
         tuning_data.append((elapsed_time, id, sub_schema))
     
     if (rank == 0):
-        common.write_tuning_result(fp, "Add2Comm", fn, [m,n,k,g], tuning, tuning_data, pref_iters)
+        common.write_tuning_result(fp, "Add2Comm", fn, [m,n,k,g], tuning, tuning_data, pref_iters, mode=2)
     return None # output.cpu()
 
 def run_xop_profiling(rank: int, group: ProcessGroup, 
