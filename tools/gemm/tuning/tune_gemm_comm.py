@@ -23,7 +23,7 @@ print = partial(print, flush=True)
 
 GEMM_COMM_ENABLE_CUDA_GRAPH = 1
 warmup_iters = 20
-pref_iters = 20
+pref_iters = 100
 is_use_fp16_acc = False # True
 
 class GemmAllreduceV2Schema:
@@ -185,23 +185,22 @@ def run_xop_profiling_graph(rank: int, group: ProcessGroup,
         
     schema_cnt = 10
     func_graph = []
+    tuning_data = []
     sub_schema = schema.sub_schema[0]
     for id in range(schema_cnt):
         # preallocate
         tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
         fn(tuning)
+        tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
         
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.stream(stream), op.ar.capture():
-            with torch.cuda.graph(graph):
-                tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
+            with torch.cuda.graph(graph):        
                 fn(tuning)
 
-        func_graph.append(lambda: graph.replay())
+        # func_graph.append(lambda: graph.replay())
     
-    tuning_data = []
-    for id in range(schema_cnt): 
         for i in range(warmup_iters + pref_iters):
             if (i == warmup_iters):
                 torch.cuda.synchronize()

@@ -16,9 +16,9 @@ import tune_common as common
 common.init_test_env(3)
 print = partial(print, flush=True)
 
-GEMM_NORMAL_ENABLE_CUDA_GRAPH = 1
+GEMM_NORMAL_ENABLE_CUDA_GRAPH = 0
 warmup_iters = 20
-pref_iters = 20
+pref_iters = 100        # If a cuda graph is used, more iterations are required.
 is_use_fp16_acc = False # True
 
 class GemmNormalSchema:
@@ -120,7 +120,7 @@ def str2schema(schema_name):
 # schema 1: [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192]
 def get_tuning_space(schema):
     space_G = [1]
-    space_M = [1,2,4,8,16,32,64,128,256] #,512,1024,2048,4096,8192,16384,32768,65536 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_M = [128,256] #1,2,4,8,16,32,64,,512,1024,2048,4096,8192,16384,32768,65536 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
     space_NK = [(4096, 4096)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     space_has_bias = [False]    
     # space_G = [4, 8]
@@ -152,28 +152,28 @@ def run_xop_profiling_graph(schema, input: torch.Tensor, weight: torch.Tensor,
         
     schema_cnt = 100
     func_graph = []
+    tuning_data = []
+
     sub_schema = schema.sub_schema[0]
     for id in range(schema_cnt):
         # preallocate
         tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
         fn(tuning)
+        tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
         
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.stream(stream):
             with torch.cuda.graph(graph):
-                tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
                 fn(tuning)
 
-        func_graph.append(lambda: graph.replay())
+        # func_graph.append(lambda: graph.replay())
     
-    tuning_data = []
-    for id in range(schema_cnt): 
         for i in range(warmup_iters + pref_iters):
             if (i == warmup_iters):
                 torch.cuda.synchronize()
                 start = time.time()
-            func_graph[id]()
+            graph.replay()
         torch.cuda.synchronize()
         elapsed_time = time.time() - start
         tuning_data.append((elapsed_time, id, sub_schema))
