@@ -105,6 +105,7 @@ def perf_torch(
                 fast_accum=False,
             )
             dist.all_reduce(output, group=group)
+            return output
 
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
 
