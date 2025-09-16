@@ -8,6 +8,8 @@ import time
 import torch
 import math
 
+import xop.util as xutil
+
 # Sync from enum class UnifiedMetaEnum
 class Meta(IntEnum):
     GemmNormal = 0           # meta type
@@ -126,7 +128,9 @@ def write_tuning_result(fp, add_func_name, fn, shape, tuning, tuning_data, pref_
         else: # cutlass
             selected_res = "{0}, {1}".format(str(tuning_data[sid][1]), "(int16_t)ME::"+str(tuning_data[sid][2]))
             
-        message = "  {0}tins.{1}({{{2},{3},{4},{5},{6}}}, /*config*/{{{7}}}); // {8}ms\n".format(prefix, add_func_name, m, n, k, g, meta_str, selected_res, str(round(tuning_data[sid][0] * 1000 / pref_iters, 3)))
+        gemm_time_ms = round(tuning_data[sid][0] * 1000 / pref_iters, 3)
+        tflops = round(xutil.calculate_tflops(m,n,k, gemm_time_ms), 3)
+        message = "  {0}tins.{1}({{{2},{3},{4},{5},{6}}}, /*config*/{{{7}}}); // {8} ms vs {9} tflops\n".format(prefix, add_func_name, m, n, k, g, meta_str, selected_res, str(gemm_time_ms), str(tflops))
         fp.write(message)
         fp.flush()
         print(message)

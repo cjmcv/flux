@@ -155,7 +155,7 @@ public:
           id_meta[IdMetaEnum::Id] = 0;
         }
       }
-      PRINTF("[runing] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+      PRINTF("[runing normal] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
       if (id_meta[IdMetaEnum::Schema] == (int16_t)UnifiedMetaEnum::GemmLt) {
         if constexpr (TUNING_WITH_CUBLASLT == false) {
           return RunTorch(input, weight, output, bias);
@@ -363,7 +363,7 @@ private:
     id_meta[IdMetaEnum::Id] = tuning_data[1];
     id_meta[IdMetaEnum::Schema] = tuning_data[2];
     
-    PRINTF("[tuning] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+    PRINTF("[tuning normal] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
     if (id_meta[IdMetaEnum::Schema] == (int16_t)UnifiedMetaEnum::GemmLt) {
       if constexpr (TUNING_WITH_CUBLASLT == false) {
         return -1;
