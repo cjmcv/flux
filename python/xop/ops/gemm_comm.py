@@ -8,8 +8,17 @@ from torch.distributed import ProcessGroup
 import xop
 from xop.ops.custom_all_reduce import CustomAllreduce
 
-ENABLE_ALLREDUCE = 0
+ENABLE_ALLREDUCE = 1
 ALLREDUCE_GPUID_OFFSET = 5
+IS_SPLIT_M = 1
+
+def split_rows(x: torch.Tensor, stride=1024):
+    n_full, rem = divmod(x.size(0), stride)
+    chunks = [x[i*stride : (i+1)*stride] for i in range(n_full)]
+    if rem:
+        chunks.append(x[n_full*stride : ])
+    return chunks
+
 class GemmCommRs:
     def __init__(
         self,
@@ -48,21 +57,41 @@ class GemmCommRs:
         if ENABLE_ALLREDUCE:
             fa, reg_buffer, reg_buffer_sz_bytes = self.ar.address()
             
+            
             if self.ar.is_capturing():
                 if torch.cuda.is_current_stream_capturing():
-                    return self.gemm_comm.forward(
-                        input,
-                        weight,
-                        output=output,
-                        bias=bias,
-                        input_scale=input_scale,
-                        weight_scale=weight_scale,
-                        output_scale=output_scale,
-                        tuning = tuning,
-                        fast_accum=fast_accum,
-                        registered=True,
-                        fa=fa, reg_buffer=0, reg_buffer_sz_bytes=0,
-                    )
+                    if (IS_SPLIT_M == True):
+                        input_chunks = split_rows(input, 1024)
+                        weight_chunks = split_rows(input, 1024)
+                        for i in len(input_chunks):
+                            self.gemm_comm.forward(
+                                input_chunks[i],
+                                weight_chunks[i],
+                                output=output,
+                                bias=bias,
+                                input_scale=input_scale,
+                                weight_scale=weight_scale,
+                                output_scale=output_scale,
+                                tuning = tuning,
+                                fast_accum=fast_accum,
+                                registered=True,
+                                fa=fa, reg_buffer=0, reg_buffer_sz_bytes=0,
+                            )
+                            return 0 
+                    else:
+                        return self.gemm_comm.forward(
+                            input,
+                            weight,
+                            output=output,
+                            bias=bias,
+                            input_scale=input_scale,
+                            weight_scale=weight_scale,
+                            output_scale=output_scale,
+                            tuning = tuning,
+                            fast_accum=fast_accum,
+                            registered=True,
+                            fa=fa, reg_buffer=0, reg_buffer_sz_bytes=0,
+                        )
             else:
                 return self.gemm_comm.forward(
                     input,
