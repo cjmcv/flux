@@ -211,8 +211,9 @@ def run_xop_profiling_graph(rank: int, group: ProcessGroup,
         elapsed_time = time.time() - start
         tuning_data.append((elapsed_time, id, sub_schema))
     
-    common.write_tuning_result(fp, "Add2Comm", fn, [m,n,k,g], tuning, tuning_data, pref_iters)
-    return output.cpu()
+    if (rank == 0):
+        common.write_tuning_result(fp, "Add2Comm", fn, [m,n,k,g], tuning, tuning_data, pref_iters)
+    return None # output.cpu()
 
 def run_xop_profiling(rank: int, group: ProcessGroup, 
                       schema, input: torch.Tensor, weight: torch.Tensor, 
@@ -296,7 +297,7 @@ def tune_one_config(rank: int, xop_group: ProcessGroup, nccl_group: ProcessGroup
         else:
             xop_output = run_xop_profiling(rank, xop_group, schema, x, y, x_scale, y_scale, bias, config, fp)
 
-    if ref_output is not None:
+    if ref_output is not None and xop_output is not None:
         if config.dtypeC == torch.bfloat16:
             atol, rtol = 0.02, 0.02
         else:
@@ -304,7 +305,7 @@ def tune_one_config(rank: int, xop_group: ProcessGroup, nccl_group: ProcessGroup
 
         if is_use_fp16_acc:
             atol, rtol = 0.1, 0.1
-        xutil.torch_allclose(xop_output, ref_output, atol=atol, rtol=rtol)
+        xutil.torch_allclose(xop_output, ref_output, atol=atol, rtol=rtol, print_prefix="rank<" + str(rank) + ">")
     
 def run_worker(world_size, rank, port, args, a):
     device = torch.device(f"cuda:{rank + xop.ALLREDUCE_GPUID_OFFSET}")

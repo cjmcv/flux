@@ -102,7 +102,7 @@ def per_block_cast_to_fp8(x: torch.Tensor, fast_accum: bool) -> Tuple[torch.Tens
         x_view.size(0), x_view.size(2)
     )
 
-def torch_allclose(x, y, rtol, atol, verbose=True):
+def torch_allclose(x, y, rtol, atol, print_prefix="", verbose=True):
     if not torch.allclose(x, y, rtol=rtol, atol=atol):
         print(f"shape of x: {x.shape}")
         print(f"shape of y: {y.shape}")
@@ -133,7 +133,7 @@ def torch_allclose(x, y, rtol, atol, verbose=True):
         raise RuntimeError
 
     if verbose:
-        print("all close!")
+        print(print_prefix + " all close!")
 
 # __all__ = [
 #     "is_fp8_dtype",

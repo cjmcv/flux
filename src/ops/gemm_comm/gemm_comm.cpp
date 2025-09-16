@@ -349,12 +349,19 @@ private:
                     int64_t fa, 
                     int64_t reg_buffer, 
                     int64_t reg_buffer_sz_bytes) {
-    XOP_CHECK_EQ(tuning_data[0], 1);
+    XOP_CHECK_EQ(tuning_data[0]==1 || tuning_data[0]==2, true);
     id_meta[IdMetaEnum::Id] = tuning_data[1];
     id_meta[IdMetaEnum::Schema] = tuning_data[2];
     
     PRINTF("[tuning] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
-    
+    int tuning_pass_mode = tuning_data[0];
+    tuning_data[0] = id_meta.size();
+    for (int i=0; i<id_meta.size(); i++) {
+      tuning_data[i+1] = id_meta[i];
+    }
+
+    if (tuning_pass_mode == 2) return 0;
+
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     GemmBase *op = ins.GetOp(id_meta, true);
     if (op == nullptr) {
@@ -379,11 +386,6 @@ private:
     comm_args.gemm_out = gemm_out.data_ptr();
     op->initialize(rt_args, &comm_args, stream);
     op->run(stream);
-
-    tuning_data[0] = id_meta.size();
-    for (int i=0; i<id_meta.size(); i++) {
-      tuning_data[i+1] = id_meta[i];
-    }
     
     return 0;
   }
