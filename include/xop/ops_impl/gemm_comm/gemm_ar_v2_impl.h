@@ -143,7 +143,7 @@ template <class ElementA, class ElementB, class ElementC, class ElementAccumulat
           class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, 
           class ThreadblockShape, class WarpShape, class InstructionShape,
-          class ThreadBlockSwizzle, int NumStages, int SplitKFactor, int AvailSms>
+          class ThreadBlockSwizzle, int NumStages, int SplitKFactor, int AvailSms, int StreamMode> // 
 class GemmAllreduceV2Impl : public GemmBase  {
   using ElementCompute = ElementAccumulator;
   using ElementOutput = ElementC;
@@ -210,7 +210,13 @@ public:
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
     ////
-    is_serial_ = false;
+    // 0: one stream no connect; 1: one stream connected; 2: two stream
+    if constexpr (StreamMode == 0) {
+      is_serial_ = true;
+    }
+    else {
+      is_serial_ = false;
+    }
     cudaEventCreate(&event_);
     cudaStreamCreate(&rs_stream_);
     m_ = rt_args->m;
@@ -264,10 +270,15 @@ public:
     constexpr int threads = 128;
     int blocks = std::min(max_blocks, n_ / ThreadblockShape::kN);
 #ifdef ENABLE_ALLREDUCE
-    if (!is_serial_)
-      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
-    else
+    if constexpr (StreamMode == 0) { // one stream no connect
       cross_device_reduce_1stage_tmp<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
+    }
+    else if constexpr (StreamMode == 1) { // one stream no connected
+      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    }
+    else { // two streams
+      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    }
 #else
     disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif

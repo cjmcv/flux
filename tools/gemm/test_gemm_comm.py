@@ -66,7 +66,8 @@ def perf_torch(
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
         
     # nccl is not support cuda graph, we should use pynccl instead !
-    if 0:
+    mode = 2
+    if mode == 0:
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.stream(stream):
@@ -78,12 +79,32 @@ def perf_torch(
         def fn(iter_id):
             graph.replay()
             return output
-    else:
+    elif mode == 1:
         def fn(iter_id):
             problem_idx = iter_id%problem_cnt
             torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias, out=output)#
             dist.all_reduce(output, group=group)
             return output
+    elif mode == 2:
+        op = xop.GemmNormal(
+            input_dtype=inputs[0].dtype,
+            output_dtype=output_dtype,
+            transpose_weight=False
+        )
+        def fn(iter_id):
+            problem_idx = iter_id % problem_cnt
+            op.forward(
+                inputs[problem_idx],
+                weights[problem_idx],
+                output=output,
+                bias=bias,
+                input_scale=None,
+                weight_scale=None,
+                output_scale=None,
+                tuning = None,
+                fast_accum=False,
+            )
+            dist.all_reduce(output, group=group)
 
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
 

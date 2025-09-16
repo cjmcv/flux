@@ -275,12 +275,13 @@ class GemmAllreduceV2Schema:
                       ((128, 256, 32), (64, 64, 32), (16, 8, 16))]
         swizzles = ['SwizzleIdentity', 'SwizzleStreamK']
         stages = [3, 4]
-        splitk_factors = [1] # , 2 暂不支持？4096x4096x4096有异常
-        avail_smss = [-1] # , 1 退化为dp，不用选
-
+        splitk_factors = [1] # , 2 not supported for now, 4096x4096x4096
+        avail_smss = [-1] # , 1 Degenerates to DP, no selection needed.
+        stream_modes = [0,2]
+        
         res = []
-        for bwi_shape, swizzle, stage, splitk_factor, avail_sm in itertools.product(
-            bwi_shapes, swizzles, stages, splitk_factors, avail_smss):
+        for bwi_shape, swizzle, stage, splitk_factor, avail_sm, stream_mode in itertools.product(
+            bwi_shapes, swizzles, stages, splitk_factors, avail_smss, stream_modes):
             bshape = bwi_shape[0]
             wshape = bwi_shape[1]
             ishape = bwi_shape[2]
@@ -293,8 +294,8 @@ class GemmAllreduceV2Schema:
             # SwizzleStreamK only support splitk_factor == 1
             if (swizzle == 'SwizzleStreamK' and splitk_factor == 2):
                 continue
-            hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
-                w.cstw(bshape), w.cstw(wshape), w.cstw(ishape), w.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm))
+            hparam_str = '{0},{1},{2},{3},{4},{5},{6},{7}'.format(
+                w.cstw(bshape), w.cstw(wshape), w.cstw(ishape), w.xop_to_cutlasstype(swizzle), str(stage), str(splitk_factor), str(avail_sm), str(stream_mode))
             
             res.append(hparam_str)
         return res

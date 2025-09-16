@@ -205,7 +205,7 @@ def run_xop_profiling_graph(rank: int, group: ProcessGroup,
             if (i == warmup_iters):
                 torch.cuda.synchronize()
                 start = time.time()
-            func_graph[id]()
+            graph.replay()
         torch.cuda.synchronize()
         elapsed_time = time.time() - start
         tuning_data.append((elapsed_time, id, sub_schema))
