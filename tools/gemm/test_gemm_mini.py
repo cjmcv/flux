@@ -46,7 +46,8 @@ def parse_args():
     )
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_mini.py --has_bias 256 4096 4096
+# StreamMode==2, disable ENABLE_ALLREDUCE
+# python3 tools/gemm/test_gemm_mini.py 4096 4096 4096
 if __name__ == "__main__":
     args = parse_args()
 
@@ -99,7 +100,7 @@ if __name__ == "__main__":
     
     torch.cuda.synchronize()
     start = time.time()
-    for i in range(50):
+    for i in range(5):
         op.forward(
             input,
             weight,

@@ -24,10 +24,19 @@
 // 4）在4096*4096的目标矩阵下，tile的数量是32*32个。
 //    则对应数组flag中的tile id号，如flag[0]==10，即表示为第0行第10列的tile。如为32，则表示为第1行第0列的tile。
 
+template <typename T, int sz>
+struct __align__(alignof(T) * sz) array_t {
+  T data[sz];
+  using type = T;
+  static constexpr int size = sz;
+};
+
 template <class GemmTileShape, typename T, int ngpus, int THREADS>
 __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, uint8_t *aux_local_buffer,
                                      T* __restrict__ out, int rank, int m, int n) {
-
+  
+  constexpr int ArrayLen = GemmTileShape::kN / 32; // one warp for one row: 128 / 32 = 4
+  using P = array_t<T, ArrayLen>; // 16 / sizeof(T) == 4/8
   int *flag = (int*)(aux_local_buffer + sizeof(int)); // The first element is the index counter.
 
 #ifdef ENABLE_ALLREDUCE
@@ -35,7 +44,11 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, u
   int target_rank = (rank+1) % world_size;
   T *rank_data = (T *)dp->ptrs[target_rank];
   T *self_data = (T *)dp->ptrs[rank];
+#else
+  T *rank_data = nullptr;
+  T *self_data = nullptr;
 #endif
+
   // One block for One gemm tile(128x128 / 64*256)
   // One block == 128 threads == 4 warp
   const int OUT_M   = m;
@@ -44,7 +57,6 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, u
   constexpr int TILE_N    = GemmTileShape::kN;
   const int TILE_NUM_M = (OUT_M+TILE_M-1) / TILE_M;   // 32
   const int TILE_NUM_N = (OUT_N+TILE_N-1) / TILE_N;   // 32
-  constexpr int ELE_PER_THREAD = GemmTileShape::kN / 32; // one warp for one row: 128 / 32 = 4
 
   const int bx = blockIdx.x;
   const int tx = threadIdx.x;  // 0..127
@@ -80,25 +92,28 @@ __global__ void disaggregated_reduce(vllm::RankData* dp, vllm::RankSignals sg, u
         int global_m = base_m + row_in_tile;
         if (global_m >= m) continue; // 不能使用return，因为 for (int k = bx; k < flagSize; k += gridDim.x) 可能还需要处理下一组
       
-        int global_n = base_n + lane_id * ELE_PER_THREAD;
+        int global_n = base_n + lane_id * ArrayLen;
         int total_offset = global_m * OUT_N + global_n;
-        T* ptr      = out + total_offset;
+        // T* ptr      = out + total_offset;
+        P* ptr      = (P*)(out + total_offset);
+        P* self_ptr = (P*)(self_data + total_offset);
+        P* rank_ptr = (P*)(rank_data + total_offset);
+        array_t<T, ArrayLen> tmp;
+        #pragma unroll
+        for (int i = 0; i < ArrayLen; i++) {
       #ifdef ENABLE_ALLREDUCE
-        T* self_ptr = self_data + total_offset;
-        T* rank_ptr = rank_data + total_offset;
-        #pragma unroll
-        for (int i = 0; i < ELE_PER_THREAD; ++i) { 
-          // printf("(%f,%f), ", __bfloat162float(self_ptr[i]), __bfloat162float(rank_ptr[i]));
-          ptr[i] = __hadd(self_ptr[i], rank_ptr[i]);
-        }
+          tmp.data[i] = __hadd(self_ptr->data[i], rank_ptr->data[i]);
       #else
-        #pragma unroll
-        for (int i = 0; i < ELE_PER_THREAD; ++i) {
-          // if (i==0)
-          //   printf("(%.0f[%d,%d]%d): (%d,%d) (%d,%d), \n", __bfloat162float(ptr[i]), tile_m, tile_n, total_offset, base_m, base_n, global_m, global_n);
-          ptr[i] = 1;
-        }
+          tmp.data[i] = __float2bfloat16(1.0f);
       #endif // ENABLE_ALLREDUCE
+        }
+        *ptr = tmp;
+
+        //// 要么使用向量(如上，一个线程一个向量)，要么逐个读(一个线程一个数据，一个warp连读32个)。
+        //// 像下面这种写法则无法合并访问。
+        // for (int i = 0; i < ArrayLen; ++i) {
+        //   ptr[i] = 1;
+        // }
       }
     }
   }

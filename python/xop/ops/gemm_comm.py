@@ -8,9 +8,9 @@ from torch.distributed import ProcessGroup
 import xop
 from xop.ops.custom_all_reduce import CustomAllreduce
 
-ENABLE_ALLREDUCE = 1
+ENABLE_ALLREDUCE = 0
 ALLREDUCE_GPUID_OFFSET = 5
-IS_SPLIT_M = 1
+IS_SPLIT_M = 0
 
 def split_rows(x: torch.Tensor, stride: int = 1024):
     M = x.size(0)
