@@ -334,8 +334,8 @@ def run_worker(world_size, rank, port, M, args, xop_perf, torch_perf):
     print(f"xop_perf_rank{rank}:{xop_perf}")
     print(f"torch_perf_rank{rank}:{torch_perf}")
     
-    plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
-    plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
+    plt.plot(plot_x, xop_perf, label='xop_fused_gemmcomm', marker='o', markersize=3)
+    plt.plot(plot_x, torch_perf, label='xop_gemm+nccl', marker='s', markersize=3)
     
     # plt.ylim(bottom=0)  # 
 

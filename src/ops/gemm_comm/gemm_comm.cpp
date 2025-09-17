@@ -137,7 +137,8 @@ public:
         return RunTorch(input, weight, output, bias);
       }
       
-      int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, 1);
+      int max_m = 1024;
+      int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, max_m);
       PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
       std::vector<int32_t> shape_meta = {tuned_m, rt_args->n, rt_args->k, 1};       // mnkl + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)
@@ -155,14 +156,35 @@ public:
 
       cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
       
+      torch::Tensor gemm_out = torch::zeros_like(output);
+
       RtCommArguments comm_args;
       comm_args.handle = fa;
       comm_args.reg_buffer = reg_buffer;
       comm_args.reg_buffer_sz_bytes = reg_buffer_sz_bytes;
-      torch::Tensor gemm_out = torch::zeros_like(output);
       comm_args.gemm_out = gemm_out.data_ptr();
-      op->initialize(rt_args.get(), &comm_args, stream);
-      op->run(stream);        
+
+      //
+
+      RtArguments *base_args = rt_args.get();
+      std::vector<int> split_m = Strategy::SplitChunkM(base_args->m, max_m);
+
+      void *ptr_A = rt_args->ptr_A;
+      void *ptr_D = rt_args->ptr_D;
+      void *ptr_GO = gemm_out.data_ptr();
+      for (int i=0; i<split_m.size(); i++) {
+        rt_args->m = split_m[i];
+
+        size_t bytes = at::elementSize(this->input_dtype);
+        rt_args->ptr_A = (void*)((char*)ptr_A + i*split_m[0]*rt_args->n*bytes);
+        rt_args->ptr_D = (void*)((char*)ptr_D + i*split_m[0]*rt_args->n*bytes);
+        comm_args.gemm_out = (void*)((char*)ptr_GO + i*split_m[0]*rt_args->n*bytes);
+        op->initialize(rt_args.get(), &comm_args, stream);
+        op->run(stream);
+      }
+
+      // op->initialize(rt_args.get(), &comm_args, stream);
+      // op->run(stream);        
     }
     // ins.PrintRegistered("abc");
     // PRINTF("id_meta: ");

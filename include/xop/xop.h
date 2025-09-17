@@ -71,6 +71,19 @@ enum class UnifiedMetaEnum : int8_t {
   RRR = 70, RCR, RCC                                   // layout
 };
 
+inline int8_t sizeof_xop_dtype(UnifiedMetaEnum xop_dtype) {
+  switch (xop_dtype) {
+    case UnifiedMetaEnum::FP32:            return 4;
+    case UnifiedMetaEnum::S32:             return 4;
+    case UnifiedMetaEnum::S8:              return 1;
+    case UnifiedMetaEnum::FP16:            return 2;
+    case UnifiedMetaEnum::BF16:            return 2;
+    case UnifiedMetaEnum::E4M3:            return 1;
+    case UnifiedMetaEnum::E5M2:            return 1;
+  }
+  throw std::runtime_error(std::string("unsupported xop_dtype"));
+}
+
 // inline std::string MetaEnumToString(UnifiedMetaEnum value) {
 //   switch (value) {
 //     case UnifiedMetaEnum::GemmNormal:
