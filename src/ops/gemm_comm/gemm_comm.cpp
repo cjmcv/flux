@@ -137,7 +137,11 @@ public:
         return RunTorch(input, weight, output, bias);
       }
       
-      int max_m = 1024;
+      //////////////////////
+      int max_m = 16384;
+      if (rt_args->k >= 4096) max_m = 2048;
+      else if (rt_args->k >= 8192) max_m = 1024;
+      //////////////////////
       int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, max_m);
       PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
       std::vector<int32_t> shape_meta = {tuned_m, rt_args->n, rt_args->k, 1};       // mnkl + meta
@@ -176,7 +180,7 @@ public:
         rt_args->m = split_m[i];
 
         size_t bytes = at::elementSize(this->input_dtype);
-        rt_args->ptr_A = (void*)((char*)ptr_A + i*split_m[0]*rt_args->n*bytes);
+        rt_args->ptr_A = (void*)((char*)ptr_A + i*split_m[0]*rt_args->k*bytes);
         rt_args->ptr_D = (void*)((char*)ptr_D + i*split_m[0]*rt_args->n*bytes);
         comm_args.gemm_out = (void*)((char*)ptr_GO + i*split_m[0]*rt_args->n*bytes);
         op->initialize(rt_args.get(), &comm_args, stream);

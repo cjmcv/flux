@@ -277,6 +277,9 @@ if __name__ == "__main__":
     fp[tag] = open(args.output_path+"/tuned_config_{0}.cu".format(tag.lower()), "w")
     common.gen_tuning_file_head(fp[tag], tag)
     
+    # device = torch.device(f"cuda:{xop.ALLREDUCE_GPUID_OFFSET}")
+    # torch.cuda.set_device(device)
+    
     schema = str2schema(args.schema)
     config_space = get_tuning_space(schema)
     for i, config in enumerate(config_space):

@@ -186,7 +186,7 @@ public:
           rt_args->m = split_m[i];
 
           size_t bytes = at::elementSize(this->input_dtype);
-          rt_args->ptr_A = (void*)((char*)ptr_A + i*split_m[0]*rt_args->n*bytes);
+          rt_args->ptr_A = (void*)((char*)ptr_A + i*split_m[0]*rt_args->k*bytes);
           rt_args->ptr_D = (void*)((char*)ptr_D + i*split_m[0]*rt_args->n*bytes);
           op->initialize(rt_args.get(), nullptr, stream);
           op->run(stream);
