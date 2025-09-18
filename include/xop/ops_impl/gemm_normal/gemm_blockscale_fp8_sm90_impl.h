@@ -20,7 +20,7 @@ template <class ElementA, class ElementB, class ElementC, class ElementAccumulat
           class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, class TileScheduler, class TileShape, class ClusterShape, 
           RasterOrderOptions RasterOrder, int Swizzle>
-class GemmBlockScaleFp8Impl : public GemmBase {
+class GemmBlockScaleFp8Sm90Impl : public GemmBase {
 public:
   ////
   using         ElementD    = ElementC;

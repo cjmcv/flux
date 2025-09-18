@@ -79,7 +79,7 @@
 
 // Includes from examples directory
 #include "xop/common_cuda.h"
-#include "xop/ops_impl/gemm_normal/gemm_v3_blockscale_fp8_impl.h"
+#include "xop/ops_impl/gemm_normal/gemm_blockscale_fp8_sm90_impl.h"
 using namespace xop;
 
 #include "hopper_fp8_commandline.hpp"
@@ -746,7 +746,7 @@ int run(Options<RasterOrderOptions> &options) {
 }
 
 int run2(Options<RasterOrderOptions> &options) {  
-  using GemmFp8Impl = GemmBlockScaleFp8Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, cutlass::gemm::PersistentScheduler, TileShape, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
+  using GemmFp8Impl = GemmBlockScaleFp8Sm90Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, cutlass::gemm::PersistentScheduler, TileShape, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
 
   RtBlockScaleFp8ArgumentsV3 rt_args;
   {

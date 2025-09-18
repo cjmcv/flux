@@ -105,10 +105,6 @@ public:
       c10::optional<torch::Tensor> tuning,
       bool fast_accum
     ) {
-    #if XOP_CUDA_ARCHS == 89
-      printf("CUDAARCHS\n");
-    #endif
-
     // std::cout << "Tensor input:\n" << input << std::endl;
     std::vector<int16_t> id_meta = MakeDefaultMeta(fast_accum);       // id + meta
     std::unique_ptr<RtArguments> rt_args;

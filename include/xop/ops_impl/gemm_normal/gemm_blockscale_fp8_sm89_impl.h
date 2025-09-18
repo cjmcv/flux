@@ -2,7 +2,7 @@
 #include "xop/ops_impl/global_resource.h"
 #include "xop/ops_impl/common_cutlass.h"
 
-#include "gemm_v2_blockscale_fp8/ada_blockwise_gemm_device.cuh"
+#include "gemm_blockscale_fp8_sm89/ada_blockwise_gemm_device.cuh"
 
 namespace xop {
 // 
@@ -10,7 +10,7 @@ template <class ElementA, class ElementB, class ElementC, class ElementAccumulat
           class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, 
           class TileShape, class PermShape, int NumStages>
-class GemmV2BlockScaleFp8Impl : public GemmBase {
+class GemmBlockScaleFp8Sm89Impl : public GemmBase {
 
   using ElementBlockScale = float;
   using KT = traits::AdaBlockwiseGemmTraits<ElementA, ElementC, ElementAccumulator, ElementBlockScale,

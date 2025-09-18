@@ -91,7 +91,7 @@
 
 // Includes from examples directory
 #include "xop/common_cuda.h"
-#include "xop/ops_impl/gemm_normal/gemm_v3_grouped_blockscale_fp8_impl.h"
+#include "xop/ops_impl/gemm_normal/gemm_grouped_blockscale_fp8_sm90_impl.h"
 using namespace xop;
 
 #include "hopper_fp8_commandline.hpp"
@@ -734,7 +734,7 @@ int run2(OptionType &options, bool host_problem_shapes_available = true)
   initialize(options);
 
   // Instantiate CUTLASS kernel depending on templates
-  using GemmGroupedFp8Impl = GemmGroupedBlockScaleFp8Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, cutlass::gemm::PersistentScheduler, TileShape, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
+  using GemmGroupedFp8Impl = GemmGroupedBlockScaleFp8Sm90Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, cutlass::gemm::PersistentScheduler, TileShape, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
   using ProblemShape = typename GemmGroupedFp8Impl::ProblemShape;
   RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
   {

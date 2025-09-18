@@ -106,7 +106,7 @@ class GemmBlockScaleFp8Schema:
         return None
 
 class GemmGroupedBlockScaleFp8Schema:
-    impl = "GemmGroupedBlockScaleFp8Impl"
+    impl = "GemmGroupedBlockScaleFp8Sm90Impl"
     sub_schema = [Meta.GemmGroupedBlockScaleFp8]
     test_input_dtype = torch.bfloat16
     space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
