@@ -107,7 +107,7 @@ function build_xop_py {
     # MAX_JOBS=${JOBS} python3 setup.py develop --user
     # --no-build-isolation: It reuses the torch already installed in your current conda/env, 
     #                       but you lose the "clean build" benefits of PEP 517; use with caution in CI.
-    MAX_JOBS=${JOBS} pip install . --user --no-build-isolation
+    MAX_JOBS=${JOBS} pip install --editable . --user --no-build-isolation
     if [ $BDIST_WHEEL == "ON" ]; then
         MAX_JOBS=${JOBS} python3 setup.py bdist_wheel
     fi
