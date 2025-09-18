@@ -51,6 +51,12 @@ include_directories(${COMMON_HEADER_DIRS})
 # add_executable(71_blackwell_gemm 71_blackwell_gemm_with_collective_builder/71_blackwell_gemm_with_collective_builder.cu)
 # target_link_libraries(71_blackwell_gemm PUBLIC xop)
 
+# add_executable(79_blackwell_geforce_gemm 79_blackwell_geforce_gemm/79a_blackwell_geforce_nvfp4_bf16_gemm.cu)
+# set_target_properties(79_blackwell_geforce_gemm PROPERTIES
+#     CUDA_ARCHITECTURES "120"
+# )
+# target_link_libraries(79_blackwell_geforce_gemm PUBLIC xop)
+
 # add_executable(49_hopper_gemm 49_hopper_gemm_with_collective_builder/49_collective_builder.cu)
 # target_link_libraries(49_hopper_gemm PUBLIC xop)
 

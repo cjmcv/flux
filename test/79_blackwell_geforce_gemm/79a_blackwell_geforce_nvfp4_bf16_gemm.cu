@@ -84,7 +84,10 @@
 
 #include <iostream>
 
-#include "helper.h"
+// #include "helper.h"
+#include "xop/common_cuda.h"
+#include "xop/ops_impl/common_cutlass.h"
+using namespace xop;
 
 using namespace cute;
 
