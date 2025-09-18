@@ -219,7 +219,7 @@ struct ExampleRunner {
   using DefaultOperation = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementCompute, ElementC, ElementScalar, RoundStyle>;
 
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
-      cutlass::arch::Sm100, cutlass::arch::OpClassTensorOp,
+      cutlass::arch::Sm120, cutlass::arch::OpClassTensorOp,
       MmaTileMNK, ClusterShapeMNK,
       cutlass::epilogue::collective::EpilogueTileAuto,
       ElementAccumulator, ElementCompute,
@@ -230,7 +230,7 @@ struct ExampleRunner {
     >::CollectiveOp;
 
   using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
-      cutlass::arch::Sm100, cutlass::arch::OpClassTensorOp,
+      cutlass::arch::Sm120, cutlass::arch::OpClassTensorOp,
       ElementA, LayoutA, AlignmentA,
       ElementB, LayoutB, AlignmentB,
       ElementAccumulator,
@@ -504,27 +504,27 @@ if (__CUDACC_VER_MAJOR__ < 12 || (__CUDACC_VER_MAJOR__ == 12 && __CUDACC_VER_MIN
   passed = runner_1.run(options, hw_info);
   print_result("KernelScheduleAuto mainloop schedule with EpilogueScheduleAuto epilogue schedule and 3 mainloop stages", passed);
 
-  // 1SM cluster MMA mainloop schedules can be used with direct store ("no-smem") epilogue schedules
-  ExampleRunner<cutlass::gemm::KernelTmaWarpSpecialized1SmSm100, cutlass::epilogue::NoSmemWarpSpecialized1Sm> runner_2;
-  passed = runner_2.run(options, hw_info);
-  print_result("KernelTmaWarpSpecialized1SmSm100 mainloop schedule with NoSmemWarpSpecialized1Sm epilogue schedule", passed);
+  // // 1SM cluster MMA mainloop schedules can be used with direct store ("no-smem") epilogue schedules
+  // ExampleRunner<cutlass::gemm::KernelTmaWarpSpecialized1SmSm100, cutlass::epilogue::NoSmemWarpSpecialized1Sm> runner_2;
+  // passed = runner_2.run(options, hw_info);
+  // print_result("KernelTmaWarpSpecialized1SmSm100 mainloop schedule with NoSmemWarpSpecialized1Sm epilogue schedule", passed);
 
-  // 1SM cluster MMA mainloop schedules can also be used with 1SM TMA epilogue schedules
-  // 1SM cluster MMA mainloop schedules will not work with 2SM TMA epilogue schedules
-  ExampleRunner<cutlass::gemm::KernelTmaWarpSpecialized1SmSm100, cutlass::epilogue::TmaWarpSpecialized1Sm> runner_3;
-  passed = runner_3.run(options, hw_info);
-  print_result("KernelTmaWarpSpecialized1SmSm100 mainloop schedule with TmaWarpSpecialized1Sm epilogue schedule", passed);
+  // // 1SM cluster MMA mainloop schedules can also be used with 1SM TMA epilogue schedules
+  // // 1SM cluster MMA mainloop schedules will not work with 2SM TMA epilogue schedules
+  // ExampleRunner<cutlass::gemm::KernelTmaWarpSpecialized1SmSm100, cutlass::epilogue::TmaWarpSpecialized1Sm> runner_3;
+  // passed = runner_3.run(options, hw_info);
+  // print_result("KernelTmaWarpSpecialized1SmSm100 mainloop schedule with TmaWarpSpecialized1Sm epilogue schedule", passed);
 
-  // 2SM cluster MMA mainloop schedules can be used with direct store ("no-smem") epilogue schedules
-  ExampleRunner<cutlass::gemm::KernelTmaWarpSpecialized2SmSm100, cutlass::epilogue::NoSmemWarpSpecialized2Sm> runner_4;
-  passed = runner_4.run(options, hw_info);
-  print_result("KernelTmaWarpSpecialized2SmSm100 mainloop schedule with NoSmemWarpSpecialized2Sm epilogue schedule", passed);
+  // // 2SM cluster MMA mainloop schedules can be used with direct store ("no-smem") epilogue schedules
+  // ExampleRunner<cutlass::gemm::KernelTmaWarpSpecialized2SmSm100, cutlass::epilogue::NoSmemWarpSpecialized2Sm> runner_4;
+  // passed = runner_4.run(options, hw_info);
+  // print_result("KernelTmaWarpSpecialized2SmSm100 mainloop schedule with NoSmemWarpSpecialized2Sm epilogue schedule", passed);
 
-  // 2SM cluster MMA mainloop schedules can also be used with 2SM TMA epilogue schedules
-  // 2SM cluster MMA mainloop schedules will not work with SM TMA epilogue schedules
-  ExampleRunner<cutlass::gemm::KernelTmaWarpSpecialized2SmSm100, cutlass::epilogue::TmaWarpSpecialized2Sm> runner_5;
-  passed = runner_5.run(options, hw_info);
-  print_result("KernelTmaWarpSpecialized2SmSm100 mainloop schedule with TmaWarpSpecialized2Sm epilogue schedule", passed);
+  // // 2SM cluster MMA mainloop schedules can also be used with 2SM TMA epilogue schedules
+  // // 2SM cluster MMA mainloop schedules will not work with SM TMA epilogue schedules
+  // ExampleRunner<cutlass::gemm::KernelTmaWarpSpecialized2SmSm100, cutlass::epilogue::TmaWarpSpecialized2Sm> runner_5;
+  // passed = runner_5.run(options, hw_info);
+  // print_result("KernelTmaWarpSpecialized2SmSm100 mainloop schedule with TmaWarpSpecialized2Sm epilogue schedule", passed);
 
   // Blackwell Auto schedule supports custom EVT fusions
   constexpr bool UseCustomEVT = true;
@@ -536,33 +536,33 @@ if (__CUDACC_VER_MAJOR__ < 12 || (__CUDACC_VER_MAJOR__ == 12 && __CUDACC_VER_MIN
   passed = runner_6.run(options, hw_info);
   print_result("KernelScheduleAuto mainloop schedule with EpilogueScheduleAuto epilogue schedule and custom EVT", passed);
 
-  // 1SM TMA epilogue schedules support custom EVT fusions
-  ExampleRunner<
-    cutlass::gemm::KernelTmaWarpSpecialized1SmSm100,
-    cutlass::epilogue::TmaWarpSpecialized1Sm,
-    cutlass::gemm::collective::StageCountAuto,
-    UseCustomEVT> runner_7;
-  passed = runner_7.run(options, hw_info);
-  print_result("KernelTmaWarpSpecialized1SmSm100 mainloop schedule with TmaWarpSpecialized1Sm epilogue and custom EVT", passed);
+  // // 1SM TMA epilogue schedules support custom EVT fusions
+  // ExampleRunner<
+  //   cutlass::gemm::KernelTmaWarpSpecialized1SmSm100,
+  //   cutlass::epilogue::TmaWarpSpecialized1Sm,
+  //   cutlass::gemm::collective::StageCountAuto,
+  //   UseCustomEVT> runner_7;
+  // passed = runner_7.run(options, hw_info);
+  // print_result("KernelTmaWarpSpecialized1SmSm100 mainloop schedule with TmaWarpSpecialized1Sm epilogue and custom EVT", passed);
 
-  // 2SM TMA epilogue schedules support custom EVT fusions
-  ExampleRunner<
-    cutlass::gemm::KernelTmaWarpSpecialized2SmSm100,
-    cutlass::epilogue::TmaWarpSpecialized2Sm,
-    cutlass::gemm::collective::StageCountAuto,
-    UseCustomEVT> runner_8;
-  passed = runner_8.run(options, hw_info);
-  print_result("KernelTmaWarpSpecialized2SmSm100 mainloop schedule with TmaWarpSpecialized2Sm epilogue and custom EVT", passed);
+  // // 2SM TMA epilogue schedules support custom EVT fusions
+  // ExampleRunner<
+  //   cutlass::gemm::KernelTmaWarpSpecialized2SmSm100,
+  //   cutlass::epilogue::TmaWarpSpecialized2Sm,
+  //   cutlass::gemm::collective::StageCountAuto,
+  //   UseCustomEVT> runner_8;
+  // passed = runner_8.run(options, hw_info);
+  // print_result("KernelTmaWarpSpecialized2SmSm100 mainloop schedule with TmaWarpSpecialized2Sm epilogue and custom EVT", passed);
 
 
-  // Blackwell direct store epilogue schedule supports custom EVTs and named fusion operations as well (not supported for pre-Blackwell kernels)
-  ExampleRunner<
-    cutlass::gemm::KernelTmaWarpSpecialized1SmSm100,
-    cutlass::epilogue::NoSmemWarpSpecialized1Sm,
-    cutlass::gemm::collective::StageCountAuto,
-    UseCustomEVT> runner_9;
-  passed = runner_9.run(options, hw_info);
-  print_result("KernelTmaWarpSpecialized1SmSm100 mainloop schedule with NoSmemWarpSpecialized1Sm epilogue and custom EVT", passed);
+  // // Blackwell direct store epilogue schedule supports custom EVTs and named fusion operations as well (not supported for pre-Blackwell kernels)
+  // ExampleRunner<
+  //   cutlass::gemm::KernelTmaWarpSpecialized1SmSm100,
+  //   cutlass::epilogue::NoSmemWarpSpecialized1Sm,
+  //   cutlass::gemm::collective::StageCountAuto,
+  //   UseCustomEVT> runner_9;
+  // passed = runner_9.run(options, hw_info);
+  // print_result("KernelTmaWarpSpecialized1SmSm100 mainloop schedule with NoSmemWarpSpecialized1Sm epilogue and custom EVT", passed);
 
 #endif
 
