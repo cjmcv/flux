@@ -299,7 +299,7 @@ struct VisitorAuxStoreRs{
 
       // printf("(%d, %d)\n", get<1>(problem_shape), blockDim.x);
       uint32_t rank = params_ptr->rank;
-      uint32_t target_rank = (rank+1) % 2;
+      // uint32_t target_rank = (rank+1) % 2;
 
       int *flag_c = (int *)params_ptr->aux_local_buffer;
       int *flag_v = (int *)(params_ptr->aux_local_buffer + sizeof(int));

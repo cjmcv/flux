@@ -84,27 +84,8 @@ struct AdaBlockwiseGemm {
     return Status::kSuccess;
   }
 
-  std::vector<int> HeuristicSchema(int m) {
-    const int size = 16384;
-    int quotient = m / size;
-    int remainder = m % size;
-    
-    std::vector<int> result;
-    for (int i = 0; i < quotient; ++i) {
-        result.push_back(size);
-    }
-    if (remainder != 0) {
-      if (!result.empty()) {
-        result.back() += remainder;
-      } else {
-        result.push_back(remainder);
-      }
-    }
-    return result;
-  }
-
   Status run(cudaStream_t stream = nullptr) {
-    std::vector<int> split_m = HeuristicSchema(params_.problem_size.m());
+    std::vector<int> split_m = Strategy::SplitChunkM(params_.problem_size.m(), 16384);
 
     for (int i=0; i<split_m.size(); i++) {
       // printf("Run m=%d, %d.\n", split_m[i], kSmemSize);
