@@ -67,7 +67,7 @@ enum class UnifiedMetaEnum : int8_t {
   GemmGroupedBlockScaleFp8, GemmLt, 
   GemmAllreduce = 20,
   Void = 50, FP16, BF16, FP32, E4M3, E5M2, S8, S32,    // data type
-  Sm80 = 60, Sm89, Sm90,                               // arch
+  Sm80 = 60, Sm89, Sm90, Sm100, Sm120,                 // arch
   RRR = 70, RCR, RCC                                   // layout
 };
 

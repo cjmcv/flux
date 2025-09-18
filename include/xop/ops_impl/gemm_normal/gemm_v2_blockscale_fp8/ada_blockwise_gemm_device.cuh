@@ -8,7 +8,9 @@
 #include <cutlass/numeric_types.h>
 #include <cutlass/trace.h>
 
+#include "xop/common_strategy.h"
 #include "ada_blockwise_gemm_kernel.cuh"
+
 namespace xop {
 namespace device {
 

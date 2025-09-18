@@ -60,7 +60,11 @@ public:
     // auto device_properties = torch::cuda::get_device_properties(0);
     cudaDeviceProp device_properties;
     cudaGetDeviceProperties(&device_properties, 0);
-    if (device_properties.major == 9 && device_properties.minor == 0)
+    if (device_properties.major == 12 && device_properties.minor == 0)
+      arch_ = UnifiedMetaEnum::Sm120;
+    else if (device_properties.major == 10 && device_properties.minor == 0)
+      arch_ = UnifiedMetaEnum::Sm100;
+    else if (device_properties.major == 9 && device_properties.minor == 0)
       arch_ = UnifiedMetaEnum::Sm90;
     else if (device_properties.major == 8 && device_properties.minor == 9)
       arch_ = UnifiedMetaEnum::Sm89;
@@ -101,6 +105,10 @@ public:
       c10::optional<torch::Tensor> tuning,
       bool fast_accum
     ) {
+    #if XOP_CUDA_ARCHS == 89
+      printf("CUDAARCHS\n");
+    #endif
+
     // std::cout << "Tensor input:\n" << input << std::endl;
     std::vector<int16_t> id_meta = MakeDefaultMeta(fast_accum);       // id + meta
     std::unique_ptr<RtArguments> rt_args;
@@ -110,6 +118,7 @@ public:
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_A = input_scale.value().data_ptr();
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_B = weight_scale.value().data_ptr();
       }
+      id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmBlockScaleFp8;
       id_meta[IdMetaEnum::Arch] = (int16_t)arch_;
       if (arch_ != UnifiedMetaEnum::Sm90 && arch_ != UnifiedMetaEnum::Sm89) {
         printf("fp8 kernel is only supported on GPUs with the sm_89 or sm_90 architecture.");

@@ -72,7 +72,7 @@ def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
 # FP8 = clamp(round(BF16 / scale), -448, 448)
 # If using per-token quantization, the max is taken over the current token; 
 # if using per-block quantization, the max is taken over the entire block.
-def per_token_cast_to_fp8(x: torch.Tensor, fast_accum: bool) -> Tuple[torch.Tensor, torch.Tensor]:
+def per_token_cast_to_fp8(x: torch.Tensor, fast_accum: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
     assert x.dim() == 2 and x.size(1) % 128 == 0
     max_value = 448.0
     if (fast_accum):
@@ -84,7 +84,7 @@ def per_token_cast_to_fp8(x: torch.Tensor, fast_accum: bool) -> Tuple[torch.Tens
         m, n
     ), (x_amax / max_value).view(m, -1)
 
-def per_block_cast_to_fp8(x: torch.Tensor, fast_accum: bool) -> Tuple[torch.Tensor, torch.Tensor]:
+def per_block_cast_to_fp8(x: torch.Tensor, fast_accum: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
     assert x.dim() == 2
     max_value = 448.0
     if (fast_accum):

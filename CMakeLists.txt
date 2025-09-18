@@ -37,6 +37,7 @@ set(CUDA_ARCH_FLAGS)
 foreach(ARCH ${CMAKE_CUDA_ARCHITECTURES})
   list(APPEND CUDA_ARCH_FLAGS "-gencode=arch=compute_${ARCH},code=\\\"sm_${ARCH},compute_${ARCH}\\\"")
 endforeach()
+add_definitions(-DXOP_CUDA_ARCHS=${CUDAARCHS})
 
 string(JOIN " " JOINED_CUDA_ARCH_FLAGS ${CUDA_ARCH_FLAGS})
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${JOINED_CUDA_ARCH_FLAGS}")

@@ -122,6 +122,7 @@ public:
       for (int i=0; i<key.size(); i++)
         printf("%d-", key[i]);
       printf("} not found.\n");
+      PrintRegistered("notfound");
       throw std::runtime_error("Gemm type not found.");
     }
 
