@@ -7,13 +7,6 @@
 #include <torch/csrc/distributed/c10d/ProcessGroup.hpp>
 #include <torch/csrc/utils/pybind.h>
 
-#define ENABLE_GEMM_NORMAL 1
-// #define ENABLE_MARLIN_KERNEL 1
-#define ENABLE_GEMM_COMM 1
-#define ENABLE_ALLREDUCE_CUSTOM 1
-// #define ENABLE_FLASH_ATTEN 1
-
-
 #define XOP_TORCH_EXTENSION_NAME xop_pybind
 
 namespace xop {
@@ -31,9 +24,21 @@ struct TorchClassWrapper : public torch::CustomClassHolder, T {
 class ThsOpsInitRegistry {
  public:
   using OpInitFunc = std::function<void(py::module &)>;
-  static ThsOpsInitRegistry &instance();
-  void register_one(std::string name, OpInitFunc &&func);
-  void initialize_all(py::module &m) const;
+  static ThsOpsInitRegistry &instance() {
+    static ThsOpsInitRegistry inst;
+    return inst;
+  }
+  void register_one(std::string name, OpInitFunc &&func){
+    std::lock_guard<std::mutex> guard(register_mutex_);
+    registry_.emplace(std::move(name), std::move(func));
+  }
+  void initialize_all(py::module &m) const {
+    std::lock_guard<std::mutex> guard(register_mutex_);
+    for (auto const &par : registry_) {
+      auto [name, func] = par;
+      func(m);
+    }
+  }
 
  private:
   std::map<std::string, OpInitFunc> registry_;
