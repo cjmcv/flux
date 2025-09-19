@@ -312,10 +312,6 @@ private:
     int batch_stride_C = rt_args->stride_c == 0 ? rt_args->n : problem_size.mn().product();
 
 #ifdef ENABLE_ALLREDUCE
-    // ElementC *gemm_out = (ElementC *)ar_args_.temp_input;
-    // if (ar_args_.is_capturing == false) {
-    //   gemm_out = (ElementC *)ar_args_.reg_buffer;
-    // }
     ElementC *gemm_out = (ElementC *)ar_args_.reg_buffer;
 #else
     ElementC *gemm_out = (ElementC *)rt_args->ptr_D;
@@ -391,18 +387,7 @@ private:
     }
 
     auto reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
-    // if (reg_buffer == 0) {
-    //   // While capturing, reg_buffer is zero.
-    //   // Use your own memory to open the ipc handle.
-    //   ar_args_.is_capturing = true;
-    //   ar_args_.reg_buffer = rt_args->gemm_out;
-    //   ar_args_.temp_input = rt_args->gemm_out;
-    // }
-    // else {
-    //   ar_args_.is_capturing = false;
-      ar_args_.reg_buffer = reg_buffer;
-    //   ar_args_.temp_input = rt_args->gemm_out;
-    // }
+    ar_args_.reg_buffer = reg_buffer;
 
     auto fa = reinterpret_cast<vllm::CustomAllreduce*>(rt_args->handle);
     fa->get_ptrs<to_cuda_type_t<ElementOutput>>(

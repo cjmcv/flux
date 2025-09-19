@@ -159,14 +159,11 @@ public:
       GemmBase *op = ins.GetOp(id_meta, false);
 
       cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-      
-      torch::Tensor gemm_out = torch::zeros_like(output);
 
       RtCommArguments comm_args;
       comm_args.handle = fa;
       comm_args.reg_buffer = reg_buffer;
       comm_args.reg_buffer_sz_bytes = reg_buffer_sz_bytes;
-      comm_args.gemm_out = gemm_out.data_ptr();
 
       //
 
@@ -175,14 +172,12 @@ public:
 
       void *ptr_A = rt_args->ptr_A;
       void *ptr_D = rt_args->ptr_D;
-      void *ptr_GO = gemm_out.data_ptr();
       for (int i=0; i<split_m.size(); i++) {
         rt_args->m = split_m[i];
 
         size_t bytes = at::elementSize(this->input_dtype);
         rt_args->ptr_A = (void*)((char*)ptr_A + i*split_m[0]*rt_args->k*bytes);
         rt_args->ptr_D = (void*)((char*)ptr_D + i*split_m[0]*rt_args->n*bytes);
-        comm_args.gemm_out = (void*)((char*)ptr_GO + i*split_m[0]*rt_args->n*bytes);
         op->initialize(rt_args.get(), &comm_args, stream);
         op->run(stream);
       }
@@ -408,8 +403,6 @@ private:
     comm_args.handle = fa;
     comm_args.reg_buffer = reg_buffer;
     comm_args.reg_buffer_sz_bytes = reg_buffer_sz_bytes;
-    torch::Tensor gemm_out = torch::zeros_like(output);
-    comm_args.gemm_out = gemm_out.data_ptr();
     op->initialize(rt_args, &comm_args, stream);
     op->run(stream);
     

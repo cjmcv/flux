@@ -8,11 +8,10 @@ from torch.distributed import ProcessGroup
 import xop
 
 # from xop.ops.custom_all_reduce import CustomAllreduce
-from xop.ops.overlap_all_reduce import CudaIpcManager
+from xop.ops.cuda_ipc_manager import CudaIpcManager
 
 ENABLE_ALLREDUCE = 1
 ALLREDUCE_GPUID_OFFSET = 5
-IS_SPLIT_M = 0
 
 def split_rows(x: torch.Tensor, stride: int = 1024):
     M = x.size(0)
@@ -52,11 +51,8 @@ class GemmCommRs:
             # self.ar = CustomAllreduce(group, device)
             self.ar = CudaIpcManager(group, device)
             self.rank = rank
-        
-    def ar(self):
-        return self.ar
-
-    def forward_inner(
+  
+    def forward(
         self,
         input: torch.Tensor,
         weight: torch.Tensor,
@@ -73,54 +69,3 @@ class GemmCommRs:
                                     input_scale=input_scale, weight_scale=weight_scale, output_scale=output_scale,
                                     tuning = tuning, fast_accum=fast_accum,
                                     registered=True, fa=fa, reg_buffer=reg_buffer, reg_buffer_sz_bytes=reg_buffer_sz_bytes)
-        
-        # if ENABLE_ALLREDUCE:
-        #     fa, reg_buffer, reg_buffer_sz_bytes = self.ar.address()
-            
-        #     if self.ar.is_capturing():
-        #         if torch.cuda.is_current_stream_capturing():
-        #             return self.gemm_comm.forward(input, weight, output, bias=bias,
-        #                 input_scale=input_scale, weight_scale=weight_scale, output_scale=output_scale,
-        #                 tuning = tuning, fast_accum=fast_accum,
-        #                 registered=True, fa=fa, reg_buffer=0, reg_buffer_sz_bytes=0)
-        #     else:
-        #         return self.gemm_comm.forward(input, weight, output, bias=bias,
-        #             input_scale=input_scale, weight_scale=weight_scale, output_scale=output_scale,
-        #             tuning = tuning, fast_accum=fast_accum,
-        #             registered=False, fa=fa, reg_buffer=reg_buffer, reg_buffer_sz_bytes=reg_buffer_sz_bytes,
-        #         )
-        # else:
-        #     fa, reg_buffer, reg_buffer_sz_bytes = 0,0,0
-        #     reg_buffer = torch.zeros((output.shape[0], output.shape[1]), dtype=torch.int32).cuda()
-            
-        #     self.gemm_comm.forward(input, weight, output, bias=bias,
-        #         input_scale=input_scale, weight_scale=weight_scale, output_scale=output_scale,
-        #         tuning = tuning, fast_accum=fast_accum,
-        #         registered=False, fa=fa, reg_buffer=reg_buffer.data_ptr(), reg_buffer_sz_bytes=reg_buffer_sz_bytes,
-        #     )
-                    
-    def forward(
-        self,
-        input: torch.Tensor,
-        weight: torch.Tensor,
-        output: torch.Tensor,
-        bias: Optional[torch.Tensor] = None,
-        input_scale: Optional[torch.Tensor] = None,
-        weight_scale: Optional[torch.Tensor] = None,
-        output_scale: Optional[torch.Tensor] = None,
-        tuning: Optional[torch.Tensor] = None,
-        fast_accum: bool = False,
-    ) -> int: 
-        if (input.size(0) > 2048 and IS_SPLIT_M == True):
-            # TODO: 普通gemm正常，serial也正常，不使用cuda graph也正常。但是使用cudagraph且非serial则不正常。使用4096测试
-            input_chunks = split_rows(input, 1024)
-            output_chunks = split_rows(output, 1024)
-            for i in range(len(input_chunks)):
-                self.forward_inner(input_chunks[i], weight, output_chunks[i], bias=bias,
-                                  input_scale=input_scale, weight_scale=weight_scale, output_scale=output_scale,
-                                  tuning = tuning, fast_accum=fast_accum)
-            return 0
-        else:
-            return self.forward_inner(input, weight, output, bias=bias,
-                                    input_scale=input_scale, weight_scale=weight_scale, output_scale=output_scale,
-                                    tuning = tuning, fast_accum=fast_accum)
