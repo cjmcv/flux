@@ -286,7 +286,7 @@ public:
     int blocks = std::min(max_blocks, n_ / ThreadblockShape::kN);
 #ifdef ENABLE_ALLREDUCE
     if constexpr (StreamMode == 0) { // one stream no connect
-      cross_device_reduce_1stage_tmp<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
+      vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
     }
     else if constexpr (StreamMode == 1) { // one stream connected
       disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
@@ -312,10 +312,11 @@ private:
     int batch_stride_C = rt_args->stride_c == 0 ? rt_args->n : problem_size.mn().product();
 
 #ifdef ENABLE_ALLREDUCE
-    ElementC *gemm_out = (ElementC *)ar_args_.temp_input;
-    if (ar_args_.is_capturing == false) {
-      gemm_out = (ElementC *)ar_args_.reg_buffer;
-    }
+    // ElementC *gemm_out = (ElementC *)ar_args_.temp_input;
+    // if (ar_args_.is_capturing == false) {
+    //   gemm_out = (ElementC *)ar_args_.reg_buffer;
+    // }
+    ElementC *gemm_out = (ElementC *)ar_args_.reg_buffer;
 #else
     ElementC *gemm_out = (ElementC *)rt_args->ptr_D;
 #endif
@@ -390,18 +391,18 @@ private:
     }
 
     auto reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
-    if (reg_buffer == 0) {
-      // While capturing, reg_buffer is zero.
-      // Use your own memory to open the ipc handle.
-      ar_args_.is_capturing = true;
-      ar_args_.reg_buffer = rt_args->gemm_out;
-      ar_args_.temp_input = rt_args->gemm_out;
-    }
-    else {
-      ar_args_.is_capturing = false;
+    // if (reg_buffer == 0) {
+    //   // While capturing, reg_buffer is zero.
+    //   // Use your own memory to open the ipc handle.
+    //   ar_args_.is_capturing = true;
+    //   ar_args_.reg_buffer = rt_args->gemm_out;
+    //   ar_args_.temp_input = rt_args->gemm_out;
+    // }
+    // else {
+    //   ar_args_.is_capturing = false;
       ar_args_.reg_buffer = reg_buffer;
-      ar_args_.temp_input = rt_args->gemm_out;
-    }
+    //   ar_args_.temp_input = rt_args->gemm_out;
+    // }
 
     auto fa = reinterpret_cast<vllm::CustomAllreduce*>(rt_args->handle);
     fa->get_ptrs<to_cuda_type_t<ElementOutput>>(

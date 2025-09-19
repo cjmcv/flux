@@ -41,102 +41,12 @@
 #include "xop/ops_impl/debug_util.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #define ENABLE_ALLREDUCE
+#define ENABLE_ALLREDUCE
 
 template <typename T = int>
 using atomic_ref_sys = cuda::atomic_ref<T, cuda::thread_scope_system>;
 template <typename T = int>
 using atomic_ref_dev = cuda::atomic_ref<T, cuda::thread_scope_device>;
-
-static DINLINE void xop_st_flag_volatile(uint32_t* flag_addr, uint32_t flag) {
-  asm volatile("st.volatile.global.u32 [%1], %0;" ::"r"(flag), "l"(flag_addr));
-}
-
-static DINLINE uint32_t xop_ld_flag_volatile(uint32_t* flag_addr) {
-  uint32_t flag;
-  asm volatile("ld.volatile.global.u32 %0, [%1];"
-               : "=r"(flag)
-               : "l"(flag_addr));
-  return flag;
-}
-
-
-template <int ngpus>
-DINLINE void xop_barrier_at_start(const vllm::RankSignals& sg, vllm::Signal* self_sg, int rank, int bias=0) {
-  uint32_t flag = self_sg->_flag[blockIdx.x] + 1;
-  // printf("self_sg: %p - (%p, %p), rank %d: block: %d, flag: %d\n", self_sg, sg.signals[0], sg.signals[1], rank, blockIdx.x, flag);
-  if (threadIdx.x < ngpus) {
-    auto peer_counter_ptr = &sg.signals[threadIdx.x+bias]->start[blockIdx.x][rank+bias];
-    auto self_counter_ptr = &self_sg->start[blockIdx.x][threadIdx.x+bias];
-    // printf("a<%d> sg.signals: [%d][%d], [%d][%d] => [%p][%p], [%p][%p]\n", rank, sg.signals[0]->start[blockIdx.x][0], sg.signals[1]->start[blockIdx.x][0], sg.signals[0]->start[blockIdx.x][1], sg.signals[1]->start[blockIdx.x][1],
-    //                                                                             &sg.signals[0]->start[blockIdx.x][0], &sg.signals[1]->start[blockIdx.x][0], &sg.signals[0]->start[blockIdx.x][1], &sg.signals[1]->start[blockIdx.x][1]);
-    // printf("a<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[blockIdx.x][0], self_sg->start[blockIdx.x][1], &self_sg->start[blockIdx.x][0], &self_sg->start[blockIdx.x][1]);
-    // printf("flag: %d. (%d[tid%d][bid%d][rank%d], %d[bid%d][tid%d])", flag, *peer_counter_ptr, threadIdx.x, blockIdx.x, rank, *self_counter_ptr, blockIdx.x, threadIdx.x);
-    // Write the expected counter value to peer and wait for correct value
-    // from peer.
-    // printf("a(%d vs %d) %d\n", *peer_counter_ptr, flag, rank);
-    vllm::st_flag_volatile(peer_counter_ptr, flag);
-    // printf("b(%d vs %d)\n", *peer_counter_ptr, flag);
-    // printf("b<%d> sg.signals: [%d][%d], [%d][%d] => [%p][%p], [%p][%p]\n", rank, sg.signals[0]->start[blockIdx.x][0], sg.signals[1]->start[blockIdx.x][0], sg.signals[0]->start[blockIdx.x][1], sg.signals[1]->start[blockIdx.x][1],
-    //   &sg.signals[0]->start[blockIdx.x][0], &sg.signals[1]->start[blockIdx.x][0], &sg.signals[0]->start[blockIdx.x][1], &sg.signals[1]->start[blockIdx.x][1]);
-    // printf("b<%d> self_sg:    [%d][%d] => [%p][%p]\n", rank, self_sg->start[blockIdx.x][0], self_sg->start[blockIdx.x][1], &self_sg->start[blockIdx.x][0], &self_sg->start[blockIdx.x][1]);
-
-    while (vllm::ld_flag_volatile(self_counter_ptr) != flag);
-    // while (ld_flag_volatile(self_counter_ptr) != flag) {
-    //   printf(".");
-    // }
-  }
-  __syncthreads();
-  // use one thread to update flag
-  if (threadIdx.x == 0) self_sg->_flag[blockIdx.x] = flag;
-}
-
-// This function is meant to be used as the second or the final
-// synchronization barrier in the all reduce kernel. If it's the final
-// synchronization barrier, we don't need to make any visibility guarantees
-// for prior memory accesses.
-template <int ngpus, bool final_sync = false>
-DINLINE void xop_barrier_at_end(const vllm::RankSignals& sg, vllm::Signal* self_sg, int rank, int bias=0) {
-  __syncthreads();
-  uint32_t flag = self_sg->_flag[blockIdx.x] + 1;
-  if (threadIdx.x < ngpus) {
-    auto peer_counter_ptr = &sg.signals[threadIdx.x+bias]->end[blockIdx.x][rank+bias];
-    auto self_counter_ptr = &self_sg->end[blockIdx.x][threadIdx.x+bias];
-    // Write the expected counter value to peer and wait for correct value from
-    // peer.
-    if constexpr (!final_sync) {
-      vllm::st_flag_release(peer_counter_ptr, flag);
-      while (vllm::ld_flag_acquire(self_counter_ptr) != flag);
-    } else {
-      vllm::st_flag_volatile(peer_counter_ptr, flag);
-      while (vllm::ld_flag_volatile(self_counter_ptr) != flag);
-    }
-  }
-  if constexpr (!final_sync) __syncthreads();
-
-  // use one thread to update flag
-  if (threadIdx.x == 0) self_sg->_flag[blockIdx.x] = flag;
-}
-
-
-template <typename T, int ngpus>
-__global__ void cross_device_reduce_1stage_tmp(vllm::RankData* _dp, vllm::RankSignals sg, vllm::Signal* self_sg,
-                                             T* __restrict__ result, int rank, int size) {
-  using P = typename vllm::packed_t<T>::P;
-  using A = typename vllm::packed_t<T>::A;
-  // note: we don't reorder the address so the accumulation order is the same
-  // for all ranks, ensuring bitwise identical results
-  auto dp = *_dp;
-
-  vllm::barrier_at_start<ngpus>(sg, self_sg, rank);
-  // do the actual reduction
-  for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size;
-      idx += gridDim.x * blockDim.x) {
-    ((P*)result)[idx] = vllm::packed_reduce<P, ngpus, A>((const P**)&dp.ptrs[0], idx);
-  }    
-  
-  vllm::barrier_at_end<ngpus, true>(sg, self_sg, rank);
-}
 
 namespace cutlass::epilogue::threadblock {
 
@@ -299,7 +209,7 @@ struct VisitorAuxStoreRs{
 
       // printf("(%d, %d)\n", get<1>(problem_shape), blockDim.x);
       uint32_t rank = params_ptr->rank;
-      // uint32_t target_rank = (rank+1) % 2;
+      uint32_t target_rank = (rank+1) % 2;
 
       int *flag_c = (int *)params_ptr->aux_local_buffer;
       int *flag_v = (int *)(params_ptr->aux_local_buffer + sizeof(int));
