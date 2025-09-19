@@ -1,26 +1,15 @@
-# Adapted from https://github.com/vllm-project/vllm/blob/v0.6.4.post1/vllm/distributed/device_communicators/custom_all_reduce.py
 
 import ctypes
 import logging
 import os
-from contextlib import contextmanager
-from functools import wraps
-from typing import Any, Callable, List, Optional, TypeVar, Union
+from typing import Any, List, Optional, Union
 
 import torch
 import torch.distributed as dist
 from torch.distributed import ProcessGroup
-from typing_extensions import ParamSpec
 
 import xop
 from xop.cuda_wrapper import CudaRTLibrary
-logger = logging.getLogger(__name__)
-
-try:
-    import pynvml
-except ImportError as e:
-    logger.warning("Failed to import pynvml with %r", e)
-
 logger = logging.getLogger(__name__)
 
 
@@ -29,7 +18,6 @@ def is_weak_contiguous(inp: torch.Tensor):
         inp.storage().nbytes() - inp.storage_offset() * inp.element_size()
         == inp.numel() * inp.element_size()
     )
-
 
 class CudaIpcManager:
     _SUPPORTED_WORLD_SIZES = [2, 4, 6, 8]
@@ -52,26 +40,15 @@ class CudaIpcManager:
         is bind to a unique device, and all communicators in this group
         are in the same node.
         """
-        self._IS_CAPTURING = False
-        self.disabled = True
         self.group = group
 
         assert (
             dist.get_backend(group) != dist.Backend.NCCL
         ), "CudaIpcManager should be attached to a non-NCCL group."
 
-        # if not all(in_the_same_node_as(group, source_rank=0)):
-        #     # No need to initialize custom allreduce for multi-node case.
-        #     logger.warning(
-        #         "Custom allreduce is disabled because this process group"
-        #         " spans across nodes."
-        #     )
-        #     return
-
         rank = dist.get_rank(group=self.group)
         world_size = dist.get_world_size(group=self.group)
         if world_size == 1:
-            # No need to initialize custom allreduce for single GPU case.
             return
 
         if world_size not in CudaIpcManager._SUPPORTED_WORLD_SIZES:
@@ -109,7 +86,6 @@ class CudaIpcManager:
         self.max_size = max_size
         self.rank = rank
         self.world_size = world_size
-        self.full_nvlink = False
 
         # Buffers memory are owned by this Python class and passed to C++.
         # Meta data composes of two parts: meta data for synchronization and a
@@ -126,17 +102,16 @@ class CudaIpcManager:
         # 8*world_size bytes where world_size is at most 8. Allocating 8MB
         # is enough for 131072 such tuples. The largest model I've seen only
         # needs less than 10000 of registered tuples.
+        # 用于存放指向ipc buffer的指针对，ipc buffer是buffer_ptrs
+        # 用本地的ipc buffer可以找到与之对应的其他GPU的IPC buffer
         self.rank_data = torch.empty(
             8 * 1024 * 1024, dtype=torch.uint8, device=self.device
         )
         self._ptr = xop.init_custom_ar(
-            self.meta_ptrs, self.rank_data, rank, self.full_nvlink
+            self.meta_ptrs, self.rank_data, rank, False
         )
         xop.register_buffer(self._ptr, self.buffer_ptrs)
         
-
-        self.disabled = False
-
     @staticmethod
     def create_shared_buffer(
         size_in_bytes: int, group: Optional[ProcessGroup] = None
@@ -214,29 +189,19 @@ class CudaIpcManager:
         xop.register_buffer(self._ptr, inp, handles, offsets)
 
     def should_custom_ar(self, inp: torch.Tensor):
-        if self.disabled:
-            return False
         inp_size = inp.numel() * inp.element_size()
         # custom allreduce requires input byte size to be multiples of 16
         if inp_size % 16 != 0:
             return False
         if not is_weak_contiguous(inp):
             return False
-        # for 4 or more non NVLink-capable GPUs, custom allreduce provides
-        # little performance improvement over NCCL.
-
-        if self.world_size == 2 or self.full_nvlink:
-            return inp_size < self.max_size
         return False
 
     ###########################################
-    def is_capturing(self):
-        return self._IS_CAPTURING
-    
+
     def address(self):
         return self._ptr, self.buffer_ptrs[self.rank], self.max_size
     
-
     def close(self):
         if not self.disabled and self._ptr:
             xop.dispose(self._ptr)

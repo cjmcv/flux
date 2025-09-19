@@ -155,7 +155,7 @@ def perf_xop(
         
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
-        with torch.cuda.stream(stream), op.ar.capture():
+        with torch.cuda.stream(stream): # , op.ar.capture():
             with torch.cuda.graph(graph):
                 problem_idx = 0
                 forward_fn(problem_idx)

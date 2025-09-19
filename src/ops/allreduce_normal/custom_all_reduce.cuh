@@ -654,89 +654,18 @@ class CustomAllreduce {
     if (size % d != 0)
       throw std::runtime_error(
           "custom allreduce currently requires input length to be multiple "
-          "of " +
-          std::to_string(d));
+          "of " + std::to_string(d));
 
-    cudaStreamCaptureStatus status;
-    CUDACHECK(cudaStreamIsCapturing(stream, &status));
-    if (status == cudaStreamCaptureStatusActive) {
-      *ptrs = d_rank_data_base_ + graph_unreg_buffers_.size();
-      graph_unreg_buffers_.push_back(input);
-    } else {
-      auto it = buffers_.find(input);
-      if (it == buffers_.end())
-        throw std::runtime_error(
-            "buffer address " +
-            std::to_string(reinterpret_cast<uint64_t>(input)) +
-            " is not registered!");
-      *ptrs = it->second;
-    }
+    auto it = buffers_.find(input);
+    if (it == buffers_.end())
+      throw std::runtime_error("buffer address " +
+          std::to_string(reinterpret_cast<uint64_t>(input)) +" is not registered!");
+    *ptrs = it->second;
     *packed_array_num = size / d;
     *world_size = world_size_;
     *rank = rank_;
     *sg = sg_;
     *self_sg = self_sg_;
-  }
-
-  template <typename T>
-  void allreduce2(cudaStream_t stream, T* input, T* output, int size,
-                 int threads = 1024, int block_limit = defaultBlockLimit) {
-
-    auto d = packed_t<T>::P::size;
-    if (size % d != 0)
-      throw std::runtime_error(
-          "custom allreduce currently requires input length to be multiple "
-          "of " +
-          std::to_string(d));
-    if (block_limit > kMaxBlocks)
-      throw std::runtime_error("max supported block limit is " +
-                               std::to_string(kMaxBlocks) + ". Got " +
-                               std::to_string(block_limit));
-    // printf("stream: %p\n", stream);
-    RankData* ptrs;
-    cudaStreamCaptureStatus status;
-    CUDACHECK(cudaStreamIsCapturing(stream, &status));
-    if (status == cudaStreamCaptureStatusActive) {
-      ptrs = d_rank_data_base_ + graph_unreg_buffers_.size();
-      graph_unreg_buffers_.push_back(input);
-    } else {
-      auto it = buffers_.find(input);
-      if (it == buffers_.end())
-        throw std::runtime_error(
-            "buffer address " +
-            std::to_string(reinterpret_cast<uint64_t>(input)) +
-            " is not registered!");
-      ptrs = it->second;
-    }
-    size /= d;
-    auto bytes = size * sizeof(typename packed_t<T>::P);
-    int blocks = std::min(block_limit, (size + threads - 1) / threads);
-
-#define KL(ngpus, name)                                                       \
-  name<T, ngpus><<<blocks, threads, 0, stream>>>(ptrs, sg_, self_sg_, output, \
-                                                 rank_, size);
-
-    if (world_size_ == 2) {                           
-      KL(2, cross_device_reduce_1stage);
-    }
-    else if (world_size_ == 4) {                                     
-      KL(4, cross_device_reduce_2stage);                                             
-    }  
-    else if (world_size_ == 6) {                                      
-      KL(6, cross_device_reduce_2stage);
-    } 
-    else if (world_size_ == 8) {
-      KL(8, cross_device_reduce_2stage);                                              
-    }
-    else {
-      throw std::runtime_error(
-          "custom allreduce only supports num gpus in (2,4,6,8). Actual "
-          "num "
-          "gpus = " +
-          std::to_string(world_size_));
-    }
-
-#undef KL
   }
 
   ~CustomAllreduce() {

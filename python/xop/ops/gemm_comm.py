@@ -10,7 +10,7 @@ import xop
 # from xop.ops.custom_all_reduce import CustomAllreduce
 from xop.ops.overlap_all_reduce import CudaIpcManager
 
-ENABLE_ALLREDUCE = 0
+ENABLE_ALLREDUCE = 1
 ALLREDUCE_GPUID_OFFSET = 5
 IS_SPLIT_M = 0
 
