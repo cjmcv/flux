@@ -10,7 +10,7 @@ import xop
 # from xop.ops.custom_all_reduce import CustomAllreduce
 from xop.ops.cuda_ipc_manager import CudaIpcManager
 
-ENABLE_ALLREDUCE = 1
+ENABLE_ALLREDUCE = 0
 ALLREDUCE_GPUID_OFFSET = 5
 
 def split_rows(x: torch.Tensor, stride: int = 1024):
@@ -64,7 +64,11 @@ class GemmCommRs:
         tuning: Optional[torch.Tensor] = None,
         fast_accum: bool = False,
     ) -> int: 
-        fa, reg_buffer, reg_buffer_sz_bytes = self.ar.address()
+        if ENABLE_ALLREDUCE:
+            fa, reg_buffer, reg_buffer_sz_bytes = self.ar.address()
+        else:
+            fa, reg_buffer_sz_bytes = 0,0
+            reg_buffer = torch.zeros_like(output).cuda().data_ptr()
         return self.gemm_comm.forward(input, weight, output, bias=bias,
                                     input_scale=input_scale, weight_scale=weight_scale, output_scale=output_scale,
                                     tuning = tuning, fast_accum=fast_accum,

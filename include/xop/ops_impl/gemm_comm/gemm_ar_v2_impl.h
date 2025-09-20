@@ -397,6 +397,7 @@ private:
 
 #else
     // For testing
+    is_serial_ = false;
     RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
     ar_args_.reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
     ar_args_.world_size = 2;

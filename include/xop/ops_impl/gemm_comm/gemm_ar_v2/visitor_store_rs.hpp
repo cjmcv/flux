@@ -41,7 +41,7 @@
 #include "xop/ops_impl/debug_util.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define ENABLE_ALLREDUCE
+// #define ENABLE_ALLREDUCE
 
 template <typename T = int>
 using atomic_ref_sys = cuda::atomic_ref<T, cuda::thread_scope_system>;

@@ -19,6 +19,12 @@
 #include <cuda_runtime_api.h>
 #include <utility>
 
+// #define GEMM_COMM_WITH_NCCL
+
+// #ifdef GEMM_COMM_WITH_NCCL
+// #include "nccl.h"
+// #endif
+
 /////////////////////////////
 #include "xop/xop.h"
 #define CHECK_TYPE(x, st) XOP_CHECK_EQ(x.scalar_type(), st) << "Inconsistency type of Tensor " #x

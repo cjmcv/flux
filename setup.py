@@ -52,11 +52,19 @@ def cuda_deps():
     libraries = ["cuda", "cudart", "cublasLt", "nvidia-ml"]
     return include_dirs, library_dirs, libraries
 
+@pathlib_wrapper
+def nccl_deps():
+    nccl_home = Path(os.environ.get("NCCL_ROOT", root_path / "3rdparty/nccl/build/local"))
+    include_dirs = [nccl_home / "include", nccl_home / "include" / "nccl" / "detail" / "include"]
+    library_dirs = [nccl_home / "lib"]
+    libraries = ["nccl_static"]
+    return include_dirs, library_dirs, libraries
+
 def setup_pytorch_extension() -> setuptools.Extension:
     """Setup CppExtension for PyTorch support"""
     include_dirs, library_dirs, libraries = [], [], []
 
-    deps = [cutlass_deps(), xop_deps(), cuda_deps()]
+    deps = [cutlass_deps(), xop_deps(), cuda_deps(), nccl_deps()]
 
     for include_dir, library_dir, library in deps:
         include_dirs += include_dir

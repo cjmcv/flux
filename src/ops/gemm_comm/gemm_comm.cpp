@@ -69,18 +69,9 @@ public:
     else
       arch_ = UnifiedMetaEnum::Sm80;
     // printf("sm: %d%d.\n", device_properties.major, device_properties.minor);
-
-    // tuning_cpu_ = torch::zeros({100}, torch::TensorOptions()
-    //       .dtype(torch::kInt16)
-    //       .device(torch::kCPU));
   } 
   ~GemmCommImpl() {}
-  // tuning：tensor进入，先构建meta，依次添加序号充当key，取获取op，计算性能，并进行排序，取top5, 保留整个meta。获取不到新op时表示结束。
-  //         top1的meta从cpp端写入文件，信息包括shape+序号+meta。保存时，meta信息需要按python脚本的生成方式，转为字符串。
-  // python脚本根据tuning结果文件，再次生成op注册表+tuning注册表，
-  //       op注册表：按第一次生成的流程再走一遍，同时检索序号+meta的字符串, 匹配者留下，不匹配的不生成。
-  //       tuning注册表：key是shape+meta，value是序号，test时输入tensor，构建meta，结合shape，获取序号。组成序号+meta，充当op注册表的key，检索搜索op。
-  // python1生成搜索空间op注册表，编译，python2执行tuning脚本，生成tuned表，python1生成top1的op注册表以及tuning注册表。
+
   int forward(
       torch::Tensor input,
       torch::Tensor weight,

@@ -20,6 +20,7 @@ function clean_py() {
 
 function clean_all() {
     clean_py
+    rm -rf 3rdparty/nccl/build
     rm -rf build/
 }
 
@@ -77,6 +78,31 @@ if [[ -z $JOBS ]]; then
     JOBS=$(nproc --ignore 2)
 fi
 
+function build_nccl() {
+    NCCL_ROOT=$PROJECT_ROOT/3rdparty/nccl
+    pushd $NCCL_ROOT
+    export BUILDDIR=${NCCL_ROOT}/build
+    export PREFIX=${BUILDDIR}/local
+
+    if [[ -n $ARCH ]]; then
+        NCCL_COMPILE_OPTIONS_ARCH="" # default none
+        arch_list=()
+        IFS=";" read -ra arch_list <<<"$ARCH"
+        for arch in "${arch_list[@]}"; do
+            NCCL_COMPILE_OPTIONS_ARCH="-gencode=arch=compute_${arch},code=sm_${arch} ${NCCL_COMPILE_OPTIONS_ARCH}"
+        done
+        make -j${JOBS} src.staticlib NVCC_GENCODE="${NCCL_COMPILE_OPTIONS_ARCH}" VERBOSE=1
+    else
+        make -j${JOBS} src.staticlib VERBOSE=1
+    fi
+    # only install static lib
+    mkdir -p ${PREFIX}/lib
+    cp -P -v ${BUILDDIR}/lib/lib* ${PREFIX}/lib/
+    cp -P -v -r ${BUILDDIR}/include ${PREFIX}/
+    popd
+}
+
+
 ##### build xop_cuda #####
 function build_xop_cuda() {
     mkdir -p build
@@ -114,5 +140,6 @@ function build_xop_py {
     fi
 }
 
+build_nccl
 build_xop_cuda
 build_xop_py
