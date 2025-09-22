@@ -57,6 +57,13 @@ class CheckFail {
 #define XOP_CHECK_LE(lhs, rhs) XOP_CHECK_BINOP((lhs), (rhs), <=)
 #define XOP_CHECK_GE(lhs, rhs) XOP_CHECK_BINOP((lhs), (rhs), >=)
 
+#define XOP_CHECK_TYPE(x, st) XOP_CHECK_EQ(x.scalar_type(), st) << "Inconsistency type of Tensor " #x
+#define XOP_CHECK_CUDA(x) XOP_CHECK(x.is_cuda()) << #x << " must be a CUDA tensor"
+#define XOP_CHECK_CONTIGUOUS(x) XOP_CHECK(x.is_contiguous()) << #x << " must be contiguous"
+#define XOP_CHECK_INPUT(x, st) \
+  XOP_CHECK_CUDA(x);           \
+  XOP_CHECK_CONTIGUOUS(x);     \
+  XOP_CHECK_TYPE(x, st)
 
 /////////////////////////////////////////////////////
 // Enum classes
@@ -69,6 +76,17 @@ enum class UnifiedMetaEnum : int8_t {
   Void = 50, FP16, BF16, FP32, E4M3, E5M2, S8, S32,    // data type
   Sm80 = 60, Sm89, Sm90, Sm100, Sm120,                 // arch
   RRR = 70, RCR, RCC                                   // layout
+};
+
+enum MetaEnum {
+  kMetaId = 0, 
+  kMetaSchema = 1,
+  kMetaTypeA = 2,
+  kMetaTypeB = 3,
+  kMetaTypeCD = 4,
+  kMetaTypeAcc = 5,
+  kMetaLayout = 6,
+  kMetaArch = 7
 };
 
 inline int8_t sizeof_xop_dtype(UnifiedMetaEnum xop_dtype) {

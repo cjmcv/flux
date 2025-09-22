@@ -24,31 +24,12 @@
 
 /////////////////////////////
 #include "xop/xop.h"
-#define CHECK_TYPE(x, st) XOP_CHECK_EQ(x.scalar_type(), st) << "Inconsistency type of Tensor " #x
-#define CHECK_CUDA(x) XOP_CHECK(x.is_cuda()) << #x << " must be a CUDA tensor"
-#define CHECK_CONTIGUOUS(x) XOP_CHECK(x.is_contiguous()) << #x << " must be contiguous"
-#define CHECK_INPUT(x, st) \
-  CHECK_CUDA(x);           \
-  CHECK_CONTIGUOUS(x);     \
-  CHECK_TYPE(x, st)
 
 #define PRINTF printf
-
 
 //////////////////////////////
 namespace xop {
 using torch::Tensor;
-
-enum IdMetaEnum {
-  Id = 0, 
-  Schema = 1,
-  TypeA = 2,
-  TypeB = 3,
-  TypeCD = 4,
-  TypeAcc = 5,
-  Layout = 6,
-  Arch = 7
-};
 
 class GemmComm::GemmCommImpl {
 public:
@@ -99,8 +80,8 @@ public:
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_A = input_scale.value().data_ptr();
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_B = weight_scale.value().data_ptr();
       }
-      id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmBlockScaleFp8; // TODO: 检查是否可删除？
-      id_meta[IdMetaEnum::Arch] = (int16_t)arch_;
+      id_meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmBlockScaleFp8; // TODO: 检查是否可删除？
+      id_meta[kMetaArch] = (int16_t)arch_;
       if (arch_ != UnifiedMetaEnum::Sm90 && arch_ != UnifiedMetaEnum::Sm89) {
         printf("fp8 kernel is only supported on GPUs with the sm_89 or sm_90 architecture.");
         return -1;
@@ -112,7 +93,7 @@ public:
       // PRINTF("\n");
     }
     else {
-      id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmAllreduce; // TODO: 检查是否可删除？
+      id_meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmAllreduce; // TODO: 检查是否可删除？
       rt_args = std::make_unique<RtArgumentsV2>();
     }
     GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, rt_args.get());
@@ -139,13 +120,13 @@ public:
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)
       
       TunedConfigRegister& tins = TunedConfigRegister::instance();
-      tins.GetCommSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);
+      tins.GetCommSelectedConfig(shape_meta, &id_meta[kMetaId], &id_meta[kMetaSchema]);
 
       // If the required configuration is not registered in the tuning config, directly use torch for computation.
-      if (id_meta[IdMetaEnum::Id] == -1) {
-        id_meta[IdMetaEnum::Id] = 0;
+      if (id_meta[kMetaId] == -1) {
+        id_meta[kMetaId] = 0;
       }
-      PRINTF("[runing comm] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+      PRINTF("[runing comm] selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
       GemmConfigRegister& ins = GemmConfigRegister::instance();
       GemmBase *op = ins.GetOp(id_meta, false);
 
@@ -197,8 +178,8 @@ public:
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
     std::vector<int16_t> id_meta = MakeDefaultMeta(false);     // id + meta
-    id_meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmGroupedBlockScaleFp8;
-    id_meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm90;
+    id_meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmGroupedBlockScaleFp8;
+    id_meta[kMetaArch] = (int16_t)UnifiedMetaEnum::Sm90;
 
     RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
     // PRINTF("size: %ld, %ld, %ld, %ld, %ld.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
@@ -226,8 +207,8 @@ public:
     if (tuning.has_value()) {
       int16_t *data = (int16_t *)tuning.value().data_ptr();
       XOP_CHECK_EQ(data[0], 1);
-      id_meta[IdMetaEnum::Id] = data[1];
-      id_meta[IdMetaEnum::Schema] = data[2];
+      id_meta[kMetaId] = data[1];
+      id_meta[kMetaSchema] = data[2];
       is_tuning = true;
     }
     else {
@@ -239,9 +220,9 @@ public:
       int32_t n = weights[0].size(0);
       std::vector<int32_t> shape_meta = {m, n, k, rt_args->groups};       // mnkg + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
-      tins.GetCommSelectedConfig(shape_meta, &id_meta[IdMetaEnum::Id], &id_meta[IdMetaEnum::Schema]);      
+      tins.GetCommSelectedConfig(shape_meta, &id_meta[kMetaId], &id_meta[kMetaSchema]);      
     }
-    PRINTF("selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+    PRINTF("selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
     GemmBase *op = ins.GetOp(id_meta, is_tuning);
     if (op == nullptr)
       return -1;
@@ -266,24 +247,24 @@ private:
   std::vector<int16_t> MakeDefaultMeta(bool fast_accum) {
     std::vector<int16_t> meta;
     meta.resize(8);
-    meta[IdMetaEnum::Id] = -1;                                  // id
+    meta[kMetaId] = -1;                                  // id
     // (GemmComm / GemmNormalSimt / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)
-    meta[IdMetaEnum::Schema] = (int16_t)UnifiedMetaEnum::GemmAllreduce; // schema type 
+    meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmAllreduce; // schema type 
 
-    meta[IdMetaEnum::TypeA] = from_torch_dtype(this->input_dtype);  // type A
-    meta[IdMetaEnum::TypeB] = from_torch_dtype(this->input_dtype);  // type B
-    meta[IdMetaEnum::TypeCD] = from_torch_dtype(this->output_dtype); // type C/D
+    meta[kMetaTypeA] = from_torch_dtype(this->input_dtype);  // type A
+    meta[kMetaTypeB] = from_torch_dtype(this->input_dtype);  // type B
+    meta[kMetaTypeCD] = from_torch_dtype(this->output_dtype); // type C/D
 
     if (fast_accum)
-      meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP16;        // type acc
+      meta[kMetaTypeAcc] = (int16_t)UnifiedMetaEnum::FP16;        // type acc
     else
-      meta[IdMetaEnum::TypeAcc] = (int16_t)UnifiedMetaEnum::FP32;
+      meta[kMetaTypeAcc] = (int16_t)UnifiedMetaEnum::FP32;
 
     if (transpose_weight)                           // layout
-      meta[IdMetaEnum::Layout] = (int16_t)UnifiedMetaEnum::RRR; 
+      meta[kMetaLayout] = (int16_t)UnifiedMetaEnum::RRR; 
     else
-      meta[IdMetaEnum::Layout] = (int16_t)UnifiedMetaEnum::RCR;
-    meta[IdMetaEnum::Arch] = (int16_t)UnifiedMetaEnum::Sm80;        // arch
+      meta[kMetaLayout] = (int16_t)UnifiedMetaEnum::RCR;
+    meta[kMetaArch] = (int16_t)UnifiedMetaEnum::Sm80;        // arch
 
     return meta;
   }
@@ -296,8 +277,8 @@ private:
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
       RtArguments *rt_args) {
-    CHECK_INPUT(input, this->input_dtype);
-    CHECK_INPUT(weight, this->input_dtype);
+    XOP_CHECK_INPUT(input, this->input_dtype);
+    XOP_CHECK_INPUT(weight, this->input_dtype);
     TORCH_CHECK(input.dim() == 2, "input shape is not 2");
     TORCH_CHECK(weight.dim() == 2, "weight dim is not 2");
     int32_t m = input.size(0);
@@ -306,7 +287,7 @@ private:
 
     rt_args->C_s = -1;
     if (bias.has_value()) {
-      CHECK_INPUT(bias.value(), this->output_dtype);
+      XOP_CHECK_INPUT(bias.value(), this->output_dtype);
       if (bias->dim() == 2) {
         XOP_CHECK_EQ(n, bias->size(1));
         XOP_CHECK((bias->size(0) == m) || (bias->size(0) == 1));
@@ -362,10 +343,10 @@ private:
                     int64_t reg_buffer, 
                     int64_t reg_buffer_sz_bytes) {
     XOP_CHECK_EQ(tuning_data[0]==1 || tuning_data[0]==2, true);
-    id_meta[IdMetaEnum::Id] = tuning_data[1];
-    id_meta[IdMetaEnum::Schema] = tuning_data[2];
+    id_meta[kMetaId] = tuning_data[1];
+    id_meta[kMetaSchema] = tuning_data[2];
     
-    PRINTF("[tuning comm] selected_id: %d, selected_schema: %d.\n", id_meta[IdMetaEnum::Id], id_meta[IdMetaEnum::Schema]);
+    PRINTF("[tuning comm] selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
     int tuning_pass_mode = tuning_data[0];
     tuning_data[0] = id_meta.size();
     for (int i=0; i<id_meta.size(); i++) {
