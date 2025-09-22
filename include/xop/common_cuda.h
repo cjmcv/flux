@@ -20,6 +20,23 @@
 
 namespace xop {
 
+inline UnifiedMetaEnum get_arch() {
+  cudaDeviceProp device_properties;
+  cudaGetDeviceProperties(&device_properties, 0);
+  if (device_properties.major == 12 && device_properties.minor == 0)
+    return UnifiedMetaEnum::Sm120;
+  else if (device_properties.major == 10 && device_properties.minor == 0)
+    return UnifiedMetaEnum::Sm100;
+  else if (device_properties.major == 9 && device_properties.minor == 0)
+    return UnifiedMetaEnum::Sm90;
+  else if (device_properties.major == 8 && device_properties.minor == 9)
+    return UnifiedMetaEnum::Sm89;
+  else
+    return UnifiedMetaEnum::Sm80; 
+  
+  printf("sm: %d%d.\n", device_properties.major, device_properties.minor);
+}
+  
 /**
  * GPU timer for recording the elapsed time across kernel(s) launched in GPU
  * stream

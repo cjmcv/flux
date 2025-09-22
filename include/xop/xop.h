@@ -78,7 +78,7 @@ enum class UnifiedMetaEnum : int8_t {
   RRR = 70, RCR, RCC                                   // layout
 };
 
-enum MetaEnum {
+enum MetaLocEnum {
   kMetaId = 0, 
   kMetaSchema = 1,
   kMetaTypeA = 2,

@@ -35,10 +35,7 @@ public:
   using LayoutD             = LayoutC;
   using ElementCompute      = float;                                          // Element type for epilogue computation
   using ElementScalar       = float;
-  ////
 
-  // using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum;
-  // using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
   static constexpr bool UseCustomEVT = false;
 
