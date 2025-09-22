@@ -43,11 +43,11 @@ public:
   using LayoutSFA     = decltype(ScaleConfig::deduce_layoutSFA());    // Layout type for SFA matrix operand
   using LayoutSFB     = decltype(ScaleConfig::deduce_layoutSFB());    // Layout type for SFB matrix operand
 
-  using KernelSchedule    = cutlass::gemm::KernelPtrArrayTmaWarpSpecializedCooperativeFP8BlockScaledAccum;
-  using EpilogueSchedule  = cutlass::epilogue::PtrArrayTmaWarpSpecializedCooperative;
+  using MainloopScheduleType    = cutlass::gemm::KernelPtrArrayTmaWarpSpecializedCooperativeFP8BlockScaledAccum;
+  using EpilogueScheduleType    = cutlass::epilogue::PtrArrayTmaWarpSpecializedCooperative;
   
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
-  using FusionOperation   = cutlass::epilogue::fusion::LinearCombination<ElementC, ElementAccumulator>;
+  using FusionOperation     = cutlass::epilogue::fusion::LinearCombination<ElementC, ElementAccumulator>;
 
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
       ArchTag, OperatorClass,
@@ -56,7 +56,7 @@ public:
       ElementAccumulator, ElementCompute,
       ElementC, LayoutC *, 128 / cutlass::sizeof_bits<ElementC>::value,
       ElementD, LayoutD *, 128 / cutlass::sizeof_bits<ElementD>::value,
-      EpilogueSchedule,
+      EpilogueScheduleType,
       FusionOperation
     >::CollectiveOp;
   using CollectiveMainloopWithGroupWiseScaling = typename cutlass::gemm::collective::CollectiveBuilder<
@@ -68,7 +68,7 @@ public:
       cutlass::gemm::collective::StageCountAutoCarveout<
         static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))
       >,
-      KernelSchedule
+      MainloopScheduleType
     >::CollectiveOp;
 
   using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
