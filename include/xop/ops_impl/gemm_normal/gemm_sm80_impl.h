@@ -16,7 +16,7 @@ template <class ElementA, class ElementB, class ElementC, class ElementAccumulat
           class ArchTag, 
           class ThreadblockShape, class WarpShape, class InstructionShape,
           class ThreadBlockSwizzle, int NumStages, int SplitKFactor, int AvailSms>
-class GemmPureV2Impl : public GemmBase  {
+class GemmSm80Impl : public GemmBase  {
 
 #ifdef ENABLE_EVT
   using ElementCompute = ElementAccumulator;
@@ -222,7 +222,7 @@ private:
 ///////////////////////////////////////////////////////////////////////////
 // // template
 // template <class ElementA, class ElementB, class ElementC。。。>
-// class GemmPureV2Impl : public GemmBase  {
+// class GemmSm80Impl : public GemmBase  {
 
 //   using EpilogueOp = cutlass::epilogue::thread::LinearCombination<。。。>;
 //   using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<。。。>;

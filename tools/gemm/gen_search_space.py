@@ -82,8 +82,8 @@ def make_meta_space(w, data_type, layout, arch):
 #### GemmNormal
 
 class GemmNormalSchema:
-    impl = "GemmPureV2Impl"
-    impl_header = "gemm_normal/gemm_v2_impl.h"
+    impl = "GemmSm80Impl"
+    impl_header = "gemm_normal/gemm_sm80_impl.h"
     arch_limit = ">=80"
     
     def get_meta_space(self, w):
@@ -137,8 +137,8 @@ class GemmNormalSchema:
             res.append(hparam_str)
         return res
 class GemmNormalSimtSchema:
-    impl = "GemmPureV2SimtImpl"
-    impl_header = "gemm_normal/gemm_v2_simt_impl.h"
+    impl = "GemmSimtSm80Impl"
+    impl_header = "gemm_normal/gemm_simt_sm80_impl.h"
     arch_limit = ">=80"
     
     def get_meta_space(self, w):

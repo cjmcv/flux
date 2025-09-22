@@ -20,13 +20,13 @@ include_directories(${COMMON_HEADER_DIRS})
 # target_link_libraries(test_dual_gemm PUBLIC xop)
 
 # ## fused_two_gemms 对shape有严格限制，ThreadblockShape::kN = problem_size.N，不符合实际应用情况
-# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/13_two_tensor_op_fusion)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/13_two_tensor_op_fusion)
 
-# add_executable(test_fused_two_gemms_f16_sm80_rf 13_two_tensor_op_fusion/fused_two_gemms_f16_sm80_rf.cu)
-# target_link_libraries(test_fused_two_gemms_f16_sm80_rf PUBLIC xop)
+add_executable(test_fused_two_gemms_f16_sm80_rf 13_two_tensor_op_fusion/fused_two_gemms_f16_sm80_rf.cu)
+target_link_libraries(test_fused_two_gemms_f16_sm80_rf PUBLIC xop)
 
-# add_executable(test_fused_two_gemms_f16_sm80_shmem 13_two_tensor_op_fusion/fused_two_gemms_f16_sm80_shmem.cu)
-# target_link_libraries(test_fused_two_gemms_f16_sm80_shmem PUBLIC xop)
+add_executable(test_fused_two_gemms_f16_sm80_shmem 13_two_tensor_op_fusion/fused_two_gemms_f16_sm80_shmem.cu)
+target_link_libraries(test_fused_two_gemms_f16_sm80_shmem PUBLIC xop)
 # ## 
 
 # ##

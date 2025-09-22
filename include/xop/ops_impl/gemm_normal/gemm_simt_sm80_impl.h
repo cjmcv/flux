@@ -9,7 +9,7 @@ template <class ElementA, class ElementB, class ElementC, class ElementAccumulat
           class ArchTag, 
           class ThreadblockShape, class WarpShape, 
           class ThreadBlockSwizzle, int NumStages, int SplitKFactor>
-class GemmPureV2SimtImpl : public GemmBase {
+class GemmSimtSm80Impl : public GemmBase {
 
   using EpilogueOpSimt = cutlass::epilogue::thread::LinearCombination<
       ElementC,               // Element type for C and D matrix operands
