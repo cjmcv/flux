@@ -10,8 +10,10 @@ import itertools
 
 class TypeWarpper:
     def tag_unify(self, tag):
-        if (tag == "GemmBlockScaleFp8Sm89"):
+        if (tag == "GemmBlockScaleFp8Sm89" or tag == "GemmBlockScaleFp8Sm90"):
             return "GemmBlockScaleFp8"
+        if (tag == "GemmGroupedBlockScaleFp8Sm90"):
+            return "GemmGroupedBlockScaleFp8"
         if (tag == "GemmAllreduceV2"):
             return "GemmAllreduce"
         if (tag == "GemmSimtSm80" or tag == "GemmSimtSm90"):

@@ -140,6 +140,6 @@ function build_xop_py {
     fi
 }
 
-build_nccl
+# build_nccl
 build_xop_cuda
 build_xop_py
