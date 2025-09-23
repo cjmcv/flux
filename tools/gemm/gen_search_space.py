@@ -14,6 +14,10 @@ class TypeWarpper:
             return "GemmBlockScaleFp8"
         if (tag == "GemmAllreduceV2"):
             return "GemmAllreduce"
+        if (tag == "GemmSimtSm80" or tag == "GemmSimtSm90"):
+            return "GemmNormalSimt"
+        if (tag == "GemmSm80" or tag == "GemmSm90"):
+            return "GemmNormal"
         return tag
     # xop type warp
     def xtw(self, type):
@@ -30,8 +34,8 @@ class TypeWarpper:
 
     def xop_to_cutlasstype(self, xop_type):
         string_to_string = {
-            "GemmNormal": "Error",
-            "GemmNormalSimt": "Error",
+            "GemmSm80": "Error",
+            "GemmSimtSm80": "Error",
             "Void": "Void",
             "FP16": "cutlass::half_t",
             "BF16": "cutlass::bfloat16_t",
@@ -55,6 +59,15 @@ class TypeWarpper:
             "AlongM": "xop::RasterOrderOptions::AlongM",
             "AlongN": "xop::RasterOrderOptions::AlongN",
             # 
+            "MSTma": "cutlass::gemm::KernelTma",
+            "MSTmaWarpSpecialized": "cutlass::gemm::KernelTmaWarpSpecialized",
+            "MSTmaWarpSpecializedPingpong": "cutlass::gemm::KernelTmaWarpSpecializedPingpong",
+            "MSTmaWarpSpecializedCooperative": "cutlass::gemm::KernelTmaWarpSpecializedCooperative",
+            
+            "ESNoSmemWarpSpecialized": "cutlass::epilogue::NoSmemWarpSpecialized",
+            "ESTmaWarpSpecialized": "cutlass::epilogue::TmaWarpSpecialized",
+            "ESTmaWarpSpecializedCooperative": "cutlass::epilogue::TmaWarpSpecializedCooperative",
+            
             "TSPersistent": "cutlass::gemm::PersistentScheduler",
             "TSStreamK": "cutlass::gemm::StreamKScheduler"
         }
@@ -79,9 +92,9 @@ def make_meta_space(w, data_type, layout, arch):
         res.append((meta_xop_str, meta_cutlass_str))
     return res
 
-#### GemmNormal
+#### GemmSm80
 
-class GemmNormalSchema:
+class GemmSm80Schema:
     impl = "GemmSm80Impl"
     impl_header = "gemm_normal/gemm_sm80_impl.h"
     arch_limit = ">=80"
@@ -136,7 +149,7 @@ class GemmNormalSchema:
             
             res.append(hparam_str)
         return res
-class GemmNormalSimtSchema:
+class GemmSimtSm80Schema:
     impl = "GemmSimtSm80Impl"
     impl_header = "gemm_normal/gemm_simt_sm80_impl.h"
     arch_limit = ">=80"
@@ -204,6 +217,49 @@ class GemmBlockScaleFp8Sm89Schema:
             res.append(hparam_str)
         return res
     
+class GemmSm90Schema:
+    impl = "GemmSm90Impl"
+    impl_header = "gemm_normal/gemm_sm90_impl.h"
+    arch_limit = "==90"
+    
+    def get_meta_space(self, w):
+        # ('BF16', 'BF16', 'BF16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP16')
+        data_type = [('BF16', 'BF16', 'BF16', 'FP32')] # a,b,cd,acc
+        layout = ['RCR'] # , 'RRR'
+        arch = ['Sm90'] # , 'Sm89'
+
+        res = make_meta_space(w, data_type, layout, arch)
+        return res
+
+    def get_hparam_space(self, w):
+        mainloop_schedules = ["MSTma", "MSTmaWarpSpecialized", "MSTmaWarpSpecializedPingpong", "MSTmaWarpSpecializedCooperative"]
+        epilogue_schedules = ["ESNoSmemWarpSpecialized", "ESTmaWarpSpecialized", "ESTmaWarpSpecializedCooperative"]
+        tile_schedulers = ["TSPersistent", "TSStreamK"]
+        tile_shapes = [(128, 128, 128), (128, 128, 64)]
+        cluster_shapes = [(1, 2, 1), (2, 1, 1)]
+
+        res = []
+        for tile_shape, cluster_shape, mainloop_schedule, epilogue_schedule, tile_scheduler in itertools.product(
+            tile_shapes, cluster_shapes, mainloop_schedules, epilogue_schedules, tile_schedulers):
+            
+            # "Ping-pong kernel does not currently support stream-K scheduler" - cutlass 4.2
+            if (mainloop_schedule == "MSTmaWarpSpecializedPingpong" and tile_scheduler == "TSStreamK"):
+                continue
+            # "TMA warp-specialized kernel does not support specializing the tile scheduler." - cutlass 4.2
+            if (mainloop_schedule == "MSTmaWarpSpecialized" and tile_scheduler != "TSPersistent"):
+                continue
+            # "TMA kernel does not support specializing the tile scheduler." - cutlass 4.2
+            if ((mainloop_schedule == "MSTma" and tile_scheduler != "TSPersistent") or 
+                (mainloop_schedule == "MSTma" and epilogue_schedules != "ESNoSmemWarpSpecialized")):
+                continue
+            
+            hparam_str = '{0},{1},{2},{3},{4}'.format(
+                w.cstw(tile_shape,3), w.cstw(cluster_shape,3),
+                w.xop_to_cutlasstype(mainloop_schedule), 
+                w.xop_to_cutlasstype(epilogue_schedule), 
+                w.xop_to_cutlasstype(tile_scheduler))
+            res.append(hparam_str)
+        return res
 class GemmBlockScaleFp8Sm90Schema:
     impl = "GemmBlockScaleFp8Sm90Impl"
     impl_header = "gemm_normal/gemm_blockscale_fp8_sm90_impl.h"
@@ -308,8 +364,9 @@ class GemmAllreduceV2Schema:
             
 def str2schema(schema_name):
     string_to_schema = {
-        "GemmNormal": GemmNormalSchema(),
-        "GemmNormalSimt": GemmNormalSimtSchema(),
+        "GemmSm80": GemmSm80Schema(),
+        "GemmSimtSm80": GemmSimtSm80Schema(),
+        "GemmSm90": GemmSm90Schema(),
         "GemmBlockScaleFp8Sm89": GemmBlockScaleFp8Sm89Schema(),
         "GemmBlockScaleFp8Sm90": GemmBlockScaleFp8Sm90Schema(),
         "GemmGroupedBlockScaleFp8Sm90": GemmGroupedBolckScaleFp8Sm90Schema(),
@@ -353,7 +410,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmNormal (GemmNormal/GemmNormalSimt/GemmBlockScaleFp8Sm89/GemmBlockScaleFp8Sm90/GemmGroupedBlockScaleFp8Sm90 // GemmAllreduceV2)")
+        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmSm80 (GemmSm80/GemmSimtSm80/GemmBlockScaleFp8Sm89/GemmSm90/GemmBlockScaleFp8Sm90/GemmGroupedBlockScaleFp8Sm90 // GemmAllreduceV2)")
         exit()
     generator = SearchSpaceGenerator()
     generator.run(args.schema, args.output_path) 

@@ -15,18 +15,10 @@
 
 namespace xop {
 
-using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
-          class ArchTag, class TileScheduler, class TileShape, class ClusterShape, 
-          RasterOrderOptions RasterOrder, int Swizzle,
-          class MainloopScheduleType = cutlass::gemm::collective::KernelScheduleAuto,
-          // Type of epilogue schedule to generate
-          class EpilogueScheduleType = cutlass::epilogue::collective::EpilogueScheduleAuto,
-          // Number of pipeline stages to use
-          class StageCountType = cutlass::gemm::collective::StageCountAuto,
-          // Type of tile scheduler to use
-          class TileSchedulerType = cutlass::gemm::PersistentScheduler>
+          class ArchTag, class TileShape, class ClusterShape, 
+          class MainloopScheduleType, class EpilogueScheduleType, class TileScheduler>
 
 class GemmSm90Impl : public GemmBase {
 public:
@@ -69,9 +61,10 @@ public:
   // These tags also provide additional metadata that can be queried at compile time.
   using DefaultOperation = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementCompute, ElementC, ElementScalar, RoundStyle>;
 
+  // CollectiveEpilogue的ClusterShape是111，CollectiveMainloop的是211
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
-      cutlass::arch::Sm90, cutlass::arch::OpClassTensorOp,
-      cute::Shape<cute::_128,cute::_128,cute::_64>, cute::Shape<cute::_1,cute::_1,cute::_1>,
+      ArchTag, cutlass::arch::OpClassTensorOp,
+      TileShape, ClusterShape,
       EpilogueTileType,
       ElementAccumulator, ElementCompute,
       ElementC, LayoutC, AlignmentC,
@@ -81,14 +74,14 @@ public:
     >::CollectiveOp;
 
   using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
-      cutlass::arch::Sm90, cutlass::arch::OpClassTensorOp,
+      ArchTag, cutlass::arch::OpClassTensorOp,
       ElementA, LayoutA, AlignmentA,
       ElementB, LayoutB, AlignmentB,
       ElementAccumulator,
-      cute::Shape<cute::_128,cute::_128,cute::_64>, cute::Shape<cute::_2,cute::_1,cute::_1>,
-      cute::conditional_t<cute::is_same_v<StageCountType, cutlass::gemm::collective::StageCountAuto>,
-          cutlass::gemm::collective::StageCountAutoCarveout<static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))>,
-          StageCountType>,
+      TileShape, ClusterShape,
+      cutlass::gemm::collective::StageCountAutoCarveout<
+        static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))
+      >,
       MainloopScheduleType
     >::CollectiveOp;
 
@@ -96,7 +89,7 @@ public:
       cute::Shape<int,int,int,int>,
       CollectiveMainloop,
       CollectiveEpilogue,
-      TileSchedulerType
+      TileScheduler
   >;
 
   using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
