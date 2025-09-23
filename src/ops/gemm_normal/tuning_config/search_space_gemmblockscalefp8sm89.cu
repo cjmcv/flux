@@ -1,5 +1,5 @@
 // clang-format off
-#if XOP_CUDA_ARCHS>=89
+#if XOP_CUDA_ARCHS==89
 #include "xop/ops_impl/gemm_normal/gemm_blockscale_fp8_sm89_impl.h"
 
 namespace xop {
@@ -59,5 +59,5 @@ static int search_space_gemmblockscalefp8sm89 = []() {
   return 0;
 }();
 }
-#endif // #if XOP_CUDA_ARCHS>=89
+#endif // #if XOP_CUDA_ARCHSXOP_CUDA_ARCHS==89
 // clang-format on

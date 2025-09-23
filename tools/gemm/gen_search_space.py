@@ -99,7 +99,7 @@ def make_meta_space(w, data_type, layout, arch):
 class GemmSm80Schema:
     impl = "GemmSm80Impl"
     impl_header = "gemm_normal/gemm_sm80_impl.h"
-    arch_limit = ">=80"
+    arch_limit = "XOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89"
     
     def get_meta_space(self, w):
         # ('BF16', 'BF16', 'BF16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP16')
@@ -154,7 +154,7 @@ class GemmSm80Schema:
 class GemmSimtSm80Schema:
     impl = "GemmSimtSm80Impl"
     impl_header = "gemm_normal/gemm_simt_sm80_impl.h"
-    arch_limit = ">=80"
+    arch_limit = "XOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89"
     
     def get_meta_space(self, w):
         data_type = [('BF16', 'BF16', 'BF16', 'FP32')] # a,b,cd,acc
@@ -188,7 +188,7 @@ class GemmSimtSm80Schema:
 class GemmBlockScaleFp8Sm89Schema:
     impl = "GemmBlockScaleFp8Sm89Impl"
     impl_header = "gemm_normal/gemm_blockscale_fp8_sm89_impl.h"
-    arch_limit = ">=89"
+    arch_limit = "XOP_CUDA_ARCHS==89"
     
     def get_meta_space(self, w):
         # ('E4M3', 'E4M3', 'FP16', 'FP16')
@@ -222,7 +222,7 @@ class GemmBlockScaleFp8Sm89Schema:
 class GemmSm90Schema:
     impl = "GemmSm90Impl"
     impl_header = "gemm_normal/gemm_sm90_impl.h"
-    arch_limit = "==90"
+    arch_limit = "XOP_CUDA_ARCHS==90"
     
     def get_meta_space(self, w):
         # ('BF16', 'BF16', 'BF16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP16')
@@ -265,7 +265,7 @@ class GemmSm90Schema:
 class GemmBlockScaleFp8Sm90Schema:
     impl = "GemmBlockScaleFp8Sm90Impl"
     impl_header = "gemm_normal/gemm_blockscale_fp8_sm90_impl.h"
-    arch_limit = "==90"
+    arch_limit = "XOP_CUDA_ARCHS==90"
     
     def get_meta_space(self, w):
         data_type = [('E4M3', 'E4M3', 'BF16', 'FP32')] # a,b,cd,acc
@@ -293,7 +293,7 @@ class GemmBlockScaleFp8Sm90Schema:
 class GemmGroupedBolckScaleFp8Sm90Schema:
     impl = "GemmGroupedBlockScaleFp8Sm90Impl"
     impl_header = "gemm_normal/gemm_grouped_blockscale_fp8_sm90_impl.h"
-    arch_limit = "==90"
+    arch_limit = "XOP_CUDA_ARCHS==90"
     
     def get_meta_space(self, w):
         data_type = [('E4M3', 'E4M3', 'BF16', 'FP32')] # a,b,cd,acc
@@ -322,7 +322,7 @@ class GemmGroupedBolckScaleFp8Sm90Schema:
 class GemmAllreduceV2Schema:
     impl = "GemmAllreduceV2Impl"
     impl_header = "gemm_comm/gemm_ar_v2_impl.h"
-    arch_limit = ">=80"
+    arch_limit = "XOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89"
     
     def get_meta_space(self, w):
         # ('BF16', 'BF16', 'BF16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP16')
@@ -383,7 +383,7 @@ class SearchSpaceGenerator:
         fp = {}
         fp[tag] = open(output_path + "/search_space_{0}.cu".format(tag.lower()), "w")
         fp[tag].write('// clang-format off\n')
-        fp[tag].write('#if XOP_CUDA_ARCHS{0}\n'.format(schema.arch_limit))
+        fp[tag].write('#if {0}\n'.format(schema.arch_limit))
         fp[tag].write('#include "xop/ops_impl/{0}"\n\n'.format(schema.impl_header))
         fp[tag].write('namespace xop {\n')
         fp[tag].write('using namespace cutlass;\n')
@@ -402,7 +402,7 @@ class SearchSpaceGenerator:
                 fp[tag].write('/*op*/[]() {{ return new {0}</*meta*/{1},/*hparam*/{2}>();}});\n'.format(schema.impl, cutlass_meta, h))
 
         fp[tag].write('  return 0;\n}();\n}\n')
-        fp[tag].write('#endif // #if XOP_CUDA_ARCHS{0}\n'.format(schema.arch_limit))
+        fp[tag].write('#endif // #if {0}\n'.format(schema.arch_limit))
         fp[tag].write('// clang-format on')
         
 if __name__ == "__main__":

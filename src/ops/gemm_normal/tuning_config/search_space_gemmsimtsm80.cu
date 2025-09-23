@@ -1,5 +1,5 @@
 // clang-format off
-#if XOP_CUDA_ARCHS>=80
+#if XOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89
 #include "xop/ops_impl/gemm_normal/gemm_simt_sm80_impl.h"
 
 namespace xop {
@@ -35,5 +35,5 @@ static int search_space_gemmsimtsm80 = []() {
   return 0;
 }();
 }
-#endif // #if XOP_CUDA_ARCHS>=80
+#endif // #if XOP_CUDA_ARCHSXOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89
 // clang-format on

@@ -1,5 +1,5 @@
 // clang-format off
-#if XOP_CUDA_ARCHS>=80
+#if XOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89
 #include "xop/ops_impl/gemm_comm/gemm_ar_v2_impl.h"
 
 namespace xop {
@@ -27,5 +27,5 @@ static int search_space_gemmallreducev2 = []() {
   return 0;
 }();
 }
-#endif // #if XOP_CUDA_ARCHS>=80
+#endif // #if XOP_CUDA_ARCHSXOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89
 // clang-format on
