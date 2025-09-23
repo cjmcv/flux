@@ -2,7 +2,7 @@
 #include "xop/ops_impl/global_resource.h"
 #include "xop/ops_impl/common_cutlass.h"
 
-#include "gemm_ar_v2/gemm_universal_rs.h"
+#include "gemm_ar_sm80/gemm_universal_rs.h"
 
 namespace xop {
 

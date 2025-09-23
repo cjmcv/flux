@@ -4,11 +4,11 @@
 
 #include "cutlass/epilogue/threadblock/fusion/visitors.hpp"
 // #include "cutlass/gemm/kernel/default_gemm_universal_with_visitor.h"
-#include "gemm_ar_v2/default_gemm_universal_with_visitor_rs.h"
+#include "gemm_ar_sm80/default_gemm_universal_with_visitor_rs.h"
 #include "cutlass/gemm/device/gemm_universal_adapter.h"
 
-#include "gemm_ar_v2/visitor_store_rs.hpp"
-// #include "gemm_ar_v2/gemm_universal_rs.h"
+#include "gemm_ar_sm80/visitor_store_rs.hpp"
+// #include "gemm_ar_sm80/gemm_universal_rs.h"
 
 ////////////////////////////////
 // #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.h"

@@ -234,8 +234,8 @@ class GemmSm90Schema:
         return res
 
     def get_hparam_space(self, w):
-        mainloop_schedules = ["MSTma", "MSTmaWarpSpecialized", "MSTmaWarpSpecializedPingpong", "MSTmaWarpSpecializedCooperative"]
-        epilogue_schedules = ["ESNoSmemWarpSpecialized", "ESTmaWarpSpecialized", "ESTmaWarpSpecializedCooperative"]
+        mainloop_schedules = ["MSTmaWarpSpecializedPingpong", "MSTmaWarpSpecializedCooperative", "MSTmaWarpSpecialized", "MSTma"]
+        epilogue_schedules = ["ESTmaWarpSpecialized", "ESTmaWarpSpecializedCooperative"] # "ESNoSmemWarpSpecialized": EVT are currently only support by the TMA warp specialized epi.
         tile_schedulers = ["TSPersistent", "TSStreamK"]
         tile_shapes = [(128, 128, 128), (128, 128, 64)]
         cluster_shapes = [(1, 2, 1), (2, 1, 1)]
@@ -244,18 +244,21 @@ class GemmSm90Schema:
         for tile_shape, cluster_shape, mainloop_schedule, epilogue_schedule, tile_scheduler in itertools.product(
             tile_shapes, cluster_shapes, mainloop_schedules, epilogue_schedules, tile_schedulers):
             
-            # "Ping-pong kernel does not currently support stream-K scheduler" - cutlass 4.2
-            if (mainloop_schedule == "MSTmaWarpSpecializedPingpong" and tile_scheduler == "TSStreamK"):
-                continue
-            # CUTE_STATIC_ASSERT(epi_tile_m % mma_tile_m == 0, "MMA_TILE_M must divide EPI_TILE_M"); - cutlass 4.2
-            if (mainloop_schedule == "MSTmaWarpSpecializedCooperative" and epilogue_schedule == "ESTmaWarpSpecialized"):
-                continue
+            # TmaWarpSpecializedPingpong / TmaWarpSpecialized -> TmaWarpSpecialized
             # "TMA warp-specialized kernel does not support specializing the tile scheduler." - cutlass 4.2
-            if (mainloop_schedule == "MSTmaWarpSpecialized" and tile_scheduler != "TSPersistent"):
+            if (mainloop_schedule == "MSTmaWarpSpecialized" and 
+                (epilogue_schedule != "ESTmaWarpSpecialized" or tile_scheduler != "TSPersistent")):
+                continue
+            # "Ping-pong kernel does not currently support stream-K scheduler" - cutlass 4.2
+            if (mainloop_schedule == "MSTmaWarpSpecializedPingpong" and 
+                (epilogue_schedule != "ESTmaWarpSpecialized" or tile_scheduler != "TSPersistent")):
+                continue
+            # TmaWarpSpecializedCooperative -> TmaWarpSpecializedCooperative
+            if (mainloop_schedule == "MSTmaWarpSpecializedCooperative" and epilogue_schedule != "ESTmaWarpSpecializedCooperative"):
                 continue
             # "TMA kernel does not support specializing the tile scheduler." - cutlass 4.2
-            if ((mainloop_schedule == "MSTma" and tile_scheduler != "TSPersistent") or 
-                (mainloop_schedule == "MSTma" and epilogue_schedule != "ESNoSmemWarpSpecialized")):
+            if (mainloop_schedule == "MSTma" and 
+                (tile_scheduler != "TSPersistent" or epilogue_schedule != "ESNoSmemWarpSpecialized")):
                 continue
             
             hparam_str = '{0},{1},{2},{3},{4}'.format(
@@ -324,7 +327,7 @@ class GemmGroupedBolckScaleFp8Sm90Schema:
 #### GemmComm
 class GemmAllreduceV2Schema:
     impl = "GemmAllreduceV2Impl"
-    impl_header = "gemm_comm/gemm_ar_v2_impl.h"
+    impl_header = "gemm_comm/gemm_ar_sm80_impl.h"
     arch_limit = "XOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89"
     
     def get_meta_space(self, w):

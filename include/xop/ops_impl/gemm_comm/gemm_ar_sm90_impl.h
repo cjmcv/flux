@@ -20,7 +20,7 @@ template <class ElementA, class ElementB, class ElementC, class ElementAccumulat
           class ArchTag, class TileShape, class ClusterShape, 
           class MainloopScheduleType, class EpilogueScheduleType, class TileScheduler>
 
-class GemmSm90Impl : public GemmBase {
+class GemmArSm90Impl : public GemmBase {
 public:
   ////
   using ElementD            = ElementC;
