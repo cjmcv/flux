@@ -247,12 +247,15 @@ class GemmSm90Schema:
             # "Ping-pong kernel does not currently support stream-K scheduler" - cutlass 4.2
             if (mainloop_schedule == "MSTmaWarpSpecializedPingpong" and tile_scheduler == "TSStreamK"):
                 continue
+            # CUTE_STATIC_ASSERT(epi_tile_m % mma_tile_m == 0, "MMA_TILE_M must divide EPI_TILE_M"); - cutlass 4.2
+            if (mainloop_schedule == "MSTmaWarpSpecializedCooperative" and epilogue_schedule == "ESTmaWarpSpecialized"):
+                continue
             # "TMA warp-specialized kernel does not support specializing the tile scheduler." - cutlass 4.2
             if (mainloop_schedule == "MSTmaWarpSpecialized" and tile_scheduler != "TSPersistent"):
                 continue
             # "TMA kernel does not support specializing the tile scheduler." - cutlass 4.2
             if ((mainloop_schedule == "MSTma" and tile_scheduler != "TSPersistent") or 
-                (mainloop_schedule == "MSTma" and epilogue_schedules != "ESNoSmemWarpSpecialized")):
+                (mainloop_schedule == "MSTma" and epilogue_schedule != "ESNoSmemWarpSpecialized")):
                 continue
             
             hparam_str = '{0},{1},{2},{3},{4}'.format(
