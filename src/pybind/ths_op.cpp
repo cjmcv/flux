@@ -1,7 +1,7 @@
 
 #include "ths_op.h"
 
-#define ENABLE_GEMM_NORMAL 1
+// #define ENABLE_GEMM_NORMAL 1
 // #define ENABLE_MARLIN_KERNEL 1
 #define ENABLE_GEMM_COMM 1
 #define ENABLE_ALLREDUCE_CUSTOM 1

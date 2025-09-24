@@ -13,6 +13,9 @@
 #include "cutlass/epilogue/collective/collective_builder.hpp"
 #include "cutlass/util/packed_stride.hpp"
 
+#include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_cooperative_rs.hpp"
+#include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_pingpong_rs.hpp"
+
 namespace xop {
 
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
@@ -85,7 +88,7 @@ public:
       MainloopScheduleType
     >::CollectiveOp;
 
-  using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
+  using GemmKernel = cutlass::gemm::kernel::GemmUniversalRsSm90<
       cute::Shape<int,int,int,int>,
       CollectiveMainloop,
       CollectiveEpilogue,
