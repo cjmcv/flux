@@ -29,7 +29,7 @@ public:
   using ElementScalar       = float;
 
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
-  static constexpr bool UseCustomEVT = false;
+  static constexpr bool UseCustomEVT = true;
 
   // 16B alignment lets us use TMA
   static constexpr int AlignmentA = 16 / sizeof(ElementA);

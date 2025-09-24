@@ -14,7 +14,7 @@ class TypeWarpper:
             return "GemmBlockScaleFp8"
         if (tag == "GemmGroupedBlockScaleFp8Sm90"):
             return "GemmGroupedBlockScaleFp8"
-        if (tag == "GemmAllreduceV2"):
+        if (tag == "GemmAllreduceSm80" or tag == "GemmAllreduceSm90"):
             return "GemmAllreduce"
         if (tag == "GemmSimtSm80" or tag == "GemmSimtSm90"):
             return "GemmNormalSimt"
@@ -325,8 +325,8 @@ class GemmGroupedBolckScaleFp8Sm90Schema:
         return res
 
 #### GemmComm
-class GemmAllreduceV2Schema:
-    impl = "GemmAllreduceV2Impl"
+class GemmAllreduceSm80Schema:
+    impl = "GemmAllreduceSm80Impl"
     impl_header = "gemm_comm/gemm_ar_sm80_impl.h"
     arch_limit = "XOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89"
     
@@ -378,7 +378,7 @@ def str2schema(schema_name):
         "GemmBlockScaleFp8Sm89": GemmBlockScaleFp8Sm89Schema(),
         "GemmBlockScaleFp8Sm90": GemmBlockScaleFp8Sm90Schema(),
         "GemmGroupedBlockScaleFp8Sm90": GemmGroupedBolckScaleFp8Sm90Schema(),
-        "GemmAllreduceV2": GemmAllreduceV2Schema(),
+        "GemmAllreduceSm80": GemmAllreduceSm80Schema(),
     }
     return string_to_schema.get(schema_name, None)
 
@@ -418,7 +418,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmSm80 (GemmSm80/GemmSimtSm80/GemmBlockScaleFp8Sm89/GemmSm90/GemmBlockScaleFp8Sm90/GemmGroupedBlockScaleFp8Sm90 // GemmAllreduceV2)")
+        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmSm80 (GemmSm80/GemmSimtSm80/GemmBlockScaleFp8Sm89/GemmSm90/GemmBlockScaleFp8Sm90/GemmGroupedBlockScaleFp8Sm90 // GemmAllreduceSm80)")
         exit()
     generator = SearchSpaceGenerator()
     generator.run(args.schema, args.output_path) 

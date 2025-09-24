@@ -29,7 +29,7 @@ public:
   using ElementScalar       = float;
 
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
-  static constexpr bool UseCustomEVT = false;
+  static constexpr bool UseCustomEVT = true;
 
   // 16B alignment lets us use TMA
   static constexpr int AlignmentA = 16 / sizeof(ElementA);
@@ -45,7 +45,7 @@ public:
 
   // EVTs can be constructed by composing the fundamental load/store/compute visitor operations defined in include/cutlass/epilogue/fusion
   // For more complex examples of EVT construction please refer to include/cutlass/epilogue/fusion/sm90_callbacks_tma_warpspecialized.hpp
-  using CustomEVT =  // alpha * acc + beta * C
+  using CustomEVT =  // (alpha * acc) + beta * C
     cutlass::epilogue::fusion::Sm90EVT<cutlass::epilogue::fusion::Sm90Compute<cutlass::homogeneous_multiply_add, ElementD, ElementCompute, RoundStyle>, // beta * C + (alpha * acc)
       cutlass::epilogue::fusion::Sm90ScalarBroadcast<ElementScalar>, // beta
       cutlass::epilogue::fusion::Sm90SrcFetch<ElementC>, // C
