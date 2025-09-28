@@ -203,7 +203,7 @@ class CudaIpcManager:
         return self._ptr, self.buffer_ptrs[self.rank], self.max_size
     
     def close(self):
-        if not self.disabled and self._ptr:
+        if not self._ptr:
             xop.dispose(self._ptr)
             self.free_shared_buffer(self.meta_ptrs)
             self.free_shared_buffer(self.buffer_ptrs)

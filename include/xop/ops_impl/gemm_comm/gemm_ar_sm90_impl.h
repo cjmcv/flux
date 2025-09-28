@@ -170,7 +170,7 @@ public:
 #ifdef ENABLE_ALLREDUCE
     if (is_serial_ == true) {
       int max_blocks = 32;
-      constexpr int threads = 128;
+      constexpr int threads = 1024;
       int blocks = max_blocks; // std::min(max_blocks, n_ / ThreadblockShape::kN);
       vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementD>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);      
     }
@@ -191,12 +191,18 @@ private:
     hw_info.device_id = 0;
     hw_info.sm_count = cutlass::KernelHardwareInfo::query_device_multiprocessor_count(hw_info.device_id);
 
+#ifdef ENABLE_ALLREDUCE
+    ElementD *gemm_out = (ElementD *)ar_args_.reg_buffer;
+#else
+    ElementD *gemm_out = (ElementD *)rt_args->ptr_D;
+#endif
+
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGemm,
       problem_size,
       {(ElementA *)rt_args->ptr_A, stride_A, (ElementB *)rt_args->ptr_B, stride_B},
       {{}, // epilogue.thread
-      (ElementC *)rt_args->ptr_C, stride_C, (ElementD *)rt_args->ptr_D, stride_D},
+      (ElementC *)rt_args->ptr_C, stride_C, gemm_out, stride_D},
       hw_info
     };
 
