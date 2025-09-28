@@ -94,8 +94,10 @@ public:
       
       //////////////////////
       int max_m = 16384;
-      if (rt_args->k >= 4096) max_m = 2048;
-      else if (rt_args->k >= 8192) max_m = 1024;
+      if (arch_ == UnifiedMetaEnum::Sm80) {
+        if (rt_args->k >= 4096) max_m = 2048;
+        else if (rt_args->k >= 8192) max_m = 1024;        
+      }
       //////////////////////
       int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, max_m);
       PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);

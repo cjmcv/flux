@@ -78,6 +78,8 @@ enum class UnifiedMetaEnum : int8_t {
   RRR = 70, RCR, RCC                                   // layout
 };
 
+enum class CommKindEnum : int8_t { IntraNode, AcrossNode, IntraNodePcie };
+
 enum MetaLocEnum {
   kMetaId = 0, 
   kMetaSchema = 1,

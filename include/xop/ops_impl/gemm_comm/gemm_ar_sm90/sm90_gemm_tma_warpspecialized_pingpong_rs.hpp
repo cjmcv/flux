@@ -50,6 +50,8 @@
 #include "cutlass/arch/grid_dependency_control.h"
 
 #include "gemm_universal_decl_rs.h"
+
+#define ENABLE_ALLREDUCE
 ///////////////////////////////////////////////////////////////////////////////
 
 namespace cutlass::gemm::kernel {

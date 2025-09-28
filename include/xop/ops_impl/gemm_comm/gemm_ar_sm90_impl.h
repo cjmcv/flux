@@ -16,7 +16,27 @@
 #include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_cooperative_rs.hpp"
 #include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_pingpong_rs.hpp"
 
+#include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
+
 namespace xop {
+
+struct AllReduceSm90Arguments {
+  int world_size;
+  int rank;
+  int packed_array_num;
+  
+  void *reg_buffer;
+  vllm::RankData* rank_data;
+  vllm::RankSignals rank_signals;
+  vllm::Signal *self_signal;
+  
+  void *output;
+  uint8_t *aux_local_buffer;
+  int aux_buffer_streamk_reduce_mark_step;   // Used to mark the tiles that require reduction in Stream-K
+  int aux_buffer_reduce_arrival_step; // Used to count the number of arrivals of reduce epi
+  size_t aux_local_size;
+  virtual ~AllReduceSm90Arguments() {}
+};
 
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
@@ -113,6 +133,16 @@ public:
   void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
+    //////////////////////////////////////////
+    is_serial_ = true;
+    m_ = rt_args->m;
+    n_ = rt_args->n;
+    output_len_ = rt_args->m * rt_args->n;
+    ar_args_.output = rt_args->ptr_D;    
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    fetch_comm_args(fusion_args, cu_stream);
+    //////////////////////////////////////////
+
     // Instantiate CUTLASS kernel depending on templates
     gemm_dev_ = Gemm();
 
@@ -136,6 +166,15 @@ public:
   void run(void *stream = nullptr) {
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
+
+#ifdef ENABLE_ALLREDUCE
+    if (is_serial_ == true) {
+      int max_blocks = 32;
+      constexpr int threads = 128;
+      int blocks = max_blocks; // std::min(max_blocks, n_ / ThreadblockShape::kN);
+      vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementD>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);      
+    }
+#endif
   }
 
 private:
@@ -189,8 +228,45 @@ private:
     return arguments;
   }
 
+  void fetch_comm_args(void *fusion_args, cudaStream_t stream) {
+#ifdef ENABLE_ALLREDUCE
+    RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
+
+    if constexpr (!(cute::is_same_v<ElementD, float> ||
+      cute::is_same_v<ElementD, cutlass::half_t> ||
+      cute::is_same_v<ElementD, cutlass::bfloat16_t>)) {
+      throw std::runtime_error("custom allreduce only supports float32, float16 and bfloat16");
+    }
+
+    auto reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
+    ar_args_.reg_buffer = reg_buffer;
+
+    auto fa = reinterpret_cast<vllm::CustomAllreduce*>(rt_args->handle);
+    fa->get_ptrs<to_cuda_type_t<ElementD>>(
+      stream, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.reg_buffer), output_len_,
+      &ar_args_.world_size, &ar_args_.rank, &ar_args_.packed_array_num,
+      &ar_args_.rank_data, &ar_args_.rank_signals, &ar_args_.self_signal);
+
+#else
+
+    // For testing
+    is_serial_ = false;
+    RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
+    ar_args_.reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
+    ar_args_.world_size = 2;
+    ar_args_.rank = 1;
+    // printf("finish malloc.\n");
+#endif
+  }
+
 private:
   Gemm gemm_dev_;
+
+  bool is_serial_;
+  AllReduceSm90Arguments ar_args_;
+  int m_;
+  int n_;
+  int output_len_;
 };
 
 } // namespace xop
