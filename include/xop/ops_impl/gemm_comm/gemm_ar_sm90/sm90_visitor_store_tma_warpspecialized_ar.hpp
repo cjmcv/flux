@@ -240,7 +240,10 @@ struct Sm90AuxStoreReduceScatter {
       int tile_idx = tile_layout(m, n);
       int flag_idx = tile_idx * 2;
       tma_store_wait<0>();
+
+      printf("auxStore 0.\n");
       Barrier::wait_eq_reset(params_ptr->barrier_ptr, thread_idx, flag_idx, 0, 1);
+      printf("auxStore 1.\n");
     }
 
     template <class T>

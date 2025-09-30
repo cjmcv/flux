@@ -170,7 +170,7 @@ public:
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
     //////////////////////////////////////////
-    is_serial_ = true;
+    is_serial_ = false;
     m_ = rt_args->m;
     n_ = rt_args->n;
     output_len_ = rt_args->m * rt_args->n;
@@ -245,8 +245,9 @@ private:
 
     cudaMemcpy(rank_data_, ar_args_.rank_data->ptrs, 8 * sizeof(ElementD*), cudaMemcpyDeviceToHost);
     cudaMemcpy(&host_rank_signals_, &ar_args_.rank_signals, sizeof(vllm::RankSignals), cudaMemcpyDeviceToHost);
-    for (int i=0; i<8; i++)
-      barrier_ptrs_[i] = host_rank_signals_.signals[i]->_flag;
+    for (int i=0; i<kMaxLocalWorldSize; i++)
+      barrier_ptrs_[i] = (int *)host_rank_signals_.signals[i]->_flag;
+    printf("is_device_pointer: %d\n", is_device_pointer(barrier_ptrs_[0]));
 
     arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
       .output_scatter_ptrs = (ElementD **)rank_data_,

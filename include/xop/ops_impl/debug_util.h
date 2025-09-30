@@ -22,6 +22,23 @@ namespace xop {
 // cute::print_layout       => include/cute/layout.hpp
 // cute::print_tensor       => include/cute/tensor_impl.hpp
 
+// Returning true indicates that the pointer is currently pointing to the device-side
+bool is_device_pointer(const void* p) {
+    cudaPointerAttributes attr;
+    cudaError_t err = cudaPointerGetAttributes(&attr, p);
+    if (err == cudaErrorInvalidValue) {
+        // The driver doesn't recognize this address at all,
+        // it can never point to the cuda memory.
+        cudaGetLastError();
+        return false;
+    }
+    if (err != cudaSuccess) return false; 
+#ifdef CUDA_VERSION >= 11020
+    return (attr.type == cudaMemoryTypeDevice);
+#else
+    return (attr.memoryType == cudaMemoryTypeDevice);
+#endif
+}
 
 template<class Engine, class Layout>
 void print_device_tensor(cute::Tensor<Engine, Layout> const& t) {
