@@ -175,6 +175,8 @@ public:
     n_ = rt_args->n;
     output_len_ = rt_args->m * rt_args->n;
     ar_args_.output = rt_args->ptr_D;    
+    ar_args_.aux_local_size = output_len_ * sizeof(ElementD);
+    ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
     auto cu_stream = static_cast<cudaStream_t>(stream);
     fetch_comm_args(fusion_args, cu_stream);
     //////////////////////////////////////////
@@ -232,16 +234,32 @@ private:
 #else
     ElementD *gemm_out = (ElementD *)rt_args->ptr_D;
 #endif
-
     typename Gemm::Arguments arguments{
-      cutlass::gemm::GemmUniversalMode::kGemm,
-      problem_size,
-      {(ElementA *)rt_args->ptr_A, stride_A, (ElementB *)rt_args->ptr_B, stride_B},
+      cutlass::gemm::GemmUniversalMode::kGemm, // mode
+      problem_size, // problem_shape
+      {(ElementA *)rt_args->ptr_A, stride_A, (ElementB *)rt_args->ptr_B, stride_B}, // mainloop
       {{}, // epilogue.thread
-      (ElementC *)rt_args->ptr_C, stride_C, gemm_out, stride_D},
-      hw_info
+       (ElementC *)rt_args->ptr_C, stride_C, gemm_out, stride_D}, // epilogue
+      hw_info, // hw_info
+      {},      // scheduler
+      {.output_scatter_ptrs = (ElementD **)ar_args_.rank_data->ptrs,
+       .stride = stride_D,
+       .rank = ar_args_.rank,
+       .world_size = ar_args_.world_size,
+       .nnodes = 1,
+       .local_reduce_buffer = (void*)ar_args_.aux_local_buffer,
+       .barrier_ptrs = ar_args_.rank_signals}       // rs_dma
     };
 
+    // struct Arguments {
+    //   Element **output_scatter_ptrs;
+    //   StrideMNL stride;
+    //   int rank = 0;
+    //   int world_size = 0;
+    //   int nnodes = 1;
+    //   void *local_reduce_buffer = nullptr;
+    //   int **barrier_ptrs;
+    // };
     // Custom EVT fusions will have nested unnamed args, the structure of which
     // can be deduced from the type definition of the EVT.
     // Each node's arguments has the recursive structure of
@@ -261,7 +279,7 @@ private:
             },                // end binary op
             {} // ternary args : multiply_add
           },   
-          {.barrier_ptr_aux = (int *)ar_args_.rank_signals.signals[ar_args_.rank]->end}  // unary args : aux store D
+          {.barrier_ptr_aux = (int *)ar_args_.rank_signals.signals[ar_args_.rank]->_flag}  // unary args : aux store D
         }; // end ternary op
     }
     // Pre-defined fusions will have flat, named args for user-friendlyness
