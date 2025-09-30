@@ -1,4 +1,4 @@
-//===- sm90_reduce_scatter_utils.hpp ------------------------------ C++ ---===//
+//===- sm90_allreduce_utils.hpp ------------------------------ C++ ---===//
 //
 // Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,6 +28,7 @@
 #include "xop/xop.h"
 // #include "flux/cuda/cuda_common.h"
 // #include "flux/cuda/memory_utils.hpp"
+#include "system_barrier.hpp"
 #ifdef FLUX_SHM_USE_NVSHMEM
 #include "host/nvshmemx_api.h"
 #endif
@@ -158,6 +159,7 @@ struct Sm90ReduceScatterDma {
     FLUX_CHECK(args.barrier_ptrs != nullptr);
     FLUX_CHECK(args.local_reduce_buffer != nullptr);
 
+    // 如4卡，tile_M=128, M=1024, 则每卡负责 1024/(128*4) = 2个m方向的tile
     params.tile_m_perrank = M / (tile_M * params.world_size);
     params.stride = args.stride;
 
@@ -208,6 +210,19 @@ struct Sm90ReduceScatterDma {
       return fetch_write_state;
     }
 
+    // m是tile的m方向编号，如总共有M=1024行，tile_M=128，则 m 取值范围是 0~7，在4卡下tile_m_perrank=2。
+    // 所以m=0/1时，src_rank=0；m=2/3时，src_rank=1；m=4/5时，src_rank=2；m=6/7时，src_rank=3；
+    // local_src_rank中的local是指本节点，为了与跨机区分。
+    // local_rank是当前卡的rank，如为2，则：
+    // local_src_rank=0，m=0/1, 后半段为(2-0)*2=4, m_fetch指向4/5
+    // local_src_rank=1，m=2/3，后半段为(2-1)*2=2, m_fetch指向4/5
+    // local_src_rank=2，m=4/5，后半段为(2-2)*2=0, m_fetch指向4/5
+    // local_src_rank=3，m=6/7，后半段为(2-3)*2=-2, m_fetch指向4/5
+    // 所以对于2号卡，负责从0到3号卡的4/5块的数据收集。
+    // 同理，0号卡负责0/1，1号卡负责2/3，3号卡负责6/7.
+    //
+    // 当前函数会有m从0-7，以local_rank=2号卡为例，当m=0/1时，目标卡local_src_rank=0，从该卡中取出其4/5.
+    //                                          当m=2/3时，目标卡local_src_rank=1，从该卡中取出其4/5...
     int thread_idx = cutlass::canonical_lane_idx();
     int src_rank = m / params_ptr->tile_m_perrank;
     int local_src_rank = src_rank % params_ptr->local_world_size;

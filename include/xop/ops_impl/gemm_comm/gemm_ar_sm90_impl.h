@@ -16,6 +16,7 @@
 #include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_cooperative_ar.hpp"
 #include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_pingpong_ar.hpp"
 #include "gemm_ar_sm90/sm90_visitor_store_tma_warpspecialized_ar.hpp"
+#include "gemm_ar_sm90/sm90_allreduce_utils.hpp"
 
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
 
@@ -132,11 +133,22 @@ public:
       MainloopScheduleType
     >::CollectiveOp;
 
+  using ReduceScatterDma = Sm90ReduceScatterDma<
+        1, // StagesDma,
+        TileShape,
+        typename EpilogueDescriptor::EpilogueTile,
+        typename AuxStoreDescriptor::SmemLayoutAtom,
+        ElementD,
+        typename AuxStoreDescriptor::Stride,
+        CommKindEnum::IntraNode,
+        false>; // rs_meta.fuse_reduction()()
+
   using GemmKernel = cutlass::gemm::kernel::GemmUniversalRsSm90<
       cute::Shape<int,int,int,int>,
       CollectiveMainloop,
       CollectiveEpilogue,
-      TileScheduler
+      TileScheduler,
+      ReduceScatterDma
   >;
 
   using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;

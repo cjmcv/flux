@@ -64,13 +64,15 @@ template <
   class ProblemShape_,
   class CollectiveMainloop_,
   class CollectiveEpilogue_,
-  class TileScheduler_
+  class TileScheduler_,
+  class ReduceScatterDma_
 >
 class GemmUniversalRsSm90<
   ProblemShape_,
   CollectiveMainloop_,
   CollectiveEpilogue_,
   TileScheduler_,
+  ReduceScatterDma_,
   cute::enable_if_t<cute::is_base_of_v<KernelTmaWarpSpecializedPingpong, typename CollectiveMainloop_::DispatchPolicy::Schedule>>>
 {
 public:

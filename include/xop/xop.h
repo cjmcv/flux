@@ -78,6 +78,8 @@ enum class UnifiedMetaEnum : int8_t {
   RRR = 70, RCR, RCC                                   // layout
 };
 
+constexpr int kMaxWorldSize = 32;
+constexpr int kMaxLocalWorldSize = 8;
 enum class CommKindEnum : int8_t { IntraNode, AcrossNode, IntraNodePcie };
 
 enum MetaLocEnum {

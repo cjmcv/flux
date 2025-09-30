@@ -51,7 +51,8 @@ template <
   class ProblemShapeOrThreadblockMma_, // (m, n, k) or (m, n, k, l)
   class CollectiveMainloopOrEpilogue_,
   class CollectiveEpilogueOrThreadblockSwizzle_,
-  class TileScheduler_ = void,
+  class TileScheduler_,
+  class ReduceScatterDma_,
   class Enable = void
 >
 class GemmUniversalRsSm90;
