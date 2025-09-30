@@ -240,16 +240,20 @@ private:
       {(ElementA *)rt_args->ptr_A, stride_A, (ElementB *)rt_args->ptr_B, stride_B}, // mainloop
       {{}, // epilogue.thread
        (ElementC *)rt_args->ptr_C, stride_C, gemm_out, stride_D}, // epilogue
-      hw_info, // hw_info
-      {},      // scheduler
-      {.output_scatter_ptrs = (ElementD **)ar_args_.rank_data->ptrs,
-       .stride = stride_D,
-       .rank = ar_args_.rank,
-       .world_size = ar_args_.world_size,
-       .nnodes = 1,
-       .local_reduce_buffer = (void*)ar_args_.aux_local_buffer,
-       .barrier_ptrs = ar_args_.rank_signals}       // rs_dma
+      hw_info // hw_info
     };
+
+    cudaMemcpy(rank_data_, ar_args_.rank_data->ptrs, 8 * sizeof(ElementD*), cudaMemcpyDeviceToHost);
+    for (int i=0; i<8; i++)
+      cudaMemcpy(&barrier_ptrs_[i], &(ar_args_.rank_signals.signals[ar_args_.rank]->_flag), sizeof(int*), cudaMemcpyDeviceToHost);
+    arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
+      .output_scatter_ptrs = rank_data_,
+      .stride = stride_D,
+      .rank = ar_args_.rank,
+      .world_size = ar_args_.world_size,
+      .nnodes = 1,
+      .local_reduce_buffer = (void*)ar_args_.aux_local_buffer,
+      .barrier_ptrs = barrier_ptrs_};
 
     // struct Arguments {
     //   Element **output_scatter_ptrs;
@@ -311,7 +315,6 @@ private:
       &ar_args_.rank_data, &ar_args_.rank_signals, &ar_args_.self_signal);
 
 #else
-
     // For testing
     is_serial_ = false;
     RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
@@ -330,6 +333,9 @@ private:
   int m_;
   int n_;
   int output_len_;
+
+  int *rank_data_[kMaxLocalWorldSize];
+  int *barrier_ptrs_[kMaxLocalWorldSize];
 };
 
 } // namespace xop

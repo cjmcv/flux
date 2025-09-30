@@ -33,7 +33,7 @@
 #include "host/nvshmemx_api.h"
 #endif
 
-#include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh" // todo clean
+// #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh" // todo clean
 
 namespace xop {
 
@@ -96,8 +96,8 @@ struct Sm90ReduceScatterDma {
     int world_size = 0;
     int nnodes = 1;
     void *local_reduce_buffer = nullptr;
-    // int **barrier_ptrs;
-    vllm::RankSignals barrier_ptrs;
+    int **barrier_ptrs;
+    // vllm::RankSignals barrier_ptrs;
   };
 
   struct Params {
@@ -160,7 +160,7 @@ struct Sm90ReduceScatterDma {
     XOP_CHECK(M % (tile_M * params.world_size) == 0)
         << "M=" << M << " tile_M=" << tile_M << " world_size=" << params.world_size;
 
-    // XOP_CHECK(args.barrier_ptrs != nullptr);
+    XOP_CHECK(args.barrier_ptrs != nullptr);
     XOP_CHECK(args.local_reduce_buffer != nullptr);
 
     // 如4卡，tile_M=128, M=1024, 则每卡负责 1024/(128*4) = 2个m方向的tile
@@ -171,8 +171,8 @@ struct Sm90ReduceScatterDma {
     for (int local_rank = 0; local_rank < params.local_world_size; ++local_rank) {
       int global_rank = params.node_idx * params.local_world_size + local_rank;
       Element *ptr = static_cast<Element *>(args.output_scatter_ptrs[global_rank]);
-      // int *barrier_ptr = reinterpret_cast<int **>(args.barrier_ptrs)[global_rank];
-      int *barrier_ptr = (int *)args.barrier_ptrs.signals[global_rank]->_flag;
+      int *barrier_ptr = reinterpret_cast<int **>(args.barrier_ptrs)[global_rank];
+      // int *barrier_ptr = (int *)args.barrier_ptrs.signals[global_rank]->_flag;
       XOP_CHECK(barrier_ptr != nullptr);
       params.local_ptr[local_rank] = ptr;
       params.local_barrier_ptr[local_rank] = barrier_ptr;
