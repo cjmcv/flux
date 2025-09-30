@@ -15,6 +15,7 @@
 
 #include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_cooperative_rs.hpp"
 #include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_pingpong_rs.hpp"
+#include "gemm_ar_sm90/sm90_visitor_store_tma_warpspecialized_ar.hpp"
 
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
 
@@ -68,7 +69,7 @@ public:
 
   // EVTs can be constructed by composing the fundamental load/store/compute visitor operations defined in include/cutlass/epilogue/fusion
   // For more complex examples of EVT construction please refer to include/cutlass/epilogue/fusion/sm90_callbacks_tma_warpspecialized.hpp
-  using CustomEVT =  // (alpha * acc) + beta * C
+  using CustomComputeEVT =  // (alpha * acc) + beta * C
     cutlass::epilogue::fusion::Sm90EVT<cutlass::epilogue::fusion::Sm90Compute<cutlass::homogeneous_multiply_add, ElementD, ElementCompute, RoundStyle>, // beta * C + (alpha * acc)
       cutlass::epilogue::fusion::Sm90ScalarBroadcast<ElementScalar>, // beta
       cutlass::epilogue::fusion::Sm90SrcFetch<ElementC>, // C
@@ -77,6 +78,29 @@ public:
         cutlass::epilogue::fusion::Sm90AccFetch // acc
       >
     >;
+  using EpilogueDescriptor = cutlass::epilogue::collective::detail::EpilogueDescriptor<
+    TileShape, EpilogueTileType, ElementC, ElementD, EpilogueScheduleType
+  >;
+  using AuxStoreDescriptor = cutlass::epilogue::collective::detail::AuxStoreDescriptor<
+    EpilogueDescriptor, cutlass::layout::RowMajor, ElementD/*ElementAux*/
+  >;
+  using AuxStore = cutlass::epilogue::fusion::Sm90AuxStoreReduceScatter<
+                                AuxStoreDescriptor::Stages, TileShape, typename EpilogueDescriptor::EpilogueTile,
+                                typename AuxStoreDescriptor::Element, RoundStyle,
+                                typename AuxStoreDescriptor::Stride, typename AuxStoreDescriptor::SmemLayoutAtom,
+                                typename AuxStoreDescriptor::CopyOpR2S, CommKindEnum::IntraNode>;
+
+    // using AuxStoreType = Sm90AuxStoreReduceScatter<
+    // DispatchPolicy::StagesD,
+    // decltype(params.tile_shape()),
+    // decltype(params.epilogue_tile_mn()),
+    // ElementD,
+    // RoundStyle,
+    // decltype(params.stride_d()),
+    // decltype(params.smem_layout_atom_d()),
+    // decltype(params.copy_op_r2s()),
+    // rs_meta.comm_kind()>;
+  using CustomEVT = cutlass::epilogue::fusion::Sm90EVT<AuxStore, CustomComputeEVT>;
 
   // A predefined set of fusion operations (implemented with EVT) are supported by the TMA warp-specialized epilogue.
   // Users can select one of these operations by passing one of the tags defined in include/cutlass/epilogue/fusion/operations.hpp
@@ -214,16 +238,19 @@ private:
     // include/cutlass/epilogue/fusion/sm90_callbacks_tma_warpspecialized.hpp
     if constexpr (UseCustomEVT) {
       arguments.epilogue.thread =
-        {    // ternary op : beta * C + (alpha * acc)
-          {{rt_args->beta}}, // leaf op+args : beta
-          {},               // leaf op+args : C
-          {                 // binary op : alpha * acc
-            {{rt_args->alpha}}, // leaf op+args : alpha
-            {},                // leaf op+args : acc
-            {}              // binary args : multiplies
-          },                // end binary op
-          {} // ternary args : multiply_add
-        };   // end ternary op
+        {
+          {    // ternary op : beta * C + (alpha * acc)
+            {{rt_args->beta}}, // leaf op+args : beta
+            {},               // leaf op+args : C  bias
+            {                 // binary op : alpha * acc
+              {{rt_args->alpha}}, // leaf op+args : alpha
+              {},                // leaf op+args : acc
+              {}              // binary args : multiplies
+            },                // end binary op
+            {} // ternary args : multiply_add
+          },   
+          {.barrier_ptr_aux = (int *)ar_args_.rank_signals.signals[ar_args_.rank]->end}  // unary args : aux store D
+        }; // end ternary op
     }
     // Pre-defined fusions will have flat, named args for user-friendlyness
     else {

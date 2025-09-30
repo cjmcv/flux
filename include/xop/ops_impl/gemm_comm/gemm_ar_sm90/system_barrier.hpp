@@ -18,6 +18,18 @@
 
 #include "cutlass/cutlass.h"
 #include "cutlass/barrier.h"
+
+enum class FluxNamedBarriers : int {
+  FirstBarrier = static_cast<int>(cutlass::arch::ReservedNamedBarriers::FirstUserBarrier),
+  ReduceScatterEpilogue = FirstBarrier,
+  ReduceScatterFetch = FirstBarrier + 1,
+  ReduceScatterReduce = FirstBarrier + 2,
+  AGScatterGather = FirstBarrier,
+  AGScatterFetcher = FirstBarrier + 1,
+  GatherRSProducer = FirstBarrier,
+  GatherRSConsumer = FirstBarrier + 1
+};
+
 namespace cutlass {
 
 namespace detail {

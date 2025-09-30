@@ -52,6 +52,8 @@
 #include "gemm_universal_decl_rs.h"
 
 #define ENABLE_ALLREDUCE
+#define ENABLE_SM90_KERNEL_LEVEL 1
+
 ///////////////////////////////////////////////////////////////////////////////
 
 namespace cutlass::gemm::kernel {
