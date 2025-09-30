@@ -36,6 +36,7 @@ namespace xop {
 
 using namespace cute;
 
+using _AcrossNode = cute::C<CommKindEnum::AcrossNode>;
 template <
     int Stages,
     class TileShape_,
@@ -140,24 +141,24 @@ struct Sm90ReduceScatterDma {
     params.world_size = args.world_size;
     params.nnodes = args.nnodes;
 
-    FLUX_CHECK(params.nnodes <= kMaxWorldSize / kMaxLocalWorldSize);
-    FLUX_CHECK(params.world_size % params.nnodes == 0);
+    XOP_CHECK(params.nnodes <= kMaxWorldSize / kMaxLocalWorldSize);
+    XOP_CHECK(params.world_size % params.nnodes == 0);
     params.local_world_size = params.world_size / params.nnodes;
-    FLUX_CHECK(params.nnodes <= params.local_world_size) << " not supported yet.";
+    XOP_CHECK(params.nnodes <= params.local_world_size) << " not supported yet.";
 
     params.local_rank = params.rank % params.local_world_size;
     params.node_idx = params.rank / params.local_world_size;
-    FLUX_CHECK(params.local_world_size <= kMaxLocalWorldSize);
+    XOP_CHECK(params.local_world_size <= kMaxLocalWorldSize);
 
     auto [tile_M, tile_N, tile_K] = TileShape{};
 
-    FLUX_CHECK(M % tile_M == 0) << "M=" << M << " tile_M=" << tile_M;
-    FLUX_CHECK(N % tile_N == 0) << "N=" << N << " tile_N=" << tile_N;
-    FLUX_CHECK(M % (tile_M * params.world_size) == 0)
+    XOP_CHECK(M % tile_M == 0) << "M=" << M << " tile_M=" << tile_M;
+    XOP_CHECK(N % tile_N == 0) << "N=" << N << " tile_N=" << tile_N;
+    XOP_CHECK(M % (tile_M * params.world_size) == 0)
         << "M=" << M << " tile_M=" << tile_M << " world_size=" << params.world_size;
 
-    FLUX_CHECK(args.barrier_ptrs != nullptr);
-    FLUX_CHECK(args.local_reduce_buffer != nullptr);
+    XOP_CHECK(args.barrier_ptrs != nullptr);
+    XOP_CHECK(args.local_reduce_buffer != nullptr);
 
     // 如4卡，tile_M=128, M=1024, 则每卡负责 1024/(128*4) = 2个m方向的tile
     params.tile_m_perrank = M / (tile_M * params.world_size);
@@ -168,7 +169,7 @@ struct Sm90ReduceScatterDma {
       int global_rank = params.node_idx * params.local_world_size + local_rank;
       Element *ptr = static_cast<Element *>(args.output_scatter_ptrs[global_rank]);
       int *barrier_ptr = reinterpret_cast<int **>(args.barrier_ptrs)[global_rank];
-      FLUX_CHECK(barrier_ptr != nullptr);
+      XOP_CHECK(barrier_ptr != nullptr);
       params.local_ptr[local_rank] = ptr;
       params.local_barrier_ptr[local_rank] = barrier_ptr;
 
