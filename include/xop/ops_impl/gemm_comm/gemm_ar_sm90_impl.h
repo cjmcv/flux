@@ -245,13 +245,15 @@ private:
     };
 
     cudaMemcpy(&host_rank_data_, ar_args_.rank_data, sizeof(vllm::RankData), cudaMemcpyDeviceToHost);
-    cudaMemcpy(host_signals_, ar_args_.rank_signals.signals, 8*sizeof(vllm::Signal*), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(host_signals_, ar_args_.rank_signals.signals, 8*sizeof(vllm::Signal*), cudaMemcpyDeviceToHost);
 
     // cudaMemcpy(rank_data_, ar_args_.rank_data->ptrs, 8 * sizeof(ElementD*), cudaMemcpyDeviceToHost);
     // cudaMemcpy(&host_rank_signals_, &ar_args_.rank_signals, sizeof(vllm::RankSignals), cudaMemcpyDeviceToHost);
     for (int i=0; i<kMaxLocalWorldSize; i++) {
       rank_data_[i] = host_rank_data_.ptrs[i];
-      barrier_ptrs_[i] = (int *)host_signals_[i]->_flag;      
+
+      cudaMemcpy(&host_signals_[i], &ar_args_.rank_signals.signals[i], sizeof(vllm::Signal*), cudaMemcpyDeviceToHost);
+      barrier_ptrs_[i] = (int *)host_signals_[i]->_flag;
     }
 
     printf("is_device_pointer: %d, %d, %d\n", is_device_pointer(barrier_ptrs_[0]), is_device_pointer(rank_data_[0]), is_device_pointer(barrier_ptrs_[0]));
@@ -347,7 +349,7 @@ private:
 
 
   vllm::RankData host_rank_data_;
-  vllm::array_t* host_signals_[8];
+  vllm::Signal* host_signals_[8];
   
   ElementD *rank_data_[kMaxLocalWorldSize];
   int *barrier_ptrs_[kMaxLocalWorldSize];
