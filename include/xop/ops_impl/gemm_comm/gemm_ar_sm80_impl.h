@@ -143,7 +143,7 @@ struct AllReduceArguments {
   
   void *reg_buffer;
   vllm::RankData* rank_data;
-  vllm::RankSignals *rank_signals;
+  vllm::RankSignals rank_signals;
   vllm::Signal *self_signal;
   
   void *output;
@@ -286,16 +286,16 @@ public:
     int blocks = std::min(max_blocks, n_ / ThreadblockShape::kN);
 #ifdef ENABLE_ALLREDUCE
     if constexpr (StreamMode == 0) { // one stream no connect
-      vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, *ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
+      vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementOutput>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);
     }
     else if constexpr (StreamMode == 1) { // one stream connected
-      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, *ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
     }
     else { // two streams
-      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, *ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
     }
 #else
-    disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, *ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
     //////////////////////////////////////////////////////////
     // wait for reduce_scatter done
@@ -329,7 +329,7 @@ private:
       { 
         gemm_out, {problem_size.n(), cute::_1{}, problem_size.mn().product()}, 
         ar_args_.world_size, ar_args_.rank, ar_args_.reg_buffer, 
-        ar_args_.rank_data, *ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, 
+        ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, ar_args_.output, 
         is_serial_, is_streamk, SplitKFactor, ar_args_.aux_local_buffer, ar_args_.aux_buffer_streamk_reduce_mark_step, ar_args_.aux_buffer_reduce_arrival_step
       },                   // D
     };   
