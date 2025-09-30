@@ -317,10 +317,10 @@ def run_worker(world_size, rank, port, M, args, xop_perf, torch_perf):
     xop_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
     
     exponent = args.M  # 65536: 17
-    run(world_size, rank, 1, args, xop_group, nccl_group, xop_perf, torch_perf)
-    for m in range(1, exponent):
-        m = 2**m
-        run(world_size, rank, m, args, xop_group, nccl_group, xop_perf, torch_perf)
+    run(world_size, rank, 256, args, xop_group, nccl_group, xop_perf, torch_perf)
+    # for m in range(1, exponent):
+    #     m = 2**m
+    #     run(world_size, rank, m, args, xop_group, nccl_group, xop_perf, torch_perf)
         
     dist.barrier(group=nccl_group)
     dist.destroy_process_group(group=nccl_group)    

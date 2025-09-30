@@ -170,8 +170,11 @@ struct Sm90ReduceScatterDma {
     params.local_reduce_buffer = static_cast<Element *>(args.local_reduce_buffer);
     for (int local_rank = 0; local_rank < params.local_world_size; ++local_rank) {
       int global_rank = params.node_idx * params.local_world_size + local_rank;
+      printf("allreduce 0.\n");
       Element *ptr = static_cast<Element *>(args.output_scatter_ptrs[global_rank]);
+      printf("allreduce 1: %p, %p.\n", args.output_scatter_ptrs, ptr);
       int *barrier_ptr = reinterpret_cast<int **>(args.barrier_ptrs)[global_rank];
+      printf("allreduce 2: %p, %p.\n", args.barrier_ptrs, barrier_ptr);
       // int *barrier_ptr = (int *)args.barrier_ptrs.signals[global_rank]->_flag;
       XOP_CHECK(barrier_ptr != nullptr);
       params.local_ptr[local_rank] = ptr;

@@ -244,16 +244,18 @@ private:
     };
 
     cudaMemcpy(rank_data_, ar_args_.rank_data->ptrs, 8 * sizeof(ElementD*), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&host_rank_signals_, &ar_args_.rank_signals, sizeof(vllm::RankSignals), cudaMemcpyDeviceToHost);
     for (int i=0; i<8; i++)
-      cudaMemcpy(&barrier_ptrs_[i], &(ar_args_.rank_signals.signals[ar_args_.rank]->_flag), sizeof(int*), cudaMemcpyDeviceToHost);
+      barrier_ptrs_[i] = host_rank_signals_.signals[i]->_flag;
+
     arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
-      .output_scatter_ptrs = rank_data_,
+      .output_scatter_ptrs = (ElementD **)rank_data_,
       .stride = stride_D,
       .rank = ar_args_.rank,
       .world_size = ar_args_.world_size,
       .nnodes = 1,
       .local_reduce_buffer = (void*)ar_args_.aux_local_buffer,
-      .barrier_ptrs = barrier_ptrs_};
+      .barrier_ptrs = (int **)barrier_ptrs_};
 
     // struct Arguments {
     //   Element **output_scatter_ptrs;
@@ -283,7 +285,7 @@ private:
             },                // end binary op
             {} // ternary args : multiply_add
           },   
-          {.barrier_ptr_aux = (int *)ar_args_.rank_signals.signals[ar_args_.rank]->_flag}  // unary args : aux store D
+          {.barrier_ptr_aux = (int *)barrier_ptrs_[ar_args_.rank]}  // unary args : aux store D
         }; // end ternary op
     }
     // Pre-defined fusions will have flat, named args for user-friendlyness
@@ -334,7 +336,9 @@ private:
   int n_;
   int output_len_;
 
-  int *rank_data_[kMaxLocalWorldSize];
+  ElementD *rank_data_[kMaxLocalWorldSize];
+
+  vllm::RankSignals host_rank_signals_;
   int *barrier_ptrs_[kMaxLocalWorldSize];
 };
 
