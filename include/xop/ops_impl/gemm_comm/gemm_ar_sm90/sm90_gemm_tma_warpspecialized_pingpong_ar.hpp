@@ -473,8 +473,7 @@ public:
     // Mainloop Load pipeline
     using MainloopPipeline = typename CollectiveMainloop::MainloopPipeline;
     typename MainloopPipeline::Params mainloop_pipeline_params;
-    if (warp_group_role == WarpGroupRole::Producer && (producer_warp_role == ProducerWarpRole::Mainloop 
-        || producer_warp_role == ProducerWarpRole::MainloopAux)) {
+    if (warp_group_role == WarpGroupRole::Producer && (producer_warp_role == ProducerWarpRole::Mainloop)) {
       mainloop_pipeline_params.role = MainloopPipeline::ThreadCategory::Producer;
     }
     if (warp_group_role == WarpGroupRole::Consumer0 || warp_group_role == WarpGroupRole::Consumer1) {
@@ -666,7 +665,7 @@ public:
         // unflushed global memory prior to this instruction
         cutlass::arch::wait_on_dependent_grids();
         bool do_load_order_arrive = true;
-        bool requires_clc_query = true;
+        // bool requires_clc_query = true;
         while (work_tile_info.is_valid()) {
           // Compute m_coord, n_coord, l_coord with the post-tiled m-shape and n-shape
           auto m_coord = idx2crd(work_tile_info.M_idx, shape<2>(gA_mkl));
@@ -676,11 +675,11 @@ public:
 
           auto k_tile_iter  = cute::make_coord_iterator(shape<3>(gA_mkl));
 
-          if (requires_clc_query) {
-            scheduler_throttle_pipeline.producer_acquire(scheduler_pipe_throttle_producer_state);
-            scheduler_throttle_pipeline.producer_commit(scheduler_pipe_throttle_producer_state);
-            ++scheduler_pipe_throttle_producer_state;
-          }
+          // if (requires_clc_query) {
+          //   scheduler_throttle_pipeline.producer_acquire(scheduler_pipe_throttle_producer_state);
+          //   scheduler_throttle_pipeline.producer_commit(scheduler_pipe_throttle_producer_state);
+          //   ++scheduler_pipe_throttle_producer_state;
+          // }
 
           collective_mainloop.load(
             params.mainloop,

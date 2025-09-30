@@ -71,8 +71,8 @@
 #include "cutlass/numeric_conversion.h"
 
 #include "xop/xop.h"
-// #include "flux/cuda/memory_utils.hpp"
-#include "system_barrier.hpp"
+#include "memory_utils.hpp"
+// #include "system_barrier.hpp"
 #include "cute/tensor.hpp"
 #include "cutlass/detail/helper_macros.hpp"
 #include "cutlass/epilogue/fusion/sm90_visitor_tma_warpspecialized.hpp"

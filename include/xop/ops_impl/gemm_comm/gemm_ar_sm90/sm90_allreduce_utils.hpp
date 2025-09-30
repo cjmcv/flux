@@ -27,8 +27,8 @@
 #include "cutlass/epilogue/collective/detail.hpp"
 #include "xop/xop.h"
 // #include "flux/cuda/cuda_common.h"
-// #include "flux/cuda/memory_utils.hpp"
-#include "system_barrier.hpp"
+#include "memory_utils.hpp"
+// #include "system_barrier.hpp"
 #ifdef FLUX_SHM_USE_NVSHMEM
 #include "host/nvshmemx_api.h"
 #endif
