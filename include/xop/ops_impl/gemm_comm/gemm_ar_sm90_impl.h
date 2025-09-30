@@ -13,8 +13,8 @@
 #include "cutlass/epilogue/collective/collective_builder.hpp"
 #include "cutlass/util/packed_stride.hpp"
 
-#include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_cooperative_rs.hpp"
-#include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_pingpong_rs.hpp"
+#include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_cooperative_ar.hpp"
+#include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_pingpong_ar.hpp"
 #include "gemm_ar_sm90/sm90_visitor_store_tma_warpspecialized_ar.hpp"
 
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
