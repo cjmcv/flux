@@ -254,7 +254,8 @@ private:
 
       // ar_args_.rank_signals.signals[i] 是device指针，将整个Signal拷贝到内存，再基于内存索引其成员变量ptr。下面仍拷贝不成功is_device_pointer(barrier_ptrs_[0])仍然为0！！！
       cudaMemcpy(host_signals_[i], ar_args_.rank_signals.signals[i], sizeof(vllm::Signal), cudaMemcpyDeviceToHost); // 
-      barrier_ptrs_[i] = (int *)host_signals_[i]->_flag;
+      // barrier_ptrs_[i] = (int *)host_signals_[i]->_flag;
+      barrier_ptrs_[i] = (int *)ar_args_.rank_signals.signals[i]->_flag; // 这样反而可以？？？
     }
 
     printf("is_device_pointer: %d, %d, %d\n", is_device_pointer(barrier_ptrs_[0]), is_device_pointer(rank_data_[0]), is_device_pointer(ar_args_.rank_signals.signals[0]));
