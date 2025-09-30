@@ -649,7 +649,7 @@ class CustomAllreduce {
   template <typename T>
   void get_ptrs(cudaStream_t stream, T* input, int size, 
                 int *world_size, int *rank, int *packed_array_num, 
-                RankData** ptrs, RankSignals *sg,  Signal **self_sg) {
+                RankData** ptrs, RankSignals **sg,  Signal **self_sg) {
     auto d = packed_t<T>::P::size;
     if (size % d != 0)
       throw std::runtime_error(
@@ -664,7 +664,7 @@ class CustomAllreduce {
     *packed_array_num = size / d;
     *world_size = world_size_;
     *rank = rank_;
-    *sg = sg_;
+    *sg = &sg_;
     *self_sg = self_sg_;
   }
 

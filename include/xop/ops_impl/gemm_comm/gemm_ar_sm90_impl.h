@@ -1,6 +1,7 @@
 #pragma once
 #include "xop/ops_impl/global_resource.h"
 #include "xop/ops_impl/common_cutlass.h"
+#include "xop/ops_impl/debug_util.h"
 
 #include "cute/tensor.hpp"
 #include "cutlass/tensor_ref.h"
@@ -29,7 +30,7 @@ struct AllReduceSm90Arguments {
   
   void *reg_buffer;
   vllm::RankData* rank_data;
-  vllm::RankSignals rank_signals;
+  vllm::RankSignals *rank_signals;
   vllm::Signal *self_signal;
   
   void *output;
@@ -210,7 +211,7 @@ public:
       int max_blocks = 32;
       constexpr int threads = 1024;
       int blocks = max_blocks; // std::min(max_blocks, n_ / ThreadblockShape::kN);
-      vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementD>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);      
+      vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementD>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, *ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);      
     }
 #endif
   }
@@ -243,11 +244,17 @@ private:
       hw_info // hw_info
     };
 
-    cudaMemcpy(rank_data_, ar_args_.rank_data->ptrs, 8 * sizeof(ElementD*), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&host_rank_signals_, &ar_args_.rank_signals, sizeof(vllm::RankSignals), cudaMemcpyDeviceToHost);
-    for (int i=0; i<kMaxLocalWorldSize; i++)
-      barrier_ptrs_[i] = (int *)host_rank_signals_.signals[i]->_flag;
-    printf("is_device_pointer: %d\n", is_device_pointer(barrier_ptrs_[0]));
+    cudaMemcpy(&host_rank_data_, ar_args_.rank_data, sizeof(vllm::RankData), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&host_rank_signals_, ar_args_.rank_signals, sizeof(vllm::RankSignals), cudaMemcpyDeviceToHost);
+
+    // cudaMemcpy(rank_data_, ar_args_.rank_data->ptrs, 8 * sizeof(ElementD*), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(&host_rank_signals_, &ar_args_.rank_signals, sizeof(vllm::RankSignals), cudaMemcpyDeviceToHost);
+    for (int i=0; i<kMaxLocalWorldSize; i++) {
+      rank_data_[i] = host_rank_data_.ptrs[i];
+      barrier_ptrs_[i] = (int *)host_rank_signals_.signals[i]->_flag;      
+    }
+
+    printf("is_device_pointer: %d, %d, %d\n", is_device_pointer(barrier_ptrs_[0]), is_device_pointer(rank_data_[0]), is_device_pointer(barrier_ptrs_[0]));
 
     arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
       .output_scatter_ptrs = (ElementD **)rank_data_,
@@ -337,9 +344,12 @@ private:
   int n_;
   int output_len_;
 
-  ElementD *rank_data_[kMaxLocalWorldSize];
 
+
+  vllm::RankData host_rank_data_;
   vllm::RankSignals host_rank_signals_;
+  
+  ElementD *rank_data_[kMaxLocalWorldSize];
   int *barrier_ptrs_[kMaxLocalWorldSize];
 };
 

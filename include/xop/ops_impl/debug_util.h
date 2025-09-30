@@ -33,11 +33,7 @@ bool is_device_pointer(const void* p) {
         return false;
     }
     if (err != cudaSuccess) return false; 
-#ifdef CUDA_VERSION >= 11020
     return (attr.type == cudaMemoryTypeDevice);
-#else
-    return (attr.memoryType == cudaMemoryTypeDevice);
-#endif
 }
 
 template<class Engine, class Layout>
