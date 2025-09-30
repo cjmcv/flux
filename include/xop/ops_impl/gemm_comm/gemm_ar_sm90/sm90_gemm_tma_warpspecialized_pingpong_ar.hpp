@@ -426,49 +426,49 @@ public:
     }
 
 
-    // TileScheduler pipeline
-    typename TileSchedulerPipeline::Params scheduler_pipeline_params;
-    typename TileSchedulerThrottlePipeline::Params scheduler_throttle_pipeline_params;
-    if constexpr (IsSchedDynamicPersistent) { 
-      if (warp_group_role == WarpGroupRole::Producer && producer_warp_role == ProducerWarpRole::Warp1) {
-        scheduler_pipeline_params.role = TileSchedulerPipeline::ThreadCategory::ProducerConsumer;
-      }
-      else {
-        scheduler_pipeline_params.role = TileSchedulerPipeline::ThreadCategory::Consumer;
-      }
-      scheduler_pipeline_params.producer_blockid = 0;
-      scheduler_pipeline_params.producer_arv_count = 1;
-      scheduler_pipeline_params.consumer_arv_count = NumSchedThreads + NumMainloopLoadThreads + NumMMAThreads;
+    // // TileScheduler pipeline
+    // typename TileSchedulerPipeline::Params scheduler_pipeline_params;
+    // typename TileSchedulerThrottlePipeline::Params scheduler_throttle_pipeline_params;
+    // if constexpr (IsSchedDynamicPersistent) { 
+    //   if (warp_group_role == WarpGroupRole::Producer && producer_warp_role == ProducerWarpRole::Warp1) {
+    //     scheduler_pipeline_params.role = TileSchedulerPipeline::ThreadCategory::ProducerConsumer;
+    //   }
+    //   else {
+    //     scheduler_pipeline_params.role = TileSchedulerPipeline::ThreadCategory::Consumer;
+    //   }
+    //   scheduler_pipeline_params.producer_blockid = 0;
+    //   scheduler_pipeline_params.producer_arv_count = 1;
+    //   scheduler_pipeline_params.consumer_arv_count = NumSchedThreads + NumMainloopLoadThreads + NumMMAThreads;
 
-      CollectiveEpilogue collective_epilogue(params.epilogue, shared_storage.tensors.epilogue);
-      bool is_epi_load_needed = collective_epilogue.is_producer_load_needed();
+    //   CollectiveEpilogue collective_epilogue(params.epilogue, shared_storage.tensors.epilogue);
+    //   bool is_epi_load_needed = collective_epilogue.is_producer_load_needed();
 
-      if (is_epi_load_needed) {
-        scheduler_pipeline_params.consumer_arv_count += NumEpilogueLoadThreads;
-      } 
-      scheduler_pipeline_params.transaction_bytes = sizeof(typename TileScheduler::CLCResponse);
+    //   if (is_epi_load_needed) {
+    //     scheduler_pipeline_params.consumer_arv_count += NumEpilogueLoadThreads;
+    //   } 
+    //   scheduler_pipeline_params.transaction_bytes = sizeof(typename TileScheduler::CLCResponse);
 
-      scheduler_throttle_pipeline_params.producer_arv_count = NumMainloopLoadThreads;
-      scheduler_throttle_pipeline_params.consumer_arv_count = NumSchedThreads;
-      scheduler_throttle_pipeline_params.dst_blockid = 0;
-      if (warp_group_role == WarpGroupRole::Producer &&
-          producer_warp_role == ProducerWarpRole::Warp1) {
-        scheduler_throttle_pipeline_params.role =
-            TileSchedulerThrottlePipeline::ThreadCategory::Consumer;
-      }
-      // set role when it is for DMA warp in Mainloop
-      else if (warp_group_role == WarpGroupRole::Producer &&
-               producer_warp_role == ProducerWarpRole::Mainloop) {
-        scheduler_throttle_pipeline_params.role =
-            TileSchedulerThrottlePipeline::ThreadCategory::Producer;
-      }
-    }
-    TileSchedulerPipeline scheduler_pipeline(shared_storage.scheduler.pipeline(), scheduler_pipeline_params);
-    TileSchedulerPipelineState scheduler_pipe_consumer_state;
+    //   scheduler_throttle_pipeline_params.producer_arv_count = NumMainloopLoadThreads;
+    //   scheduler_throttle_pipeline_params.consumer_arv_count = NumSchedThreads;
+    //   scheduler_throttle_pipeline_params.dst_blockid = 0;
+    //   if (warp_group_role == WarpGroupRole::Producer &&
+    //       producer_warp_role == ProducerWarpRole::Warp1) {
+    //     scheduler_throttle_pipeline_params.role =
+    //         TileSchedulerThrottlePipeline::ThreadCategory::Consumer;
+    //   }
+    //   // set role when it is for DMA warp in Mainloop
+    //   else if (warp_group_role == WarpGroupRole::Producer &&
+    //            producer_warp_role == ProducerWarpRole::Mainloop) {
+    //     scheduler_throttle_pipeline_params.role =
+    //         TileSchedulerThrottlePipeline::ThreadCategory::Producer;
+    //   }
+    // }
+    // TileSchedulerPipeline scheduler_pipeline(shared_storage.scheduler.pipeline(), scheduler_pipeline_params);
+    // TileSchedulerPipelineState scheduler_pipe_consumer_state;
 
-    TileSchedulerThrottlePipeline scheduler_throttle_pipeline(shared_storage.scheduler.throttle_pipeline(), scheduler_throttle_pipeline_params);
-    TileSchedulerThrottlePipelineState scheduler_pipe_throttle_consumer_state;
-    TileSchedulerThrottlePipelineState scheduler_pipe_throttle_producer_state = cutlass::make_producer_start_state<TileSchedulerThrottlePipeline>();
+    // TileSchedulerThrottlePipeline scheduler_throttle_pipeline(shared_storage.scheduler.throttle_pipeline(), scheduler_throttle_pipeline_params);
+    // TileSchedulerThrottlePipelineState scheduler_pipe_throttle_consumer_state;
+    // TileSchedulerThrottlePipelineState scheduler_pipe_throttle_producer_state = cutlass::make_producer_start_state<TileSchedulerThrottlePipeline>();
 
     // Mainloop Load pipeline
     using MainloopPipeline = typename CollectiveMainloop::MainloopPipeline;
@@ -702,33 +702,33 @@ public:
             do_load_order_arrive = false;
           }
 
-          if constexpr (IsSchedDynamicPersistent) {  
-            // Get next work tile
-            auto [next_work_tile_info, increment_pipe] =
-              scheduler.fetch_next_work(
-                  work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
+          // if constexpr (IsSchedDynamicPersistent) {  
+          //   // Get next work tile
+          //   auto [next_work_tile_info, increment_pipe] =
+          //     scheduler.fetch_next_work(
+          //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
 
-            work_tile_info = next_work_tile_info;
-            requires_clc_query = increment_pipe;
-            if (increment_pipe) {
-              ++scheduler_pipe_consumer_state;
-            }
-          }
-          else {
+          //   work_tile_info = next_work_tile_info;
+          //   requires_clc_query = increment_pipe;
+          //   if (increment_pipe) {
+          //     ++scheduler_pipe_consumer_state;
+          //   }
+          // }
+          // else {
           // Get next work tile
           scheduler.advance_to_next_work();
           work_tile_info = scheduler.get_current_work();
-          }
+          // }
         } // Scheduler work fetch loop
 
         // Make sure all Consumer Warp Groups have been waited upon
         collective_mainloop.load_tail(mainloop_pipeline, mainloop_pipe_producer_state);
 
-        if constexpr (IsSchedDynamicPersistent) {  
-          auto [next_work_tile_info, increment_pipe] = 
-            scheduler.fetch_next_work(
-                work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-        }
+        // if constexpr (IsSchedDynamicPersistent) {  
+        //   auto [next_work_tile_info, increment_pipe] = 
+        //     scheduler.fetch_next_work(
+        //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
+        // }
         
       } // Mainloop Producer Warp End
 
@@ -810,32 +810,32 @@ public:
             shared_storage.tensors.epilogue
           );
 
-          if constexpr (IsSchedDynamicPersistent) {  
-            // Get next work tile
-            auto [next_work_tile_info, increment_pipe] = 
-              scheduler.fetch_next_work(
-                  work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
+          // if constexpr (IsSchedDynamicPersistent) {  
+          //   // Get next work tile
+          //   auto [next_work_tile_info, increment_pipe] = 
+          //     scheduler.fetch_next_work(
+          //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
 
-            work_tile_info = next_work_tile_info;
-            if (increment_pipe) {
-              ++scheduler_pipe_consumer_state;
-            }
-          }
-          else {
+          //   work_tile_info = next_work_tile_info;
+          //   if (increment_pipe) {
+          //     ++scheduler_pipe_consumer_state;
+          //   }
+          // }
+          // else {
           // Get next work tile
           scheduler.advance_to_next_work();
           work_tile_info = scheduler.get_current_work();
-          }
+          // }
         } // Scheduler work fetch loop
 
         // Make sure all Consumer Warp Groups have been waited upon
         collective_epilogue.load_tail(epi_load_pipeline, epi_load_pipe_producer_state);
 
-        if constexpr (IsSchedDynamicPersistent) {  
-          auto [next_work_tile_info, increment_pipe] = 
-            scheduler.fetch_next_work(
-                work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-        }
+        // if constexpr (IsSchedDynamicPersistent) {  
+        //   auto [next_work_tile_info, increment_pipe] = 
+        //     scheduler.fetch_next_work(
+        //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
+        // }
       }
       // comm
       else if (producer_warp_role == ProducerWarpRole::ReduceScatterFetch) {
@@ -896,25 +896,25 @@ public:
       }
       #endif
       
-      if constexpr (IsSchedDynamicPersistent) {
-        // Consumer0's initial tile is static. It starts consuming the 2nd tile.
-        if (warp_group_role == WarpGroupRole::Consumer0) {
-            ++scheduler_pipe_consumer_state;
-        } 
+      // if constexpr (IsSchedDynamicPersistent) {
+      //   // Consumer0's initial tile is static. It starts consuming the 2nd tile.
+      //   if (warp_group_role == WarpGroupRole::Consumer0) {
+      //       ++scheduler_pipe_consumer_state;
+      //   } 
 
-        if (warp_group_role == WarpGroupRole::Consumer1) {
-          // Get next work tile
-          auto [next_work_tile_info, increment_pipe] = 
-            scheduler.fetch_next_work(
-                work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
+      //   if (warp_group_role == WarpGroupRole::Consumer1) {
+      //     // Get next work tile
+      //     auto [next_work_tile_info, increment_pipe] = 
+      //       scheduler.fetch_next_work(
+      //           work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
 
-          work_tile_info = next_work_tile_info;
-          if (increment_pipe) {
-            ++scheduler_pipe_consumer_state;
-            ++scheduler_pipe_consumer_state;
-          }
-        } 
-      }
+      //     work_tile_info = next_work_tile_info;
+      //     if (increment_pipe) {
+      //       ++scheduler_pipe_consumer_state;
+      //       ++scheduler_pipe_consumer_state;
+      //     }
+      //   } 
+      // }
 
       while (work_tile_info.is_valid()) {
         // Compute m_coord, n_coord, l_coord with the post-tiled m-shape and n-shape
@@ -1001,23 +1001,23 @@ public:
         // Cue for next Math WG's Epilogue to start
         math_wg_order_barrier.arrive();
 
-        if constexpr (IsSchedDynamicPersistent) {  
-          // Get next work tile
-          auto [next_work_tile_info, increment_pipe] = 
-            scheduler.fetch_next_work(
-                work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
+        // if constexpr (IsSchedDynamicPersistent) {  
+        //   // Get next work tile
+        //   auto [next_work_tile_info, increment_pipe] = 
+        //     scheduler.fetch_next_work(
+        //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
 
-          work_tile_info = next_work_tile_info;
-          if (increment_pipe) {
-            ++scheduler_pipe_consumer_state;
-            ++scheduler_pipe_consumer_state;
-          }
-        }
-        else {
+        //   work_tile_info = next_work_tile_info;
+        //   if (increment_pipe) {
+        //     ++scheduler_pipe_consumer_state;
+        //     ++scheduler_pipe_consumer_state;
+        //   }
+        // }
+        // else {
         // Get next work tile
         scheduler.advance_to_next_work(NumMmaWarpGroups);
         work_tile_info = scheduler.get_current_work();
-        }
+        // }
       } // Scheduler work fetch loop
     } // Consumer Warp Groups End
 #endif
