@@ -142,7 +142,7 @@ public:
         ElementD,
         typename AuxStoreDescriptor::Stride,
         CommKindEnum::IntraNode,
-        false>; // rs_meta.fuse_reduction()()
+        true>; // rs_meta.fuse_reduction()()
 
   using GemmKernel = cutlass::gemm::kernel::GemmUniversalRsSm90<
       cute::Shape<int,int,int,int>,

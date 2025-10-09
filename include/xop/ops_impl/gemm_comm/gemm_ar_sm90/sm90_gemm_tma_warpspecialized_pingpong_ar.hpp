@@ -613,59 +613,12 @@ public:
     if (warp_group_role == WarpGroupRole::Producer) {
       cutlass::arch::warpgroup_reg_dealloc<LoadRegisterRequirement>();
     
-      // Scheduler Producer Warp
-      // if (producer_warp_role == ProducerWarpRole::Warp1) {
-      //   if constexpr (IsSchedDynamicPersistent) { 
-      //     bool requires_clc_query = true;
-      //     TileSchedulerPipelineState scheduler_pipe_producer_state = cutlass::make_producer_start_state<TileSchedulerPipeline>();
-
-      //     while (work_tile_info.is_valid()) {
-            
-      //       if (requires_clc_query) {
-
-      //         // Throttle CLC query to mitigate workload imbalance caused by skews among persistent workers.
-      //         scheduler_throttle_pipeline.consumer_wait(scheduler_pipe_throttle_consumer_state);
-      //         scheduler_throttle_pipeline.consumer_release(scheduler_pipe_throttle_consumer_state);
-      //         ++scheduler_pipe_throttle_consumer_state;
-
-      //         // Query next work tile
-      //         scheduler_pipe_producer_state = scheduler.advance_to_next_work(scheduler_pipeline, scheduler_pipe_producer_state);
-      //       }
-
-      //       // Fetch next work tile
-      //       auto [next_work_tile_info, increment_pipe] = 
-      //         scheduler.fetch_next_work(
-      //             work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-            
-      //       work_tile_info = next_work_tile_info;
-      //       requires_clc_query = increment_pipe;
-      //       if (increment_pipe) {
-      //         ++scheduler_pipe_consumer_state;
-      //       }
-      //     }
-
-      //     // Terminal condition - if work_tile_info is end-of-grid, produce an extra invalid tile
-      //     scheduler_pipeline.producer_acquire(scheduler_pipe_producer_state);
-      //     scheduler.store_invalid_response(scheduler_pipe_producer_state); // Push invalid tile to smem
-      //     scheduler_pipeline.producer_commit(scheduler_pipe_producer_state); // Manual completion of transaction
-      //     ++scheduler_pipe_producer_state;
-
-      //     auto [next_work_tile_info, increment_pipe] = 
-      //       scheduler.fetch_next_work(
-      //           work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-
-      //     scheduler_pipeline.producer_tail(scheduler_pipe_producer_state);
-      //   } 
-      // } // Scheduler Producer Warp End  
-      // else
-      
       // Mainloop Producer Warp
       if (producer_warp_role == ProducerWarpRole::Mainloop) {
         // Ensure that the prefetched kernel does not touch
         // unflushed global memory prior to this instruction
         cutlass::arch::wait_on_dependent_grids();
         bool do_load_order_arrive = true;
-        // bool requires_clc_query = true;
         while (work_tile_info.is_valid()) {
           // Compute m_coord, n_coord, l_coord with the post-tiled m-shape and n-shape
           auto m_coord = idx2crd(work_tile_info.M_idx, shape<2>(gA_mkl));
@@ -674,12 +627,6 @@ public:
           auto blk_coord = make_coord(m_coord, n_coord, _, l_coord);
 
           auto k_tile_iter  = cute::make_coord_iterator(shape<3>(gA_mkl));
-
-          // if (requires_clc_query) {
-          //   scheduler_throttle_pipeline.producer_acquire(scheduler_pipe_throttle_producer_state);
-          //   scheduler_throttle_pipeline.producer_commit(scheduler_pipe_throttle_producer_state);
-          //   ++scheduler_pipe_throttle_producer_state;
-          // }
 
           collective_mainloop.load(
             params.mainloop,
@@ -701,81 +648,15 @@ public:
             do_load_order_arrive = false;
           }
 
-          // if constexpr (IsSchedDynamicPersistent) {  
-          //   // Get next work tile
-          //   auto [next_work_tile_info, increment_pipe] =
-          //     scheduler.fetch_next_work(
-          //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-
-          //   work_tile_info = next_work_tile_info;
-          //   requires_clc_query = increment_pipe;
-          //   if (increment_pipe) {
-          //     ++scheduler_pipe_consumer_state;
-          //   }
-          // }
-          // else {
           // Get next work tile
           scheduler.advance_to_next_work();
           work_tile_info = scheduler.get_current_work();
-          // }
         } // Scheduler work fetch loop
 
         // Make sure all Consumer Warp Groups have been waited upon
         collective_mainloop.load_tail(mainloop_pipeline, mainloop_pipe_producer_state);
 
-        // if constexpr (IsSchedDynamicPersistent) {  
-        //   auto [next_work_tile_info, increment_pipe] = 
-        //     scheduler.fetch_next_work(
-        //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-        // }
-        
       } // Mainloop Producer Warp End
-
-      // else if (producer_warp_role == ProducerWarpRole::MainloopAux) {
-      //   if constexpr (IsMainloopAuxiliaryLoadNeeded) {
-      //     // Ensure that the prefetched kernel does not touch
-      //     // unflushed global memory prior to this instruction
-      //     cutlass::arch::wait_on_dependent_grids();
-      //     while (work_tile_info.is_valid()) {
-      //       // Compute m_coord, n_coord, l_coord with the post-tiled m-shape and n-shape
-      //       auto m_coord = idx2crd(work_tile_info.M_idx, shape<2>(gA_mkl));
-      //       auto n_coord = idx2crd(work_tile_info.N_idx, shape<2>(gB_nkl));
-      //       auto l_coord = idx2crd(work_tile_info.L_idx, shape<4>(gB_nkl));
-      //       auto blk_coord = make_coord(m_coord, n_coord, _, l_coord);
-
-      //       auto k_tile_iter = cute::make_coord_iterator(shape<3>(gA_mkl));
-      //       collective_mainloop.load_auxiliary(
-      //         params.mainloop,
-      //         mainloop_pipeline,
-      //         mainloop_pipe_producer_state,
-      //         load_inputs,
-      //         blk_coord,
-      //         k_tile_iter, k_tile_count,
-      //         lane_idx,
-      //         block_rank_in_cluster,
-      //         shared_storage.tensors.mainloop
-      //       );
-      //       // Update starting pipeline state for the next tile
-      //       mainloop_pipe_producer_state.advance(k_tile_count);
-
-      //       scheduler.advance_to_next_work();
-      //       work_tile_info = scheduler.get_current_work();
-      //     } // Scheduler work fetch loop
-
-      //     // Make sure all Consumer Warp Groups have been waited upon
-      //     collective_mainloop.load_tail(mainloop_pipeline, mainloop_pipe_producer_state);
-
-      //     if constexpr (IsSchedDynamicPersistent) {  
-      //       auto [next_work_tile_info, increment_pipe] = 
-      //         scheduler.fetch_next_work(
-      //           work_tile_info,
-      //           scheduler_pipeline,
-      //           scheduler_pipe_consumer_state
-      //         );
-      //     }
-          
-      //   }
-      // }
 
       // Epilogue Producer Warp
       else if (producer_warp_role == ProducerWarpRole::Epilogue && collective_epilogue.is_producer_load_needed()) {
@@ -809,32 +690,13 @@ public:
             shared_storage.tensors.epilogue
           );
 
-          // if constexpr (IsSchedDynamicPersistent) {  
-          //   // Get next work tile
-          //   auto [next_work_tile_info, increment_pipe] = 
-          //     scheduler.fetch_next_work(
-          //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-
-          //   work_tile_info = next_work_tile_info;
-          //   if (increment_pipe) {
-          //     ++scheduler_pipe_consumer_state;
-          //   }
-          // }
-          // else {
           // Get next work tile
           scheduler.advance_to_next_work();
           work_tile_info = scheduler.get_current_work();
-          // }
         } // Scheduler work fetch loop
 
         // Make sure all Consumer Warp Groups have been waited upon
         collective_epilogue.load_tail(epi_load_pipeline, epi_load_pipe_producer_state);
-
-        // if constexpr (IsSchedDynamicPersistent) {  
-        //   auto [next_work_tile_info, increment_pipe] = 
-        //     scheduler.fetch_next_work(
-        //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-        // }
       }
       // comm
       else if (producer_warp_role == ProducerWarpRole::ReduceScatterFetch) {
@@ -894,26 +756,6 @@ public:
         return;
       }
       #endif
-      
-      // if constexpr (IsSchedDynamicPersistent) {
-      //   // Consumer0's initial tile is static. It starts consuming the 2nd tile.
-      //   if (warp_group_role == WarpGroupRole::Consumer0) {
-      //       ++scheduler_pipe_consumer_state;
-      //   } 
-
-      //   if (warp_group_role == WarpGroupRole::Consumer1) {
-      //     // Get next work tile
-      //     auto [next_work_tile_info, increment_pipe] = 
-      //       scheduler.fetch_next_work(
-      //           work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-
-      //     work_tile_info = next_work_tile_info;
-      //     if (increment_pipe) {
-      //       ++scheduler_pipe_consumer_state;
-      //       ++scheduler_pipe_consumer_state;
-      //     }
-      //   } 
-      // }
 
       while (work_tile_info.is_valid()) {
         // Compute m_coord, n_coord, l_coord with the post-tiled m-shape and n-shape
@@ -1000,23 +842,9 @@ public:
         // Cue for next Math WG's Epilogue to start
         math_wg_order_barrier.arrive();
 
-        // if constexpr (IsSchedDynamicPersistent) {  
-        //   // Get next work tile
-        //   auto [next_work_tile_info, increment_pipe] = 
-        //     scheduler.fetch_next_work(
-        //         work_tile_info, scheduler_pipeline, scheduler_pipe_consumer_state);
-
-        //   work_tile_info = next_work_tile_info;
-        //   if (increment_pipe) {
-        //     ++scheduler_pipe_consumer_state;
-        //     ++scheduler_pipe_consumer_state;
-        //   }
-        // }
-        // else {
         // Get next work tile
         scheduler.advance_to_next_work(NumMmaWarpGroups);
         work_tile_info = scheduler.get_current_work();
-        // }
       } // Scheduler work fetch loop
     } // Consumer Warp Groups End
 #endif
