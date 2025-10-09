@@ -236,14 +236,14 @@ def run(world_size, rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
     weights_scale = []
 
     for i in range(problem_count):
-        inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
-        weights.append(xutil.rand_tensor((N, K), dtype=dtype))
+        # inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
+        # weights.append(xutil.rand_tensor((N, K), dtype=dtype))
         # if (rank == 0):
         #     inputs.append(torch.zeros((M, K), dtype=dtype).cuda())
         #     weights.append(torch.zeros((N, K), dtype=dtype).cuda())
         # else:
-        # inputs.append(torch.ones((M, K), dtype=dtype).cuda())
-        # weights.append(torch.ones((N, K), dtype=dtype).cuda())
+        inputs.append(torch.ones((M, K), dtype=dtype).cuda())
+        weights.append(torch.ones((N, K), dtype=dtype).cuda())
         inputs_scale.append(None)
         weights_scale.append(None)
 
