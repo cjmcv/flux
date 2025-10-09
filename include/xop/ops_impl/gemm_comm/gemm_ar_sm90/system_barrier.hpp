@@ -55,40 +55,40 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
 
  public:
   /// Uses thread[0] to wait for at least the specified count of signals on the given flag counter
-  CUTLASS_DEVICE
-  static int
-  check_value(void *lock_ptr, int thread_idx, int flag_idx) {
-    int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
-    return ld_acquire(flag_ptr);
-  }
+  // CUTLASS_DEVICE
+  // static int
+  // check_value(void *lock_ptr, int thread_idx, int flag_idx) {
+  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
+  //   return ld_acquire(flag_ptr);
+  // }
 
-  CUTLASS_DEVICE
-  static void
-  wait_lt(void *lock_ptr, int thread_idx, int flag_idx, int count) {
-    int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
+  // CUTLASS_DEVICE
+  // static void
+  // wait_lt(void *lock_ptr, int thread_idx, int flag_idx, int count) {
+  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
 
-    // clang-format off
-    if (thread_idx == 0) {
-      // Spin-loop
-      #pragma unroll 1
-      while (ld_acquire(flag_ptr) < count) {}
-    }
-    // clang-format on
-    Sync::sync();
-  }
+  //   // clang-format off
+  //   if (thread_idx == 0) {
+  //     // Spin-loop
+  //     #pragma unroll 1
+  //     while (ld_acquire(flag_ptr) < count) {}
+  //   }
+  //   // clang-format on
+  //   Sync::sync();
+  // }
 
-  CUTLASS_DEVICE
-  static void
-  wait_eq(void *lock_ptr, int thread_idx, int flag_idx, int val) {
-    int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
-    // clang-format off
-    if (thread_idx == 0) {
-      #pragma unroll 1
-      while (ld_acquire(flag_ptr) != val) {}
-    }
-    // clang-format on
-    Sync::sync();
-  }
+  // CUTLASS_DEVICE
+  // static void
+  // wait_eq(void *lock_ptr, int thread_idx, int flag_idx, int val) {
+  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
+  //   // clang-format off
+  //   if (thread_idx == 0) {
+  //     #pragma unroll 1
+  //     while (ld_acquire(flag_ptr) != val) {}
+  //   }
+  //   // clang-format on
+  //   Sync::sync();
+  // }
 
   CUTLASS_DEVICE
   static void
@@ -103,16 +103,16 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
     Sync::sync();
   }
 
-  CUTLASS_DEVICE
-  static void
-  arrive_inc(void *lock_ptr, int thread_idx, int flag_idx, int val = 1) {
-    int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
+  // CUTLASS_DEVICE
+  // static void
+  // arrive_inc(void *lock_ptr, int thread_idx, int flag_idx, int val = 1) {
+  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
 
-    Sync::sync();
-    if (thread_idx == 0) {
-      red_release(flag_ptr, val);
-    }
-  }
+  //   Sync::sync();
+  //   if (thread_idx == 0) {
+  //     red_release(flag_ptr, val);
+  //   }
+  // }
 
   CUTLASS_DEVICE
   static int
@@ -139,18 +139,18 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
 
 template <class Sync>
 struct CustomizedGenericBarrier : public GenericBarrier<Sync> {
-  CUTLASS_DEVICE
-  static void
-  wait_eq_reset(void *lock_ptr, int thread_idx, int flag_idx, int val, int reset_val = 0) {
-    int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
-    // clang-format off
-    if (thread_idx == 0) {
-      #pragma unroll 1
-      while(atomicCAS(flag_ptr, val, reset_val) != val) {}
-    }
-    // clang-format on
-    Sync::sync();
-  }
+  // CUTLASS_DEVICE
+  // static void
+  // wait_eq_reset(void *lock_ptr, int thread_idx, int flag_idx, int val, int reset_val = 0) {
+  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
+  //   // clang-format off
+  //   if (thread_idx == 0) {
+  //     #pragma unroll 1
+  //     while(atomicCAS(flag_ptr, val, reset_val) != val) {}
+  //   }
+  //   // clang-format on
+  //   Sync::sync();
+  // }
 
   CUTLASS_DEVICE
   static int
