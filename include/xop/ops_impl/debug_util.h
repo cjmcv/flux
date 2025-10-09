@@ -23,7 +23,7 @@ namespace xop {
 // cute::print_tensor       => include/cute/tensor_impl.hpp
 
 // Returning true indicates that the pointer is currently pointing to the device-side
-bool is_device_pointer(const void* p) {
+CUTE_HOST_DEVICE bool is_device_pointer(const void* p) {
     cudaPointerAttributes attr;
     cudaError_t err = cudaPointerGetAttributes(&attr, p);
     if (err == cudaErrorInvalidValue) {

@@ -27,11 +27,93 @@
 #include "cutlass/epilogue/collective/detail.hpp"
 #include "xop/xop.h"
 // #include "flux/cuda/cuda_common.h"
-#include "memory_utils.hpp"
-// #include "system_barrier.hpp"
+// #include "memory_utils.hpp"
+#include "custom_barrier.hpp"
 #ifdef FLUX_SHM_USE_NVSHMEM
 #include "host/nvshmemx_api.h"
 #endif
+
+
+namespace cutlass {
+namespace arch {
+
+// #include "cutlass/arch/memory.h" 
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+// use red.global to reduce on local GPU
+template <
+    /// Fragment type to store data
+    typename AccessType,
+    /// The bytes of storing
+    int StoreBytes,
+    /// Element type for reduction
+    typename ElementType>
+struct local_red;
+
+template <typename AccessType>
+struct local_red<AccessType, 16, half_t> {
+  CUTLASS_DEVICE
+  local_red(AccessType const &D, void *ptr, bool pred_guard) {
+#if defined(CUTE_ARCH_TMA_SM90_ENABLED)
+    using Registers = uint16_t[8];
+    Registers const &data = reinterpret_cast<Registers const &>(D);
+    asm volatile(
+        "{\n"
+        "  .reg .pred p;\n"
+        "  setp.ne.b32 p, %1, 0;\n"
+        "  @p red.global.add.noftz.v8.f16 [%0], {%2, %3, %4, %5, %6, %7, %8, %9};\n"
+        "}\n"
+        :
+        : "l"(ptr),
+          "r"((int)pred_guard),
+          "h"(data[0]),
+          "h"(data[1]),
+          "h"(data[2]),
+          "h"(data[3]),
+          "h"(data[4]),
+          "h"(data[5]),
+          "h"(data[6]),
+          "h"(data[7]));
+#else
+    CUTE_INVALID_CONTROL_PATH("Trying to use tma without CUTE_ARCH_TMA_SM90_ENABLED.");
+#endif
+  }
+};
+
+template <typename AccessType>
+struct local_red<AccessType, 16, bfloat16_t> {
+  CUTLASS_DEVICE
+  local_red(AccessType const &D, void *ptr, bool pred_guard) {
+#if defined(CUTE_ARCH_TMA_SM90_ENABLED)
+    using Registers = uint16_t[8];
+    Registers const &data = reinterpret_cast<Registers const &>(D);
+    asm volatile(
+        "{\n"
+        "  .reg .pred p;\n"
+        "  setp.ne.b32 p, %1, 0;\n"
+        "  @p red.global.add.noftz.v8.bf16 [%0], {%2, %3, %4, %5, %6, %7, %8, %9};\n"
+        "}\n"
+        :
+        : "l"(ptr),
+          "r"((int)pred_guard),
+          "h"(data[0]),
+          "h"(data[1]),
+          "h"(data[2]),
+          "h"(data[3]),
+          "h"(data[4]),
+          "h"(data[5]),
+          "h"(data[6]),
+          "h"(data[7]));
+#else
+    CUTE_INVALID_CONTROL_PATH("Trying to use tma without CUTE_ARCH_TMA_SM90_ENABLED.");
+#endif
+  }
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+}  // namespace arch
+}  // namespace cutlass
 
 namespace xop {
 
@@ -235,14 +317,10 @@ struct Sm90ReduceScatterDma {
     int m_fetch = m + (params_ptr->local_rank - local_src_rank) * params_ptr->tile_m_perrank;
 
     /////////////////// Fetch Tensors ////////////////////
-    Tensor mFetch =
-        params_ptr->tma_load_fetch[local_src_rank].get_tma_tensor(make_shape(M, N, L));  // (M,N,L)
-    Tensor gFetch =
-        local_tile(mFetch, take<0, 2>(TileShape{}), make_coord(m_fetch, n, l));  // (TILE_M,TILE_N)
-    Tensor gFetch_epi =
-        flat_divide(gFetch, EpilogueTile{});  // (EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)
-    Tensor sFetch_epi =
-        make_tensor(make_smem_ptr(smem_tensor), SmemLayout{});  // (EPI_TILE_M,EPI_TILE_N,PIPE)
+    Tensor mFetch     = params_ptr->tma_load_fetch[local_src_rank].get_tma_tensor(make_shape(M, N, L));  // (M,N,L)
+    Tensor gFetch     = local_tile(mFetch, take<0, 2>(TileShape{}), make_coord(m_fetch, n, l));  // (TILE_M,TILE_N)
+    Tensor gFetch_epi = flat_divide(gFetch, EpilogueTile{});  // (EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)
+    Tensor sFetch_epi = make_tensor(make_smem_ptr(smem_tensor), SmemLayout{});  // (EPI_TILE_M,EPI_TILE_N,PIPE)
 
     ThrCopy thrblk_g2s_fetch = params_ptr->tma_load_fetch[local_src_rank].get_slice(_0{});
     Tensor bGS_gFetch = thrblk_g2s_fetch.partition_S(gFetch_epi);
@@ -255,9 +333,8 @@ struct Sm90ReduceScatterDma {
     // wait for the tile to fetch ready before processing
     int fetch_tile_idx = params_ptr->tile_layout(m_fetch, n);
 
-    using BarrierSync =
-        cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterFetch>;
-    using Barrier = cutlass::detail::GenericSystemBarrier<BarrierSync>;
+    using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterFetch>;
+    using Barrier     = cutlass::detail::GenericSystemBarrier<BarrierSync>;
 
     Barrier::wait_eq_reset(
         params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 2, 1);
@@ -385,8 +462,7 @@ struct Sm90ReduceScatterDma {
     Tensor tgReduce =
         thread_copy.partition_D(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
 
-    using BarrierSync = cutlass::detail::
-        NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterReduce>;
+    using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterReduce>;
     using Barrier = cutlass::detail::CustomizedGenericBarrier<BarrierSync>;
 
     int reduce_tile_idx = params_ptr->tile_layout(m_reduce_in_output, n);

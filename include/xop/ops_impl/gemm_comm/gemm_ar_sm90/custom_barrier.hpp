@@ -4,6 +4,21 @@
 #include "cutlass/cutlass.h"
 #include "cutlass/barrier.h"
 
+
+namespace xop {
+
+enum class FluxNamedBarriers : int {
+  FirstBarrier = static_cast<int>(cutlass::arch::ReservedNamedBarriers::FirstUserBarrier),
+  ReduceScatterEpilogue = FirstBarrier,
+  ReduceScatterFetch = FirstBarrier + 1,
+  ReduceScatterReduce = FirstBarrier + 2,
+  AGScatterGather = FirstBarrier,
+  AGScatterFetcher = FirstBarrier + 1,
+  GatherRSProducer = FirstBarrier,
+  GatherRSConsumer = FirstBarrier + 1
+};
+}  // xop
+
 namespace cutlass {
 
 namespace detail {
@@ -46,34 +61,6 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
   //   return ld_acquire(flag_ptr);
   // }
 
-  // CUTLASS_DEVICE
-  // static void
-  // wait_lt(void *lock_ptr, int thread_idx, int flag_idx, int count) {
-  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
-
-  //   // clang-format off
-  //   if (thread_idx == 0) {
-  //     // Spin-loop
-  //     #pragma unroll 1
-  //     while (ld_acquire(flag_ptr) < count) {}
-  //   }
-  //   // clang-format on
-  //   Sync::sync();
-  // }
-
-  // CUTLASS_DEVICE
-  // static void
-  // wait_eq(void *lock_ptr, int thread_idx, int flag_idx, int val) {
-  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
-  //   // clang-format off
-  //   if (thread_idx == 0) {
-  //     #pragma unroll 1
-  //     while (ld_acquire(flag_ptr) != val) {}
-  //   }
-  //   // clang-format on
-  //   Sync::sync();
-  // }
-
   CUTLASS_DEVICE
   static void
   wait_eq_reset(void *lock_ptr, int thread_idx, int flag_idx, int val, int reset_val = 0) {
@@ -86,17 +73,6 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
     // clang-format on
     Sync::sync();
   }
-
-  // CUTLASS_DEVICE
-  // static void
-  // arrive_inc(void *lock_ptr, int thread_idx, int flag_idx, int val = 1) {
-  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
-
-  //   Sync::sync();
-  //   if (thread_idx == 0) {
-  //     red_release(flag_ptr, val);
-  //   }
-  // }
 
   CUTLASS_DEVICE
   static int

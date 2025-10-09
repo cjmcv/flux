@@ -713,8 +713,7 @@ public:
             rs_fetch_pipe_producer_state = rs_fetch_pipe_producer_state_next;
           }
 
-          auto [next_work_tile_info, increment_pipe] = scheduler.fetch_next_work(work_tile_info
-                                                                           );
+          auto [next_work_tile_info, increment_pipe] = scheduler.fetch_next_work(work_tile_info);
           work_tile_info = next_work_tile_info;
         }
         rs_dma.fetch_tail(rs_fetch_pipeline, rs_fetch_pipe_producer_state);
@@ -734,8 +733,7 @@ public:
             rs_fetch_pipe_consumer_state = rs_fetch_pipe_consumer_state_next;
           }
 
-          auto [next_work_tile_info, increment_pipe] = scheduler.fetch_next_work(work_tile_info
-                                                                           );
+          auto [next_work_tile_info, increment_pipe] = scheduler.fetch_next_work(work_tile_info);
           work_tile_info = next_work_tile_info;
         }
       }  // Reduce Scatter Warp End
