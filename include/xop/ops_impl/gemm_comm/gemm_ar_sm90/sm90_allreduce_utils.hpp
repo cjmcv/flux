@@ -33,8 +33,6 @@
 #include "host/nvshmemx_api.h"
 #endif
 
-// #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh" // todo clean
-
 namespace xop {
 
 using namespace cute;

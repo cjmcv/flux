@@ -92,16 +92,6 @@ public:
                                 typename AuxStoreDescriptor::Stride, typename AuxStoreDescriptor::SmemLayoutAtom,
                                 typename AuxStoreDescriptor::CopyOpR2S, CommKindEnum::IntraNode>;
 
-    // using AuxStoreType = Sm90AuxStoreReduceScatter<
-    // DispatchPolicy::StagesD,
-    // decltype(params.tile_shape()),
-    // decltype(params.epilogue_tile_mn()),
-    // ElementD,
-    // RoundStyle,
-    // decltype(params.stride_d()),
-    // decltype(params.smem_layout_atom_d()),
-    // decltype(params.copy_op_r2s()),
-    // rs_meta.comm_kind()>;
   using CustomEVT = cutlass::epilogue::fusion::Sm90EVT<AuxStore, CustomComputeEVT>;
 
   // A predefined set of fusion operations (implemented with EVT) are supported by the TMA warp-specialized epilogue.

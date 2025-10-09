@@ -1,19 +1,4 @@
-//===- system_barrier.hpp ----------------------------------------- C++ ---===//
-//
-// Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
-//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include "cutlass/cutlass.h"
@@ -26,8 +11,7 @@ namespace detail {
 
 struct SingleThreadSync {
   CUTLASS_DEVICE
-  static void
-  sync() {}
+  static void sync() {}
 };
 
 template <class Sync>
@@ -125,12 +109,15 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
 
     if (thread_idx == 0) {
       asm volatile("fence.acq_rel.sys;\n");
-      old_val = atomicAdd_system(flag_ptr, val);
+      old_val = atomicAdd_system(flag_ptr, val); // red.relaxed.sys.global.add.s32
     }
 
     if constexpr (cute::is_same_v<Sync, detail::SingleThreadSync>) {
       return old_val + val;
     } else {
+      // T __shfl_sync(unsigned mask, T var, int srcLane);
+      // 0xffffffff: all 32 threads in the warp.  0: srcLane
+      // The value of old_val + val computed by lane 0 is broadcast to all 32 threads in the warp, and the result is stored in ret.
       int ret = __shfl_sync(0xffffffff, old_val + val, 0);
       return ret;
     }
@@ -139,18 +126,18 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
 
 template <class Sync>
 struct CustomizedGenericBarrier : public GenericBarrier<Sync> {
-  // CUTLASS_DEVICE
-  // static void
-  // wait_eq_reset(void *lock_ptr, int thread_idx, int flag_idx, int val, int reset_val = 0) {
-  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
-  //   // clang-format off
-  //   if (thread_idx == 0) {
-  //     #pragma unroll 1
-  //     while(atomicCAS(flag_ptr, val, reset_val) != val) {}
-  //   }
-  //   // clang-format on
-  //   Sync::sync();
-  // }
+  CUTLASS_DEVICE
+  static void
+  wait_eq_reset(void *lock_ptr, int thread_idx, int flag_idx, int val, int reset_val = 0) {
+    int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
+    // clang-format off
+    if (thread_idx == 0) {
+      #pragma unroll 1
+      while(atomicCAS(flag_ptr, val, reset_val) != val) {}
+    }
+    // clang-format on
+    Sync::sync();
+  }
 
   CUTLASS_DEVICE
   static int
