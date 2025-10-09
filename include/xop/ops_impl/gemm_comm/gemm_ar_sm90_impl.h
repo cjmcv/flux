@@ -252,13 +252,15 @@ private:
     for (int i=0; i<kMaxLocalWorldSize; i++) {
       rank_data_[i] = (ElementD *)host_rank_data_.ptrs[i];
 
-      // ar_args_.rank_signals.signals[i] 是device指针，将整个Signal拷贝到内存，再基于内存索引其成员变量ptr。下面仍拷贝不成功is_device_pointer(barrier_ptrs_[0])仍然为0！！！
-      cudaMemcpy(host_signals_[i], ar_args_.rank_signals.signals[i], sizeof(vllm::Signal), cudaMemcpyDeviceToHost); // 
+      // ar_args_.rank_signals.signals是host指针，ar_args_.rank_signals.signals[i] 是device指针
+      // cudaMemcpy(host_signals_[i], ar_args_.rank_signals.signals[i], sizeof(vllm::Signal), cudaMemcpyDeviceToHost); // 
       // barrier_ptrs_[i] = (int *)host_signals_[i]->_flag;
-      barrier_ptrs_[i] = (int *)ar_args_.rank_signals.signals[i]->_flag; // 这样反而可以？？？
+      // barrier_ptrs_[i] = (int *)ar_args_.rank_signals.signals[i]->_flag; // 这样反而可以？？？
+      barrier_ptrs_[i] = (int *)ar_args_.rank_signals.signals[i]; // 不需要任何转换，直接用即可
+      // todo: 检查一下ar_args_.rank_data是host还是device，如果是host可以直接赋值。
     }
 
-    printf("is_device_pointer: %d, %d, %d\n", is_device_pointer(barrier_ptrs_[0]), is_device_pointer(rank_data_[0]), is_device_pointer(ar_args_.rank_signals.signals[0]));
+    printf("is_device_pointer: %d, %d, %d, %d\n", is_device_pointer(barrier_ptrs_[0]), is_device_pointer(ar_args_.rank_data), is_device_pointer(rank_data_[0]), is_device_pointer(ar_args_.rank_signals.signals[0]));
 
     arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
       .output_scatter_ptrs = (ElementD **)rank_data_,
