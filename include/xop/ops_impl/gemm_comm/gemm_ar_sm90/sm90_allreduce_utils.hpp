@@ -1,19 +1,3 @@
-//===- sm90_allreduce_utils.hpp ------------------------------ C++ ---===//
-//
-// Copyright 2025 ByteDance Ltd. and/or its affiliates. All rights reserved.
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
-//===----------------------------------------------------------------------===//
 
 #pragma once
 #include "cute/arch/cluster_sm90.hpp"
@@ -33,13 +17,10 @@
 #include "host/nvshmemx_api.h"
 #endif
 
-
+//////////////////////////////////////////////
+// reference: cutlass/arch/memory.h
 namespace cutlass {
 namespace arch {
-
-// #include "cutlass/arch/memory.h" 
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
 // use red.global to reduce on local GPU
 template <
     /// Fragment type to store data
@@ -110,16 +91,19 @@ struct local_red<AccessType, 16, bfloat16_t> {
   }
 };
 
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
 }  // namespace arch
 }  // namespace cutlass
 
+//////////////////////////////////////////////
+// reference: g2s - include/cutlass/epilogue/fusion/sm90_visitor_load_tma_warpspecialized.hpp
+// fetch 使用tma将数据从gmem搬运到smem
+// reduce 在smem上进行计算，后赋值到gmem
 namespace xop {
 
 using namespace cute;
 
 using _AcrossNode = cute::C<CommKindEnum::AcrossNode>;
+
 template <
     int Stages,
     class TileShape_,
@@ -149,11 +133,9 @@ struct Sm90ReduceScatterDma {
   // Find the max contiguous layout usable by TMA (if EpilogueTile is a non-compact tiler)
   using SmemShapeTma = decltype(make_shape(
       max_common_vector(make_layout(get<0>(EpilogueTile{})), make_layout(get<0>(EpilogueTile{}))),
-      max_common_vector(
-          make_layout(get<1>(EpilogueTile{})), make_layout(get<1>(EpilogueTile{})))));
+      max_common_vector(make_layout(get<1>(EpilogueTile{})), make_layout(get<1>(EpilogueTile{})))));
   using SmemLayoutTma = decltype(tile_to_shape(
-      SmemLayoutAtom{},
-      SmemShapeTma{},
+      SmemLayoutAtom{}, SmemShapeTma{},
       cute::conditional_t<is_m_major, Step<_2, _1>, Step<_1, _2>>{}));
   using SmemLayout = decltype(tile_to_shape(
       SmemLayoutTma{},
@@ -183,10 +165,7 @@ struct Sm90ReduceScatterDma {
   struct Params {
     using TMA_Fetch = decltype(make_tma_copy(
         SM90_TMA_LOAD{},
-        make_tensor(
-            static_cast<Element const *>(nullptr),
-            repeat_like(StrideMNL{}, int32_t(0)),
-            StrideMNL{}),
+        make_tensor(static_cast<Element const *>(nullptr), repeat_like(StrideMNL{}, int32_t(0)), StrideMNL{}),
         SmemLayoutTma{}));
 
     tuple<int, int> problem_shape;
@@ -250,11 +229,8 @@ struct Sm90ReduceScatterDma {
     params.local_reduce_buffer = static_cast<Element *>(args.local_reduce_buffer);
     for (int local_rank = 0; local_rank < params.local_world_size; ++local_rank) {
       int global_rank = params.node_idx * params.local_world_size + local_rank;
-      printf("allreduce 0.\n");
       Element *ptr = static_cast<Element *>(args.output_scatter_ptrs[global_rank]);
-      printf("allreduce 1: %p, %p.\n", args.output_scatter_ptrs, ptr);
       int *barrier_ptr = reinterpret_cast<int **>(args.barrier_ptrs)[global_rank];
-      printf("allreduce 2: %p, %p.\n", args.barrier_ptrs, barrier_ptr);
       // int *barrier_ptr = (int *)args.barrier_ptrs.signals[global_rank]->_flag;
       XOP_CHECK(barrier_ptr != nullptr);
       params.local_ptr[local_rank] = ptr;
@@ -309,8 +285,22 @@ struct Sm90ReduceScatterDma {
     // 所以对于2号卡，负责从0到3号卡的4/5块的数据收集。
     // 同理，0号卡负责0/1，1号卡负责2/3，3号卡负责6/7.
     //
-    // 当前函数会有m从0-7，以local_rank=2号卡为例，当m=0/1时，目标卡local_src_rank=0，从该卡中取出其4/5.
-    //                                          当m=2/3时，目标卡local_src_rank=1，从该卡中取出其4/5...
+    // 当前函数会有m从0-7.
+    //   以local_rank=2号卡为例，当m=0/1时，从local_src_rank=0中取出其4/5. 
+    //                          当m=2/3时，从local_src_rank=1中取出其4/5...
+    //   以local_rank=3号卡为例，当m=0/1时，从local_src_rank=0中取出其6/7.
+    //                          当m=2/3时，从local_src_rank=1中取出其6/7...
+    //   从gmem(远程tma tensor)拷贝到smem(当前rank)，smem视图维度是(EPI_TILE_M,EPI_TILE_N,PIPE)，PIPE即stage，这里取1即可。
+    //   gmem对应视图是(EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)，需要分 EPI_M*EPI_N 次copy。
+    //   因为smem只有一份，每次copy后都需要由fetch_pipeline.producer_commit通知给reduce线程，reduce完了后会由fetch_pipeline.producer_acquire获悉，开始下一次copy。
+    //   与reduce的fetch_pipeline.consumer_wait / fetch_pipeline.consumer_release 对应。
+    // 
+    // 同步点：
+    //    1) 大块同步, Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 2, 1);
+    //     与 sm90_visitor_store_tma_warpspecialized_ar.hpp 中的 Barrier::wait_eq_reset(params_ptr->barrier_ptr, thread_idx, tile_idx * 2, 0, 1); 对应
+    //     即远程rank完成store对应tile后，即可开始对该远程rank做fetch。
+    //    2) 小块同步，基于fetch_pipeline，producer_acquire 对应 consumer_wait 与 producer_commit 对应 consumer_release。
+
     int thread_idx = cutlass::canonical_lane_idx();
     int src_rank = m / params_ptr->tile_m_perrank;
     int local_src_rank = src_rank % params_ptr->local_world_size;
@@ -336,8 +326,7 @@ struct Sm90ReduceScatterDma {
     using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterFetch>;
     using Barrier     = cutlass::detail::GenericSystemBarrier<BarrierSync>;
 
-    Barrier::wait_eq_reset(
-        params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 2, 1);
+    Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 2, 1);
 
     CUTLASS_PRAGMA_UNROLL
     for (int epi_n = 0; epi_n < size<3>(gFetch_epi); ++epi_n) {
@@ -348,10 +337,8 @@ struct Sm90ReduceScatterDma {
         fetch_pipeline.producer_acquire(fetch_write_state);
 
         if (issue_tma_load) {
-          copy(
-              params_ptr->tma_load_fetch[local_src_rank].with(*tma_barrier, mcast_mask),
-              bGS_gFetch(_, _, _, epi_m, epi_n),
-              bGS_sFetch(_, _, _, fetch_write_state.index()));
+          copy(params_ptr->tma_load_fetch[local_src_rank].with(*tma_barrier, mcast_mask),
+               bGS_gFetch(_, _, _, epi_m, epi_n), bGS_sFetch(_, _, _, fetch_write_state.index()));
           fetch_pipeline.producer_expect_transaction(fetch_write_state);
         }
         fetch_pipeline.producer_commit(fetch_write_state);
@@ -391,9 +378,8 @@ struct Sm90ReduceScatterDma {
     int local_dst_rank = dst_rank % params_ptr->local_world_size;
     int dst_node_idx = dst_rank / params_ptr->local_world_size;
     // the logical m coord of the reduction tile in the output buffer
-    int m_reduce_in_output =
-        m + (params_ptr->local_rank - local_dst_rank) * params_ptr->tile_m_perrank;
-
+    int m_reduce_in_output = m + (params_ptr->local_rank - local_dst_rank) * params_ptr->tile_m_perrank;
+        
     auto get_m_reduce_coord = [&]() {
       int m = get<0>(tile_coord);
       if constexpr (FuseReduction) {
@@ -436,13 +422,9 @@ struct Sm90ReduceScatterDma {
     };
 
     auto mReduce = get_mReduce();  // (M_reduce,N,L)
-    Tensor gReduce =
-        local_tile(mReduce, take<0, 2>(TileShape{}), make_coord(m_reduce, n));  // (TILE_M,TILE_N)
-    Tensor gReduce_epi =
-        flat_divide(gReduce, EpilogueTile{});  // (EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)
-
-    Tensor sReduce_epi =
-        make_tensor(make_smem_ptr(smem_tensor), SmemLayout{});  // (EPI_TILE_M,EPI_TILE_N,PIPE)
+    Tensor gReduce = local_tile(mReduce, take<0, 2>(TileShape{}), make_coord(m_reduce, n));  // (TILE_M,TILE_N)
+    Tensor gReduce_epi = flat_divide(gReduce, EpilogueTile{});  // (EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)
+    Tensor sReduce_epi = make_tensor(make_smem_ptr(smem_tensor), SmemLayout{});  // (EPI_TILE_M,EPI_TILE_N,PIPE)
 
     // tiled copy for fetch from global memory from other rank to registers
     // each thread of the TiledMMA (256 threads for cooperative and 128 threads for pingpong
@@ -452,15 +434,13 @@ struct Sm90ReduceScatterDma {
 
     auto tiled_copy = make_tiled_copy(
         Copy_Atom<DefaultCopy, Element>{},
-        make_layout(
-            make_shape(Int<ThreadLayoutM>{}, Int<ThreadLayoutN>{}),
-            make_stride(Int<ThreadLayoutN>{}, _1{})),
+        make_layout(make_shape(Int<ThreadLayoutM>{}, Int<ThreadLayoutN>{}),
+                    make_stride(Int<ThreadLayoutN>{}, _1{})),
         make_layout(make_shape(_1{}, Int<kAlignment>{}), make_stride(_0{}, _1{})));
 
     auto thread_copy = tiled_copy.get_slice(thread_idx);
     Tensor tsReduce = thread_copy.partition_S(sReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,PIPE)
-    Tensor tgReduce =
-        thread_copy.partition_D(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
+    Tensor tgReduce = thread_copy.partition_D(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
 
     using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterReduce>;
     using Barrier = cutlass::detail::CustomizedGenericBarrier<BarrierSync>;

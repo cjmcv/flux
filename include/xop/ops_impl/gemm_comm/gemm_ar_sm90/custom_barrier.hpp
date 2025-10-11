@@ -24,10 +24,10 @@ namespace cutlass {
 namespace detail {
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct SingleThreadSync {
-  CUTLASS_DEVICE
-  static void sync() {}
-};
+// struct SingleThreadSync {
+//   CUTLASS_DEVICE
+//   static void sync() {}
+// };
 
 template <class Sync>
 struct GenericSystemBarrier : public GenericBarrier<Sync> {
@@ -88,15 +88,15 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
       old_val = atomicAdd_system(flag_ptr, val); // red.relaxed.sys.global.add.s32
     }
 
-    if constexpr (cute::is_same_v<Sync, detail::SingleThreadSync>) {
-      return old_val + val;
-    } else {
+    // if constexpr (cute::is_same_v<Sync, detail::SingleThreadSync>) {
+    //   return old_val + val;
+    // } else {
       // T __shfl_sync(unsigned mask, T var, int srcLane);
       // 0xffffffff: all 32 threads in the warp.  0: srcLane
       // The value of old_val + val computed by lane 0 is broadcast to all 32 threads in the warp, and the result is stored in ret.
       int ret = __shfl_sync(0xffffffff, old_val + val, 0);
       return ret;
-    }
+    // }
   }
 };
 
@@ -129,12 +129,12 @@ struct CustomizedGenericBarrier : public GenericBarrier<Sync> {
       old_val = atomicAdd(flag_ptr, val);
     }
 
-    if constexpr (cute::is_same_v<Sync, detail::SingleThreadSync>) {
-      return old_val + val;
-    } else {
+    // if constexpr (cute::is_same_v<Sync, detail::SingleThreadSync>) {
+    //   return old_val + val;
+    // } else {
       int ret = __shfl_sync(0xffffffff, old_val + val, 0);
       return ret;
-    }
+    // }
   }
 };
 

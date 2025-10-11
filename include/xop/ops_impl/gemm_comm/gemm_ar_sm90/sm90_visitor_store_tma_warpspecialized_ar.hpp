@@ -71,7 +71,6 @@
 #include "cutlass/numeric_conversion.h"
 
 #include "xop/xop.h"
-// #include "memory_utils.hpp"
 #include "custom_barrier.hpp"
 #include "cute/tensor.hpp"
 #include "cutlass/detail/helper_macros.hpp"
