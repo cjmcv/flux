@@ -278,10 +278,10 @@ struct Sm90ReduceScatterDma {
     // 所以m=0/1时，src_rank=0；m=2/3时，src_rank=1；m=4/5时，src_rank=2；m=6/7时，src_rank=3；
     // local_src_rank中的local是指本节点，为了与跨机区分。
     // local_rank是当前卡的rank，如为2，则：
-    // local_src_rank=0，m=0/1, 后半段为(2-0)*2=4, m_fetch指向4/5
-    // local_src_rank=1，m=2/3，后半段为(2-1)*2=2, m_fetch指向4/5
-    // local_src_rank=2，m=4/5，后半段为(2-2)*2=0, m_fetch指向4/5
-    // local_src_rank=3，m=6/7，后半段为(2-3)*2=-2, m_fetch指向4/5
+    // local_src_rank=0，m=0/1, 后半段为(2-0)*2=4, m_fetch 指向4/5
+    // local_src_rank=1，m=2/3，后半段为(2-1)*2=2, m_fetch 指向4/5
+    // local_src_rank=2，m=4/5，后半段为(2-2)*2=0, m_fetch 指向4/5
+    // local_src_rank=3，m=6/7，后半段为(2-3)*2=-2, m_fetch 指向4/5
     // 所以对于2号卡，负责从0到3号卡的4/5块的数据收集。
     // 同理，0号卡负责0/1，1号卡负责2/3，3号卡负责6/7.
     //
@@ -328,6 +328,8 @@ struct Sm90ReduceScatterDma {
 
     Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 2, 1);
 
+    // todo: 检查这个fetch_pipeline producer是否会跟reduce的consumer_wait交错进行
+    //       检查当不做 FuseReduction 时，size<2>(gFetch_epi)与 reduce的 size<2>(gReduce_epi) 是否一致？
     CUTLASS_PRAGMA_UNROLL
     for (int epi_n = 0; epi_n < size<3>(gFetch_epi); ++epi_n) {
       CUTLASS_PRAGMA_UNROLL
@@ -379,44 +381,29 @@ struct Sm90ReduceScatterDma {
     int dst_node_idx = dst_rank / params_ptr->local_world_size;
     // the logical m coord of the reduction tile in the output buffer
     int m_reduce_in_output = m + (params_ptr->local_rank - local_dst_rank) * params_ptr->tile_m_perrank;
-        
-    auto get_m_reduce_coord = [&]() {
-      int m = get<0>(tile_coord);
-      if constexpr (FuseReduction) {
-        return (m % params_ptr->tile_m_perrank) +
-               params_ptr->tile_m_perrank *
-                   (dst_node_idx * params_ptr->nnodes + params_ptr->node_idx);
-      } else {
-        return m;
-      }
-    };
-
+    
     // the actual m coord in reduce_buffer
-    int m_reduce = get_m_reduce_coord();
+    int m_reduce = get<0>(tile_coord);
+    if constexpr (FuseReduction) {
+      m_reduce = (m_reduce % params_ptr->tile_m_perrank) +
+             params_ptr->tile_m_perrank * (dst_node_idx * params_ptr->nnodes + params_ptr->node_idx);
+    }
 
     /////////////////// Reduce Tensors ////////////////////
     auto get_mReduce = [&]() {
       auto [M, N] = take<0, 2>(problem_shape);
       if constexpr (FuseReduction) {
-        int M_reduce = params_ptr->tile_m_perrank * params_ptr->nnodes * params_ptr->nnodes *
-                       get<0>(TileShape{});
-
+        int M_reduce = params_ptr->tile_m_perrank * params_ptr->nnodes * params_ptr->nnodes * get<0>(TileShape{});
         if constexpr (CommKind == _AcrossNode{}) {
           auto tile_layout = make_ordered_layout(take<0, 2>(TileShape{}), make_step(_1{}, _0{}));
-          auto mReduce = make_tensor(
-              params_ptr->local_reduce_buffer,
-              tile_to_shape(tile_layout, make_shape(M_reduce, N)));
+          auto mReduce = make_tensor(params_ptr->local_reduce_buffer, tile_to_shape(tile_layout, make_shape(M_reduce, N)));
           return mReduce;
         } else {
-          auto mReduce = make_tensor(
-              params_ptr->local_reduce_buffer,
-              make_ordered_layout(make_shape(M_reduce, N), make_step(_1{}, _0{})));
+          auto mReduce = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M_reduce, N), make_step(_1{}, _0{})));
           return mReduce;
         }
       } else {
-        auto mReduce = make_tensor(
-            params_ptr->local_reduce_buffer,
-            make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
+        auto mReduce = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
         return mReduce;
       }
     };
@@ -478,8 +465,10 @@ struct Sm90ReduceScatterDma {
             // write to reduce_buffer
             if constexpr (FuseReduction) {
               if (is_local_tile_reduce) {
+                // trReduce是自己的，直接拷贝
                 copy(tiled_copy, trReduce, tgReduce_epi(_, copy_m, copy_n));
               } else {
+                // trReduce是其他rank的，需要规约
                 using VecType = uint_byte_t<sizeof(trReduce)>;
                 cutlass::arch::local_red<VecType, sizeof(Element) * kAlignment, Element>(
                     recast<VecType>(trReduce)(_0{}),
