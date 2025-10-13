@@ -398,14 +398,14 @@ struct Sm90ReduceScatterDma {
         int M_reduce = params_ptr->tile_m_perrank * params_ptr->nnodes * params_ptr->nnodes * get<0>(TileShape{});
         if constexpr (CommKind == _AcrossNode{}) {
           auto tile_layout = make_ordered_layout(take<0, 2>(TileShape{}), make_step(_1{}, _0{}));
-          auto mReduce = make_tensor(params_ptr->local_reduce_buffer, tile_to_shape(tile_layout, make_shape(M_reduce, N)));
+          auto mReduce = make_tensor(params_ptr->local_ptr[params_ptr->rank], tile_to_shape(tile_layout, make_shape(M_reduce, N)));
           return mReduce;
         } else {
-          auto mReduce = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M_reduce, N), make_step(_1{}, _0{})));
+          auto mReduce = make_tensor(params_ptr->local_ptr[params_ptr->rank], make_ordered_layout(make_shape(M_reduce, N), make_step(_1{}, _0{})));
           return mReduce;
         }
       } else {
-        auto mReduce = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
+        auto mReduce = make_tensor(params_ptr->local_ptr[params_ptr->rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{}))); // 
         return mReduce;
       }
     };
@@ -513,32 +513,37 @@ struct Sm90ReduceScatterDma {
       }
     }
 
-    // allgather
-    // 只有拥有者发 params.local_ptr[local_rank]
-    if (is_local_tile_reduce) {
-      // 本地拥有者视角：把要广播的片看成“源”
-      Tensor gLocal = make_tensor(gReduce.data(), gReduce.shape());   // (TILE_M, TILE_N)
+    // // allgather
+    // // params_ptr->local_reduce_buffer
+    // using BarrierSysSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::AllReduceAllgather>;
+    // using BarrierSys = cutlass::detail::GenericSystemBarrier<BarrierSysSync>;
+    // int *allgather_lock_ptr = params_ptr->local_barrier_ptr[params_ptr->local_rank];
+    // int allgather_flag_idx = reduce_tile_idx * 2; // 对应fetch
+    // if (is_local_tile_reduce) {
+    //   Tensor gLocal = make_tensor(gReduce.data(), gReduce.shape());   // (TILE_M, TILE_N)
 
-      // 目标 peer 视角：把远端 GMEM 同样映射成 tensor
-      auto make_peer_tensor = [&](int peer) {
-        return make_tensor(const_cast<Element*>(params_ptr->local_ptr[peer]) +
-                    reduce_tile_idx * gReduce.size(), gReduce.shape());
-      };
+    //   // 目标 peer 视角：把远端 GMEM 同样映射成 tensor
+    //   auto make_peer_tensor = [&](int peer) {
+    //     return make_tensor(const_cast<Element*>(params_ptr->local_ptr[peer]) +
+    //                 reduce_tile_idx * gReduce.size(), gReduce.shape());
+    //   };
       
-      for (int peer = 0; peer < params_ptr->local_world_size; ++peer) {
-        if (peer == params_ptr->local_rank) continue;
+    //   for (int peer = 0; peer < params_ptr->local_world_size; ++peer) {
+    //     if (peer == params_ptr->local_rank) continue;
     
-        Tensor gPeer = make_peer_tensor(peer); // 远端 GMEM tensor
-        
-        auto thr_copy = tiled_copy.get_slice(thread_idx);
-        auto src_thr  = thr_copy.partition_S(gLocal);
-        auto dst_thr  = thr_copy.partition_D(gPeer);
-    
-        // 线程自己拷自己那一小块
-        cute::copy(tiled_copy, src_thr, dst_thr);
-      }
-    }
+    //     Tensor gPeer = make_peer_tensor(peer); // 远端 GMEM tensor
 
+    //     auto thr_copy = tiled_copy.get_slice(thread_idx);
+    //     auto src_thr  = thr_copy.partition_S(gLocal);
+    //     auto dst_thr  = thr_copy.partition_D(gPeer);
+    
+    //     // 线程自己拷自己那一小块
+    //     cute::copy(tiled_copy, src_thr, dst_thr);
+    //   }
+    //   Barrier::wait_eq_reset(allgather_lock_ptr, thread_idx, allgather_flag_idx, 2);
+    // }
+    // Barrier::wait_eq_reset(allgather_lock_ptr, thread_idx, flag_ag, 1);
+    
     return fetch_read_state;
   }
 

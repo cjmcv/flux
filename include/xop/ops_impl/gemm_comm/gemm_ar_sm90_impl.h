@@ -204,6 +204,7 @@ public:
       vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementD>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);      
     }
 #endif
+    cudaMemcpyAsync((void *)rt_args->ptr_D, (void *)rank_data_[ar_args_.rank], output_len_ * sizeof(ElementD), cudaMemcpyDeviceToDevice, cu_stream);
   }
 
 private:

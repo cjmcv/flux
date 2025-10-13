@@ -12,6 +12,7 @@ enum class FluxNamedBarriers : int {
   ReduceScatterEpilogue = FirstBarrier,
   ReduceScatterFetch = FirstBarrier + 1,
   ReduceScatterReduce = FirstBarrier + 2,
+  AllReduceAllgather = FirstBarrier + 3,
   AGScatterGather = FirstBarrier,
   AGScatterFetcher = FirstBarrier + 1,
   GatherRSProducer = FirstBarrier,
