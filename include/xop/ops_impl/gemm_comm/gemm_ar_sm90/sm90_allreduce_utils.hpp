@@ -390,19 +390,6 @@ struct Sm90ReduceScatterDma {
     //   以local_rank=3号卡为例，当m=0/1时，从local_src_rank=0中取出其6/7.
     //                          当m=2/3时，从local_src_rank=1中取出其6/7...
     // 那么这里的 原m_reduce 范围就是0-7，4卡 => tile_m_perrank=2
-    // 如果 FuseReduction，单节点下：
-    //   m_reduce = 0/1 => 0/1 + 2 * 0 => 0/1
-    //              2/3 => 0/1 + 2 * 0 => 0/1
-    //              4/5 => 0/1 + 2 * 0 => 0/1
-    //              6/7 => 0/1 + 2 * 0 => 0/1
-    //   均指向前0/1，为结果填充区的范围。
-    // 双节点下，如双节点双卡(nnodes=2, node_idx=0)：？？确认
-    //   m_reduce = 0/1 (dst_rank=0, dst_node_idx=0) => 0/1 + 2 * 0 => 0/1
-    //              2/3 (dst_rank=1, dst_node_idx=0) => 0/1 + 2 * 0 => 0/1
-    //              4/5 (dst_rank=2, dst_node_idx=1) => 0/1 + 2 * (1*2+0) => 4/5
-    //                               如 node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
-    //              6/7 (dst_rank=3, dst_node_idx=1) => 0/1 + 2 * (1*2+0) => 4/5
-    //                               如 node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
 
     /////////////////// Reduce Tensors ////////////////////
     auto get_mReduce = [&]() {
@@ -525,6 +512,33 @@ struct Sm90ReduceScatterDma {
         }
       }
     }
+
+    // allgather
+    // 只有拥有者发 params.local_ptr[local_rank]
+    if (is_local_tile_reduce) {
+      // 本地拥有者视角：把要广播的片看成“源”
+      Tensor gLocal = make_tensor(gReduce.data(), gReduce.shape());   // (TILE_M, TILE_N)
+
+      // 目标 peer 视角：把远端 GMEM 同样映射成 tensor
+      auto make_peer_tensor = [&](int peer) {
+        return make_tensor(const_cast<Element*>(params_ptr->local_ptr[peer]) +
+                    reduce_tile_idx * gReduce.size(), gReduce.shape());
+      };
+      
+      for (int peer = 0; peer < params_ptr->local_world_size; ++peer) {
+        if (peer == params_ptr->local_rank) continue;
+    
+        Tensor gPeer = make_peer_tensor(peer); // 远端 GMEM tensor
+        
+        auto thr_copy = tiled_copy.get_slice(thread_idx);
+        auto src_thr  = thr_copy.partition_S(gLocal);
+        auto dst_thr  = thr_copy.partition_D(gPeer);
+    
+        // 线程自己拷自己那一小块
+        cute::copy(tiled_copy, src_thr, dst_thr);
+      }
+    }
+
     return fetch_read_state;
   }
 
