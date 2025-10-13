@@ -358,6 +358,7 @@ struct Sm90ReduceScatterDma {
     }
   }
 
+  
   template <class ProblemShapeMNKL, class TileCoordMNKL>
   CUTLASS_DEVICE auto
   reduce(
@@ -382,12 +383,26 @@ struct Sm90ReduceScatterDma {
     // the logical m coord of the reduction tile in the output buffer
     int m_reduce_in_output = m + (params_ptr->local_rank - local_dst_rank) * params_ptr->tile_m_perrank;
     
-    // the actual m coord in reduce_buffer
-    int m_reduce = get<0>(tile_coord);
-    if constexpr (FuseReduction) {
-      m_reduce = (m_reduce % params_ptr->tile_m_perrank) +
-             params_ptr->tile_m_perrank * (dst_node_idx * params_ptr->nnodes + params_ptr->node_idx);
-    }
+    // 即fetch的例子：
+    // 当前函数会有m从0-7.
+    //   以local_rank=2号卡为例，当m=0/1时，从local_src_rank=0中取出其4/5. 
+    //                          当m=2/3时，从local_src_rank=1中取出其4/5...
+    //   以local_rank=3号卡为例，当m=0/1时，从local_src_rank=0中取出其6/7.
+    //                          当m=2/3时，从local_src_rank=1中取出其6/7...
+    // 那么这里的 原m_reduce 范围就是0-7，4卡 => tile_m_perrank=2
+    // 如果 FuseReduction，单节点下：
+    //   m_reduce = 0/1 => 0/1 + 2 * 0 => 0/1
+    //              2/3 => 0/1 + 2 * 0 => 0/1
+    //              4/5 => 0/1 + 2 * 0 => 0/1
+    //              6/7 => 0/1 + 2 * 0 => 0/1
+    //   均指向前0/1，为结果填充区的范围。
+    // 双节点下，如双节点双卡(nnodes=2, node_idx=0)：？？确认
+    //   m_reduce = 0/1 (dst_rank=0, dst_node_idx=0) => 0/1 + 2 * 0 => 0/1
+    //              2/3 (dst_rank=1, dst_node_idx=0) => 0/1 + 2 * 0 => 0/1
+    //              4/5 (dst_rank=2, dst_node_idx=1) => 0/1 + 2 * (1*2+0) => 4/5
+    //                               如 node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
+    //              6/7 (dst_rank=3, dst_node_idx=1) => 0/1 + 2 * (1*2+0) => 4/5
+    //                               如 node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
 
     /////////////////// Reduce Tensors ////////////////////
     auto get_mReduce = [&]() {
@@ -408,8 +423,12 @@ struct Sm90ReduceScatterDma {
       }
     };
 
+    // 无论做不做reduce，gReduce的大小都是一样的。这里以m为单元进行派发数据，m为0-7, 则会有8个tile的m进行这里。
+    // 如果做reduce，每个m会针对指向上面收缩后的范围(m_reduce % params_ptr->tile_m_perrank)，从smem拿数据规约到这里。
+    // 如果不做reduce，每个m会直接指向原本自己所属的目的地，从smem取出数据。
+    // 0-7的m里对应的smem的内容是 从其他rank需要规约的数据。所以如果不fused reduce，则需要将目的buffer中，将自己的m=2/3，4/5，6/7, 都额外规约到自己的0/1上。
     auto mReduce = get_mReduce();  // (M_reduce,N,L)
-    Tensor gReduce = local_tile(mReduce, take<0, 2>(TileShape{}), make_coord(m_reduce, n));  // (TILE_M,TILE_N)
+    Tensor gReduce = local_tile(mReduce, take<0, 2>(TileShape{}), make_coord(m_reduce_in_output, n));  // (TILE_M,TILE_N)
     Tensor gReduce_epi = flat_divide(gReduce, EpilogueTile{});  // (EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)
     Tensor sReduce_epi = make_tensor(make_smem_ptr(smem_tensor), SmemLayout{});  // (EPI_TILE_M,EPI_TILE_N,PIPE)
 
@@ -441,6 +460,9 @@ struct Sm90ReduceScatterDma {
     if constexpr (FuseReduction) {
       if (not is_local_tile_reduce) {
         // if this tile is fetched from other rank, wait for the local rank to reduce first
+        // 与下面的int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);对应
+        // 如果当前tile任务是从其他rank获取数据，那么需要等待当前rank的数据就绪，即需要用过一次arrive_inc_get。
+        // 因为下面的tgReduce_epi第一次是直接从smem拷贝过去的(免去清零操作？)，读取其他rank则在tgReduce_epi进行累加。
         Barrier::wait_lt(lock_ptr, thread_idx, flag_idx, 1);
       }
     }
@@ -476,6 +498,7 @@ struct Sm90ReduceScatterDma {
                     true);
               }
             } else {
+              // 不做reduce，就直接拷贝。
               copy(tiled_copy, trReduce, tgReduce_epi(_, copy_m, copy_n));
             }
           }
@@ -486,6 +509,183 @@ struct Sm90ReduceScatterDma {
       }
     }
 
+    // 确保所有rank都到位，每到位一个则arrive_inc_get+1，由wait_eq_reset集齐统一退出
+    if constexpr (FuseReduction) {
+      int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);
+      if (reduce_count == params_ptr->local_world_size) {
+        Barrier::wait_eq_reset(lock_ptr, thread_idx, flag_idx, params_ptr->local_world_size, 0);
+        if constexpr (CommKind == _AcrossNode{}) {
+          if (dst_node_idx != params_ptr->node_idx) {
+            int remote_rank = dst_node_idx * params_ptr->local_world_size + params_ptr->local_rank;
+#ifdef FLUX_SHM_USE_NVSHMEM
+            nvshmemx_putmem_nbi_warp(
+                gReduce.data(), gReduce.data(), gReduce.size() * sizeof(Element), remote_rank);
+#endif
+          }
+        }
+      }
+    }
+    return fetch_read_state;
+  }
+
+  template <class ProblemShapeMNKL, class TileCoordMNKL>
+  CUTLASS_DEVICE auto
+  reduce2(
+      FetchPipeline fetch_pipeline,
+      PipelineState fetch_read_state,
+      ProblemShapeMNKL const &problem_shape,
+      TileCoordMNKL const &tile_coord) {
+    auto [M, N, K, L] = problem_shape;
+    auto [m, n, k, l] = tile_coord;
+
+    if (m >= size<0>(params_ptr->tile_layout.shape()) or
+        n >= size<1>(params_ptr->tile_layout.shape())) {
+      // early exit if out of bound
+      return fetch_read_state;
+    }
+
+    int thread_idx = cutlass::canonical_lane_idx();
+
+    int dst_rank = m / params_ptr->tile_m_perrank;
+    int local_dst_rank = dst_rank % params_ptr->local_world_size;
+    int dst_node_idx = dst_rank / params_ptr->local_world_size;
+    // the logical m coord of the reduction tile in the output buffer
+    int m_reduce_in_output = m + (params_ptr->local_rank - local_dst_rank) * params_ptr->tile_m_perrank;
+    
+    // 即fetch的例子：
+    // 当前函数会有m从0-7.
+    //   以local_rank=2号卡为例，当m=0/1时，从local_src_rank=0中取出其4/5. 
+    //                          当m=2/3时，从local_src_rank=1中取出其4/5...
+    //   以local_rank=3号卡为例，当m=0/1时，从local_src_rank=0中取出其6/7.
+    //                          当m=2/3时，从local_src_rank=1中取出其6/7...
+    // 那么这里的 原m_reduce 范围就是0-7，4卡 => tile_m_perrank=2
+    // 如果 FuseReduction，单节点下：
+    //   m_reduce = 0/1 => 0/1 + 2 * 0 => 0/1
+    //              2/3 => 0/1 + 2 * 0 => 0/1
+    //              4/5 => 0/1 + 2 * 0 => 0/1
+    //              6/7 => 0/1 + 2 * 0 => 0/1
+    //   均指向前0/1，为结果填充区的范围。
+    // 双节点下，如双节点双卡(nnodes=2, node_idx=0)：？？确认
+    //   m_reduce = 0/1 (dst_rank=0, dst_node_idx=0) => 0/1 + 2 * 0 => 0/1
+    //              2/3 (dst_rank=1, dst_node_idx=0) => 0/1 + 2 * 0 => 0/1
+    //              4/5 (dst_rank=2, dst_node_idx=1) => 0/1 + 2 * (1*2+0) => 4/5
+    //                               如 node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
+    //              6/7 (dst_rank=3, dst_node_idx=1) => 0/1 + 2 * (1*2+0) => 4/5
+    //                               如 node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
+
+    // the actual m coord in reduce_buffer
+    int m_reduce = get<0>(tile_coord);
+    if constexpr (FuseReduction) {
+      m_reduce = (m_reduce % params_ptr->tile_m_perrank) +
+             params_ptr->tile_m_perrank * (dst_node_idx * params_ptr->nnodes + params_ptr->node_idx);
+    }
+
+    /////////////////// Reduce Tensors ////////////////////
+    auto get_mReduce = [&]() {
+      auto [M, N] = take<0, 2>(problem_shape);
+      if constexpr (FuseReduction) {
+        int M_reduce = params_ptr->tile_m_perrank * params_ptr->nnodes * params_ptr->nnodes * get<0>(TileShape{});
+        if constexpr (CommKind == _AcrossNode{}) {
+          auto tile_layout = make_ordered_layout(take<0, 2>(TileShape{}), make_step(_1{}, _0{}));
+          auto mReduce = make_tensor(params_ptr->local_reduce_buffer, tile_to_shape(tile_layout, make_shape(M_reduce, N)));
+          return mReduce;
+        } else {
+          auto mReduce = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M_reduce, N), make_step(_1{}, _0{})));
+          return mReduce;
+        }
+      } else {
+        auto mReduce = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
+        return mReduce;
+      }
+    };
+
+    // 无论做不做reduce，gReduce的大小都是一样的。这里以m为单元进行派发数据，m为0-7, 则会有8个tile的m进行这里。
+    // 如果做reduce，每个m会针对指向上面收缩后的范围(m_reduce % params_ptr->tile_m_perrank)，从smem拿数据规约到这里。
+    // 如果不做reduce，每个m会直接指向原本自己所属的目的地，从smem取出数据。
+    // 0-7的m里对应的smem的内容是 从其他rank需要规约的数据。所以如果不fused reduce，则需要将目的buffer中，将自己的m=2/3，4/5，6/7, 都额外规约到自己的0/1上。
+    auto mReduce = get_mReduce();  // (M_reduce,N,L)
+    Tensor gReduce = local_tile(mReduce, take<0, 2>(TileShape{}), make_coord(m_reduce, n));  // (TILE_M,TILE_N)
+    Tensor gReduce_epi = flat_divide(gReduce, EpilogueTile{});  // (EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)
+    Tensor sReduce_epi = make_tensor(make_smem_ptr(smem_tensor), SmemLayout{});  // (EPI_TILE_M,EPI_TILE_N,PIPE)
+
+    // tiled copy for fetch from global memory from other rank to registers
+    // each thread of the TiledMMA (256 threads for cooperative and 128 threads for pingpong
+    // kernel) process contiguous Alignment values
+    constexpr int ThreadLayoutN = size<1>(EpilogueTile{}) / kAlignment;
+    constexpr int ThreadLayoutM = ThreadCount / ThreadLayoutN;
+
+    auto tiled_copy = make_tiled_copy(
+        Copy_Atom<DefaultCopy, Element>{},
+        make_layout(make_shape(Int<ThreadLayoutM>{}, Int<ThreadLayoutN>{}),
+                    make_stride(Int<ThreadLayoutN>{}, _1{})),
+        make_layout(make_shape(_1{}, Int<kAlignment>{}), make_stride(_0{}, _1{})));
+
+    auto thread_copy = tiled_copy.get_slice(thread_idx);
+    Tensor tsReduce = thread_copy.partition_S(sReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,PIPE)
+    Tensor tgReduce = thread_copy.partition_D(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
+
+    using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterReduce>;
+    using Barrier = cutlass::detail::CustomizedGenericBarrier<BarrierSync>;
+
+    int reduce_tile_idx = params_ptr->tile_layout(m_reduce_in_output, n);
+    int *lock_ptr = params_ptr->local_barrier_ptr[params_ptr->local_rank];
+    int flag_idx = reduce_tile_idx * 2 + 1;
+
+    bool is_local_tile_reduce = local_dst_rank == params_ptr->local_rank;
+
+    if constexpr (FuseReduction) {
+      if (not is_local_tile_reduce) {
+        // if this tile is fetched from other rank, wait for the local rank to reduce first
+        // 与下面的int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);对应
+        // 如果当前tile任务是从其他rank获取数据，那么需要等待当前rank的数据就绪，即需要用过一次arrive_inc_get。
+        // 因为下面的tgReduce_epi第一次是直接从smem拷贝过去的(免去清零操作？)，读取其他rank则在tgReduce_epi进行累加。
+        Barrier::wait_lt(lock_ptr, thread_idx, flag_idx, 1);
+      }
+    }
+
+    CUTLASS_PRAGMA_UNROLL
+    for (int epi_n = 0; epi_n < size<3>(gReduce_epi); ++epi_n) {
+      CUTLASS_PRAGMA_UNROLL
+      for (int epi_m = 0; epi_m < size<2>(gReduce_epi); ++epi_m) {
+        auto barrier_token = fetch_pipeline.consumer_try_wait(fetch_read_state);
+        fetch_pipeline.consumer_wait(fetch_read_state, barrier_token);
+        // do copy from smem to reg and reduce to gmem
+        Tensor tsReduce_epi = tsReduce(_, _, _, fetch_read_state.index());
+        Tensor tgReduce_epi = tgReduce(_, _, _, epi_m, epi_n);
+
+        CUTLASS_PRAGMA_UNROLL
+        for (int copy_m = 0; copy_m < size<1>(tgReduce_epi); ++copy_m) {
+          CUTLASS_PRAGMA_UNROLL
+          for (int copy_n = 0; copy_n < size<2>(tgReduce_epi); ++copy_n) {
+            Tensor trReduce = make_tensor<Element>(size<0>(tgReduce));
+            // fetch from local_src_rank
+            copy(tiled_copy, tsReduce_epi(_, copy_m, copy_n), trReduce);
+            // write to reduce_buffer
+            if constexpr (FuseReduction) {
+              if (is_local_tile_reduce) {
+                // trReduce是自己的，直接拷贝
+                copy(tiled_copy, trReduce, tgReduce_epi(_, copy_m, copy_n));
+              } else {
+                // trReduce是其他rank的，需要规约
+                using VecType = uint_byte_t<sizeof(trReduce)>;
+                cutlass::arch::local_red<VecType, sizeof(Element) * kAlignment, Element>(
+                    recast<VecType>(trReduce)(_0{}),
+                    (void *)tgReduce_epi(_, copy_m, copy_n).data(),
+                    true);
+              }
+            } else {
+              // 不做reduce，就直接拷贝。
+              copy(tiled_copy, trReduce, tgReduce_epi(_, copy_m, copy_n));
+            }
+          }
+        }
+
+        fetch_pipeline.consumer_release(fetch_read_state);
+        ++fetch_read_state;
+      }
+    }
+
+    // 确保所有rank都到位，每到位一个则arrive_inc_get+1，由wait_eq_reset集齐统一退出
     if constexpr (FuseReduction) {
       int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);
       if (reduce_count == params_ptr->local_world_size) {
