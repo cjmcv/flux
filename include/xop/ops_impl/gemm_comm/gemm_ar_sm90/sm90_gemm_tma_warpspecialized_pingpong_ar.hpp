@@ -700,6 +700,7 @@ public:
       }
       // comm
       else if (producer_warp_role == ProducerWarpRole::ReduceScatterFetch) {
+        if (params.rs_dma.nnodes != 0) return;
         ReduceScatterDma rs_dma(params.rs_dma, shared_storage.tensors.rs_dma);
         while (work_tile_info.is_valid()) {
           if (TileScheduler::compute_epilogue(work_tile_info, params.scheduler)) {
@@ -720,6 +721,7 @@ public:
       }  // Reduce Scatter Fetch Warp End
 
       else if (producer_warp_role == ProducerWarpRole::ReduceScatterReduce) {
+        if (params.rs_dma.nnodes != 0) return;
         ReduceScatterDma rs_dma(params.rs_dma, shared_storage.tensors.rs_dma);
         while (work_tile_info.is_valid()) {
           if (TileScheduler::compute_epilogue(work_tile_info, params.scheduler)) {

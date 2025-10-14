@@ -34,17 +34,17 @@ struct AllReduceSm90Arguments {
   vllm::Signal *self_signal;
   
   void *output;
-  uint8_t *aux_local_buffer;
-  int aux_buffer_streamk_reduce_mark_step;   // Used to mark the tiles that require reduction in Stream-K
-  int aux_buffer_reduce_arrival_step; // Used to count the number of arrivals of reduce epi
-  size_t aux_local_size;
+  // uint8_t *aux_local_buffer;
+  // int aux_buffer_streamk_reduce_mark_step;   // Used to mark the tiles that require reduction in Stream-K
+  // int aux_buffer_reduce_arrival_step; // Used to count the number of arrivals of reduce epi
+  // size_t aux_local_size;
   virtual ~AllReduceSm90Arguments() {}
 };
 
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, class TileShape, class ClusterShape, 
-          class MainloopScheduleType, class EpilogueScheduleType, class TileScheduler>
+          class MainloopScheduleType, class EpilogueScheduleType, class TileScheduler, int StreamMode>
 
 class GemmArSm90Impl : public GemmBase {
 public:
@@ -109,7 +109,7 @@ public:
       ElementC, LayoutC, AlignmentC,
       ElementD, LayoutD, AlignmentD,
       EpilogueScheduleType,
-      cute::conditional_t<UseCustomEVT, CustomEVT, DefaultOperation>
+      cute::conditional_t<UseCustomEVT && StreamMode!=0, CustomEVT, DefaultOperation>
     >::CollectiveOp;
 
   using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
@@ -161,13 +161,12 @@ public:
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 
     //////////////////////////////////////////
-    is_serial_ = false;
     m_ = rt_args->m;
     n_ = rt_args->n;
     output_len_ = rt_args->m * rt_args->n;
     ar_args_.output = rt_args->ptr_D;    // todo: delete?
-    ar_args_.aux_local_size = output_len_ * sizeof(ElementD);
-    ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
+    // ar_args_.aux_local_size = output_len_ * sizeof(ElementD);
+    // ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
     auto cu_stream = static_cast<cudaStream_t>(stream);
     
     fetch_comm_args(fusion_args, cu_stream);
@@ -198,14 +197,12 @@ public:
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
 
-#ifdef ENABLE_ALLREDUCE
-    if (is_serial_ == true) {
+    if constexpr (StreamMode == 0) {
       int max_blocks = 32;
       constexpr int threads = 1024;
       int blocks = max_blocks; // std::min(max_blocks, n_ / ThreadblockShape::kN);
       vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementD>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);      
     }
-#endif
     // cudaMemcpyAsync((void *)ar_args_.output, (void *)rank_data_[ar_args_.rank], output_len_ * sizeof(ElementD), cudaMemcpyDeviceToDevice, cu_stream);  // ÓÐÎÊÌâ£¿
   }
 
@@ -232,11 +229,7 @@ private:
     }
     printf("is_device_pointer: %d, %d, %d, %d\n", is_device_pointer(barrier_ptrs_[0]), is_device_pointer(ar_args_.rank_data), is_device_pointer(rank_data_[0]), is_device_pointer(ar_args_.rank_signals.signals[0]));
 
-#ifdef ENABLE_ALLREDUCE
     ElementD *gemm_out = (ElementD *)rank_data_[ar_args_.rank]; //ar_args_.reg_buffer;
-#else
-    ElementD *gemm_out = (ElementD *)rt_args->ptr_D;
-#endif
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGemm, // mode
       problem_size, // problem_shape
@@ -246,13 +239,16 @@ private:
       hw_info // hw_info
     };
 
-
+    int nnodes = 1;
+    if constexpr (StreamMode == 0) {
+      nnodes = 0;
+    }
     arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
       .output_scatter_ptrs = (ElementD **)rank_data_,
       .stride = stride_D,
       .rank = ar_args_.rank,
       .world_size = ar_args_.world_size,
-      .nnodes = 1,
+      .nnodes = nnodes,
       .local_reduce_buffer = (void*)rt_args->ptr_D,
       .barrier_ptrs = (int **)barrier_ptrs_};
 
@@ -271,7 +267,7 @@ private:
     // {first_child_args, ..., last_child_args, op_args},
     // For more complex examples of EVT initialization please refer to
     // include/cutlass/epilogue/fusion/sm90_callbacks_tma_warpspecialized.hpp
-    if constexpr (UseCustomEVT) {
+    if constexpr (UseCustomEVT && StreamMode!=0) {
       arguments.epilogue.thread =
         {
           {    // ternary op : beta * C + (alpha * acc)
@@ -297,7 +293,7 @@ private:
   }
 
   void fetch_comm_args(void *fusion_args, cudaStream_t stream) {
-#ifdef ENABLE_ALLREDUCE
+
     RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
 
     if constexpr (!(cute::is_same_v<ElementD, float> ||
@@ -314,22 +310,11 @@ private:
       stream, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.reg_buffer), output_len_,
       &ar_args_.world_size, &ar_args_.rank, &ar_args_.packed_array_num,
       &ar_args_.rank_data, &ar_args_.rank_signals, &ar_args_.self_signal);
-
-#else
-    // For testing
-    is_serial_ = false;
-    RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
-    ar_args_.reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
-    ar_args_.world_size = 2;
-    ar_args_.rank = 1;
-    // printf("finish malloc.\n");
-#endif
   }
 
 private:
   Gemm gemm_dev_;
 
-  bool is_serial_;
   AllReduceSm90Arguments ar_args_;
   int m_;
   int n_;
