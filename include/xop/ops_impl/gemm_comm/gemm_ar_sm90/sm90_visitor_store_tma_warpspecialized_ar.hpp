@@ -238,7 +238,7 @@ struct Sm90AuxStoreReduceScatter {
         return;
       }
       int tile_idx = tile_layout(m, n);
-      int flag_idx = tile_idx * 2;
+      int flag_idx = tile_idx * 3;
       tma_store_wait<0>();
 
       Barrier::wait_eq_reset(params_ptr->barrier_ptr, thread_idx, flag_idx, 0, 1);

@@ -55,12 +55,12 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
 
  public:
   /// Uses thread[0] to wait for at least the specified count of signals on the given flag counter
-  // CUTLASS_DEVICE
-  // static int
-  // check_value(void *lock_ptr, int thread_idx, int flag_idx) {
-  //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
-  //   return ld_acquire(flag_ptr);
-  // }
+  CUTLASS_DEVICE
+  static int
+  check_value(void *lock_ptr, int thread_idx, int flag_idx) {
+    int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
+    return ld_acquire(flag_ptr);
+  }
   
   /// Uses thread[0] to wait for at least the specified count of signals on the given flag counter
   CUTLASS_DEVICE

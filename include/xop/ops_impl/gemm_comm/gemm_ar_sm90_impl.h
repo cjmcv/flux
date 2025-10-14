@@ -178,7 +178,7 @@ public:
 
     // Create a structure of gemm kernel arguments suitable for invoking an instance of Gemm
     auto arguments = args_from_options(rt_args);
-    CUDA_CHECK(cudaMemsetAsync(barrier_ptrs_[ar_args_.rank], 0, 10000, cu_stream));
+    // CUDA_CHECK(cudaMemsetAsync(barrier_ptrs_[ar_args_.rank], 0, 10000, cu_stream));
 
     // Using the arguments, query for extra workspace required for matrix multiplication computation
     size_t workspace_size = Gemm::get_workspace_size(arguments);

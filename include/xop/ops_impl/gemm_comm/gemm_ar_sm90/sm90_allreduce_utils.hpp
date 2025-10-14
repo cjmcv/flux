@@ -327,7 +327,7 @@ struct Sm90ReduceScatterDma {
     using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterFetch>;
     using Barrier     = cutlass::detail::GenericSystemBarrier<BarrierSync>;
 
-    Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 2, 1);
+    Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 3, 1);
 
     // todo: 检查这个fetch_pipeline producer是否会跟reduce的consumer_wait交错进行
     //       检查当不做 FuseReduction 时，size<2>(gFetch_epi)与 reduce的 size<2>(gReduce_epi) 是否一致？
@@ -444,7 +444,7 @@ struct Sm90ReduceScatterDma {
 
     int reduce_tile_idx = params_ptr->tile_layout(m_reduce_in_output, n);
     int *lock_ptr = params_ptr->local_barrier_ptr[params_ptr->local_rank];
-    int flag_idx = reduce_tile_idx * 2 + 1;
+    int flag_idx = reduce_tile_idx * 3 + 1;
 
     bool is_local_tile_reduce = local_dst_rank == params_ptr->local_rank;
 
@@ -542,12 +542,17 @@ struct Sm90ReduceScatterDma {
         // xop::print_tensor_shape("src_thr_shape", src_thr);
         // xop::print_tensor("src_thr", src_thr, false);
         // xop::print_tensor("dst_thr", dst_thr, false);
+
+        int flag_gather_idx = reduce_tile_idx * 3 + 2;
+        BarrierSys::wait_eq(lock_ptr, thread_idx, flag_gather_idx, params_ptr->local_world_size-1, 0);  // 表示有world_size-1个其他rank完成该tile的接收。即可重置。
+        if (thread_idx == 0)
+          *(lock_ptr+flag_idx) = 0;
       }
       else {
         // m从0-7，local_rank=0 => m=0/1; 1=>2/3; 2=>4/5; 3=>6/7
         int src_rank = m / params_ptr->tile_m_perrank;
-
         int *src_lock_ptr = params_ptr->local_barrier_ptr[src_rank];
+
         BarrierSys::wait_eq(src_lock_ptr, thread_idx, flag_idx, 99);
 
         auto mSrc = make_tensor(params_ptr->local_ptr[src_rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
@@ -556,7 +561,10 @@ struct Sm90ReduceScatterDma {
 
         Tensor tgSrc = thread_copy.partition_S(gSrc_epi);
         copy(tiled_copy, tgSrc, tgGather);
-      }
+
+        int flag_gather_idx = reduce_tile_idx * 3 + 2;
+        BarrierSys::arrive_inc_get(src_lock_ptr, thread_idx, flag_gather_idx, 1); // 给对方rank标志+1
+      } 
     }
     
     return fetch_read_state;
