@@ -501,11 +501,12 @@ struct Sm90ReduceScatterDma {
     }
 
     // 确保所有rank都到位，每到位一个则arrive_inc_get+1，由wait_eq_reset集齐统一退出
+    constexpr int finish_reduce_tag = 99;
     if constexpr (FuseReduction) {
       int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);
       if (reduce_count == params_ptr->local_world_size) {
         // 仅有一组能到达这里，其他组获取的reduce_count无法进入到这里if里面
-        BarrierSys::wait_eq_reset(lock_ptr, thread_idx, flag_idx, params_ptr->local_world_size, 99);
+        BarrierSys::wait_eq_reset(lock_ptr, thread_idx, flag_idx, params_ptr->local_world_size, finish_reduce_tag);
         if constexpr (CommKind == _AcrossNode{}) {
           if (dst_node_idx != params_ptr->node_idx) {
             int remote_rank = dst_node_idx * params_ptr->local_world_size + params_ptr->local_rank;
@@ -528,32 +529,38 @@ struct Sm90ReduceScatterDma {
       //   thr_layout,
       //   val_layout);
 
-      // auto mReduce = make_tensor(params_ptr->local_ptr[params_ptr->rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
-      // Tensor gReduce = local_tile(mReduce, take<0, 2>(TileShape{}), make_coord(m, n));
+      int gather_tile_idx = params_ptr->tile_layout(m, n);
+      int flag_idx = gather_tile_idx * 3 + 1;
+      int flag_end_idx = gather_tile_idx * 3 + 2;
+      
       auto mGather = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
       Tensor gGather = local_tile(mGather, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
       Tensor gGather_epi = flat_divide(gGather, EpilogueTile{});
       Tensor tgGather = thread_copy.partition_D(gGather_epi);       // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
 
       if (m == m_reduce_in_output) { 
-        BarrierSys::wait_eq(lock_ptr, thread_idx, flag_idx, 99);
+        BarrierSys::wait_eq(lock_ptr, thread_idx, flag_idx, finish_reduce_tag);
+
         // Tensor tgReduce = thread_copy.partition_S(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,PIPE)
         copy(tiled_copy, tgReduce, tgGather);
         // xop::print_tensor_shape("src_thr_shape", src_thr);
         // xop::print_tensor("src_thr", src_thr, false);
-        // xop::print_tensor("dst_thr", dst_thr, false);
 
-        int flag_gather_idx = reduce_tile_idx * 3 + 2;
-        BarrierSys::wait_eq(lock_ptr, thread_idx, flag_gather_idx, params_ptr->local_world_size-1, 0);  // 表示有world_size-1个其他rank完成该tile的接收。即可重置。
+        // 表示有world_size-1个其他rank完成该tile的接收。即可重置。
+        // printf("<%d,%d,%d> local wait_eq_reset.\n", params_ptr->local_rank, m, flag_idx);
+        BarrierSys::wait_eq_reset(lock_ptr, thread_idx, flag_end_idx, params_ptr->local_world_size-1, 0);  
         if (thread_idx == 0)
           *(lock_ptr+flag_idx) = 0;
+        // printf("<%d,%d,%d> finish local wait_eq_reset.\n", params_ptr->local_rank, m, flag_idx);
       }
       else {
         // m从0-7，local_rank=0 => m=0/1; 1=>2/3; 2=>4/5; 3=>6/7
         int src_rank = m / params_ptr->tile_m_perrank;
         int *src_lock_ptr = params_ptr->local_barrier_ptr[src_rank];
 
-        BarrierSys::wait_eq(src_lock_ptr, thread_idx, flag_idx, 99);
+        // printf("<%d,%d,%d> remote wait_eq.\n", params_ptr->local_rank, m, flag_idx);
+        BarrierSys::wait_eq(src_lock_ptr, thread_idx, flag_idx, finish_reduce_tag);
+        // printf("<%d,%d,%d> finish remote wait_eq.\n", params_ptr->local_rank, m, flag_idx);
 
         auto mSrc = make_tensor(params_ptr->local_ptr[src_rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
         Tensor gSrc = local_tile(mSrc, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
@@ -562,8 +569,7 @@ struct Sm90ReduceScatterDma {
         Tensor tgSrc = thread_copy.partition_S(gSrc_epi);
         copy(tiled_copy, tgSrc, tgGather);
 
-        int flag_gather_idx = reduce_tile_idx * 3 + 2;
-        BarrierSys::arrive_inc_get(src_lock_ptr, thread_idx, flag_gather_idx, 1); // 给对方rank标志+1
+        BarrierSys::arrive_inc_get(src_lock_ptr, thread_idx, flag_end_idx, 1); // 给对方rank标志+1
       } 
     }
     
