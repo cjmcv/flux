@@ -10,6 +10,7 @@
 #include "cutlass/util/packed_stride.hpp"
 #include "cutlass/epilogue/collective/detail.hpp"
 #include "xop/xop.h"
+#include "xop/ops_impl/debug_util.h"
 // #include "flux/cuda/cuda_common.h"
 // #include "memory_utils.hpp"
 #include "custom_barrier.hpp"
@@ -515,7 +516,7 @@ struct Sm90ReduceScatterDma {
     }
 
     // // allgather
-    { 
+    if constexpr (1) { 
       // auto tiled_copy = make_tiled_copy(
       //   Copy_Atom<DefaultCopy, Element>{},
       //   make_layout(make_shape(Int<ThreadLayoutM>{}, Int<ThreadLayoutN>{}),
@@ -543,6 +544,8 @@ struct Sm90ReduceScatterDma {
         auto src_thr  = thr_copy.partition_S(gReduce);
         auto dst_thr  = thr_copy.partition_D(gGather);
         cute::copy(tiled_copy, src_thr, dst_thr);
+        xop::print_tensor("src_thr", src_thr);
+        xop::print_tensor("dst_thr", dst_thr);
       }
       else {
         using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::AllReduceAllgather>;
@@ -559,6 +562,7 @@ struct Sm90ReduceScatterDma {
         auto mSrc = make_tensor(params_ptr->local_ptr[dst_rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
         Tensor gSrc = local_tile(mSrc, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
 
+        auto thr_copy = tiled_copy.get_slice(thread_idx);
         auto src_thr  = thr_copy.partition_S(gSrc);
         auto dst_thr  = thr_copy.partition_D(gGather);
         cute::copy(tiled_copy, src_thr, dst_thr);

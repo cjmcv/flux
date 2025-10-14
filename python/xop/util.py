@@ -39,6 +39,11 @@ class PerfResult:
         return f"{self.name}: gemm {self.gemm_time_ms:.3f} ms"
 
 def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
+    if (warmup_iters + iters == 0):
+        output = fn(0)
+        torch.cuda.synchronize()
+        return PerfResult(name=name, output=output, gemm_time_ms=1 / 1 * 1000)
+    
     total_time = 0
     for i in range(warmup_iters + iters):
         if (i == warmup_iters):

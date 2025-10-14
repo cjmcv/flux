@@ -386,8 +386,8 @@ def parse_args():
     parser.add_argument("K", type=int)
     parser.add_argument("--quant_bits", default=-1, type=int, help="whether to use GemmQuant.")
     parser.add_argument("--step", default=5, type=int, help="m step")
-    parser.add_argument("--warmup_iters", default=10, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=20, type=int, help="perf iterations")
+    parser.add_argument("--warmup_iters", default=0, type=int, help="perf warmup iterations")
+    parser.add_argument("--iters", default=0, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16", # float16, float8_e4m3fn
