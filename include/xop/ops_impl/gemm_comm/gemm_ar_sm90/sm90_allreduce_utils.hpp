@@ -517,16 +517,7 @@ struct Sm90ReduceScatterDma {
 
     // // allgather
     if constexpr (1) { 
-      // auto tiled_copy = make_tiled_copy(
-      //   Copy_Atom<DefaultCopy, Element>{},
-      //   make_layout(make_shape(Int<ThreadLayoutM>{}, Int<ThreadLayoutN>{}),
-      //               make_stride(Int<ThreadLayoutN>{}, _1{})),
-      //   make_layout(make_shape(_1{}, Int<kAlignment>{}), make_stride(_0{}, _1{})));
-
-      // int m_tiles = ceil_div(M, size<0>(TileShape{}));
-      // int n_tiles = ceil_div(N, size<1>(TileShape{}));
-      // params.tile_layout = make_layout(make_shape(m_tiles, n_tiles))
-
+      // 不能使用tile级别的拷贝，因为进入这里的线程是warp为单位的，并没有完整block的所有线程。所以拷贝要沿用前面的warp级别拷贝
       // auto thr_layout = make_layout(make_shape(size<0>(TileShape{}), size<1>(TileShape{}) / kAlignment));
       // auto val_layout = make_layout(make_shape(_1{}, Int<kAlignment>{}), make_stride(_0{}, _1{}));
       // auto tiled_copy = make_tiled_copy(
@@ -539,48 +530,37 @@ struct Sm90ReduceScatterDma {
       auto mGather = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
       Tensor gGather = local_tile(mGather, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
       Tensor gGather_epi = flat_divide(gGather, EpilogueTile{});
+      Tensor tgGather = thread_copy.partition_D(gGather_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
 
-      if (m == m_reduce_in_output) {
-        Tensor tgReduce = thread_copy.partition_S(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,PIPE)
-        Tensor tgGather = thread_copy.partition_D(gGather_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
-        CUTLASS_PRAGMA_UNROLL
-        for (int epi_n = 0; epi_n < size<3>(gReduce_epi); ++epi_n) {
-          CUTLASS_PRAGMA_UNROLL
-          for (int epi_m = 0; epi_m < size<2>(gReduce_epi); ++epi_m) {
-            Tensor tgReduce_epi = tgReduce(_, _, _, epi_m, epi_n);
-            Tensor tgGather_epi = tgGather(_, _, _, epi_m, epi_n);
-            CUTLASS_PRAGMA_UNROLL
-            for (int copy_m = 0; copy_m < size<1>(tgGather_epi); ++copy_m) {
-              CUTLASS_PRAGMA_UNROLL
-              for (int copy_n = 0; copy_n < size<2>(tgGather_epi); ++copy_n) {
-                copy(tiled_copy, tgReduce_epi(_, copy_m, copy_n), tgGather_epi(_, copy_m, copy_n));
-              }
-            }
-          }
-        }
+      if (m == m_reduce_in_output) { 
+        Barrier::wait_eq(lock_ptr, thread_idx, flag_idx, 99);
+        // Tensor tgReduce = thread_copy.partition_S(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,PIPE)
+        copy(tiled_copy, tgReduce, tgGather);
         // xop::print_tensor_shape("src_thr_shape", src_thr);
         // xop::print_tensor("src_thr", src_thr, false);
         // xop::print_tensor("dst_thr", dst_thr, false);
       }
       else {
+        // m从0-7，local_rank=0 => m=0/1; 1=>2/3; 2=>4/5; 3=>6/7
+        int src_rank = m / params_ptr->tile_m_perrank;
+
+        int *src_lock_ptr = params_ptr->local_barrier_ptr[src_rank];
+        Barrier::wait_eq_reset(src_lock_ptr, thread_idx, flag_idx, 99);
+
+        
+        auto mSrc = make_tensor(params_ptr->local_ptr[src_rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
+        Tensor gSrc = local_tile(mSrc, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
+        Tensor gSrc_epi = flat_divide(gSrc, EpilogueTile{});
+
+        Tensor tgSrc = thread_copy.partition_S(gSrc_epi);
+        copy(tgSrc, tgSrc, tgGather);
+
         // using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::AllReduceAllgather>;
         // using Barrier     = cutlass::detail::GenericSystemBarrier<BarrierSync>;
     
         // int reduce_tile_idx = params_ptr->tile_layout(m, n);
         // int flag_idx = reduce_tile_idx * 2 + 1;
         // Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[dst_rank], thread_idx, flag_idx, 99, 0);
-
-        
-        // // int reduce_tile_idx = params_ptr->tile_layout(m_reduce_in_output, n);
-        // // m从0-7，local_rank=0 => m=0/1; 1=>2/3; 2=>4/5; 3=>6/7
-        // // dst_rank = m / params_ptr->tile_m_perrank
-        // auto mSrc = make_tensor(params_ptr->local_ptr[dst_rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
-        // Tensor gSrc = local_tile(mSrc, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
-
-        // auto thr_copy = tiled_copy.get_slice(thread_idx);
-        // auto src_thr  = thr_copy.partition_S(gSrc);
-        // auto dst_thr  = thr_copy.partition_D(gGather);
-        // cute::copy(tiled_copy, src_thr, dst_thr);
       }
     }
     
