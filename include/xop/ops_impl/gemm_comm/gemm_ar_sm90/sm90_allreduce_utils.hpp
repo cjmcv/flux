@@ -113,7 +113,8 @@ template <
     class Element_,
     class StrideMNL_,
     CommKindEnum CommKind_,
-    bool FuseReduction_>
+    bool FuseReduction_,
+    bool FuseAllGather_>
 struct Sm90ReduceScatterDma {
  public:
   // Type aliases
@@ -124,7 +125,9 @@ struct Sm90ReduceScatterDma {
   using StrideMNL = StrideMNL_;
   static constexpr CommKindEnum CommKind = CommKind_;
   static constexpr bool FuseReduction = FuseReduction_;
-  static_assert(not(!FuseReduction and CommKind == _AcrossNode{}));
+  static constexpr bool FuseAllGather = FuseAllGather_;
+  // CommKind == _AcrossNode{} 时，需要 FuseReduction == true
+  static_assert(not(!FuseReduction and CommKind == _AcrossNode{})); 
   static constexpr int kAlignment = 128 / sizeof_bits_v<Element>;
 
   // Shared Mem
@@ -500,12 +503,14 @@ struct Sm90ReduceScatterDma {
       }
     }
 
-    // 确保所有rank都到位，每到位一个则arrive_inc_get+1，由wait_eq_reset集齐统一退出
-    constexpr int finish_reduce_tag = 99;
+    // 确保所有rank都到位，每到位一个则arrive_inc_get+1，由wait_eq_reset集齐结束reduce阶段
+    // 99 表示reduce结束，可接着做allgather。0是直接复位，不再做后续计算。
+    constexpr int finish_reduce_tag = (FuseAllGather == true) ? 99 : 0;
     if constexpr (FuseReduction) {
       int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);
       if (reduce_count == params_ptr->local_world_size) {
         // 仅有一组能到达这里，其他组获取的reduce_count无法进入到这里if里面
+
         BarrierSys::wait_eq_reset(lock_ptr, thread_idx, flag_idx, params_ptr->local_world_size, finish_reduce_tag);
         if constexpr (CommKind == _AcrossNode{}) {
           if (dst_node_idx != params_ptr->node_idx) {
@@ -520,7 +525,7 @@ struct Sm90ReduceScatterDma {
     }
 
     // // allgather
-    if constexpr (1) { 
+    if constexpr (FuseAllGather) { 
       // 不能使用tile级别的拷贝，因为进入这里的线程是warp为单位的，并没有完整block的所有线程。所以拷贝要沿用前面的warp级别拷贝
       // auto thr_layout = make_layout(make_shape(size<0>(TileShape{}), size<1>(TileShape{}) / kAlignment));
       // auto val_layout = make_layout(make_shape(_1{}, Int<kAlignment>{}), make_stride(_0{}, _1{}));

@@ -44,7 +44,8 @@ struct AllReduceSm90Arguments {
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, class TileShape, class ClusterShape, 
-          class MainloopScheduleType, class EpilogueScheduleType, class TileScheduler, int StreamMode>
+          class MainloopScheduleType, class EpilogueScheduleType, class TileScheduler, 
+          int FuseMode>
 
 class GemmArSm90Impl : public GemmBase {
 public:
@@ -109,7 +110,7 @@ public:
       ElementC, LayoutC, AlignmentC,
       ElementD, LayoutD, AlignmentD,
       EpilogueScheduleType,
-      cute::conditional_t<UseCustomEVT && StreamMode!=0, CustomEVT, DefaultOperation>
+      cute::conditional_t<UseCustomEVT && FuseMode!=0, CustomEVT, DefaultOperation>
     >::CollectiveOp;
 
   using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
@@ -124,6 +125,9 @@ public:
       MainloopScheduleType
     >::CollectiveOp;
 
+  // FuseMode => 0 serial, 1 scatter fetch, 2 scatter fetch+reduce, 3 allreduce
+  static constexpr bool FuseReduction = (FuseMode >= 2) ? true : false;
+  static constexpr bool FuseAllGather = (FuseMode == 3) ? true : false;
   using ReduceScatterDma = Sm90ReduceScatterDma<
         1, // StagesDma,
         TileShape,
@@ -132,7 +136,8 @@ public:
         ElementD,
         typename AuxStoreDescriptor::Stride,
         CommKindEnum::IntraNode,
-        true>; // rs_meta.fuse_reduction()()
+        FuseReduction,
+        FuseAllGather>; // rs_meta.fuse_reduction()()
 
   using GemmKernel = cutlass::gemm::kernel::GemmUniversalRsSm90<
       cute::Shape<int,int,int,int>,
@@ -197,11 +202,20 @@ public:
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
 
-    if constexpr (StreamMode == 0) {
+    if constexpr (FuseMode == 0) { // serial
       int max_blocks = 32;
       constexpr int threads = 1024;
       int blocks = max_blocks; // std::min(max_blocks, n_ / ThreadblockShape::kN);
       vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementD>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);      
+    }
+    else if constexpr (FuseMode == 1) {  // 1 scatter fetch
+
+    }
+    else if constexpr (FuseMode == 2) {  // 2 scatter fetch+reduce
+
+    }
+    else {
+      // 3 allreduce
     }
     // cudaMemcpyAsync((void *)ar_args_.output, (void *)rank_data_[ar_args_.rank], output_len_ * sizeof(ElementD), cudaMemcpyDeviceToDevice, cu_stream);  // ”–Œ Ã‚£ø
   }
@@ -240,7 +254,7 @@ private:
     };
 
     int nnodes = 1;
-    if constexpr (StreamMode == 0) {
+    if constexpr (FuseMode == 0) {
       nnodes = 0;
     }
     arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
@@ -267,7 +281,7 @@ private:
     // {first_child_args, ..., last_child_args, op_args},
     // For more complex examples of EVT initialization please refer to
     // include/cutlass/epilogue/fusion/sm90_callbacks_tma_warpspecialized.hpp
-    if constexpr (UseCustomEVT && StreamMode!=0) {
+    if constexpr (UseCustomEVT && FuseMode!=0) {
       arguments.epilogue.thread =
         {
           {    // ternary op : beta * C + (alpha * acc)
