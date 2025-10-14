@@ -527,79 +527,62 @@ struct Sm90ReduceScatterDma {
       // int n_tiles = ceil_div(N, size<1>(TileShape{}));
       // params.tile_layout = make_layout(make_shape(m_tiles, n_tiles))
 
-      auto thr_layout = make_layout(make_shape(size<0>(TileShape{}), size<1>(TileShape{}) / kAlignment));
-      auto val_layout = make_layout(make_shape(_1{}, Int<kAlignment>{}), make_stride(_0{}, _1{}));
-      auto tiled_copy = make_tiled_copy(
-        Copy_Atom<DefaultCopy, Element>{},
-        thr_layout,
-        val_layout);
+      // auto thr_layout = make_layout(make_shape(size<0>(TileShape{}), size<1>(TileShape{}) / kAlignment));
+      // auto val_layout = make_layout(make_shape(_1{}, Int<kAlignment>{}), make_stride(_0{}, _1{}));
+      // auto tiled_copy = make_tiled_copy(
+      //   Copy_Atom<DefaultCopy, Element>{},
+      //   thr_layout,
+      //   val_layout);
 
       // auto mReduce = make_tensor(params_ptr->local_ptr[params_ptr->rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
       // Tensor gReduce = local_tile(mReduce, take<0, 2>(TileShape{}), make_coord(m, n));
       auto mGather = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
       Tensor gGather = local_tile(mGather, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
+      Tensor gGather_epi = flat_divide(gGather, EpilogueTile{});
 
       if (m == m_reduce_in_output) {
-        auto thr_copy = tiled_copy.get_slice(thread_idx);
-        auto src_thr  = thr_copy.partition_S(gReduce);
-        auto dst_thr  = thr_copy.partition_D(gGather);
-        cute::copy(tiled_copy, src_thr, dst_thr);
-        xop::print_tensor("src_thr", src_thr);
-        xop::print_tensor("dst_thr", dst_thr);
+        Tensor tgReduce = thread_copy.partition_S(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,PIPE)
+        Tensor tgGather = thread_copy.partition_D(gGather_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
+        CUTLASS_PRAGMA_UNROLL
+        for (int epi_n = 0; epi_n < size<3>(gReduce_epi); ++epi_n) {
+          CUTLASS_PRAGMA_UNROLL
+          for (int epi_m = 0; epi_m < size<2>(gReduce_epi); ++epi_m) {
+            Tensor tgReduce_epi = tgReduce(_, _, _, epi_m, epi_n);
+            Tensor tgGather_epi = tgGather(_, _, _, epi_m, epi_n);
+            CUTLASS_PRAGMA_UNROLL
+            for (int copy_m = 0; copy_m < size<1>(tgGather_epi); ++copy_m) {
+              CUTLASS_PRAGMA_UNROLL
+              for (int copy_n = 0; copy_n < size<2>(tgGather_epi); ++copy_n) {
+                copy(tiled_copy, tgReduce_epi(_, copy_m, copy_n), tgGather_epi(_, copy_m, copy_n));
+              }
+            }
+          }
+        }
+        // xop::print_tensor_shape("src_thr_shape", src_thr);
+        // xop::print_tensor("src_thr", src_thr, false);
+        // xop::print_tensor("dst_thr", dst_thr, false);
       }
       else {
-        using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::AllReduceAllgather>;
-        using Barrier     = cutlass::detail::GenericSystemBarrier<BarrierSync>;
+        // using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::AllReduceAllgather>;
+        // using Barrier     = cutlass::detail::GenericSystemBarrier<BarrierSync>;
     
-        int reduce_tile_idx = params_ptr->tile_layout(m, n);
-        int flag_idx = reduce_tile_idx * 2 + 1;
-        Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[dst_rank], thread_idx, flag_idx, 99, 0);
+        // int reduce_tile_idx = params_ptr->tile_layout(m, n);
+        // int flag_idx = reduce_tile_idx * 2 + 1;
+        // Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[dst_rank], thread_idx, flag_idx, 99, 0);
 
         
-        // int reduce_tile_idx = params_ptr->tile_layout(m_reduce_in_output, n);
-        // m从0-7，local_rank=0 => m=0/1; 1=>2/3; 2=>4/5; 3=>6/7
-        // dst_rank = m / params_ptr->tile_m_perrank
-        auto mSrc = make_tensor(params_ptr->local_ptr[dst_rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
-        Tensor gSrc = local_tile(mSrc, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
+        // // int reduce_tile_idx = params_ptr->tile_layout(m_reduce_in_output, n);
+        // // m从0-7，local_rank=0 => m=0/1; 1=>2/3; 2=>4/5; 3=>6/7
+        // // dst_rank = m / params_ptr->tile_m_perrank
+        // auto mSrc = make_tensor(params_ptr->local_ptr[dst_rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
+        // Tensor gSrc = local_tile(mSrc, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
 
-        auto thr_copy = tiled_copy.get_slice(thread_idx);
-        auto src_thr  = thr_copy.partition_S(gSrc);
-        auto dst_thr  = thr_copy.partition_D(gGather);
-        cute::copy(tiled_copy, src_thr, dst_thr);
+        // auto thr_copy = tiled_copy.get_slice(thread_idx);
+        // auto src_thr  = thr_copy.partition_S(gSrc);
+        // auto dst_thr  = thr_copy.partition_D(gGather);
+        // cute::copy(tiled_copy, src_thr, dst_thr);
       }
     }
- 
-
-
-    // // params_ptr->local_reduce_buffer
-    // using BarrierSysSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::AllReduceAllgather>;
-    // using BarrierSys = cutlass::detail::GenericSystemBarrier<BarrierSysSync>;
-    // int *allgather_lock_ptr = params_ptr->local_barrier_ptr[params_ptr->local_rank];
-    // int allgather_flag_idx = reduce_tile_idx * 2; // 对应fetch
-    // if (is_local_tile_reduce) {
-    //   Tensor gLocal = make_tensor(gReduce.data(), gReduce.shape());   // (TILE_M, TILE_N)
-
-    //   // 目标 peer 视角：把远端 GMEM 同样映射成 tensor
-    //   auto make_peer_tensor = [&](int peer) {
-    //     return make_tensor(const_cast<Element*>(params_ptr->local_ptr[peer]) +
-    //                 reduce_tile_idx * gReduce.size(), gReduce.shape());
-    //   };
-      
-    //   for (int peer = 0; peer < params_ptr->local_world_size; ++peer) {
-    //     if (peer == params_ptr->local_rank) continue;
-    
-    //     Tensor gPeer = make_peer_tensor(peer); // 远端 GMEM tensor
-
-    //     auto thr_copy = tiled_copy.get_slice(thread_idx);
-    //     auto src_thr  = thr_copy.partition_S(gLocal);
-    //     auto dst_thr  = thr_copy.partition_D(gPeer);
-    
-    //     // 线程自己拷自己那一小块
-    //     cute::copy(tiled_copy, src_thr, dst_thr);
-    //   }
-    //   Barrier::wait_eq_reset(allgather_lock_ptr, thread_idx, allgather_flag_idx, 2);
-    // }
-    // Barrier::wait_eq_reset(allgather_lock_ptr, thread_idx, flag_ag, 1);
     
     return fetch_read_state;
   }
