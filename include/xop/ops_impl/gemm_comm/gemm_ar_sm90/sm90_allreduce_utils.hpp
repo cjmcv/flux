@@ -439,6 +439,9 @@ struct Sm90ReduceScatterDma {
     using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterReduce>;
     using Barrier = cutlass::detail::CustomizedGenericBarrier<BarrierSync>;
 
+    using BarrierSysSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::AllReduceAllgather>;
+    using BarrierSys = cutlass::detail::GenericSystemBarrier<BarrierSysSync>;
+
     int reduce_tile_idx = params_ptr->tile_layout(m_reduce_in_output, n);
     int *lock_ptr = params_ptr->local_barrier_ptr[params_ptr->local_rank];
     int flag_idx = reduce_tile_idx * 2 + 1;
@@ -501,8 +504,8 @@ struct Sm90ReduceScatterDma {
     if constexpr (FuseReduction) {
       int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);
       if (reduce_count == params_ptr->local_world_size) {
-        // TODO: 这个可能需要改成system？
-        Barrier::wait_eq_reset(lock_ptr, thread_idx, flag_idx, params_ptr->local_world_size, 99);  // reset_val=0
+        // 仅有一组能到达这里，其他组获取的reduce_count无法进入到这里if里面
+        BarrierSys::wait_eq_reset(lock_ptr, thread_idx, flag_idx, params_ptr->local_world_size, 99);
         if constexpr (CommKind == _AcrossNode{}) {
           if (dst_node_idx != params_ptr->node_idx) {
             int remote_rank = dst_node_idx * params_ptr->local_world_size + params_ptr->local_rank;
@@ -530,10 +533,10 @@ struct Sm90ReduceScatterDma {
       auto mGather = make_tensor(params_ptr->local_reduce_buffer, make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
       Tensor gGather = local_tile(mGather, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
       Tensor gGather_epi = flat_divide(gGather, EpilogueTile{});
-      Tensor tgGather = thread_copy.partition_D(gGather_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
+      Tensor tgGather = thread_copy.partition_D(gGather_epi);       // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
 
       if (m == m_reduce_in_output) { 
-        Barrier::wait_eq(lock_ptr, thread_idx, flag_idx, 99);
+        BarrierSys::wait_eq(lock_ptr, thread_idx, flag_idx, 99);
         // Tensor tgReduce = thread_copy.partition_S(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,PIPE)
         copy(tiled_copy, tgReduce, tgGather);
         // xop::print_tensor_shape("src_thr_shape", src_thr);
@@ -545,22 +548,14 @@ struct Sm90ReduceScatterDma {
         int src_rank = m / params_ptr->tile_m_perrank;
 
         int *src_lock_ptr = params_ptr->local_barrier_ptr[src_rank];
-        Barrier::wait_eq_reset(src_lock_ptr, thread_idx, flag_idx, 99);
+        BarrierSys::wait_eq(src_lock_ptr, thread_idx, flag_idx, 99);
 
-        
         auto mSrc = make_tensor(params_ptr->local_ptr[src_rank], make_ordered_layout(make_shape(M, N), make_step(_1{}, _0{})));
         Tensor gSrc = local_tile(mSrc, take<0, 2>(TileShape{}), make_coord(m, n));  // (TILE_M,TILE_N)
         Tensor gSrc_epi = flat_divide(gSrc, EpilogueTile{});
 
         Tensor tgSrc = thread_copy.partition_S(gSrc_epi);
-        copy(tgSrc, tgSrc, tgGather);
-
-        // using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::AllReduceAllgather>;
-        // using Barrier     = cutlass::detail::GenericSystemBarrier<BarrierSync>;
-    
-        // int reduce_tile_idx = params_ptr->tile_layout(m, n);
-        // int flag_idx = reduce_tile_idx * 2 + 1;
-        // Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[dst_rank], thread_idx, flag_idx, 99, 0);
+        copy(tiled_copy, tgSrc, tgGather);
       }
     }
     

@@ -61,6 +61,19 @@ struct GenericSystemBarrier : public GenericBarrier<Sync> {
   //   int *flag_ptr = static_cast<int *>(lock_ptr) + flag_idx;
   //   return ld_acquire(flag_ptr);
   // }
+  
+  /// Uses thread[0] to wait for at least the specified count of signals on the given flag counter
+  CUTLASS_DEVICE
+  static void 
+  wait_eq(void *lock_ptr, int thread_idx, int flag_idx, int val = 1) {
+    int *flag_ptr = reinterpret_cast<int*>(lock_ptr) + flag_idx;
+    if (thread_idx == 0) {
+        // Spin-loop
+        #pragma unroll 1
+        while(ld_acquire(flag_ptr) != val) {}
+    }
+    Sync::sync();
+  }
 
   CUTLASS_DEVICE
   static void

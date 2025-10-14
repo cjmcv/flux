@@ -169,6 +169,7 @@ public:
     ar_args_.aux_local_size = output_len_ * sizeof(ElementD);
     ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
     auto cu_stream = static_cast<cudaStream_t>(stream);
+    
     fetch_comm_args(fusion_args, cu_stream);
     //////////////////////////////////////////
 
@@ -177,6 +178,7 @@ public:
 
     // Create a structure of gemm kernel arguments suitable for invoking an instance of Gemm
     auto arguments = args_from_options(rt_args);
+    CUDA_CHECK(cudaMemsetAsync(barrier_ptrs_[ar_args_.rank], 0, 10000, cu_stream));
 
     // Using the arguments, query for extra workspace required for matrix multiplication computation
     size_t workspace_size = Gemm::get_workspace_size(arguments);
