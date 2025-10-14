@@ -236,14 +236,14 @@ def run(world_size, rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
     weights_scale = []
 
     for i in range(problem_count):
-        # inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
-        # weights.append(xutil.rand_tensor((N, K), dtype=dtype))
+        inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
+        weights.append(xutil.rand_tensor((N, K), dtype=dtype))
         # if (rank == 0):
         #     inputs.append(torch.zeros((M, K), dtype=dtype).cuda())
         #     weights.append(torch.zeros((N, K), dtype=dtype).cuda())
         # else:
-        inputs.append(torch.ones((M, K), dtype=dtype).cuda())
-        weights.append(torch.ones((N, K), dtype=dtype).cuda())
+        # inputs.append(torch.ones((M, K), dtype=dtype).cuda())
+        # weights.append(torch.ones((N, K), dtype=dtype).cuda())
         inputs_scale.append(None)
         weights_scale.append(None)
 
@@ -317,10 +317,10 @@ def run_worker(world_size, rank, port, M, args, xop_perf, torch_perf):
     xop_group = torch.distributed.new_group(list(range(world_size)), backend="gloo")
     
     exponent = args.M  # 65536: 17
-    run(world_size, rank, 256, args, xop_group, nccl_group, xop_perf, torch_perf)
-    # for m in range(1, exponent):
-    #     m = 2**m
-    #     run(world_size, rank, m, args, xop_group, nccl_group, xop_perf, torch_perf)
+    run(world_size, rank, 1, args, xop_group, nccl_group, xop_perf, torch_perf)
+    for m in range(1, exponent):
+        m = 2**m
+        run(world_size, rank, m, args, xop_group, nccl_group, xop_perf, torch_perf)
         
     dist.barrier(group=nccl_group)
     dist.destroy_process_group(group=nccl_group)    
@@ -386,8 +386,8 @@ def parse_args():
     parser.add_argument("K", type=int)
     parser.add_argument("--quant_bits", default=-1, type=int, help="whether to use GemmQuant.")
     parser.add_argument("--step", default=5, type=int, help="m step")
-    parser.add_argument("--warmup_iters", default=0, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=0, type=int, help="perf iterations")
+    parser.add_argument("--warmup_iters", default=10, type=int, help="perf warmup iterations")
+    parser.add_argument("--iters", default=20, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16", # float16, float8_e4m3fn
