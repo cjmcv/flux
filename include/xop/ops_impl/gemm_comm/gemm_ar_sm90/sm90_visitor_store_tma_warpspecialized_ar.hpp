@@ -137,7 +137,7 @@ struct Sm90AuxStoreAllReduce {
   struct Params {
     int world_size;
     int rank;
-    int **barrier_ptrs;
+    int *barrier_ptrs[kMaxLocalWorldSize];
     uint8_t *aux_local_buffer;
     int fuse_mode;
   };
@@ -155,7 +155,11 @@ struct Sm90AuxStoreAllReduce {
 
     params.world_size = args.world_size;
     params.rank = args.rank;
-    params.barrier_ptrs = args.barrier_ptrs_aux;
+    for (int rank = 0; rank < params.world_size; ++rank) {
+      int *barrier_ptr = reinterpret_cast<int **>(args.barrier_ptrs_aux)[rank];
+      XOP_CHECK(barrier_ptr != nullptr);
+      params.barrier_ptrs[rank] = barrier_ptr;
+    }
     params.aux_local_buffer = args.aux_local_buffer;
     params.fuse_mode = args.fuse_mode;
 
