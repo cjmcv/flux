@@ -31,11 +31,11 @@ struct __align__(alignof(T) * sz) array_t {
   static constexpr int size = sz;
 };
 
-template <class GemmTileShape, typename T, int ngpus, int THREADS>
+template <class TileShape, typename T, int ngpus, int THREADS>
 __global__ void disaggregated_allreduce(T** rank_data_ptrs, int **barrier_ptrs, uint8_t *aux_local_buffer,
                                         T* __restrict__ out, int rank, int m, int n) {
   
-  constexpr int ArrayLen = GemmTileShape::kN / 32; // one warp for one row: 128 / 32 = 4
+  constexpr int ArrayLen = cute::get<1>(TileShape{}) / 32; // kN, one warp for one row: 128 / 32 = 4
   using P = array_t<T, ArrayLen>; // 16 / sizeof(T) == 4/8
   int *flag = (int*)(aux_local_buffer + sizeof(int)); // The first element is the index counter.
 
@@ -53,8 +53,8 @@ __global__ void disaggregated_allreduce(T** rank_data_ptrs, int **barrier_ptrs, 
   // One block == 128 threads == 4 warp
   const int OUT_M   = m;
   const int OUT_N   = n;
-  constexpr int TILE_M    = GemmTileShape::kM; // 128;
-  constexpr int TILE_N    = GemmTileShape::kN;
+  constexpr int TILE_M    = cute::get<0>(TileShape{}); // 128;
+  constexpr int TILE_N    = cute::get<1>(TileShape{}); // 
   const int TILE_NUM_M = (OUT_M+TILE_M-1) / TILE_M;   // 32
   const int TILE_NUM_N = (OUT_N+TILE_N-1) / TILE_N;   // 32
 
@@ -88,7 +88,7 @@ __global__ void disaggregated_allreduce(T** rank_data_ptrs, int **barrier_ptrs, 
       int lane_id = tx & 31;            // 0..31
       int warp_id = tx >> 5;            // 0..3（一个 block 4 个 warp）
 
-      for (int row_in_tile = warp_id; row_in_tile < GemmTileShape::kM; row_in_tile += 4) {
+      for (int row_in_tile = warp_id; row_in_tile < TILE_M; row_in_tile += 4) {
         int global_m = base_m + row_in_tile;
         if (global_m >= m) continue; // 不能使用return，因为 for (int k = bx; k < flagSize; k += gridDim.x) 可能还需要处理下一组
       
@@ -311,8 +311,8 @@ public:
     else if constexpr (FuseMode == 1) {  // 1 mark output
       int max_blocks = 32;
       constexpr int threads = 128;
-      int blocks = std::min(max_blocks, n_ / TileShape::kN);
-      disaggregated_allreduce<TileShape, to_cuda_type_t<ElementD>, 2, threads><<<blocks, threads, 0, ar_stream_>>>((ElementD **)rank_data_, barrier_ptrs_, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, m_, n_);
+      int blocks = std::min(max_blocks, n_ / cute::get<1>(TileShape{}));
+      disaggregated_allreduce<TileShape, to_cuda_type_t<ElementD>, 2, threads><<<blocks, threads, 0, ar_stream_>>>(reinterpret_cast<to_cuda_type_t<ElementD>**>(rank_data_), barrier_ptrs_, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, m_, n_);
     }
     else if constexpr (FuseMode == 2) {  // 2 scatter fetch
 
