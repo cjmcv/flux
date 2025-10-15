@@ -21,6 +21,8 @@
 
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
 
+// todo: 考虑扩展两个stream的融合方案。
+
 namespace xop {
 
 struct AllReduceSm90Arguments {
@@ -56,7 +58,7 @@ public:
   using ElementScalar       = float;
 
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
-  static constexpr bool UseCustomEVT = true;
+  // static constexpr bool UseCustomEVT = true;
 
   // 16B alignment lets us use TMA
   static constexpr int AlignmentA = 16 / sizeof(ElementA);
@@ -64,10 +66,10 @@ public:
   static constexpr int AlignmentC = 16 / sizeof(ElementC);
   static constexpr int AlignmentD = 16 / sizeof(ElementD);
 
-  static_assert(not UseCustomEVT ||
-    (cute::is_same_v<EpilogueScheduleType, cutlass::epilogue::TmaWarpSpecialized> ||
-      cute::is_same_v<EpilogueScheduleType, cutlass::epilogue::TmaWarpSpecializedCooperative>),
-    "Epilogue visitor trees are currently only supported by the TMA warp-specialized epilogue");
+  // static_assert(not UseCustomEVT ||
+  //   (cute::is_same_v<EpilogueScheduleType, cutlass::epilogue::TmaWarpSpecialized> ||
+  //     cute::is_same_v<EpilogueScheduleType, cutlass::epilogue::TmaWarpSpecializedCooperative>),
+  //   "Epilogue visitor trees are currently only supported by the TMA warp-specialized epilogue");
   static constexpr auto RoundStyle = cutlass::FloatRoundStyle::round_to_nearest;
 
   // EVTs can be constructed by composing the fundamental load/store/compute visitor operations defined in include/cutlass/epilogue/fusion
@@ -99,7 +101,7 @@ public:
   // Users can select one of these operations by passing one of the tags defined in include/cutlass/epilogue/fusion/operations.hpp
   // to the CollectiveBuilder. This frees the user from having to compute additional parameters such as stage counts and copy atoms/layouts.
   // These tags also provide additional metadata that can be queried at compile time.
-  using DefaultOperation = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementCompute, ElementC, ElementScalar, RoundStyle>;
+  // using DefaultOperation = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementCompute, ElementC, ElementScalar, RoundStyle>;
 
   // CollectiveEpilogue的ClusterShape是111，CollectiveMainloop的是211
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
@@ -110,7 +112,7 @@ public:
       ElementC, LayoutC, AlignmentC,
       ElementD, LayoutD, AlignmentD,
       EpilogueScheduleType,
-      cute::conditional_t<UseCustomEVT && FuseMode!=0, CustomEVT, DefaultOperation>
+      cute::conditional_t<FuseMode!=0, CustomEVT, CustomComputeEVT>
     >::CollectiveOp;
 
   using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
@@ -281,7 +283,7 @@ private:
     // {first_child_args, ..., last_child_args, op_args},
     // For more complex examples of EVT initialization please refer to
     // include/cutlass/epilogue/fusion/sm90_callbacks_tma_warpspecialized.hpp
-    if constexpr (UseCustomEVT && FuseMode!=0) {
+    if constexpr (FuseMode!=0) {
       arguments.epilogue.thread =
         {
           {    // ternary op : beta * C + (alpha * acc)
@@ -299,8 +301,19 @@ private:
     }
     // Pre-defined fusions will have flat, named args for user-friendlyness
     else {
-      arguments.epilogue.thread.alpha = rt_args->alpha;
-      arguments.epilogue.thread.beta = rt_args->beta;
+      // arguments.epilogue.thread.alpha = rt_args->alpha;
+      // arguments.epilogue.thread.beta = rt_args->beta;
+      arguments.epilogue.thread =
+        {    // ternary op : beta * C + (alpha * acc)
+          {{rt_args->beta}}, // leaf op+args : beta
+          {},               // leaf op+args : C
+          {                 // binary op : alpha * acc
+            {{rt_args->alpha}}, // leaf op+args : alpha
+            {},                // leaf op+args : acc
+            {}              // binary args : multiplies
+          },                // end binary op
+          {} // ternary args : multiply_add
+        };   // end ternary op
     }
 
     return arguments;
