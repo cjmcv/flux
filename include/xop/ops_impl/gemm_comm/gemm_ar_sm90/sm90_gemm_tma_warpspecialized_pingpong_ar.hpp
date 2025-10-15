@@ -699,7 +699,7 @@ public:
         collective_epilogue.load_tail(epi_load_pipeline, epi_load_pipe_producer_state);
       }
       // comm
-      else if (producer_warp_role == ProducerWarpRole::ReduceScatterFetch) {
+      else if (producer_warp_role == ProducerWarpRole::ReduceScatterFetch && params.rs_dma.enable_flag == true) {
         if (params.rs_dma.nnodes == 0) return;
         ReduceScatterDma rs_dma(params.rs_dma, shared_storage.tensors.rs_dma);
         while (work_tile_info.is_valid()) {
@@ -720,8 +720,7 @@ public:
         rs_dma.fetch_tail(rs_fetch_pipeline, rs_fetch_pipe_producer_state);
       }  // Reduce Scatter Fetch Warp End
 
-      else if (producer_warp_role == ProducerWarpRole::ReduceScatterReduce) {
-        if (params.rs_dma.nnodes == 0) return;
+      else if (producer_warp_role == ProducerWarpRole::ReduceScatterReduce && params.rs_dma.enable_flag == true) {
         ReduceScatterDma rs_dma(params.rs_dma, shared_storage.tensors.rs_dma);
         while (work_tile_info.is_valid()) {
           if (TileScheduler::compute_epilogue(work_tile_info, params.scheduler)) {

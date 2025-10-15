@@ -112,7 +112,7 @@ public:
       ElementC, LayoutC, AlignmentC,
       ElementD, LayoutD, AlignmentD,
       EpilogueScheduleType,
-      CustomEVT, // cute::conditional_t<FuseMode!=0, CustomEVT, CustomComputeEVT>
+      CustomEVT // cute::conditional_t<FuseMode!=0, CustomEVT, CustomComputeEVT>
     >::CollectiveOp;
 
   using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
@@ -255,16 +255,17 @@ private:
       hw_info // hw_info
     };
 
-    int nnodes = 1;
-    if constexpr (FuseMode == 0) { nnodes = 0; } // disable flag
+    bool enable_flag = true;
+    if constexpr (FuseMode == 0) { enable_flag = false; } // disable flag
     arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
       .output_scatter_ptrs = (ElementD **)rank_data_,
       .stride = stride_D,
       .rank = ar_args_.rank,
       .world_size = ar_args_.world_size,
-      .nnodes = nnodes,
+      .nnodes = 1,
       .local_reduce_buffer = (void*)rt_args->ptr_D,
-      .barrier_ptrs = (int **)barrier_ptrs_};
+      .barrier_ptrs = (int **)barrier_ptrs_,
+      .enable_flag = enable_flag};
 
     // struct Arguments {
     //   Element **output_scatter_ptrs;

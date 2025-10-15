@@ -163,6 +163,7 @@ struct Sm90ReduceScatterDma {
     int nnodes = 1;
     void *local_reduce_buffer = nullptr;
     int **barrier_ptrs;
+    bool enable_flag = true;
     // vllm::RankSignals barrier_ptrs;
   };
 
@@ -172,6 +173,7 @@ struct Sm90ReduceScatterDma {
         make_tensor(static_cast<Element const *>(nullptr), repeat_like(StrideMNL{}, int32_t(0)), StrideMNL{}),
         SmemLayoutTma{}));
 
+    bool enable_flag;
     tuple<int, int> problem_shape;
     int rank;
     int world_size;
@@ -201,6 +203,8 @@ struct Sm90ReduceScatterDma {
   static constexpr Params
   to_underlying_arguments(ProblemShape const &problem_shape, Arguments const &args) {
     Params params;
+    params.enable_flag = args.enable_flag;
+    
     auto [M, N, K, L] = problem_shape;
 
     params.rank = args.rank;
