@@ -17,11 +17,9 @@
 #include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_cooperative_ar.hpp"
 #include "gemm_ar_sm90/sm90_gemm_tma_warpspecialized_pingpong_ar.hpp"
 #include "gemm_ar_sm90/sm90_visitor_store_tma_warpspecialized_ar.hpp"
-#include "gemm_ar_sm90/sm90_allreduce_utils.hpp"
+#include "gemm_ar_sm90/sm90_allreduce.hpp"
 
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
-
-// todo: 考虑扩展两个stream的融合方案。
 
 namespace xop {
 
@@ -127,9 +125,9 @@ public:
       MainloopScheduleType
     >::CollectiveOp;
 
-  // FuseMode => 0 serial, 1 scatter fetch, 2 scatter fetch+reduce, 3 allreduce
-  static constexpr bool FuseReduction = (FuseMode >= 2) ? true : false;
-  static constexpr bool FuseAllGather = (FuseMode == 3) ? true : false;
+  // FuseMode => 0 serial, 1 mark output, 2 scatter fetch, 3 scatter fetch+reduce, 4 allreduce
+  static constexpr bool FuseReduction = (FuseMode >= 3) ? true : false;
+  static constexpr bool FuseAllGather = (FuseMode == 4) ? true : false;
   using AllReduceDma = Sm90AllReduceDma<
         1, // StagesDma,
         TileShape,
@@ -210,14 +208,17 @@ public:
       int blocks = max_blocks; // std::min(max_blocks, n_ / ThreadblockShape::kN);
       vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementD>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);      
     }
-    else if constexpr (FuseMode == 1) {  // 1 scatter fetch
+    else if constexpr (FuseMode == 1) {  // 1 mark output
 
     }
-    else if constexpr (FuseMode == 2) {  // 2 scatter fetch+reduce
+    else if constexpr (FuseMode == 2) {  // 2 scatter fetch
+
+    }
+    else if constexpr (FuseMode == 3) {  // 3 scatter fetch+reduce
 
     }
     else {
-      // 3 allreduce
+      // 4 allreduce
     }
     // cudaMemcpyAsync((void *)ar_args_.output, (void *)rank_data_[ar_args_.rank], output_len_ * sizeof(ElementD), cudaMemcpyDeviceToDevice, cu_stream);  // 有问题？
   }
@@ -256,7 +257,7 @@ private:
     };
 
     bool enable_flag = true;
-    if constexpr (FuseMode == 0) { enable_flag = false; } // disable flag
+    if constexpr (FuseMode == 0 || FuseMode == 1) { enable_flag = false; } // disable flag
     arguments.rs_dma = typename GemmKernel::AllReduceDmaArguments{
       .output_scatter_ptrs = (ElementD **)rank_data_,
       .stride = stride_D,
