@@ -32,7 +32,7 @@ struct __align__(alignof(T) * sz) array_t {
 };
 
 template <class TileShape, typename T, int ngpus, int THREADS>
-__global__ void disaggregated_allreduce(T** rank_data_ptrs, int **barrier_ptrs, uint8_t *aux_local_buffer,
+__global__ void disaggregated_allreduce(vllm::RankData* dp, int **barrier_ptrs, uint8_t *aux_local_buffer,
                                         T* __restrict__ out, int rank, int m, int n) {
   
   constexpr int ArrayLen = cute::get<1>(TileShape{}) / 32; // kN, one warp for one row: 128 / 32 = 4
@@ -42,8 +42,8 @@ __global__ void disaggregated_allreduce(T** rank_data_ptrs, int **barrier_ptrs, 
 #ifdef ENABLE_ALLREDUCE
   int world_size = 2;
   int target_rank = (rank+1) % world_size;
-  T *rank_data = (T *)rank_data_ptrs[target_rank];
-  T *self_data = (T *)rank_data_ptrs[rank];
+  T *rank_data = (T *)dp->ptrs[target_rank];
+  T *self_data = (T *)dp->ptrs[rank];
 #else
   T *rank_data = nullptr;
   T *self_data = nullptr;
@@ -312,7 +312,7 @@ public:
       int max_blocks = 32;
       constexpr int threads = 128;
       int blocks = std::min(max_blocks, n_ / cute::get<1>(TileShape{}));
-      disaggregated_allreduce<TileShape, to_cuda_type_t<ElementD>, 2, threads><<<blocks, threads, 0, ar_stream_>>>(reinterpret_cast<to_cuda_type_t<ElementD>**>(rank_data_), barrier_ptrs_, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, m_, n_);
+      disaggregated_allreduce<TileShape, to_cuda_type_t<ElementD>, 2, threads><<<blocks, threads, 0, ar_stream_>>>(ar_args_.rank_data, barrier_ptrs_, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, m_, n_);
     }
     else if constexpr (FuseMode == 2) {  // 2 scatter fetch
 

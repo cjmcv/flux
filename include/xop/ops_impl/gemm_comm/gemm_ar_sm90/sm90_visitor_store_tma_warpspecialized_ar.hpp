@@ -271,10 +271,9 @@ struct Sm90AuxStoreAllReduce {
         uint32_t target_rank = (rank+1) % 2;
         int *flag_c = (int *)params_ptr->aux_local_buffer;
         int *flag_v = (int *)(params_ptr->aux_local_buffer + sizeof(int));
-        __syncthreads();
-        if (threadIdx.x == 0) {
-          Barrier::wait_eq_reset(params_ptr->barrier_ptrs[target_rank], thread_idx, flag_idx, 1, 0);
+        Barrier::wait_eq_reset(params_ptr->barrier_ptrs[target_rank], thread_idx, flag_idx, 1, 0);
 
+        if (thread_idx == 0) {
           int idx = atomicAdd(flag_c, 1); 
           atomic_ref_sys<int> ref(flag_v[idx]);
           ref.store(tile_idx+1, cuda::memory_order_release);  
