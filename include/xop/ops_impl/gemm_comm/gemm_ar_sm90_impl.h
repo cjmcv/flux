@@ -112,7 +112,7 @@ public:
       ElementC, LayoutC, AlignmentC,
       ElementD, LayoutD, AlignmentD,
       EpilogueScheduleType,
-      cute::conditional_t<FuseMode!=0, CustomEVT, CustomComputeEVT>
+      CustomEVT, // cute::conditional_t<FuseMode!=0, CustomEVT, CustomComputeEVT>
     >::CollectiveOp;
 
   using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
@@ -256,9 +256,7 @@ private:
     };
 
     int nnodes = 1;
-    if constexpr (FuseMode == 0) {
-      nnodes = 0;
-    }
+    if constexpr (FuseMode == 0) { nnodes = 0; } // disable flag
     arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
       .output_scatter_ptrs = (ElementD **)rank_data_,
       .stride = stride_D,
@@ -283,38 +281,23 @@ private:
     // {first_child_args, ..., last_child_args, op_args},
     // For more complex examples of EVT initialization please refer to
     // include/cutlass/epilogue/fusion/sm90_callbacks_tma_warpspecialized.hpp
-    if constexpr (FuseMode!=0) {
-      arguments.epilogue.thread =
-        {
-          {    // ternary op : beta * C + (alpha * acc)
-            {{rt_args->beta}}, // leaf op+args : beta
-            {},               // leaf op+args : C  bias
-            {                 // binary op : alpha * acc
-              {{rt_args->alpha}}, // leaf op+args : alpha
-              {},                // leaf op+args : acc
-              {}              // binary args : multiplies
-            },                // end binary op
-            {} // ternary args : multiply_add
-          },   
-          {.barrier_ptr_aux = (int *)barrier_ptrs_[ar_args_.rank]}  // unary args : aux store D
-        }; // end ternary op
-    }
-    // Pre-defined fusions will have flat, named args for user-friendlyness
-    else {
-      // arguments.epilogue.thread.alpha = rt_args->alpha;
-      // arguments.epilogue.thread.beta = rt_args->beta;
-      arguments.epilogue.thread =
+
+    int *barrier_ptr_aux = (int *)barrier_ptrs_[ar_args_.rank];
+    if constexpr (FuseMode == 0) { barrier_ptr_aux = nullptr; } // disable flag
+    arguments.epilogue.thread =
+      {
         {    // ternary op : beta * C + (alpha * acc)
           {{rt_args->beta}}, // leaf op+args : beta
-          {},               // leaf op+args : C
+          {},               // leaf op+args : C  bias
           {                 // binary op : alpha * acc
             {{rt_args->alpha}}, // leaf op+args : alpha
             {},                // leaf op+args : acc
             {}              // binary args : multiplies
           },                // end binary op
           {} // ternary args : multiply_add
-        };   // end ternary op
-    }
+        },   
+        {.barrier_ptr_aux = barrier_ptr_aux}  // unary args : aux store D
+      }; // end ternary op
 
     return arguments;
   }

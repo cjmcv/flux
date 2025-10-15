@@ -232,6 +232,8 @@ struct Sm90AuxStoreReduceScatter {
     // 自己的tile存好就置位自己tile的标志，标志跨rank共享，以供其他rank得到该rank的对应tile数据就绪
     CUTLASS_DEVICE void
     end() {
+      if (params_ptr->barrier_ptr == nullptr) return;
+
       auto [m, n, _] = tile_coord_mnl;
       if (m >= size<0>(tile_layout.shape()) or n >= size<1>(tile_layout.shape())) {
         // early exit if out of bound
