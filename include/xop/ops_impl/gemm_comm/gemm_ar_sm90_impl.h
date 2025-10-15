@@ -3,6 +3,9 @@
 #include "xop/ops_impl/common_cutlass.h"
 #include "xop/ops_impl/debug_util.h"
 
+#include <cuda/atomic>
+#include <cuda/std/atomic>
+
 #include "cute/tensor.hpp"
 #include "cutlass/tensor_ref.h"
 #include "cutlass/gemm/dispatch_policy.hpp"
@@ -21,6 +24,96 @@
 
 #include "xop/../../src/ops/allreduce_normal/custom_all_reduce.cuh"
 
+template <typename T, int sz>
+struct __align__(alignof(T) * sz) array_t {
+  T data[sz];
+  using type = T;
+  static constexpr int size = sz;
+};
+
+template <class GemmTileShape, typename T, int ngpus, int THREADS>
+__global__ void disaggregated_allreduce(T** rank_data_ptrs, int **barrier_ptrs, uint8_t *aux_local_buffer,
+                                        T* __restrict__ out, int rank, int m, int n) {
+  
+  constexpr int ArrayLen = GemmTileShape::kN / 32; // one warp for one row: 128 / 32 = 4
+  using P = array_t<T, ArrayLen>; // 16 / sizeof(T) == 4/8
+  int *flag = (int*)(aux_local_buffer + sizeof(int)); // The first element is the index counter.
+
+#ifdef ENABLE_ALLREDUCE
+  int world_size = 2;
+  int target_rank = (rank+1) % world_size;
+  T *rank_data = (T *)rank_data_ptrs[target_rank];
+  T *self_data = (T *)rank_data_ptrs[rank];
+#else
+  T *rank_data = nullptr;
+  T *self_data = nullptr;
+#endif
+
+  // One block for One gemm tile(128x128 / 64*256)
+  // One block == 128 threads == 4 warp
+  const int OUT_M   = m;
+  const int OUT_N   = n;
+  constexpr int TILE_M    = GemmTileShape::kM; // 128;
+  constexpr int TILE_N    = GemmTileShape::kN;
+  const int TILE_NUM_M = (OUT_M+TILE_M-1) / TILE_M;   // 32
+  const int TILE_NUM_N = (OUT_N+TILE_N-1) / TILE_N;   // 32
+
+  const int bx = blockIdx.x;
+  const int tx = threadIdx.x;  // 0..127
+
+  int flagSize = TILE_NUM_M * TILE_NUM_N;
+
+  for (int k = bx; k < flagSize; k += gridDim.x) {
+    atomic_ref_sys<int> ref(flag[k]);
+    // A single thread is sufficient for the blocking operation to avoid unnecessary overhead.
+    if (threadIdx.x == 0) {  
+      while (ref.load(cuda::memory_order_relaxed) == 0) { __nanosleep(40); } // printf("id:%d,", k); 
+    }
+    // Synchronization is needed, or non-zero threads will skip the semaphore and proceed directly.
+    __syncthreads();
+
+    int fv = ref.load(cuda::memory_order_relaxed);
+    int tileId = fv - 1;
+    if (tileId < 0) tileId = 0; // catch
+    
+    // printf("(%d, %d, %d, %d)\n", OUT_M, OUT_N, TILE_NUM_M, TILE_NUM_N);
+    int tile_m    = tileId / TILE_NUM_N;   // tile rows
+    int tile_n    = tileId % TILE_NUM_N;   // tile cols
+
+    // the top-left corner of the tile 128*128
+    int base_m = tile_m * TILE_M;
+    int base_n = tile_n * TILE_N;
+
+    if constexpr (THREADS == 128) {
+      int lane_id = tx & 31;            // 0..31
+      int warp_id = tx >> 5;            // 0..3（一个 block 4 个 warp）
+
+      for (int row_in_tile = warp_id; row_in_tile < GemmTileShape::kM; row_in_tile += 4) {
+        int global_m = base_m + row_in_tile;
+        if (global_m >= m) continue; // 不能使用return，因为 for (int k = bx; k < flagSize; k += gridDim.x) 可能还需要处理下一组
+      
+        int global_n = base_n + lane_id * ArrayLen;
+        int total_offset = global_m * OUT_N + global_n;
+        // T* ptr      = out + total_offset;
+        P* ptr      = (P*)(out + total_offset);
+        P* self_ptr = (P*)(self_data + total_offset);
+        P* rank_ptr = (P*)(rank_data + total_offset);
+        array_t<T, ArrayLen> tmp;
+        #pragma unroll
+        for (int i = 0; i < ArrayLen; i++) {
+      #ifdef ENABLE_ALLREDUCE
+          tmp.data[i] = __hadd(self_ptr->data[i], rank_ptr->data[i]);
+      #else
+          tmp.data[i] = __float2bfloat16(1.0f);
+      #endif // ENABLE_ALLREDUCE
+        }
+        *ptr = tmp;
+      }
+    }
+  }
+}
+
+
 namespace xop {
 
 struct AllReduceSm90Arguments {
@@ -34,10 +127,11 @@ struct AllReduceSm90Arguments {
   vllm::Signal *self_signal;
   
   void *output;
-  // uint8_t *aux_local_buffer;
+  size_t aux_local_size;
+  uint8_t *aux_local_buffer;
   // int aux_buffer_streamk_reduce_mark_step;   // Used to mark the tiles that require reduction in Stream-K
   // int aux_buffer_reduce_arrival_step; // Used to count the number of arrivals of reduce epi
-  // size_t aux_local_size;
+  
   virtual ~AllReduceSm90Arguments() {}
 };
 
@@ -164,15 +258,19 @@ public:
 public:
   void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
+    auto cu_stream = static_cast<cudaStream_t>(stream);
 
     //////////////////////////////////////////
+    cudaEventCreate(&event_);
+    cudaStreamCreate(&ar_stream_);
+
     m_ = rt_args->m;
     n_ = rt_args->n;
     output_len_ = rt_args->m * rt_args->n;
-    ar_args_.output = rt_args->ptr_D;    // todo: delete?
-    // ar_args_.aux_local_size = output_len_ * sizeof(ElementD);
-    // ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
-    auto cu_stream = static_cast<cudaStream_t>(stream);
+    ar_args_.output = rt_args->ptr_D;
+    ar_args_.aux_local_size = output_len_ * sizeof(ElementD);  // todo: 不需要这么大
+    ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
+    CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_local_buffer, 0, ar_args_.aux_local_size, cu_stream));
     
     fetch_comm_args(fusion_args, cu_stream);
     //////////////////////////////////////////
@@ -200,6 +298,8 @@ public:
 
   void run(void *stream = nullptr) {
     auto cu_stream = static_cast<cudaStream_t>(stream);
+    CUDA_CHECK(cudaEventRecord(event_, cu_stream));      // Record computation stream
+    CUDA_CHECK(cudaStreamWaitEvent(ar_stream_, event_)); // Make the ar_stream_ wait for all tasks before the computation stream to complete.
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
 
     if constexpr (FuseMode == 0) { // serial
@@ -209,7 +309,10 @@ public:
       vllm::cross_device_reduce_1stage<to_cuda_type_t<ElementD>, 2><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.self_signal, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, ar_args_.packed_array_num);      
     }
     else if constexpr (FuseMode == 1) {  // 1 mark output
-
+      int max_blocks = 32;
+      constexpr int threads = 128;
+      int blocks = std::min(max_blocks, n_ / TileShape::kN);
+      disaggregated_allreduce<TileShape, to_cuda_type_t<ElementD>, 2, threads><<<blocks, threads, 0, ar_stream_>>>((ElementD **)rank_data_, barrier_ptrs_, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementD>*>(ar_args_.output), ar_args_.rank, m_, n_);
     }
     else if constexpr (FuseMode == 2) {  // 2 scatter fetch
 
@@ -220,7 +323,10 @@ public:
     else {
       // 4 allreduce
     }
-    // cudaMemcpyAsync((void *)ar_args_.output, (void *)rank_data_[ar_args_.rank], output_len_ * sizeof(ElementD), cudaMemcpyDeviceToDevice, cu_stream);  // 有问题？
+    //////////////////////////////////////////////////////////
+    // wait for reduce_scatter done
+    CUDA_CHECK(cudaEventRecord(event_, ar_stream_)); // Record ar_stream_
+    CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); // Make the computation stream wait for all tasks before the communication stream in the event to complete.
   }
 
 private:
@@ -283,9 +389,6 @@ private:
     // {first_child_args, ..., last_child_args, op_args},
     // For more complex examples of EVT initialization please refer to
     // include/cutlass/epilogue/fusion/sm90_callbacks_tma_warpspecialized.hpp
-
-    int *barrier_ptr_aux = (int *)barrier_ptrs_[ar_args_.rank];
-    if constexpr (FuseMode == 0) { barrier_ptr_aux = nullptr; } // disable flag
     arguments.epilogue.thread =
       {
         {    // ternary op : beta * C + (alpha * acc)
@@ -298,7 +401,13 @@ private:
           },                // end binary op
           {} // ternary args : multiply_add
         },   
-        {.barrier_ptr_aux = barrier_ptr_aux}  // unary args : aux store D
+        {
+          .world_size = ar_args_.world_size,
+          .rank = ar_args_.rank,
+          .barrier_ptrs_aux = (int **)barrier_ptrs_,
+          .aux_local_buffer = ar_args_.aux_local_buffer,
+          .fuse_mode = FuseMode
+        }  // unary args : aux store D
       }; // end ternary op
 
     return arguments;
@@ -327,6 +436,9 @@ private:
 private:
   Gemm gemm_dev_;
 
+  cudaEvent_t event_;      // It must be linked to the previous instance and cannot be created on the fly.
+  cudaStream_t ar_stream_;
+  
   AllReduceSm90Arguments ar_args_;
   int m_;
   int n_;

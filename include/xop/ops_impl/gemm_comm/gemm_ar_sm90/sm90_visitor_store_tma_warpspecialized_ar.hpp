@@ -78,6 +78,11 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+template <typename T = int>
+using atomic_ref_sys = cuda::atomic_ref<T, cuda::thread_scope_system>;
+template <typename T = int>
+using atomic_ref_dev = cuda::atomic_ref<T, cuda::thread_scope_device>;
+
 namespace cutlass::epilogue::fusion {
 
 using namespace cute;
@@ -122,11 +127,19 @@ struct Sm90AuxStoreAllReduce {
       cute::conditional_t<is_m_major, Step<_2, _1, _3>, Step<_1, _2, _3>>{}));
 
   struct Arguments {
-    int *barrier_ptr_aux;
+    int world_size;
+    int rank;
+    int **barrier_ptrs_aux;
+    uint8_t *aux_local_buffer;
+    int fuse_mode;
   };
 
   struct Params {
-    int *barrier_ptr;
+    int world_size;
+    int rank;
+    int **barrier_ptrs;
+    uint8_t *aux_local_buffer;
+    int fuse_mode;
   };
 
   struct SharedStorage {};
@@ -140,7 +153,11 @@ struct Sm90AuxStoreAllReduce {
     auto [M, N, K, L] = problem_shape_mnkl;
     Params params;
 
-    params.barrier_ptr = args.barrier_ptr_aux;
+    params.world_size = args.world_size;
+    params.rank = args.rank;
+    params.barrier_ptrs = args.barrier_ptrs_aux;
+    params.aux_local_buffer = args.aux_local_buffer;
+    params.fuse_mode = args.fuse_mode;
 
     return params;
   }
@@ -232,7 +249,7 @@ struct Sm90AuxStoreAllReduce {
     // 自己的tile存好就置位自己tile的标志，标志跨rank共享，以供其他rank得到该rank的对应tile数据就绪
     CUTLASS_DEVICE void
     end() {
-      if (params_ptr->barrier_ptr == nullptr) return;
+      if (params_ptr->fuse_mode == 0) return;
 
       auto [m, n, _] = tile_coord_mnl;
       if (m >= size<0>(tile_layout.shape()) or n >= size<1>(tile_layout.shape())) {
@@ -243,7 +260,22 @@ struct Sm90AuxStoreAllReduce {
       int flag_idx = tile_idx * 3;
       tma_store_wait<0>();
 
-      Barrier::wait_eq_reset(params_ptr->barrier_ptr, thread_idx, flag_idx, 0, 1);
+      Barrier::wait_eq_reset(params_ptr->barrier_ptrs[params_ptr->rank], thread_idx, flag_idx, 0, 1);        
+      
+      if (params_ptr->fuse_mode == 1) {
+        uint32_t rank = params_ptr->rank;
+        uint32_t target_rank = (rank+1) % 2;
+        int *flag_c = (int *)params_ptr->aux_local_buffer;
+        int *flag_v = (int *)(params_ptr->aux_local_buffer + sizeof(int));
+        __syncthreads();
+        if (threadIdx.x == 0) {
+          Barrier::wait_eq_reset(params_ptr->barrier_ptrs[target_rank], thread_idx, flag_idx, 1, 0);
+
+          int idx = atomicAdd(flag_c, 1); 
+          atomic_ref_sys<int> ref(flag_v[idx]);
+          ref.store(tile_idx+1, cuda::memory_order_release);  
+        }
+      }
     }
 
     template <class T>

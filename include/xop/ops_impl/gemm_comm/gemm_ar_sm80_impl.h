@@ -233,7 +233,7 @@ public:
       is_serial_ = false;
     }
     cudaEventCreate(&event_);
-    cudaStreamCreate(&rs_stream_);
+    cudaStreamCreate(&ar_stream_);
     m_ = rt_args->m;
     n_ = rt_args->n;
     output_len_ = rt_args->m * rt_args->n;
@@ -276,7 +276,7 @@ public:
 
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUDA_CHECK(cudaEventRecord(event_, cu_stream));      // Record computation stream
-    CUDA_CHECK(cudaStreamWaitEvent(rs_stream_, event_)); // Make the rs_stream_ wait for all tasks before the computation stream to complete.
+    CUDA_CHECK(cudaStreamWaitEvent(ar_stream_, event_)); // Make the ar_stream_ wait for all tasks before the computation stream to complete.
     
     //////////////////////////////////////////////////////////
     CUTLASS_CHECK(gemm_dev_.run(cu_stream));
@@ -292,14 +292,14 @@ public:
       disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, cu_stream>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
     }
     else { // two streams
-      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+      disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, ar_stream_>>>(ar_args_.rank_data, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
     }
 #else
-    disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, rs_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
+    disaggregated_reduce<ThreadblockShape, to_cuda_type_t<ElementOutput>, 2, threads><<<blocks, threads, 0, ar_stream_>>>((vllm::RankData *)ar_args_.reg_buffer, ar_args_.rank_signals, ar_args_.aux_local_buffer, reinterpret_cast<to_cuda_type_t<ElementOutput>*>(ar_args_.output), ar_args_.rank, m_, n_);
 #endif
     //////////////////////////////////////////////////////////
     // wait for reduce_scatter done
-    CUDA_CHECK(cudaEventRecord(event_, rs_stream_)); // Record rs_stream_
+    CUDA_CHECK(cudaEventRecord(event_, ar_stream_)); // Record ar_stream_
     CUDA_CHECK(cudaStreamWaitEvent(cu_stream, event_)); // Make the computation stream wait for all tasks before the communication stream in the event to complete.
   }
 
@@ -413,7 +413,7 @@ private:
   AllReduceArguments ar_args_;
 
   cudaEvent_t event_;      // It must be linked to the previous instance and cannot be created on the fly.
-  cudaStream_t rs_stream_;
+  cudaStream_t ar_stream_;
   int m_;
   int n_;
   int output_len_;
