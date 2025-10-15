@@ -87,7 +87,7 @@ using namespace xop;
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
-// Epilogue Store For _ReduceScatter{}
+// Epilogue Store For _AllReduce{}
 //   Update flag if tile has been written to global memory
 /////////////////////////////////////////////////////////////////////////////////////////////////
 template <
@@ -101,7 +101,7 @@ template <
     class CopyOpR2S,
     CommKindEnum CommKind,
     int Alignment = 128 / sizeof_bits_v<Element>>
-struct Sm90AuxStoreReduceScatter {
+struct Sm90AuxStoreAllReduce {
   using ElementAux = Element;
   static_assert(
       Alignment * sizeof_bits_v<Element> % 128 == 0, "sub-16B alignment not supported yet");
@@ -169,10 +169,10 @@ struct Sm90AuxStoreReduceScatter {
   }
 
   CUTLASS_HOST_DEVICE
-  Sm90AuxStoreReduceScatter() {}
+  Sm90AuxStoreAllReduce() {}
 
   CUTLASS_HOST_DEVICE
-  Sm90AuxStoreReduceScatter(Params const &params, SharedStorage const &shared_storage)
+  Sm90AuxStoreAllReduce(Params const &params, SharedStorage const &shared_storage)
       : params_ptr(&params) {}
 
   Params const *params_ptr;
@@ -270,7 +270,7 @@ struct Sm90AuxStoreReduceScatter {
 
     constexpr int ThreadCount = size(decltype(args.tiled_copy){});
     using BarrierSync = cutlass::detail::
-        NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterEpilogue>;
+        NamedBarrierSync<ThreadCount, (int)XopNamedBarriers::AllReduceEpilogue>;
     using Barrier = cutlass::detail::GenericSystemBarrier<BarrierSync>;
 
     return ConsumerStoreCallbacks(

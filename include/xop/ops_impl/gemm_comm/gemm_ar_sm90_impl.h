@@ -89,7 +89,7 @@ public:
   using AuxStoreDescriptor = cutlass::epilogue::collective::detail::AuxStoreDescriptor<
     EpilogueDescriptor, cutlass::layout::RowMajor, ElementD/*ElementAux*/
   >;
-  using AuxStore = cutlass::epilogue::fusion::Sm90AuxStoreReduceScatter<
+  using AuxStore = cutlass::epilogue::fusion::Sm90AuxStoreAllReduce<
                                 AuxStoreDescriptor::Stages, TileShape, typename EpilogueDescriptor::EpilogueTile,
                                 typename AuxStoreDescriptor::Element, RoundStyle,
                                 typename AuxStoreDescriptor::Stride, typename AuxStoreDescriptor::SmemLayoutAtom,
@@ -130,7 +130,7 @@ public:
   // FuseMode => 0 serial, 1 scatter fetch, 2 scatter fetch+reduce, 3 allreduce
   static constexpr bool FuseReduction = (FuseMode >= 2) ? true : false;
   static constexpr bool FuseAllGather = (FuseMode == 3) ? true : false;
-  using ReduceScatterDma = Sm90ReduceScatterDma<
+  using AllReduceDma = Sm90AllReduceDma<
         1, // StagesDma,
         TileShape,
         typename EpilogueDescriptor::EpilogueTile,
@@ -146,7 +146,7 @@ public:
       CollectiveMainloop,
       CollectiveEpilogue,
       TileScheduler,
-      ReduceScatterDma
+      AllReduceDma
   >;
 
   using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
@@ -257,7 +257,7 @@ private:
 
     bool enable_flag = true;
     if constexpr (FuseMode == 0) { enable_flag = false; } // disable flag
-    arguments.rs_dma = typename GemmKernel::ReduceScatterDmaArguments{
+    arguments.rs_dma = typename GemmKernel::AllReduceDmaArguments{
       .output_scatter_ptrs = (ElementD **)rank_data_,
       .stride = stride_D,
       .rank = ar_args_.rank,
@@ -331,11 +331,7 @@ private:
   int n_;
   int output_len_;
 
-
-
   vllm::RankData host_rank_data_;
-  // vllm::Signal* host_signals_[8];
-  
   ElementD *rank_data_[kMaxLocalWorldSize];
   int *barrier_ptrs_[kMaxLocalWorldSize];
 };

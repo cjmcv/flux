@@ -7,12 +7,12 @@
 
 namespace xop {
 
-enum class FluxNamedBarriers : int {
+enum class XopNamedBarriers : int {
   FirstBarrier = static_cast<int>(cutlass::arch::ReservedNamedBarriers::FirstUserBarrier),
-  ReduceScatterEpilogue = FirstBarrier,
-  ReduceScatterFetch = FirstBarrier + 1,
-  ReduceScatterReduce = FirstBarrier + 2,
-  AllReduceAllgather = FirstBarrier + 3,
+  AllReduceEpilogue = FirstBarrier,
+  AllReduceFetch = FirstBarrier + 1,
+  AllReduceReduce = FirstBarrier + 2,
+  AllReduceGather = FirstBarrier + 3,
   AGScatterGather = FirstBarrier,
   AGScatterFetcher = FirstBarrier + 1,
   GatherRSProducer = FirstBarrier,

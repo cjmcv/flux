@@ -115,7 +115,7 @@ template <
     CommKindEnum CommKind_,
     bool FuseReduction_,
     bool FuseAllGather_>
-struct Sm90ReduceScatterDma {
+struct Sm90AllReduceDma {
  public:
   // Type aliases
   using TileShape = TileShape_;
@@ -259,10 +259,10 @@ struct Sm90ReduceScatterDma {
   Element *smem_tensor;
 
   CUTLASS_HOST_DEVICE
-  Sm90ReduceScatterDma() {}
+  Sm90AllReduceDma() {}
 
   CUTLASS_HOST_DEVICE
-  Sm90ReduceScatterDma(Params const &params, TensorStorage const &shared_tensor)
+  Sm90AllReduceDma(Params const &params, TensorStorage const &shared_tensor)
       : params_ptr(&params), smem_tensor(const_cast<Element *>(shared_tensor.tensor.data())) {}
 
   template <class ProblemShapeMNKL, class TileCoordMNKL>
@@ -331,7 +331,7 @@ struct Sm90ReduceScatterDma {
     // wait for the tile to fetch ready before processing
     int fetch_tile_idx = params_ptr->tile_layout(m_fetch, n);
 
-    using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterFetch>;
+    using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)XopNamedBarriers::AllReduceFetch>;
     using Barrier     = cutlass::detail::GenericSystemBarrier<BarrierSync>;
 
     Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 3, 1);
@@ -443,10 +443,10 @@ struct Sm90ReduceScatterDma {
     Tensor tsReduce = thread_copy.partition_S(sReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,PIPE)
     Tensor tgReduce = thread_copy.partition_D(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
 
-    using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterReduce>;
+    using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)XopNamedBarriers::AllReduceReduce>;
     using Barrier = cutlass::detail::CustomizedGenericBarrier<BarrierSync>;
 
-    using BarrierSysSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::AllReduceAllgather>;
+    using BarrierSysSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)XopNamedBarriers::AllReduceGather>;
     using BarrierSys = cutlass::detail::GenericSystemBarrier<BarrierSysSync>;
 
     int reduce_tile_idx = params_ptr->tile_layout(m_reduce_in_output, n);
@@ -681,7 +681,7 @@ struct Sm90ReduceScatterDma {
     Tensor tsReduce = thread_copy.partition_S(sReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,PIPE)
     Tensor tgReduce = thread_copy.partition_D(gReduce_epi);  // ((Atom,AtomNum),ATOM_M,ATOM_N,EPI_M,EPI_N)
 
-    using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)FluxNamedBarriers::ReduceScatterReduce>;
+    using BarrierSync = cutlass::detail::NamedBarrierSync<ThreadCount, (int)XopNamedBarriers::AllReduceReduce>;
     using Barrier = cutlass::detail::CustomizedGenericBarrier<BarrierSync>;
 
     int reduce_tile_idx = params_ptr->tile_layout(m_reduce_in_output, n);

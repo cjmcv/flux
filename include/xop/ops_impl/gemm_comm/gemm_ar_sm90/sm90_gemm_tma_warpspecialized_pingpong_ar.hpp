@@ -65,14 +65,14 @@ template <
   class CollectiveMainloop_,
   class CollectiveEpilogue_,
   class TileScheduler_,
-  class ReduceScatterDma_
+  class AllReduceDma_
 >
 class GemmUniversalRsSm90<
   ProblemShape_,
   CollectiveMainloop_,
   CollectiveEpilogue_,
   TileScheduler_,
-  ReduceScatterDma_,
+  AllReduceDma_,
   cute::enable_if_t<cute::is_base_of_v<KernelTmaWarpSpecializedPingpong, typename CollectiveMainloop_::DispatchPolicy::Schedule>>>
 {
 public:
@@ -154,10 +154,10 @@ public:
   static constexpr uint32_t LoadRegisterRequirement = !HeavyRegisterPressure ? 40 : 24;
   static constexpr uint32_t MmaRegisterRequirement = !HeavyRegisterPressure ? 232 : 240;
 
-  // comm: ReduceScatterDma
-  using ReduceScatterDma = ReduceScatterDma_;
-  using ReduceScatterDmaArguments = typename ReduceScatterDma::Arguments;
-  using ReduceScatterDmaParams = typename ReduceScatterDma::Params;
+  // comm: AllReduceDma
+  using AllReduceDma = AllReduceDma_;
+  using AllReduceDmaArguments = typename AllReduceDma::Arguments;
+  using AllReduceDmaParams = typename AllReduceDma::Params;
 
   // 1 stage ordered sequence between mainloop and epilogue producer load threads
   using LoadWarpOrderBarrier = cutlass::OrderedSequenceBarrier<1,2>;
@@ -177,13 +177,13 @@ public:
       using MainloopPipelineStorage = typename CollectiveMainloop::PipelineStorage;
       using EpiLoadPipelineStorage = typename CollectiveEpilogue::PipelineStorage;
       using MathWarpGroupOrderBarrierStorage = MathWarpGroupOrderBarrierSharedStorage;
-      using ReduceScatterDmaPipelineStorage = typename ReduceScatterDma::PipelineStorage; // comm
+      using AllReduceDmaPipelineStorage = typename AllReduceDma::PipelineStorage; // comm
 
       alignas(16) MainloopPipelineStorage mainloop;
       alignas(16) EpiLoadPipelineStorage epi_load;
       alignas(16) MathWarpGroupOrderBarrierStorage math_wg_order;
       alignas(16) typename LoadWarpOrderBarrier::SharedStorage load_order;
-      alignas(16) ReduceScatterDmaPipelineStorage rs_dma;  // comm
+      alignas(16) AllReduceDmaPipelineStorage rs_dma;  // comm
     } pipelines;
     
     alignas(16) TileSchedulerStorage scheduler;
@@ -191,7 +191,7 @@ public:
     struct TensorStorage : cute::aligned_struct<128, _1> {
       using MainloopTensorStorage = typename CollectiveMainloop::TensorStorage;
       using EpilogueTensorStorage = typename CollectiveEpilogue::TensorStorage;
-      using RsDmaTensorStorage = typename ReduceScatterDma::TensorStorage;  // comm
+      using RsDmaTensorStorage = typename AllReduceDma::TensorStorage;  // comm
 
       EpilogueTensorStorage epilogue;
       MainloopTensorStorage mainloop;
@@ -209,7 +209,7 @@ public:
     EpilogueArguments epilogue{};
     KernelHardwareInfo hw_info{};
     TileSchedulerArguments scheduler{};
-    ReduceScatterDmaArguments rs_dma{};  // comm
+    AllReduceDmaArguments rs_dma{};  // comm
   };
 
   // Kernel entry point API
@@ -220,7 +220,7 @@ public:
     EpilogueParams epilogue{};
     KernelHardwareInfo hw_info{};
     TileSchedulerParams scheduler{};
-    ReduceScatterDmaParams rs_dma{};  // comm
+    AllReduceDmaParams rs_dma{};  // comm
   };
 
   //
@@ -289,7 +289,7 @@ public:
       TileScheduler::to_underlying_arguments(
         problem_shape_MNKL, TileShape{}, ClusterShape{}, hw_info, args.scheduler, scheduler_workspace, NumEpilogueSubTiles
       ),
-      ReduceScatterDma::to_underlying_arguments(args.problem_shape, args.rs_dma) // comm
+      AllReduceDma::to_underlying_arguments(args.problem_shape, args.rs_dma) // comm
     };
   }
 
@@ -403,8 +403,8 @@ public:
     enum class ProducerWarpRole {
       Mainloop = 0,
       Epilogue = 1,
-      ReduceScatterFetch = 2,  // comm
-      ReduceScatterReduce = 3
+      AllReduceFetch = 2,  // comm
+      AllReduceReduce = 3
     };
     // Kernel level shared memory storage
     SharedStorage& shared_storage = *reinterpret_cast<SharedStorage*>(smem_buf);
@@ -519,27 +519,27 @@ public:
     params_math_wg_order_barrier.group_size = NumThreadsPerWarpGroup; // Number of threads / participants in a group
     MathWarpGroupOrderBarrier math_wg_order_barrier(shared_storage.pipelines.math_wg_order, params_math_wg_order_barrier);
 
-    // comm: ReduceScatter fetch pipeline
-    using RSFetchPipeline = typename ReduceScatterDma::FetchPipeline;
+    // comm: AllReduce fetch pipeline
+    using RSFetchPipeline = typename AllReduceDma::FetchPipeline;
     typename RSFetchPipeline::Params rs_fetch_pipeline_params;
     if (warp_group_role == WarpGroupRole::Producer) {
-      if (producer_warp_role == ProducerWarpRole::ReduceScatterFetch) {
+      if (producer_warp_role == ProducerWarpRole::AllReduceFetch) {
         rs_fetch_pipeline_params.role = RSFetchPipeline::ThreadCategory::Producer;
-      } else if (producer_warp_role == ProducerWarpRole::ReduceScatterReduce) {
+      } else if (producer_warp_role == ProducerWarpRole::AllReduceReduce) {
         rs_fetch_pipeline_params.role = RSFetchPipeline::ThreadCategory::Consumer;
       }
     }
     rs_fetch_pipeline_params.dst_blockid = cute::block_rank_in_cluster();
     rs_fetch_pipeline_params.producer_arv_count = NumThreadsPerWarp;
     rs_fetch_pipeline_params.consumer_arv_count = NumThreadsPerWarp;
-    rs_fetch_pipeline_params.transaction_bytes = ReduceScatterDma::TmaTransactionBytes;
+    rs_fetch_pipeline_params.transaction_bytes = AllReduceDma::TmaTransactionBytes;
     RSFetchPipeline rs_fetch_pipeline(shared_storage.pipelines.rs_dma, rs_fetch_pipeline_params);
 
     // Initialize starting pipeline states for the collectives
     // Epilogue store pipe is producer-only (consumer is TMA unit, waits via scoreboarding)
     typename CollectiveMainloop::PipelineState mainloop_pipe_consumer_state;
     typename CollectiveEpilogue::LoadPipelineState epi_load_pipe_consumer_state;
-    typename ReduceScatterDma::PipelineState rs_fetch_pipe_consumer_state; // comm
+    typename AllReduceDma::PipelineState rs_fetch_pipe_consumer_state; // comm
 
     // For the DMA Load (producer) we start with an opposite phase
     // i.e., we skip all waits since we know that the buffer is indeed empty
@@ -699,9 +699,9 @@ public:
         collective_epilogue.load_tail(epi_load_pipeline, epi_load_pipe_producer_state);
       }
       // comm
-      else if (producer_warp_role == ProducerWarpRole::ReduceScatterFetch && params.rs_dma.enable_flag == true) {
+      else if (producer_warp_role == ProducerWarpRole::AllReduceFetch && params.rs_dma.enable_flag == true) {
         if (params.rs_dma.nnodes == 0) return;
-        ReduceScatterDma rs_dma(params.rs_dma, shared_storage.tensors.rs_dma);
+        AllReduceDma rs_dma(params.rs_dma, shared_storage.tensors.rs_dma);
         while (work_tile_info.is_valid()) {
           if (TileScheduler::compute_epilogue(work_tile_info, params.scheduler)) {
             // Compute m_coord, n_coord, l_coord with the post-tiled m-shape and n-shape
@@ -720,8 +720,8 @@ public:
         rs_dma.fetch_tail(rs_fetch_pipeline, rs_fetch_pipe_producer_state);
       }  // Reduce Scatter Fetch Warp End
 
-      else if (producer_warp_role == ProducerWarpRole::ReduceScatterReduce && params.rs_dma.enable_flag == true) {
-        ReduceScatterDma rs_dma(params.rs_dma, shared_storage.tensors.rs_dma);
+      else if (producer_warp_role == ProducerWarpRole::AllReduceReduce && params.rs_dma.enable_flag == true) {
+        AllReduceDma rs_dma(params.rs_dma, shared_storage.tensors.rs_dma);
         while (work_tile_info.is_valid()) {
           if (TileScheduler::compute_epilogue(work_tile_info, params.scheduler)) {
             // Compute m_coord, n_coord, l_coord with the post-tiled m-shape and n-shape
