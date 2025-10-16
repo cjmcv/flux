@@ -21,8 +21,8 @@ warmup_iters = 20
 pref_iters = 100        # If a cuda graph is used, more iterations are required.
 is_use_fp16_acc = False # True
 
-class GemmNormalSchema:
-    name = "GemmNormal"
+class GemmSm80Schema:
+    name = "GemmSm80"
     sub_schema = [Meta.GemmNormal] # GemmNormalSimt, Meta.GemmLt
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
@@ -42,8 +42,8 @@ class GemmNormalSchema:
             output += bias
         return output.cpu()
 
-class GemmV2BlockScaleFp8Schema:
-    impl = "GemmV2BlockScaleFp8"
+class GemmBlockScaleFp8Sm89Schema:
+    impl = "GemmBlockScaleFp8Sm89"
     sub_schema = [Meta.GemmBlockScaleFp8]
     
     if is_use_fp16_acc:
@@ -63,8 +63,8 @@ class GemmV2BlockScaleFp8Schema:
         # output = torch.matmul(input, weight.t())
         # return output.cpu()
         return None
-class GemmBlockScaleFp8Schema:
-    impl = "GemmBlockScaleFp8"
+class GemmBlockScaleFp8Sm90Schema:
+    impl = "GemmBlockScaleFp8Sm90"
     sub_schema = [Meta.GemmBlockScaleFp8]
     test_input_dtype = torch.bfloat16
     space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
@@ -79,7 +79,7 @@ class GemmBlockScaleFp8Schema:
         # return output.cpu()
         return None
 
-class GemmGroupedBlockScaleFp8Schema:
+class GemmGroupedBlockScaleFp8Sm90Schema:
     impl = "GemmGroupedBlockScaleFp8Sm90Impl"
     sub_schema = [Meta.GemmGroupedBlockScaleFp8]
     test_input_dtype = torch.bfloat16
@@ -110,10 +110,10 @@ class GemmGroupedBlockScaleFp8Schema:
       
 def str2schema(schema_name):
     string_to_schema = {
-        "GemmNormal": GemmNormalSchema(),
-        "GemmV2BlockScaleFp8": GemmV2BlockScaleFp8Schema(),
-        "GemmBlockScaleFp8": GemmBlockScaleFp8Schema(),
-        "GemmGroupedBlockScaleFp8": GemmGroupedBlockScaleFp8Schema(),
+        "GemmSm80": GemmSm80Schema(),
+        "GemmBlockScaleFp8Sm89": GemmBlockScaleFp8Sm89Schema(),
+        "GemmBlockScaleFp8Sm90": GemmBlockScaleFp8Sm90Schema(),
+        "GemmGroupedBlockScaleFp8Sm90": GemmGroupedBlockScaleFp8Sm90Schema(),
     }
     return string_to_schema.get(schema_name, None)
 
@@ -234,7 +234,7 @@ def tune_one_config(schema, config: TuningConfig, fp):
     # start_time = time.time()
 
     # print(f"torch compute time: {(time.time() - start_time) * 1000} ms")
-    if (isinstance(schema, GemmGroupedBlockScaleFp8Schema)):
+    if (isinstance(schema, GemmGroupedBlockScaleFp8Sm90Schema)):
         x, x_scale, y, y_scale = schema.gen_scale(input.clone(), weight.clone(), config)
         ref_output = schema.get_ref_output(x, y, x_scale, y_scale)
         xop_output = run_xop_grouped_profiling(schema, x, y, x_scale, y_scale, config, fp)
@@ -266,7 +266,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmNormal (GemmNormal(GemmNormalSimt) / GemmV2BlockScaleFp8 / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
+        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmSm80 (GemmSm80(GemmNormalSimt) / GemmBlockScaleFp8Sm89 / GemmBlockScaleFp8Sm90 / GemmGroupedBlockScaleFp8Sm90)")
         exit()
 
     if args.output_path and not os.path.isdir(args.output_path):

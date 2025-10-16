@@ -141,7 +141,7 @@ template <class ElementA, class ElementB, class ElementC, class ElementAccumulat
           class MainloopScheduleType, class EpilogueScheduleType, class TileScheduler, 
           int FuseMode>
 
-class GemmArSm90Impl : public GemmBase {
+class GemmAllreduceSm90Impl : public GemmBase {
 public:
   ////
   using ElementD            = ElementC;

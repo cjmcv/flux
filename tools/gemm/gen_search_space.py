@@ -369,7 +369,50 @@ class GemmAllreduceSm80Schema:
             
             res.append(hparam_str)
         return res
+     
+class GemmAllreduceSm90Schema:
+    impl = "GemmAllreduceSm90Impl"
+    impl_header = "gemm_comm/gemm_ar_sm90_impl.h"
+    arch_limit = "XOP_CUDA_ARCHS==90"
+    
+    def get_meta_space(self, w):
+        # ('BF16', 'BF16', 'BF16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP16')
+        data_type = [('BF16', 'BF16', 'BF16', 'FP32')] # a,b,cd,acc
+        layout = ['RCR'] # , 'RRR'
+        arch = ['Sm90'] # , 'Sm89'
+
+        res = make_meta_space(w, data_type, layout, arch)
+        return res
+
+    def get_hparam_space(self, w):
+        mainloop_schedules = ["MSTmaWarpSpecializedPingpong"] #, "MSTmaWarpSpecializedCooperative"
+        epilogue_schedules = ["ESTmaWarpSpecialized"] #, "ESTmaWarpSpecializedCooperative"
+        tile_schedulers = ["TSPersistent"] # , "TSStreamK"
+        tile_shapes = [(128, 128, 128), (128, 128, 64)]
+        cluster_shapes = [(1, 2, 1), (2, 1, 1)]
+        fuse_modes = [0,1,4]
+
+        res = []
+        for tile_shape, cluster_shape, mainloop_schedule, epilogue_schedule, tile_scheduler, fuse_mode in itertools.product(
+            tile_shapes, cluster_shapes, mainloop_schedules, epilogue_schedules, tile_schedulers, fuse_modes):
             
+            # "Ping-pong kernel does not currently support stream-K scheduler" - cutlass 4.2
+            if (mainloop_schedule == "MSTmaWarpSpecializedPingpong" and 
+                (epilogue_schedule != "ESTmaWarpSpecialized" or tile_scheduler != "TSPersistent")):
+                continue
+            # TmaWarpSpecializedCooperative -> TmaWarpSpecializedCooperative
+            if (mainloop_schedule == "MSTmaWarpSpecializedCooperative" and epilogue_schedule != "ESTmaWarpSpecializedCooperative"):
+                continue
+            
+            hparam_str = '{0},{1},{2},{3},{4},{5}'.format(
+                w.cstw(tile_shape,3), w.cstw(cluster_shape,3),
+                w.xop_to_cutlasstype(mainloop_schedule), 
+                w.xop_to_cutlasstype(epilogue_schedule), 
+                w.xop_to_cutlasstype(tile_scheduler),
+                fuse_mode)
+            res.append(hparam_str)
+        return res
+           
 def str2schema(schema_name):
     string_to_schema = {
         "GemmSm80": GemmSm80Schema(),
@@ -379,6 +422,7 @@ def str2schema(schema_name):
         "GemmBlockScaleFp8Sm90": GemmBlockScaleFp8Sm90Schema(),
         "GemmGroupedBlockScaleFp8Sm90": GemmGroupedBolckScaleFp8Sm90Schema(),
         "GemmAllreduceSm80": GemmAllreduceSm80Schema(),
+        "GemmAllreduceSm90": GemmAllreduceSm90Schema(),
     }
     return string_to_schema.get(schema_name, None)
 
@@ -418,7 +462,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmSm80 (GemmSm80/GemmSimtSm80/GemmBlockScaleFp8Sm89/GemmSm90/GemmBlockScaleFp8Sm90/GemmGroupedBlockScaleFp8Sm90 // GemmAllreduceSm80)")
+        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmSm80 (GemmSm80/GemmSimtSm80/GemmBlockScaleFp8Sm89/GemmSm90/GemmBlockScaleFp8Sm90/GemmGroupedBlockScaleFp8Sm90 // GemmAllreduceSm80/GemmAllreduceSm90)")
         exit()
     generator = SearchSpaceGenerator()
     generator.run(args.schema, args.output_path) 

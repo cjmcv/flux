@@ -26,8 +26,8 @@ warmup_iters = 20
 pref_iters = 100
 is_use_fp16_acc = False # True
 
-class GemmAllreduceV2Schema:
-    name = "GemmAllreduceV2"
+class GemmAllreduceSm80Schema:
+    name = "GemmAllreduceSm80"
     sub_schema = [Meta.GemmAllreduce]
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
@@ -46,10 +46,10 @@ class GemmAllreduceV2Schema:
         output = torch.nn.functional.linear(input, weight, bias) #, out=output
         dist.all_reduce(output, group=group)
         return output.cpu()
-    
-class GemmNormalSchema:
-    name = "GemmNormal"
-    sub_schema = [Meta.GemmNormal] # GemmNormalSimt, Meta.GemmLt
+
+class GemmAllreduceSm90Schema:
+    name = "GemmAllreduceSm90"
+    sub_schema = [Meta.GemmAllreduce]
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
     if is_use_fp16_acc:
@@ -60,87 +60,18 @@ class GemmNormalSchema:
         space_dtype = [(torch.bfloat16,torch.bfloat16,torch.bfloat16)]
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
         return input, None, weight, None
-    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
+    def get_ref_output(self, rank: int, group: ProcessGroup, 
+                       input: torch.Tensor, weight: torch.Tensor, 
                        input_scale: torch.Tensor, weight_scale: torch.Tensor,
                        bias: torch.Tensor):
-        output = torch.matmul(input, weight.t())
-        if (bias != None):
-            output += bias
+        output = torch.nn.functional.linear(input, weight, bias) #, out=output
+        dist.all_reduce(output, group=group)
         return output.cpu()
-
-class GemmV2BlockScaleFp8Schema:
-    impl = "GemmV2BlockScaleFp8"
-    sub_schema = [Meta.GemmBlockScaleFp8]
-    
-    if is_use_fp16_acc:
-        test_input_dtype = torch.float16
-        space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.float16)]
-    else:
-        test_input_dtype = torch.bfloat16
-        space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
-    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
-        x, x_scale = xutil.per_token_cast_to_fp8(input, is_use_fp16_acc)
-        y, y_scale = xutil.per_block_cast_to_fp8(weight, is_use_fp16_acc)
-        x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
-        return x, x_scale, y, y_scale.contiguous()
-    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
-                       input_scale: torch.Tensor, weight_scale: torch.Tensor,
-                       bias: torch.Tensor):
-        # output = torch.matmul(input, weight.t())
-        # return output.cpu()
-        return None
-class GemmBlockScaleFp8Schema:
-    impl = "GemmBlockScaleFp8"
-    sub_schema = [Meta.GemmBlockScaleFp8]
-    test_input_dtype = torch.bfloat16
-    space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
-    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
-        x, x_scale = xutil.per_token_cast_to_fp8(input)
-        y, y_scale = xutil.per_block_cast_to_fp8(weight)
-        return x, x_scale.t().contiguous(), y, y_scale.t().contiguous()
-    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
-                       input_scale: torch.Tensor, weight_scale: torch.Tensor,
-                       bias: torch.Tensor):
-        # output = torch.matmul(input, weight.t())
-        # return output.cpu()
-        return None
-
-class GemmGroupedBlockScaleFp8Schema:
-    impl = "GemmGroupedBlockScaleFp8Sm90Impl"
-    sub_schema = [Meta.GemmGroupedBlockScaleFp8]
-    test_input_dtype = torch.bfloat16
-    space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
-    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor, config: TuningConfig):
-        x_list = []
-        x_scale_list = []
-        y_list = []
-        y_scale_list = []
-
-        for i in range(config.G):
-            x, x_scale = xutil.per_token_cast_to_fp8(input)
-            y, y_scale = xutil.per_block_cast_to_fp8(weight)
-
-            x_list.append(x)
-            x_scale_list.append(x_scale.t().contiguous())
-            y_list.append(y)
-            y_scale_list.append(y_scale.t().contiguous())
-
-        return x_list, x_scale_list, y_list, y_scale_list
-        
-    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
-                       input_scale: torch.Tensor, weight_scale: torch.Tensor,
-                       bias: torch.Tensor):
-        # output = torch.matmul(input, weight.t())
-        # return output.cpu()
-        return None
       
 def str2schema(schema_name):
     string_to_schema = {
-        "GemmNormal": GemmNormalSchema(),
-        "GemmV2BlockScaleFp8": GemmV2BlockScaleFp8Schema(),
-        "GemmBlockScaleFp8": GemmBlockScaleFp8Schema(),
-        "GemmGroupedBlockScaleFp8": GemmGroupedBlockScaleFp8Schema(),
-        "GemmAllreduceV2": GemmAllreduceV2Schema(),
+        "GemmAllreduceSm80": GemmAllreduceSm80Schema(),
+        "GemmAllreduceSm90": GemmAllreduceSm90Schema(),
     }
     return string_to_schema.get(schema_name, None)
 
@@ -373,7 +304,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/tuning/tune_gemm_comm.py --schema=GemmAllreduceV2 (GemmAllreduceV2 / GemmV2BlockScaleFp8 / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)")
+        print("usage: python3 tools/gemm/tuning/tune_gemm_comm.py --schema=GemmAllreduceSm80 (GemmAllreduceSm80 / GemmAllreduceSm90)")
         exit()
 
     if args.output_path and not os.path.isdir(args.output_path):

@@ -129,6 +129,7 @@ struct Sm90AllReduceDma {
   to_underlying_arguments(ProblemShape const &problem_shape, Arguments const &args) {
     Params params;
     params.enable_flag = args.enable_flag;
+    if (params.enable_flag == false) return params;
     
     auto [M, N, K, L] = problem_shape;
 
