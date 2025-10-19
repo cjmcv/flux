@@ -178,6 +178,19 @@ public:
       }
       return;
     }
+    // else {
+    //   printf("total normal_tuned_map.size: %d.\n", normal_tuned_map.size());
+    //   for (auto it = normal_tuned_map.begin(); it != normal_tuned_map.end(); ++it) {
+    //     const auto& key = it->first;
+    //     const auto& value = it->second;
+
+    //     std::cout << "Key: ";
+    //     for (int32_t k : key) std::cout << k << " ";
+    //       std::cout << " => Value: ";
+    //     for (int16_t v : value) std::cout << v << " ";
+    //       std::cout << "\n";
+    //   }
+    // }
   }  
   
   void Add2Comm(const std::vector<int32_t> &key, const std::vector<int16_t> &select_config) {
