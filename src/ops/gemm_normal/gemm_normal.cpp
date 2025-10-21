@@ -108,7 +108,7 @@ public:
         return RunTorch(input, weight, output, bias);
       }
       
-      int max_m = 16384;
+      int max_m = 8192;
       int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, max_m);
       PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
       std::vector<int32_t> shape_meta = {tuned_m, rt_args->n, rt_args->k, 1};       // mnkl + meta
