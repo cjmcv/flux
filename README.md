@@ -28,6 +28,7 @@ ncu-ui # Open file: my_profile.ncu-rep
 ## Quick Start
 
 ```bash
+# Select the GPU you want to use: CUDA_VISIBLE_DEVICES=5,6 python...
 # Generate search_space_gemmnormal.cu 
 # Move it to src/ops/gemm_normal/tuning_config, and compile the library again.
 python3 tools/gen_search_space.py --schema=GemmNormal

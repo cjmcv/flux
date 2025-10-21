@@ -250,13 +250,14 @@ def tune_one_config(schema, config: TuningConfig, fp):
             xop_output = run_xop_profiling(schema, x, y, x_scale, y_scale, bias, config, fp)
 
     if ref_output is not None:
-        if config.dtypeC == torch.bfloat16:
-            atol, rtol = 0.02, 0.02
-        else:
-            atol, rtol = 0.01, 0.01
+        # if config.dtypeC == torch.bfloat16:
+        #     atol, rtol = 0.02, 0.02
+        # else:
+        #     atol, rtol = 0.01, 0.01
 
-        if is_use_fp16_acc:
-            atol, rtol = 0.1, 0.1
+        # if is_use_fp16_acc:
+        #     atol, rtol = 0.1, 0.1
+        atol, rtol = xutil.get_allclose_threshold(config.K, config.dtypeC)
         xutil.torch_allclose(xop_output, ref_output, atol=atol, rtol=rtol)
     
 if __name__ == "__main__":

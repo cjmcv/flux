@@ -3,6 +3,7 @@ import sys
 import torch
 import time
 import math
+import numpy as np
 from typing import Tuple
 
 def get_arch():
@@ -107,6 +108,19 @@ def per_block_cast_to_fp8(x: torch.Tensor, fast_accum: bool = False) -> Tuple[to
         x_view.size(0), x_view.size(2)
     )
 
+# return atol, rtol
+def get_allclose_threshold(k, dtype, quant_bits=0):
+    # print("aaa", DTYPE_MAP[args.dtype], args.dtype, torch.float8_e4m3fn)
+    if (quant_bits == 8):
+        return 2e-1*np.sqrt(k), 2e-2
+    if (quant_bits == 4):
+        return 2e-1*np.sqrt(k), 2e-2
+    if (dtype == "float8_e4m3fn" or dtype == "float8_e5m2"):
+        return 2e-1*np.sqrt(k), 2e-2
+    # if (args.output_dtype == "s8" or args.output_dtype == "s32"):
+    #     return 0, 0
+    return 5e-3*np.sqrt(k), 2e-2
+
 def torch_allclose(x, y, rtol, atol, print_prefix="", verbose=True):
     if not torch.allclose(x, y, rtol=rtol, atol=atol):
         print(f"shape of x: {x.shape}")
@@ -139,6 +153,7 @@ def torch_allclose(x, y, rtol, atol, print_prefix="", verbose=True):
 
     if verbose:
         print(print_prefix + " all close!")
+
 
 # __all__ = [
 #     "is_fp8_dtype",

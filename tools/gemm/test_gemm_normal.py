@@ -214,20 +214,6 @@ def perf_xop(
                 return output
     return xutil.perf_gemm(warmup_iters, iters, "xop", fn)
 
-# return atol, rtol
-def get_allclose_threshold(args, k):
-    # print("aaa", DTYPE_MAP[args.dtype], args.dtype, torch.float8_e4m3fn)
-    if (args.quant_bits == 8):
-        return 2e-1*np.sqrt(k), 2e-2
-    if (args.quant_bits == 4):
-        return 2e-1*np.sqrt(k), 2e-2
-    if (args.dtype == "float8_e4m3fn" or args.dtype == "float8_e5m2"):
-        return 2e-1*np.sqrt(k), 2e-2
-    if (args.output_dtype == "s8" or args.output_dtype == "s32"):
-        return 0, 0
-
-    return 5e-3*np.sqrt(k), 2e-2
-    
 THRESHOLD_MAP = {
     torch.float16: 10,  # 1e-1,
     torch.bfloat16: 2e-2,
@@ -375,7 +361,7 @@ def run(M, args, xop_perf, torch_perf):
 
     # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
-    atol, rtol = get_allclose_threshold(args, K)
+    atol, rtol = xutil.get_allclose_threshold(K, args.dtype, args.quant_bits)
     # print(atol, rtol)
     xutil.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
 
