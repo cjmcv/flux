@@ -84,7 +84,8 @@ public:
     ) {
     // std::cout << "Tensor input:\n" << input << std::endl;
     std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, this->output_dtype, fast_accum, transpose_weight, false);       // id + meta
-    
+    RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
+    ///////
     std::unique_ptr<RtArguments> rt_args;
     if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
       rt_args = std::make_unique<RtBlockScaleFp8ArgumentsV3>();
@@ -98,7 +99,7 @@ public:
     }
     TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, this->input_dtype, this->output_dtype, transpose_weight, rt_args.get());
     
-    if (tuning.has_value()) {
+    if (run_mode == kRunWithTuning) {
       return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
                             (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get());
     }
@@ -109,6 +110,11 @@ public:
       }
       
       int max_m = 8192;
+      if (run_mode == kRunWithHparam) {
+        int16_t *tdata = (int16_t *)tuning.value().data_ptr();
+        max_m = tdata[1];
+        // printf("set max_m = %d.\n", max_m);
+      }
       int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, max_m);
       PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
       std::vector<int32_t> shape_meta = {tuned_m, rt_args->n, rt_args->k, 1};       // mnkl + meta
@@ -186,6 +192,7 @@ public:
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
     std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, this->output_dtype, false, transpose_weight, true);     // id + meta
+    RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
 
     RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
     // PRINTF("size: %ld, %ld, %ld, %ld, %ld.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
@@ -210,7 +217,7 @@ public:
     rt_args->beta = 0.0f;
     
     bool is_tuning = false;
-    if (tuning.has_value()) {
+    if (run_mode == kRunWithTuning) {
       int16_t *data = (int16_t *)tuning.value().data_ptr();
       XOP_CHECK_EQ(data[0], 1);
       id_meta[kMetaId] = data[1];
@@ -237,7 +244,7 @@ public:
     op->initialize(rt_args, nullptr, stream);
     op->run(stream);
 
-    if (tuning.has_value()) {
+    if (run_mode == kRunWithTuning) {
       int16_t *data = (int16_t *)tuning.value().data_ptr();
       data[0] = id_meta.size();
       for (int i=0; i<id_meta.size(); i++) {

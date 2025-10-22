@@ -154,7 +154,7 @@ class GemmQuant:
                 input_scale=x_scale,
                 weight_scale=y_scale,
                 output_scale=None,
-                tuning = None,
+                tuning = tuning,
                 fast_accum=fast_accum,
             )
         else:

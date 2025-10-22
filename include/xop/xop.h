@@ -82,6 +82,12 @@ constexpr int kMaxWorldSize = 32;
 constexpr int kMaxLocalWorldSize = 8;
 enum class CommKindEnum : int8_t { IntraNode, AcrossNode, IntraNodePcie };
 
+enum RunModeEnum {
+  kRunWithNormal = 0, 
+  kRunWithTuning = 1,
+  kRunWithHparam = 2,
+};
+
 enum MetaLocEnum {
   kMetaId = 0, 
   kMetaSchema = 1,

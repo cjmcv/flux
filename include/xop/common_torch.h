@@ -146,6 +146,18 @@ struct TorchDefaultConfig {
     //   padded_input_.slice(0, 0, m).slice(1, 0, k).copy_(input);
     // }
   }
+
+  static RunModeEnum GetRunMode(c10::optional<torch::Tensor> tuning) {
+    if (tuning.has_value()) {
+      int16_t *tdata = (int16_t *)tuning.value().data_ptr();
+      if (tdata[0] == 1)
+        return kRunWithTuning;
+      else if (tdata[0] == 2) {
+        return kRunWithHparam; // max_m = tdata[1];
+      }
+    }
+    return kRunWithNormal;
+  }
 };
 
 }  // namespace xop
