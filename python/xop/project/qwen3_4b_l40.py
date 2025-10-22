@@ -47,32 +47,32 @@ class XopGemmSpecify:
             )
             self.weight_quant4_ready = False
 
-    def get_run_mode(
-        self,
-        input: torch.Tensor,
-        output: torch.Tensor
-    ) -> int:
-        
-        M = input.shape[0]
-        N = output.shape[1]
-        K = input.shape[1]
+    def get_run_mode(self, M, N, K) -> int:
         
         #######################################
         mode = 0
-        if (M >= 32):
+        if (M >= 128):
             mode = 1
-            if (M >= 1024 and ENABLE_QUANT_8 == 1):
+            if (M >= 2048 and ENABLE_QUANT_8 == 1):
                 mode = 8 
-        else:
+        elif (M <= 32):
             if (ENABLE_QUANT_4):
                 mode = 4
         #######################################
         
         # N K => max_m
         if mode == 1:
-            self.hparam[1] = 1024
+            if (N == 2560 and K == 9728) or (N == 19456 and K == 2560):
+                self.hparam[1] = 512
+            else:  # if (N == 2560 and K == 4096) or (N == 6144 and K == 2560)
+                self.hparam[1] = 1024
         elif mode == 8:
-            self.hparam[1] = 512
+            if (N == 2560 and K == 4096) or (N == 6144 and K == 2560):
+                self.hparam[1] = 1024
+            elif (N == 2560 and K == 9728):
+                self.hparam[1] = 2048
+            else:
+                self.hparam[1] = 512
             
         return mode
     
@@ -81,28 +81,34 @@ class XopGemmSpecify:
         run_mode,
         input: torch.Tensor,
         weight: torch.Tensor,
-        output: torch.Tensor,
         bias: Optional[torch.Tensor] = None
     ) -> int: 
+        output = torch.empty(input.shape[0], weight.shape[0], dtype=input.dtype, device="cuda")
+        
         if (run_mode == 0):
             assert(0)
         elif (run_mode == 1):
-            return self.gemm_normal.forward(input, weight, output, bias, 
-                                            None, None, None, 
-                                            self.hparam, self.fast_accum)
+            print("xop_noquant")
+            self.gemm_normal.forward(input, weight, output, bias, 
+                                    None, None, None, 
+                                    self.hparam, self.fast_accum)
         elif (run_mode == 8):
+            print("xop_quant8")
             if (self.weight_quant8_ready == False):
                 self.q8_y, self.q8_y_scale = self.gemm_quant8.weight_preprocess(weight, self.fast_accum)
                 self.weight_quant8_ready = True
                 
-            return self.gemm_quant8.forward(input, self.q8_y, output, bias, 
-                                           None, self.q8_y_scale, None, 
-                                           self.hparam, self.fast_accum)
+            self.gemm_quant8.forward(input, self.q8_y, output, bias, 
+                                    None, self.q8_y_scale, None, 
+                                    self.hparam, self.fast_accum)
         elif (run_mode == 4):
+            print("xop_quant4")
             if (self.weight_quant4_ready == False):
                 self.q4_y, self.q4_y_scale = self.gemm_quant4.weight_preprocess(weight, self.fast_accum)
                 self.weight_quant4_ready = True
                 
-            return self.gemm_quant4.forward(input, self.q4_y, output, bias, 
-                                           None, self.q4_y_scale, None, 
-                                           None, self.fast_accum)
+            self.gemm_quant4.forward(input, self.q4_y, output, bias, 
+                                    None, self.q4_y_scale, None, 
+                                    None, self.fast_accum)
+        
+        return output

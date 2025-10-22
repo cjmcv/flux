@@ -18,12 +18,13 @@ def main():
     print("torch: ", D, D.shape)
     
     xop_gemm_normal = XopGemmSpecify(input_dtype=torch.bfloat16, output_dtype=torch.bfloat16, fast_accum=False)
-    mode = xop_gemm_normal.get_run_mode(input=A, output=C)
+    mode = xop_gemm_normal.get_run_mode(A.shape[0], B.shape[0], A.shape[1])
     if (mode != 0):
-        xop_gemm_normal.forward(mode, input=A, weight=B, output=C)
+        C = xop_gemm_normal.forward(mode, input=A, weight=B)
+        print("Xop1 : ", C, C.shape)
     else:
         C = F.linear(A, B, None)
-    print("Xop : ", C, C.shape)
+        print("Xop0 : ", C, C.shape)
     
 if __name__ == '__main__':
     main()
