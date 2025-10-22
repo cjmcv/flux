@@ -4,13 +4,14 @@ cmake_minimum_required(VERSION 3.17)
 set(TUNING_CONFIGS
     ${CMAKE_CURRENT_LIST_DIR}/tuning_config/search_space_gemmsm80.cu
     ${CMAKE_CURRENT_LIST_DIR}/tuning_config/search_space_gemmsimtsm80.cu
-    ${CMAKE_CURRENT_LIST_DIR}/tuning_config/tuned_config_gemmsm80.cu
     #
     ${CMAKE_CURRENT_LIST_DIR}/tuning_config/search_space_gemmblockscalefp8sm89.cu
     #
     ${CMAKE_CURRENT_LIST_DIR}/tuning_config/search_space_gemmsm90.cu    
     ${CMAKE_CURRENT_LIST_DIR}/tuning_config/search_space_gemmblockscalefp8sm90.cu
     ${CMAKE_CURRENT_LIST_DIR}/tuning_config/search_space_gemmgroupedblockscalefp8sm90.cu
+    ### tuning ###
+    # ${CMAKE_CURRENT_LIST_DIR}/tuning_config/tuned_config_gemmsm80.cu
 )
 message(STATUS "TUNING_CONFIGS: ${TUNING_CONFIGS}")
 
