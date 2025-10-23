@@ -107,8 +107,8 @@ public:
   using LayoutTagD = cutlass::gemm::detail::StrideToLayoutTagC_t<StrideD>;
 
 public:
-  void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
-    RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
+  void initialize(RtArgumentsBase *args, void *fusion_args = nullptr, void *stream = nullptr) {
+    RtArgumentsV2 *rt_args = static_cast<RtArgumentsV2*>(args);
 
     // Instantiate CUTLASS kernel depending on templates
     gemm_dev_ = Gemm();

@@ -56,8 +56,8 @@ public:
       rt_args->stride_d);             // stride_d
   }
 
-  void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
-    RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
+  void initialize(RtArgumentsBase *args, void *fusion_args = nullptr, void *stream = nullptr) {
+    RtArgumentsV2 *rt_args = static_cast<RtArgumentsV2*>(args);
     gemm_dev_ = DeviceGemmSimt();
 
     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args->m, rt_args->n, rt_args->k);

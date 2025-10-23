@@ -43,8 +43,8 @@ struct TorchDefaultConfig {
     std::vector<int16_t> meta;
     meta.resize(8);
     meta[kMetaId] = -1;                                  // id
-    // (GemmNormal / GemmNormalSimt / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8)
-    meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmNormal; // schema type 
+    // (GemmNormal / GemmNormalSimt / GemmGrouped / GemmBlockScaleFp8 / GemmGroupedBlockScaleFp8 / GemmLt)
+    // meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmNormal; // schema type 
 
     meta[kMetaTypeA] = from_torch_dtype(input_dtype);  // type A
     meta[kMetaTypeB] = from_torch_dtype(input_dtype);  // type B

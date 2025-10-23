@@ -93,9 +93,11 @@ public:
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_A = input_scale.value().data_ptr();
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_B = weight_scale.value().data_ptr();
       }
+      default_schema_ = UnifiedMetaEnum::GemmBlockScaleFp8;
     }
     else {
       rt_args = std::make_unique<RtArgumentsV2>();
+      default_schema_ = UnifiedMetaEnum::GemmNormal;
     }
     TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, this->input_dtype, this->output_dtype, transpose_weight, rt_args.get());
     
@@ -130,6 +132,7 @@ public:
           return RunTorch(input, weight, output, bias);
         else {
           id_meta[kMetaId] = 0;
+          id_meta[kMetaSchema] = (int16_t)default_schema_;
         }
       }
       PRINTF("[runing normal] selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
@@ -194,15 +197,24 @@ public:
     std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, this->output_dtype, false, transpose_weight, true);     // id + meta
     RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
 
-    RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();
-    // PRINTF("size: %ld, %ld, %ld, %ld, %ld.\n", inputs.size(), weights.size(), outputs.size(), inputs_scale.value().size(), weights_scale.value().size());
-    rt_args->groups = inputs.size();
-    if (inputs_scale.has_value() && weights_scale.has_value()) {
-      for (int i=0; i < inputs_scale.value().size(); i++) {
-        rt_args->ptr_blockscale_A.push_back(inputs_scale.value()[i].data_ptr());
-        rt_args->ptr_blockscale_B.push_back(weights_scale.value()[i].data_ptr());
+    std::unique_ptr<RtGroupedArguments> rt_args;
+    if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
+      rt_args = std::make_unique<RtGroupedBlockScaleFp8ArgumentsV3>();
+      rt_args->groups = inputs.size();
+      if (inputs_scale.has_value() && weights_scale.has_value()) {
+        for (int i=0; i < inputs_scale.value().size(); i++) {
+          ((RtGroupedBlockScaleFp8ArgumentsV3 *)rt_args.get())->ptr_blockscale_A.push_back(inputs_scale.value()[i].data_ptr());
+          ((RtGroupedBlockScaleFp8ArgumentsV3 *)rt_args.get())->ptr_blockscale_B.push_back(weights_scale.value()[i].data_ptr());
+        }
       }
+      default_schema_ = UnifiedMetaEnum::GemmGroupedBlockScaleFp8;
     }
+    else {
+      rt_args = std::make_unique<RtGroupedArguments>();
+      rt_args->groups = inputs.size();
+      default_schema_ = UnifiedMetaEnum::GemmGrouped;
+    }
+
     for (int i=0; i < inputs.size(); i++) {
       rt_args->problem_sizes.push_back(inputs[i].size(0));  // m
       rt_args->problem_sizes.push_back(outputs[i].size(1)); // n
@@ -233,7 +245,12 @@ public:
       int32_t n = weights[0].size(0);
       std::vector<int32_t> shape_meta = {m, n, k, rt_args->groups};       // mnkg + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip id and schema
-      tins.GetSelectedConfig(shape_meta, &id_meta[kMetaId], &id_meta[kMetaSchema]);      
+      tins.GetSelectedConfig(shape_meta, &id_meta[kMetaId], &id_meta[kMetaSchema]);   
+      
+      if (id_meta[kMetaId] == -1) {
+          id_meta[kMetaId] = 0;
+          id_meta[kMetaSchema] = (int16_t)default_schema_;
+      }
     }
     PRINTF("selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
     GemmBase *op = ins.GetOp(id_meta, is_tuning);
@@ -241,7 +258,7 @@ public:
       return -1;
 
     cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-    op->initialize(rt_args, nullptr, stream);
+    op->initialize(rt_args.get(), nullptr, stream);
     op->run(stream);
 
     if (run_mode == kRunWithTuning) {
@@ -252,7 +269,6 @@ public:
       }
     }
 
-    delete rt_args;
     return 0;
   }
 
@@ -360,7 +376,7 @@ private:
   const c10::ScalarType output_dtype;
   const bool transpose_weight;
 
-  int16_t default_schema;
+  UnifiedMetaEnum default_schema_;
   UnifiedMetaEnum arch_;
 
   torch::Tensor padded_input_;

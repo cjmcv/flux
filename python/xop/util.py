@@ -56,7 +56,12 @@ def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
     end = time.time()
     total_time = end - start
 
-    output.zero_()
+    # Clean up and run it once to confirm the results are correct.
+    if isinstance(output, torch.Tensor):
+        output.zero_()
+    else:
+        for o in output:
+            o.zero_()
     output = fn(0)
     # print(output)
     torch.cuda.synchronize()

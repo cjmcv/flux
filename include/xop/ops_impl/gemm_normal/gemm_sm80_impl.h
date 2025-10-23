@@ -107,8 +107,8 @@ class GemmSm80Impl : public GemmBase  {
 #endif
 
 public:
-  void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
-    RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
+  void initialize(RtArgumentsBase *args, void *fusion_args = nullptr, void *stream = nullptr) {
+    RtArgumentsV2 *rt_args = static_cast<RtArgumentsV2*>(args);
 
     gemm_dev_ = DeviceGemmBasic();
     // Using the arguments, query for extra workspace required for matrix multiplication computation
@@ -228,7 +228,7 @@ private:
 //   using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<¡£¡£¡£>;
 
 // public:
-//   void initialize(RtArguments *args, void *stream = nullptr) {
+//   void initialize(RtArgumentsBase *args, void *stream = nullptr) {
 //     RtArgumentsV2 *rt_args = dynamic_cast<RtArgumentsV2*>(args);
 //     gemm_dev_ = DeviceGemmBasic();
 //     // Using the arguments, query for extra workspace required for matrix multiplication computation
@@ -250,7 +250,7 @@ private:
 //   }
 
 // private:
-//   typename DeviceGemmBasic::Arguments args_from_options(const RtArguments *rt_args) {
+//   typename DeviceGemmBasic::Arguments args_from_options(const RtArgumentsBase *rt_args) {
 //     return typename DeviceGemmBasic::Arguments(
 //       ...
 //     )}

@@ -97,8 +97,8 @@ public:
   using UlyProblemShape = typename ProblemShape::UnderlyingProblemShape;
 
 public:
-  void initialize(RtArguments *args, void *fusion_args = nullptr, void *stream = nullptr) {
-    RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = dynamic_cast<RtGroupedBlockScaleFp8ArgumentsV3*>(args);
+  void initialize(RtArgumentsBase *args, void *fusion_args = nullptr, void *stream = nullptr) {
+    RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = static_cast<RtGroupedBlockScaleFp8ArgumentsV3*>(args);
 
     static_assert(cute::is_same_v<ElementAccumulator, ElementBlockScale>,
       "ElementAccumulator and ElementBlockScale should be same datatype");

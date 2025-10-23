@@ -76,9 +76,11 @@ public:
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_A = input_scale.value().data_ptr();
         ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_B = weight_scale.value().data_ptr();
       }
+      default_schema_ = UnifiedMetaEnum::GemmBlockScaleFp8;
     }
     else {
       rt_args = std::make_unique<RtArgumentsV2>();
+      default_schema_ = UnifiedMetaEnum::GemmNormal;
     }
     TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, this->input_dtype, this->output_dtype, transpose_weight, rt_args.get());
     
@@ -116,6 +118,7 @@ public:
       // If the required configuration is not registered in the tuning config, directly use torch for computation.
       if (id_meta[kMetaId] == -1) {
         id_meta[kMetaId] = 0;
+        id_meta[kMetaSchema] = (int16_t)default_schema_;
       }
       PRINTF("[runing comm] selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
       GemmConfigRegister& ins = GemmConfigRegister::instance();

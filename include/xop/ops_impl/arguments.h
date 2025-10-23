@@ -3,7 +3,8 @@
 #include <cstdint>
 namespace xop {
 
-struct RtArguments {
+struct RtArgumentsBase {};
+struct RtArguments : public RtArgumentsBase {
   int m;
   int n;
   int k;
@@ -45,15 +46,20 @@ struct RtBlockScaleFp8ArgumentsV3 : public RtArguments {
   void *d_abs_max_D;
 };
 
-struct RtGroupedBlockScaleFp8ArgumentsV3 : public RtArguments {
+struct RtGroupedArguments : public RtArgumentsBase {
   int groups;
   std::vector<int32_t> problem_sizes; // mnk,mnk,mnk...
 
   std::vector<void const *> ptr_A;
   std::vector<void const *> ptr_B;
   std::vector<void const *> ptr_C;
-  std::vector<void *> ptr_D;  
+  std::vector<void *> ptr_D;
 
+  float alpha;
+  float beta;
+};
+
+struct RtGroupedBlockScaleFp8ArgumentsV3 : public RtGroupedArguments {
   std::vector<void const *> ptr_blockscale_A;
   std::vector<void const *> ptr_blockscale_B;
 };

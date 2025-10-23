@@ -61,6 +61,7 @@ def perf_torch(
     iters: int,
     problem_cnt: int,
     output_dtype: torch.dtype,
+    num_groups: int,
 ):
     alpha_scale = 1.0
     if is_fp8:
@@ -69,10 +70,16 @@ def perf_torch(
             inputs[i] = inputs[i].to(torch.bfloat16)
         for i in range(len(weights)):
             weights[i] = weights[i].to(torch.bfloat16)
-
+    
     def fn(iter_id):
         problem_idx = iter_id%problem_cnt
-        if is_s8_dequant:
+        if num_groups != -1:
+            output = []
+            input_list = [inputs[(iter_id+i) % problem_cnt] for i in range(num_groups)]
+            weight_list = [weights[(iter_id+i) % problem_cnt] for i in range(num_groups)]
+            for i in range(len(input_list)):
+                output.append(torch.nn.functional.linear(input_list[i], weight_list[i], bias))
+        elif is_s8_dequant:
             accum = matmul_int8(inputs[problem_idx], weights[problem_idx].t()).to(torch.float32)
             output = input_scale * weight_scale * accum
             output = output.to(torch.bfloat16)
@@ -102,6 +109,7 @@ def perf_xop(
     problem_cnt: int,
     output_dtype: torch.dtype,
     fast_accum: bool,
+    num_groups: int,
     quant_bits: int,
 ):
     m = inputs[0].size(0)
@@ -158,6 +166,26 @@ def perf_xop(
                 fast_accum=fast_accum,
             )
             return output
+    elif (num_groups != -1):
+        op = xop.GemmNormal(
+            input_dtype=inputs[0].dtype,
+            output_dtype=output_dtype,
+            transpose_weight=transpose_weight
+        )
+        
+        output_list = [output.clone() for _ in range(num_groups)]
+        def fn(iter_id):
+            input_list = [inputs[(iter_id+i) % problem_cnt] for i in range(num_groups)]
+            weight_list = [weights[(iter_id+i) % problem_cnt] for i in range(num_groups)]
+            op.grouped_forward(
+                inputs=input_list,
+                weights=weight_list,
+                outputs=output_list,
+                inputs_scale=None,
+                weights_scale=None,
+                tuning = None,
+            )
+            return output_list
     else:
         op = xop.GemmNormal(
             input_dtype=inputs[0].dtype,
@@ -275,29 +303,10 @@ def run(M, args, xop_perf, torch_perf):
 
             inputs_scale.append(x_scale)
             weights_scale.append(y_scale.clone().contiguous())
-            
-            # for i in range(100):
-            #     xop_gemm = xop.GemmNormal(
-            #         input_dtype=torch.float8_e4m3fn,
-            #         output_dtype=output_dtype,
-            #         transpose_weight=False
-            #     )
-            #     out_xop = torch.empty((M, N), device="cuda", dtype=output_dtype)
-
-            #     xop_gemm.forward(
-            #         x_fp8.clone(),
-            #         y_fp8.clone(),
-            #         output=out_xop,
-            #         bias=None,
-            #         input_scale=xt_scale.clone(),
-            #         weight_scale=yt_scale.clone(),
-            #         output_scale=None,
-            #         tuning = None,
-            #         fast_accum=False,
-            #     )
-            #     print(out_xop)
     else:
         for i in range(problem_count):
+            # inputs.append(torch.ones((M, K), device="cuda", dtype=dtype))
+            # weights.append(torch.ones((N, K), device="cuda", dtype=dtype))
             inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
             weights.append(xutil.rand_tensor((N, K), dtype=dtype))
             inputs_scale.append(None)
@@ -323,6 +332,7 @@ def run(M, args, xop_perf, torch_perf):
         problem_count, 
         output_dtype,
         args.fast_accum,
+        args.num_groups,
         args.quant_bits,
     )
     
@@ -339,6 +349,7 @@ def run(M, args, xop_perf, torch_perf):
             args.iters,
             problem_count,
             output_dtype,
+            args.num_groups,
         )
     else:
         fp8_org_inputs[0] 
@@ -355,10 +366,16 @@ def run(M, args, xop_perf, torch_perf):
     print(perf_result_torch)
     print(perf_result_xop)
 
-    xop_output = perf_result_xop.output
-    torch_output = perf_result_torch.output
+    if isinstance(perf_result_xop, torch.Tensor):
+        xop_output = perf_result_xop.output
+        torch_output = perf_result_torch.output
+    else: # list
+        xop_output = torch.cat(perf_result_xop.output, dim=0)
+        torch_output = torch.cat(perf_result_torch.output, dim=0)
     print(xop_output.dtype, torch_output.dtype)
 
+    print(xop_output)
+    print(torch_output)
     # is_bitwise_match = xop.bitwise_check(xop_output, torch_output)
     # print("is bitwise match: ", is_bitwise_match)
     atol, rtol = xutil.get_allclose_threshold(K, args.dtype, args.quant_bits)
@@ -373,6 +390,7 @@ def parse_args():
     parser.add_argument("M", type=int)
     parser.add_argument("N", type=int)
     parser.add_argument("K", type=int)
+    parser.add_argument("--num_groups", default=-1, type=int, help="whether to use GemmGrouped.")
     parser.add_argument("--quant_bits", default=-1, type=int, help="whether to use GemmQuant.")
     parser.add_argument("--step", default=5, type=int, help="m step")
     parser.add_argument("--warmup_iters", default=10, type=int, help="perf warmup iterations")
@@ -401,6 +419,7 @@ def parse_args():
 
     return parser.parse_args()
 
+# python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --num_groups 4
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8 --dtype=float16 --output_dtype=float16
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --show_ms
