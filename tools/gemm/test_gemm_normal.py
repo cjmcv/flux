@@ -356,22 +356,23 @@ def run(M, args, xop_perf, torch_perf):
         output = torch.nn.functional.linear(fp8_org_inputs[0] , fp8_org_weights[0])
         perf_result_torch = xutil.PerfResult(name="torch.sim", output=output, gemm_time_ms=10000)
 
-    if args.show_ms:
-        xop_perf.append(perf_result_xop.gemm_time_ms)
-        torch_perf.append(perf_result_torch.gemm_time_ms)
-    else:
-        xop_perf.append(xutil.calculate_tflops(M,N,K, perf_result_xop.gemm_time_ms))
-        torch_perf.append(xutil.calculate_tflops(M,N,K, perf_result_torch.gemm_time_ms))
-
-    print(perf_result_torch)
-    print(perf_result_xop)
-
-    if isinstance(perf_result_xop, torch.Tensor):
+    if isinstance(perf_result_xop.output, torch.Tensor):
         xop_output = perf_result_xop.output
         torch_output = perf_result_torch.output
+        xop_perf['tflops'].append(xutil.calculate_tflops(M,N,K, perf_result_xop.gemm_time_ms))
+        torch_perf['tflops'].append(xutil.calculate_tflops(M,N,K, perf_result_torch.gemm_time_ms))
     else: # list
         xop_output = torch.cat(perf_result_xop.output, dim=0)
         torch_output = torch.cat(perf_result_torch.output, dim=0)
+        xop_perf['tflops'].append(xutil.calculate_tflops(M,N,K, perf_result_xop.gemm_time_ms) * len(perf_result_xop.output))
+        torch_perf['tflops'].append(xutil.calculate_tflops(M,N,K, perf_result_torch.gemm_time_ms) * len(perf_result_torch.output))
+        
+    xop_perf['ms'].append(perf_result_xop.gemm_time_ms)
+    torch_perf['ms'].append(perf_result_torch.gemm_time_ms)        
+        
+    print(perf_result_torch)
+    print(perf_result_xop)
+    
     print(xop_output.dtype, torch_output.dtype)
 
     print(xop_output)
@@ -432,8 +433,8 @@ if __name__ == "__main__":
     init_seed()
     args = parse_args()
 
-    xop_perf = []
-    torch_perf = []
+    xop_perf = {'ms': [], 'tflops': []} 
+    torch_perf = {'ms': [], 'tflops': []} 
     print(f"M: {1}, N: {args.N}, K: {args.K}")
     run(1, args, xop_perf, torch_perf)
 
@@ -453,9 +454,13 @@ if __name__ == "__main__":
         plot_x = range(len(plot_x_value))
         plt.xticks(plot_x, plot_x_value, rotation=45)
 
-    print("xop_perf:", xop_perf)
-    plt.plot(plot_x, xop_perf, label='xop', marker='o', markersize=3)
-    plt.plot(plot_x, torch_perf, label='torch', marker='s', markersize=3)
+    print("xop_perf  [tflops]:", xop_perf['tflops'])
+    print("torch_perf[tflops]:", torch_perf['tflops'])
+    print("xop_perf  [ms]:", xop_perf['ms'])
+    print("torch_perf[ms]:", torch_perf['ms'])
+    
+    plt.plot(plot_x, xop_perf['tflops'], label='xop', marker='o', markersize=3)
+    plt.plot(plot_x, torch_perf['tflops'], label='torch', marker='s', markersize=3)
     
     # plt.ylim(bottom=0)  # 
 
