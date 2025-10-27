@@ -81,8 +81,11 @@ include_directories(${COMMON_HEADER_DIRS})
 # add_executable(37_gemm_layernorm_gemm_fusion 37_gemm_layernorm_gemm_fusion/gemm_layernorm.cu)
 # target_link_libraries(37_gemm_layernorm_gemm_fusion PUBLIC xop)
 
-add_executable(gemm_grouped 24_gemm_grouped/gemm_grouped.cu)
-target_link_libraries(gemm_grouped PUBLIC xop)
+# add_executable(gemm_grouped 24_gemm_grouped/gemm_grouped.cu)
+# target_link_libraries(gemm_grouped PUBLIC xop)
+
+add_executable(55_hopper_int4_bf16_gemm 55_hopper_mixed_dtype_gemm/55_hopper_int4_bf16_gemm.cu)
+target_link_libraries(55_hopper_int4_bf16_gemm PUBLIC xop)
 
 ##
 
