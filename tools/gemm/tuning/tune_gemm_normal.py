@@ -63,6 +63,28 @@ class GemmBlockScaleFp8Sm89Schema:
         # output = torch.matmul(input, weight.t())
         # return output.cpu()
         return None
+
+class GemmSm90Schema:
+    name = "GemmSm90"
+    sub_schema = [Meta.GemmNormal] # GemmNormalSimt, Meta.GemmLt
+    # test_input_dtype = torch.float16
+    # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
+    if is_use_fp16_acc:
+        test_input_dtype = torch.float16
+        space_dtype = [(torch.float16,torch.float16,torch.float16)]
+    else:
+        test_input_dtype = torch.bfloat16
+        space_dtype = [(torch.bfloat16,torch.bfloat16,torch.bfloat16)]
+    def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
+        return input, None, weight, None
+    def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
+                       input_scale: torch.Tensor, weight_scale: torch.Tensor,
+                       bias: torch.Tensor):
+        output = torch.matmul(input, weight.t())
+        if (bias != None):
+            output += bias
+        return output.cpu()
+    
 class GemmBlockScaleFp8Sm90Schema:
     impl = "GemmBlockScaleFp8Sm90"
     sub_schema = [Meta.GemmBlockScaleFp8]
@@ -112,6 +134,7 @@ def str2schema(schema_name):
     string_to_schema = {
         "GemmSm80": GemmSm80Schema(),
         "GemmBlockScaleFp8Sm89": GemmBlockScaleFp8Sm89Schema(),
+        "GemmSm90": GemmSm90Schema(),
         "GemmBlockScaleFp8Sm90": GemmBlockScaleFp8Sm90Schema(),
         "GemmGroupedBlockScaleFp8Sm90": GemmGroupedBlockScaleFp8Sm90Schema(),
     }
@@ -268,7 +291,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmSm80 (GemmSm80(GemmNormalSimt) / GemmBlockScaleFp8Sm89 / GemmBlockScaleFp8Sm90 / GemmGroupedBlockScaleFp8Sm90)")
+        print("usage: python3 tools/gemm/tuning/tune_gemm_normal.py --schema=GemmSm80 (GemmSm80(GemmNormalSimt) / GemmBlockScaleFp8Sm89 / GemmSm90 / GemmBlockScaleFp8Sm90 / GemmGroupedBlockScaleFp8Sm90)")
         exit()
 
     if args.output_path and not os.path.isdir(args.output_path):
