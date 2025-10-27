@@ -9,6 +9,7 @@ struct RtArguments : public RtArgumentsBase {
   int n;
   int k;
   int l; // batch
+  int g;
 
   void *ptr_A;
   void *ptr_B;
@@ -29,14 +30,11 @@ struct RtArgumentsV2 : public RtArguments {
   int stride_d;
 };
 
-struct RtBlockScaleFp8ArgumentsV3 : public RtArguments {
-  std::vector<int32_t> problem_sizes; // mnk,mnk,mnk...
-  int groups;
-  
+struct RtBlockScaleArguments : public RtArguments {
   float scale_a = 1.f, scale_b = 1.f, scale_c = 1.f, scale_d = 1.f, scale_aux = 1.f;
 
-  void *d_blockscale_A;
-  void *d_blockscale_B;
+  void *ptr_blockscale_A;
+  void *ptr_blockscale_B;
 
   // debug
   bool save_aux;

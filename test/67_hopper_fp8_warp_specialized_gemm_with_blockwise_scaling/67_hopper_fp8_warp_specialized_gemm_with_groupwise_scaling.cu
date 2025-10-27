@@ -748,7 +748,7 @@ int run(Options<RasterOrderOptions> &options) {
 int run2(Options<RasterOrderOptions> &options) {  
   using GemmFp8Impl = GemmBlockScaleFp8Sm90Impl<ElementA,ElementB,ElementC,float,LayoutA,LayoutB,LayoutC, cutlass::arch::Sm90, cutlass::gemm::PersistentScheduler, TileShape, Shape<_1,_2,_1>, RasterOrderOptions::AlongN, 2>;
 
-  RtBlockScaleFp8ArgumentsV3 rt_args;
+  RtBlockScaleArguments rt_args;
   {
     rt_args.m = options.m;
     rt_args.n = options.n;

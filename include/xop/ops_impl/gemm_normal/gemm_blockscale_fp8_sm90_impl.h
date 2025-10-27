@@ -94,7 +94,7 @@ public:
 
 public:
   void initialize(RtArgumentsBase *args, void *fusion_args = nullptr, void *stream = nullptr) {
-    RtBlockScaleFp8ArgumentsV3 *rt_args = static_cast<RtBlockScaleFp8ArgumentsV3*>(args);
+    RtBlockScaleArguments *rt_args = static_cast<RtBlockScaleArguments*>(args);
 
     static_assert(cute::is_same_v<ElementAccumulator, ElementBlockScale>,
       "ElementAccumulator and ElementBlockScale should be same datatype");
@@ -125,7 +125,7 @@ public:
   }
 
 private:
-  typename Gemm::Arguments args_from_options(const RtBlockScaleFp8ArgumentsV3 *rt_args)
+  typename Gemm::Arguments args_from_options(const RtBlockScaleArguments *rt_args)
   {
     StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(rt_args->m, rt_args->k, rt_args->l));
     StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(rt_args->n, rt_args->k, rt_args->l));
@@ -142,9 +142,9 @@ private:
       stride_A,
       (ElementB *)rt_args->ptr_B,
       stride_B,
-      (ElementBlockScale *)rt_args->d_blockscale_A, // blockscale_tensor_A.device_data(),
+      (ElementBlockScale *)rt_args->ptr_blockscale_A, // blockscale_tensor_A.device_data(),
       layout_SFA,
-      (ElementBlockScale *)rt_args->d_blockscale_B, // blockscale_tensor_B.device_data()
+      (ElementBlockScale *)rt_args->ptr_blockscale_B, // blockscale_tensor_B.device_data()
       layout_SFB,
       },
       {

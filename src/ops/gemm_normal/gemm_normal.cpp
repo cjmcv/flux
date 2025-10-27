@@ -88,10 +88,10 @@ public:
     ///////
     std::unique_ptr<RtArguments> rt_args;
     if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
-      rt_args = std::make_unique<RtBlockScaleFp8ArgumentsV3>();
+      rt_args = std::make_unique<RtBlockScaleArguments>();
       if (input_scale.has_value() && weight_scale.has_value()) {
-        ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_A = input_scale.value().data_ptr();
-        ((RtBlockScaleFp8ArgumentsV3 *)rt_args.get())->d_blockscale_B = weight_scale.value().data_ptr();
+        ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_A = input_scale.value().data_ptr();
+        ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_B = weight_scale.value().data_ptr();
       }
       default_schema_ = UnifiedMetaEnum::GemmBlockScaleFp8;
     }

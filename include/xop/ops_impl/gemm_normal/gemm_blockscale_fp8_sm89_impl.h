@@ -18,19 +18,19 @@ class GemmBlockScaleFp8Sm89Impl : public GemmBase {
   using Gemm = device::AdaBlockwiseGemm<KT>;
 
 public:
-  typename Gemm::Arguments args_from_options(RtBlockScaleFp8ArgumentsV3 *rt_args) {
+  typename Gemm::Arguments args_from_options(RtBlockScaleArguments *rt_args) {
     cutlass::gemm::GemmCoord problem_size = {rt_args->m, rt_args->n, rt_args->k};
     return typename Gemm::Arguments (
       problem_size, 
       rt_args->ptr_A, 
       rt_args->ptr_B, 
       rt_args->ptr_D, 
-      (float const* )rt_args->d_blockscale_A, 
-      (float const* )rt_args->d_blockscale_B);
+      (float const* )rt_args->ptr_blockscale_A, 
+      (float const* )rt_args->ptr_blockscale_B);
   }
   
   void initialize(RtArgumentsBase *args, void *fusion_args = nullptr, void *stream = nullptr) {
-    RtBlockScaleFp8ArgumentsV3 *rt_args = static_cast<RtBlockScaleFp8ArgumentsV3*>(args);
+    RtBlockScaleArguments *rt_args = static_cast<RtBlockScaleArguments*>(args);
     gemm_dev_ = Gemm();
 
     auto arguments = args_from_options(rt_args);

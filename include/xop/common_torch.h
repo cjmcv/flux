@@ -129,6 +129,7 @@ struct TorchDefaultConfig {
     rt_args->n = n;
     rt_args->k = k;
     rt_args->l = 1;
+    rt_args->g = 1;
     // rt_args->ptr_A = padded_input_.data_ptr();
     rt_args->ptr_A = input.data_ptr();
     rt_args->ptr_B = weight.data_ptr();

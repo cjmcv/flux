@@ -105,7 +105,9 @@
 #include "cutlass/util/reference/device/tensor_compare.h"
 #include "cutlass/util/mixed_dtype_utils.hpp"
 
-#include "helper.h"
+// #include "helper.h"
+#include "xop/common_cuda.h"
+#include "xop/ops_impl/common_cutlass.h"
 #include "mixed_dtype_utils.hpp"
 
 using namespace cute;
@@ -151,7 +153,7 @@ using ElementZero = ElementScale;
 using LayoutScale = cutlass::layout::RowMajor;
 
 // C/D matrix configuration
-using         ElementC    = cutlass::half_t;                                // Element type for C and D matrix operands
+using         ElementC    = cutlass::bfloat16_t;                                // Element type for C and D matrix operands
 using         LayoutC     = cutlass::layout::RowMajor;                      // Layout type for C and D matrix operands
 constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 
