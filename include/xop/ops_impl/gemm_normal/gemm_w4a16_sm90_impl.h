@@ -11,30 +11,30 @@
 #include "cutlass/gemm/kernel/tile_scheduler_params.h"
 #include "cutlass/epilogue/dispatch_policy.hpp"
 #include "cutlass/epilogue/collective/collective_builder.hpp"
+#include "cutlass/util/mixed_dtype_utils.hpp" // cutlass::compute_memory_reordering_atom
 #include "cutlass/util/packed_stride.hpp"
 
 namespace xop {
 
-template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
-          class LayoutA, class LayoutB, class LayoutC,
-          class ArchTag, class TileShape, class ClusterShape, 
-          class MainloopScheduleType, class EpilogueScheduleType, class TileScheduler>
+template <class ElementA, class ElementC, 
+          class ArchTag, class TileShapetemp0, class ClusterShape, 
+          class KernelSchedule, class EpilogueSchedule>
 
 class GemmW4A16Sm90Impl : public GemmBase {
 public:
-  using MmaType = cutlass::bfloat16_t;
+  using MmaType = ElementA;
   using QuantType = cutlass::int4b_t;
-  constexpr int TileShapeK = 128 * 8 / sizeof_bits<MmaType>::value;
+  static constexpr int TileShapeK = 128 * 8 / cutlass::sizeof_bits<MmaType>::value;
 
   // A matrix configuration
-  using         ElementA    = MmaType;                                        // Element type for A matrix operand
+  // using         ElementA    = MmaType;                                        // Element type for A matrix operand
   using         LayoutA     = cutlass::layout::RowMajor;                      // Layout type for A matrix operand
-  constexpr int AlignmentA  = 128 / cutlass::sizeof_bits<ElementA>::value;    // Memory access granularity/alignment of A matrix in units of elements (up to 16 bytes)
+  static constexpr int AlignmentA  = 128 / cutlass::sizeof_bits<ElementA>::value;    // Memory access granularity/alignment of A matrix in units of elements (up to 16 bytes)
 
   // B matrix configuration
   using         ElementB    = QuantType;                                      // Element type for B matrix operand
   using         LayoutB     = cutlass::layout::ColumnMajor;                   // Layout type for B matrix operand
-  constexpr int AlignmentB  = 128 / cutlass::sizeof_bits<ElementB>::value;    // Memory access granularity/alignment of B matrix in units of elements (up to 16 bytes)
+  static constexpr int AlignmentB  = 128 / cutlass::sizeof_bits<ElementB>::value;    // Memory access granularity/alignment of B matrix in units of elements (up to 16 bytes)
 
   // This example manually swaps and transposes, so keep transpose of input layouts
   using LayoutA_Transpose = typename cutlass::layout::LayoutTranspose<LayoutA>::type;
@@ -47,39 +47,39 @@ public:
   // LayoutAtomQuant places values that will be read by the same thread in contiguous locations in global memory.
   // It specifies the reordering within a single warp's fragment
   //using ValueShuffle = Layout<_1>;                          // no value reordering
-  using ValueShuffle = Layout<Shape<_2,_4>, Stride<_4,_1>>; // order [0,2,4,6,1,3,5,7]
-  int constexpr NumShuffleAtoms = 1;
-  using MmaAtomShape = Layout<Shape<_1,Int<NumShuffleAtoms>>>;
+  using ValueShuffle = cutlass::Layout<cutlass::Shape<cute::_2,cute::_4>, cutlass::Stride<cute::_4,cute::_1>>; // order [0,2,4,6,1,3,5,7]
+  static constexpr int NumShuffleAtoms = 1;
+  using MmaAtomShape = cutlass::Layout<cutlass::Shape<cute::_1,cute::Int<NumShuffleAtoms>>>;
   using LayoutAtomQuant = decltype(cutlass::compute_memory_reordering_atom<MmaType, MmaAtomShape, ValueShuffle>());
-  using LayoutB_Reordered = decltype(cute::tile_to_shape(LayoutAtomQuant{}, Layout<Shape<int,int,int>, StrideB>{}));
+  using LayoutB_Reordered = decltype(cute::tile_to_shape(LayoutAtomQuant{}, cutlass::Layout<cutlass::Shape<int,int,int>, StrideB>{}));
 
   using ElementScale = MmaType;
   using ElementZero = ElementScale;
   using LayoutScale = cutlass::layout::RowMajor;
 
   // C/D matrix configuration
-  using         ElementC    = cutlass::bfloat16_t;                                // Element type for C and D matrix operands
+  // using         ElementC    = cutlass::bfloat16_t;                                // Element type for C and D matrix operands
   using         LayoutC     = cutlass::layout::RowMajor;                      // Layout type for C and D matrix operands
-  constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
+  static constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 
   // D matrix configuration
   using         ElementD    = ElementC;
   using         LayoutD     = LayoutC;
-  constexpr int AlignmentD  = 128 / cutlass::sizeof_bits<ElementD>::value;
+  static constexpr int AlignmentD  = 128 / cutlass::sizeof_bits<ElementD>::value;
 
   // Core kernel configurations
   using ElementAccumulator  = float;                                          // Element type for internal accumulation
   using ElementCompute      = float;                                          // Element type for epilogue computation
-  using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
+  // using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
-  using TileShape           = Shape<_128,_128,cute::Int<TileShapeK>>;         // Threadblock-level tile size
-  using ClusterShape        = Shape<_1,_1,_1>;                                // Shape of the threadblocks in a cluster
-  using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperative;  // Kernel to launch based on the default setting in the Collective Builder 
-  using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
+  using TileShape           = cutlass::Shape<cute::_128,cute::_128,cute::Int<TileShapeK>>;         // Threadblock-level tile size
+  // using ClusterShape        = cutlass::Shape<cute::_1,cute::_1,cute::_1>;                                // Shape of the threadblocks in a cluster
+  // using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperative;  // Kernel to launch based on the default setting in the Collective Builder 
+  // using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
 
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
-      cutlass::arch::Sm90, cutlass::arch::OpClassTensorOp,
+      ArchTag, cutlass::arch::OpClassTensorOp,
       TileShape, ClusterShape,
       EpilogueTileType,
       ElementAccumulator, ElementAccumulator,
@@ -105,17 +105,18 @@ public:
     >::CollectiveOp;
 
   using GemmKernelScaleOnlyShuffled = cutlass::gemm::kernel::GemmUniversal<
-      Shape<int,int,int,int>, // Indicates ProblemShape
+      cute::Shape<int,int,int,int>, // Indicates ProblemShape
       CollectiveMainloopScaleOnlyShuffled,
       CollectiveEpilogue
     >;
 
-  using GemmScaleOnlyShuffled = cutlass::gemm::device::GemmUniversalAdapter<GemmKernelScaleOnlyShuffled>;
+  using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernelScaleOnlyShuffled>; // GemmScaleOnlyShuffled
+  
+  using StrideS = typename CollectiveMainloopScaleOnlyShuffled::StrideScale;
+  using StrideC = typename GemmKernelScaleOnlyShuffled::StrideC;
+  using StrideD = typename GemmKernelScaleOnlyShuffled::StrideD;
   ////////////////
-
-  using StrideC = typename GemmKernelScaleOnly::StrideC;
-  using StrideD = typename GemmKernelScaleOnly::StrideD;
-
+  
 public:
   void initialize(RtArgumentsBase *args, void *fusion_args = nullptr, void *stream = nullptr) {
     RtBlockScaleArguments *rt_args = static_cast<RtBlockScaleArguments*>(args);
@@ -147,61 +148,50 @@ public:
 
 private:
   typename Gemm::Arguments args_from_options(const RtBlockScaleArguments *rt_args) {
-    ProblemShapeType problem_size = ProblemShapeType{rt_args->m, rt_args->n, rt_args->k, rt_args->l};
-    auto shape_B = cute::make_shape(rt_args->n, rt_args->k, rt_args->l);
-    int const scale_k = cutlass::ceil_div(rt_args->k, rt_args->g);
-    StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(rt_args->m, rt_args->k, rt_args->l));
+    const int m = rt_args->m;
+    const int n = rt_args->n;
+    const int k = rt_args->k;
+    const int l = rt_args->l;
+    const int g = rt_args->g;
+
+    // ProblemShapeType problem_size = ProblemShapeType{m, n, k, l};
+    auto shape_B = cute::make_shape(n, k, l);
+    int const scale_k = cutlass::ceil_div(k, g);
+    StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(m, k, l));
     StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, shape_B);
+    StrideS stride_S = cutlass::make_cute_packed_stride(StrideS{}, cute::make_shape(n, scale_k, l));
     // Reverse stride here due to swap and transpose
-    StrideC stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(rt_args->n, rt_args->m, rt_args->l));
-    StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(rt_args->n, rt_args->m, rt_args->l));
+    StrideC stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(n, m, l));
+    StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(n, m, l));
     
     auto layout_B = make_layout(shape_B, stride_B);
-    if (true) { // shuffle
+
+    LayoutB_Reordered layout_B_reordered;
+    if (false) { // shuffle
       // Repeat the reorder layout atom to tile the whole tensor shape 
       layout_B_reordered = cute::tile_to_shape(LayoutAtomQuant{}, shape_B);
-      cutlass::reorder_tensor(block_B.get(), layout_B, layout_B_reordered);
+      cutlass::reorder_tensor((ElementScale *)rt_args->ptr_blockscale_B, layout_B, layout_B_reordered);
     }
 
-    // Change device_id to another value if you are running on a machine with multiple GPUs and wish
-    // to use a GPU other than that with device ID 0.
-    cutlass::KernelHardwareInfo hw_info;
-    hw_info.device_id = 0;
-    hw_info.sm_count = cutlass::KernelHardwareInfo::query_device_multiprocessor_count(hw_info.device_id);
+    using Args = typename Gemm::Arguments;
+    auto&& dB = [&]() {
+      return layout_B_reordered; // offline swizzling is enabled.
+      // if constexpr (cute::is_same_v<Gemm, GemmScaleOnlyShuffled> ||
+      //               cute::is_same_v<Gemm, GemmScaleWithZeroPointShuffled>) {
+      //   // offline swizzling is enabled.
+      //   return layout_B_reordered;
+      // }
+      // else {
+      //   return stride_B;
+      // }
+    }();
 
     typename Gemm::Arguments arguments{
       cutlass::gemm::GemmUniversalMode::kGemm,
-      problem_size,
-      {(ElementA *)rt_args->ptr_A, stride_A, (ElementB *)rt_args->ptr_B, stride_B},
-      {{}, // epilogue.thread
-      (ElementC *)rt_args->ptr_C, stride_C, (ElementD *)rt_args->ptr_D, stride_D},
-      hw_info
+      {n, m, k, l},
+      {(ElementB *)rt_args->ptr_B, dB, (ElementA *)rt_args->ptr_A, stride_A, (ElementScale *)rt_args->ptr_blockscale_B, stride_S, g},
+      {{rt_args->alpha, rt_args->beta}, (ElementC *)rt_args->ptr_C, stride_C, (ElementD *)rt_args->ptr_D, stride_D}
     };
-
-    // Custom EVT fusions will have nested unnamed args, the structure of which
-    // can be deduced from the type definition of the EVT.
-    // Each node's arguments has the recursive structure of
-    // {first_child_args, ..., last_child_args, op_args},
-    // For more complex examples of EVT initialization please refer to
-    // include/cutlass/epilogue/fusion/sm90_callbacks_tma_warpspecialized.hpp
-    if constexpr (UseCustomEVT) {
-      arguments.epilogue.thread =
-        {    // ternary op : beta * C + (alpha * acc)
-          {{rt_args->beta}}, // leaf op+args : beta
-          {},               // leaf op+args : C
-          {                 // binary op : alpha * acc
-            {{rt_args->alpha}}, // leaf op+args : alpha
-            {},                // leaf op+args : acc
-            {}              // binary args : multiplies
-          },                // end binary op
-          {} // ternary args : multiply_add
-        };   // end ternary op
-    }
-    // Pre-defined fusions will have flat, named args for user-friendlyness
-    else {
-      arguments.epilogue.thread.alpha = rt_args->alpha;
-      arguments.epilogue.thread.beta = rt_args->beta;
-    }
 
     return arguments;
   }

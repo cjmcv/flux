@@ -84,7 +84,7 @@ include_directories(${COMMON_HEADER_DIRS})
 # add_executable(gemm_grouped 24_gemm_grouped/gemm_grouped.cu)
 # target_link_libraries(gemm_grouped PUBLIC xop)
 
-add_executable(55_hopper_int4_bf16_gemm 55_hopper_mixed_dtype_gemm/55_hopper_int4_bf16_gemm.cu)
+add_executable(55_hopper_int4_bf16_gemm 55_hopper_mixed_dtype_gemm/55_quant_dequant.cu) # 55_hopper_int4_bf16_gemm
 target_link_libraries(55_hopper_int4_bf16_gemm PUBLIC xop)
 
 ##

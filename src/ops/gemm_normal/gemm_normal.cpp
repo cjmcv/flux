@@ -86,21 +86,9 @@ public:
     std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, this->output_dtype, fast_accum, transpose_weight, false);       // id + meta
     RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
     ///////
-    std::unique_ptr<RtArguments> rt_args;
-    if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
-      rt_args = std::make_unique<RtBlockScaleArguments>();
-      if (input_scale.has_value() && weight_scale.has_value()) {
-        ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_A = input_scale.value().data_ptr();
-        ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_B = weight_scale.value().data_ptr();
-      }
-      default_schema_ = UnifiedMetaEnum::GemmBlockScaleFp8;
-    }
-    else {
-      rt_args = std::make_unique<RtArgumentsV2>();
-      default_schema_ = UnifiedMetaEnum::GemmNormal;
-    }
-    TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, this->input_dtype, this->output_dtype, transpose_weight, rt_args.get());
-    
+    std::unique_ptr<RtArguments> rt_args = TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, 
+                                                                             this->input_dtype, this->output_dtype, transpose_weight, &default_schema_);
+
     if (run_mode == kRunWithTuning) {
       return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
                             (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get());
@@ -110,7 +98,6 @@ public:
       if (rt_args->n%8 != 0 || rt_args->k%8 != 0) {
         return RunTorch(input, weight, output, bias);
       }
-      
       int max_m = 8192;
       if (run_mode == kRunWithHparam) {
         int16_t *tdata = (int16_t *)tuning.value().data_ptr();
@@ -119,7 +106,7 @@ public:
       }
       int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, max_m);
       PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
-      std::vector<int32_t> shape_meta = {tuned_m, rt_args->n, rt_args->k, 1};       // mnkl + meta
+      std::vector<int32_t> shape_meta = {tuned_m, rt_args->n, rt_args->k, rt_args->g};       // mnkl/g + meta
       shape_meta.insert(shape_meta.end(), id_meta.begin()+2, id_meta.end());     // skip 2 (id + schema)
       
       cublasLtMatmulAlgo_t algo;

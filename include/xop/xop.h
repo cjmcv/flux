@@ -71,7 +71,8 @@ class CheckFail {
 // 算子不区分v2/v3
 enum class UnifiedMetaEnum : int8_t {
   GemmNormal = 0, GemmNormalSimt, GemmGrouped,    // gemm type
-  GemmBlockScaleFp8, GemmGroupedBlockScaleFp8, GemmLt, 
+  GemmBlockScaleFp8, GemmGroupedBlockScaleFp8, 
+  GemmW4A16, GemmLt, 
   GemmAllreduce = 20,
   Void = 50, FP16, BF16, FP32, E4M3, E5M2, S8, S32,    // data type
   Sm80 = 60, Sm89, Sm90, Sm100, Sm120,                 // arch

@@ -203,6 +203,7 @@ bool initialize_tensor(
     scope_max = 8;
     scope_min = -8;
   }
+  printf("%f, %f.\n", scope_max, scope_min);
   cutlass::reference::device::BlockFillRandomUniform(
       block.get(), block.size(), seed, Element(scope_max), Element(scope_min));
 

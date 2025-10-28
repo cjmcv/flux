@@ -83,7 +83,7 @@ struct TorchDefaultConfig {
     return meta;
   }
 
-  static void GetBaseRtConf(
+  static std::unique_ptr<RtArguments> GetBaseRtConf(
       torch::Tensor input,
       torch::Tensor weight,
       torch::Tensor output,
@@ -93,7 +93,7 @@ struct TorchDefaultConfig {
       c10::ScalarType input_dtype,
       c10::ScalarType output_dtype,
       bool is_transpose_weight,
-      RtArguments *rt_args) {
+      UnifiedMetaEnum *default_schema) {
     XOP_CHECK_INPUT(input, input_dtype);
     XOP_CHECK_INPUT(weight, input_dtype);
     TORCH_CHECK(input.dim() == 2, "input shape is not 2");
@@ -101,6 +101,25 @@ struct TorchDefaultConfig {
     int32_t m = input.size(0);
     int32_t k = input.size(1);
     int32_t n = is_transpose_weight ? weight.size(1) : weight.size(0); // true是RRR，正常使用是false，对应linear层的RCR
+
+    std::unique_ptr<RtArguments> rt_args;
+    if (weight_scale.has_value()) {
+      rt_args = std::make_unique<RtBlockScaleArguments>();
+      ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_B = weight_scale.value().data_ptr();
+      if (input_scale.has_value()) {
+        ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_A = input_scale.value().data_ptr();
+        *default_schema = UnifiedMetaEnum::GemmBlockScaleFp8;
+      }
+      else {
+        ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_A = nullptr;
+        rt_args->g = weight.size(1) / weight_scale.value().size(1);
+        *default_schema = UnifiedMetaEnum::GemmW4A16;
+      }
+    }
+    else {
+      rt_args = std::make_unique<RtArgumentsV2>();
+      *default_schema = UnifiedMetaEnum::GemmNormal;
+    }
 
     rt_args->C_s = -1;
     if (bias.has_value()) {
@@ -129,7 +148,8 @@ struct TorchDefaultConfig {
     rt_args->n = n;
     rt_args->k = k;
     rt_args->l = 1;
-    rt_args->g = 1;
+    if (rt_args->g == 0)
+      rt_args->g = 1;
     // rt_args->ptr_A = padded_input_.data_ptr();
     rt_args->ptr_A = input.data_ptr();
     rt_args->ptr_B = weight.data_ptr();
@@ -146,6 +166,7 @@ struct TorchDefaultConfig {
     //   padded_input_ = torch::zeros({m, new_k}, input.options());
     //   padded_input_.slice(0, 0, m).slice(1, 0, k).copy_(input);
     // }
+    return rt_args;
   }
 
   static RunModeEnum GetRunMode(c10::optional<torch::Tensor> tuning) {

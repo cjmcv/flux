@@ -69,20 +69,8 @@ public:
     id_meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmAllreduce;
     RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
 
-    std::unique_ptr<RtArguments> rt_args;
-    if (from_torch_dtype(this->input_dtype) == (int)UnifiedMetaEnum::E4M3) {
-      rt_args = std::make_unique<RtBlockScaleArguments>();
-      if (input_scale.has_value() && weight_scale.has_value()) {
-        ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_A = input_scale.value().data_ptr();
-        ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_B = weight_scale.value().data_ptr();
-      }
-      default_schema_ = UnifiedMetaEnum::GemmBlockScaleFp8;
-    }
-    else {
-      rt_args = std::make_unique<RtArgumentsV2>();
-      default_schema_ = UnifiedMetaEnum::GemmNormal;
-    }
-    TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, this->input_dtype, this->output_dtype, transpose_weight, rt_args.get());
+    std::unique_ptr<RtArguments> rt_args = TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, 
+                                                                             this->input_dtype, this->output_dtype, transpose_weight, &default_schema_);
     
     if (run_mode == kRunWithTuning) {
       return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 

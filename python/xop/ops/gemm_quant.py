@@ -121,6 +121,7 @@ class GemmQuant:
             return y_fp8, y_scale
         else:
             w_fp, q_int4, s_int4 = marlin_quant_int4(weight.t())
+        print(q_int4.shape, q_int4.dtype, s_int4.shape, s_int4.dtype)
         return q_int4, s_int4
     
     def forward(
