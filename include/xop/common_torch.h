@@ -38,7 +38,7 @@ inline at::ScalarType to_torch_dtype(UnifiedMetaEnum dtype) {
 struct TorchDefaultConfig {
 
   static std::vector<int16_t> 
-  MakeDefaultMeta(UnifiedMetaEnum arch, c10::ScalarType input_dtype, c10::ScalarType output_dtype, bool fast_accum, bool is_transpose_weight=false, bool is_group=false) {
+  MakeDefaultMeta(UnifiedMetaEnum arch, c10::ScalarType input_dtype, c10::ScalarType weight_dtype, c10::ScalarType output_dtype, bool fast_accum, bool is_transpose_weight=false, bool is_group=false) {
   
     std::vector<int16_t> meta;
     meta.resize(8);
@@ -47,7 +47,7 @@ struct TorchDefaultConfig {
     // meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmNormal; // schema type 
 
     meta[kMetaTypeA] = from_torch_dtype(input_dtype);  // type A
-    meta[kMetaTypeB] = from_torch_dtype(input_dtype);  // type B
+    meta[kMetaTypeB] = from_torch_dtype(weight_dtype);  // type B
     meta[kMetaTypeCD] = from_torch_dtype(output_dtype); // type C/D
 
     if (fast_accum)
@@ -95,7 +95,7 @@ struct TorchDefaultConfig {
       bool is_transpose_weight,
       UnifiedMetaEnum *default_schema) {
     XOP_CHECK_INPUT(input, input_dtype);
-    XOP_CHECK_INPUT(weight, input_dtype);
+    // XOP_CHECK_INPUT(weight, input_dtype);
     TORCH_CHECK(input.dim() == 2, "input shape is not 2");
     TORCH_CHECK(weight.dim() == 2, "weight dim is not 2");
     int32_t m = input.size(0);

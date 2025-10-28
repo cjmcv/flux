@@ -65,7 +65,7 @@ public:
     // torch::Tensor gemm_out = torch::zeros_like(output);
 
     // std::cout << "Tensor input:\n" << input << std::endl;
-    std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, this->output_dtype, fast_accum, transpose_weight, false);       // id + meta
+    std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, weight.scalar_type(), this->output_dtype, fast_accum, transpose_weight, false);       // id + meta
     id_meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmAllreduce;
     RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
 
@@ -159,7 +159,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, this->output_dtype, false, transpose_weight, true);     // id + meta
+    std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, weights[0].scalar_type(), this->output_dtype, false, transpose_weight, true);     // id + meta
     RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
     
     RtGroupedBlockScaleFp8ArgumentsV3 *rt_args = new RtGroupedBlockScaleFp8ArgumentsV3();

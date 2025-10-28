@@ -83,7 +83,7 @@ public:
       bool fast_accum
     ) {
     // std::cout << "Tensor input:\n" << input << std::endl;
-    std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, this->output_dtype, fast_accum, transpose_weight, false);       // id + meta
+    std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, weight.scalar_type(), this->output_dtype, fast_accum, transpose_weight, false);       // id + meta
     RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
     ///////
     std::unique_ptr<RtArguments> rt_args = TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, 
@@ -181,7 +181,7 @@ public:
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     TunedConfigRegister& tins = TunedConfigRegister::instance();
 
-    std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, this->output_dtype, false, transpose_weight, true);     // id + meta
+    std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, weights[0].scalar_type(), this->output_dtype, false, transpose_weight, true);     // id + meta
     RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
 
     std::unique_ptr<RtGroupedArguments> rt_args;

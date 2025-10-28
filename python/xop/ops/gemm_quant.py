@@ -100,6 +100,56 @@ def marlin_quant_int4(w, groupsize=-1):
     qo, so = pack2int4(m,n,groupsize, w_fp, s)
     return w_fp, qo, so
 
+def symmetric_group_w4a16_pack_bf16(w_bf16: torch.Tensor, group_size: int = 128):
+    """
+    ? bfloat16 ???????????? CUTLASS W4A16 ??
+    ?? int4 ??? bfloat16 scale?
+    
+    ??
+    ----
+    w_bf16 : torch.Tensor
+        ???? [N, K]?dtype=torch.bfloat16
+    group_size : int
+        ?????????? K
+    
+    ??
+    ----
+    packed_w : torch.Tensor
+        ????? [N, K//2]?dtype=torch.int8
+    scale : torch.Tensor
+        ?? scale [num_groups, N]?dtype=torch.bfloat16
+    """
+    assert w_bf16.dim() == 2, "only support 2-D weight"
+    N, K = w_bf16.shape
+    assert K % group_size == 0, "K must be divisible by group_size"
+    num_groups = K // group_size
+    
+    # ????????????????
+    w = w_bf16.contiguous()   # [N, K]
+    
+    # ???? scale??????zero=0?
+    w_groups = w.reshape(N, num_groups, group_size)        # [N, G, GS]
+    w_max = w_groups.abs().amax(dim=-1, keepdim=True)      # [N, G, 1]
+    scale_ = w_max / 7.0                                   # int4 ?? [-7,7]
+    scale_ = scale_.clamp(min=1e-12)
+    
+    # ?? & -round- ???
+    w_int4 = torch.round(w_groups / scale_).clamp(-7, 7).to(torch.int8)  # [N, G, GS]
+    
+    # ? scale ??? bfloat16????? [G, N] ?? CUTLASS ??
+    scale_bf16 = scale_.squeeze(-1).t().contiguous().to(torch.bfloat16)   # [G, N]
+    
+    # ???int4 ??????? int8
+    # ? reshape ? [N, K] ???????
+    w_int4 = w_int4.reshape(N, K)
+    assert K % 2 == 0, "K must be even for packing"
+    w_even = w_int4[:, 0::2]          # ???
+    w_odd  = w_int4[:, 1::2]          # ???
+    # ? 4-bit = even, ? 4-bit = odd
+    packed_w = (w_even << 4) | (w_odd & 0x0F)
+    packed_w = packed_w.contiguous()   # [N, K//2]
+    
+    return packed_w, scale_bf16
 class GemmQuant:
     def __init__(
         self,
@@ -114,15 +164,24 @@ class GemmQuant:
                 output_dtype=output_dtype,
                 transpose_weight=False
             )
+        elif (self.quant_bits == 44):
+            self.gemm_normal = xop.GemmNormal(
+                input_dtype=input_dtype,
+                output_dtype=output_dtype,
+                transpose_weight=False
+            )
 
     def weight_preprocess(self, weight: torch.Tensor, fast_accum: bool = False):
         if (self.quant_bits == 8):
             y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
             return y_fp8, y_scale
-        else:
+        elif (self.quant_bits == 4):
             w_fp, q_int4, s_int4 = marlin_quant_int4(weight.t())
-        print(q_int4.shape, q_int4.dtype, s_int4.shape, s_int4.dtype)
-        return q_int4, s_int4
+            return q_int4, s_int4
+        else: # 44
+            q_int4, s_int4 = symmetric_group_w4a16_pack_bf16(weight, 128)
+            print(weight.shape, q_int4.shape, q_int4.dtype, s_int4.shape, s_int4.dtype)
+            return q_int4, s_int4
     
     def forward(
         self,
@@ -158,10 +217,22 @@ class GemmQuant:
                 tuning = tuning,
                 fast_accum=fast_accum,
             )
-        else:
+        elif (self.quant_bits == 4):
             m = output.shape[0]
             n = output.shape[1]
             workspace = torch.zeros(n // 128 * 16, device=input.device)
             thread_k, thread_n = -1, -1 # 64, 256
             xop.marlin_fp16xint4_matmul(input, weight, output, weight_scale, workspace, thread_k, thread_n, -1, 16)
             return 0
+        else: # 44
+            return self.gemm_normal.forward(
+                input,
+                weight,
+                output=output,
+                bias=bias,
+                input_scale=None,
+                weight_scale=weight_scale,
+                output_scale=None,
+                tuning = tuning,
+                fast_accum=fast_accum,
+            )
