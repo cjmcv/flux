@@ -6,7 +6,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 # cmake global settings
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
 set(BUILD_TEST ON CACHE INTERNAL "Build unit tests")
-set(CUTLASS_TRACE OFF CACHE INTERNAL "Print CUTLASS Host Trace info")
+set(CUTLASS_TRACE ON CACHE INTERNAL "Print CUTLASS Host Trace info")
 set(CUTLASS_SYNCLOG OFF CACHE INTERNAL "Print CUTLASS Host Trace info") # Only available on cutlass3.0 and above.
 message("PYTHONPATH: ${PYTHONPATH}")
 
