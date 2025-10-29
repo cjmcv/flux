@@ -305,11 +305,12 @@ def run(M, args, xop_perf, torch_perf):
             weights_scale.append(y_scale.clone().contiguous())
     else:
         for i in range(problem_count):
-            inputs.append(torch.ones((M, K), device="cuda", dtype=dtype))
+            # inputs.append(torch.ones((M, K), device="cuda", dtype=dtype))
             # weights.append(torch.ones((N, K), device="cuda", dtype=dtype))
-            # inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
-            # weights.append(xutil.rand_tensor((N, K), dtype=dtype))
-            weights.append(xop.create_matrix_arange_row(N, K, dtype=dtype))
+            inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
+            weights.append(xutil.rand_tensor((N, K), dtype=dtype))
+            # inputs.append(xutil.create_matrix_arange_col(M, K, dtype=dtype))
+            # weights.append(xutil.create_matrix_arange_row(N, K, dtype=dtype))
             
             inputs_scale.append(None)
             weights_scale.append(None)

@@ -46,7 +46,7 @@ public:
   // Define the CuTe layout for reoredered quantized tensor B
   // LayoutAtomQuant places values that will be read by the same thread in contiguous locations in global memory.
   // It specifies the reordering within a single warp's fragment
-  //using ValueShuffle = Layout<_1>;                          // no value reordering
+  //using ValueShuffle = cutlass::Layout<cute::_1>;                          // no value reordering
   using ValueShuffle = cutlass::Layout<cutlass::Shape<cute::_2,cute::_4>, cutlass::Stride<cute::_4,cute::_1>>; // order [0,2,4,6,1,3,5,7]
   static constexpr int NumShuffleAtoms = 1;
   using MmaAtomShape = cutlass::Layout<cutlass::Shape<cute::_1,cute::Int<NumShuffleAtoms>>>;

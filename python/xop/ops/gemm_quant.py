@@ -150,8 +150,8 @@ def symmetric_group_w4a16_pack_bf16(w_bf16: torch.Tensor,
     # 先 reshape 成 [N, K] 再按列两两打包
     w_int4 = w_int4.reshape(N, K)
     assert K % 2 == 0, "K must be even for packing"
-    w_even = w_int4[:, 0::2]          # 偶数列
-    w_odd  = w_int4[:, 1::2]          # 奇数列
+    w_even = w_int4[:, 1::2]          # 偶数列
+    w_odd  = w_int4[:, 0::2]          # 奇数列
     
     # 安全的打包方式
     w_even_uint8 = (w_even & 0x0F).to(torch.uint8)
@@ -160,45 +160,6 @@ def symmetric_group_w4a16_pack_bf16(w_bf16: torch.Tensor,
     packed_w = packed_w.to(torch.int8).contiguous()   # [N, K//2]
     
     return packed_w, scale_bf16.t().contiguous()
-
-def symmetric_group_w4a16_pack_bf16_t(w_bf16: torch.Tensor,
-                                      group_size: int = 128):
-    """
-    将 bfloat16 权重做分组对称量化，生成 CUTLASS W4A16 所需
-    打包 int4 权重和 bfloat16 scale。
-    输入维度为 [K, N]（行主序），输出 scale 为 [scale_k, N]，权重为 [K, N//2]
-    """
-    w_bf16 = w_bf16.t().contiguous()
-    assert w_bf16.dim() == 2, "only support 2-D weight"
-    K, N = w_bf16.shape
-    assert K % group_size == 0, "K must be divisible by group_size"
-    num_groups = K // group_size
-
-    w = w_bf16.contiguous()                      # [K, N] 行主序
-
-    # ---------- 1. 按 K 维分组求 scale ----------
-    w_groups = w.reshape(num_groups, group_size, N)   # [G, GS, N]
-    w_max = w_groups.abs().amax(dim=1, keepdim=True)  # [G, 1, N]
-    scale_ = w_max / 8.0                              # int4 范围 [-7, 7]
-    scale_ = scale_.clamp(min=1e-12)
-    # scale 输出形状 [G, N] -> [scale_k, N]
-    scale_bf16 = scale_.squeeze(1).contiguous().to(torch.bfloat16)  # [scale_k, N]
-
-    # ---------- 2. 量化到 int4 ----------
-    w_int4 = torch.round(w_groups / scale_).clamp(-8, 7).to(torch.int8)  # [G, GS, N]
-
-    # ---------- 3. 打包：每行两两合并 ----------
-    w_int4 = w_int4.reshape(K, N)            # [K, N]
-    assert N % 2 == 0, "N must be even for packing"
-    w_even = w_int4[:, 0::2]                 # 偶数列 [K, N//2]
-    w_odd  = w_int4[:, 1::2]                 # 奇数列 [K, N//2]
-
-    w_even_uint8 = (w_even & 0x0F).to(torch.uint8)
-    w_odd_uint8  = (w_odd  & 0x0F).to(torch.uint8)
-    packed_w = (w_even_uint8 << 4) | w_odd_uint8
-    packed_w = packed_w.to(torch.int8).contiguous()   # [K, N//2] 行主序
-
-    return packed_w, scale_bf16
 
 class GemmQuant:
     def __init__(
