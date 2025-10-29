@@ -91,6 +91,27 @@ public:
       EpilogueSchedule // This is the only epi supporting the required swap + transpose.
     >::CollectiveOp;
 
+    using CollectiveMainloopScaleOnly = typename cutlass::gemm::collective::CollectiveBuilder<
+        ArchTag, OperatorClass,
+        cute::tuple<ElementB, ElementScale>, LayoutB_Transpose, AlignmentB,
+        ElementA, LayoutA_Transpose, AlignmentA,
+        ElementAccumulator,
+        TileShape, ClusterShape,
+        cutlass::gemm::collective::StageCountAutoCarveout<
+          static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))
+        >,
+        KernelSchedule
+      >::CollectiveOp;
+
+  using GemmKernelScaleOnly = cutlass::gemm::kernel::GemmUniversal<
+      cute::Shape<int,int,int,int>, // Indicates ProblemShape
+      CollectiveMainloopScaleOnly,
+      CollectiveEpilogue
+  >;
+
+  using GemmScaleOnly = cutlass::gemm::device::GemmUniversalAdapter<GemmKernelScaleOnly>;
+
+
   // ScaleOnlyShuffled
   using CollectiveMainloopScaleOnlyShuffled = typename cutlass::gemm::collective::CollectiveBuilder<
       ArchTag, OperatorClass,
@@ -112,7 +133,8 @@ public:
 
   using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernelScaleOnlyShuffled>; // GemmScaleOnlyShuffled
   
-  using StrideS = typename CollectiveMainloopScaleOnlyShuffled::StrideScale;
+  using StrideS = typename CollectiveMainloopScaleOnly::StrideScale;
+  // using StrideS = typename CollectiveMainloopScaleOnlyShuffled::StrideScale;
   using StrideC = typename GemmKernelScaleOnlyShuffled::StrideC;
   using StrideD = typename GemmKernelScaleOnlyShuffled::StrideD;
   ////////////////
