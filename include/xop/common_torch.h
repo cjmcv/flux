@@ -100,7 +100,7 @@ struct TorchDefaultConfig {
     TORCH_CHECK(weight.dim() == 2, "weight dim is not 2");
     int32_t m = input.size(0);
     int32_t k = input.size(1);
-    int32_t n = is_transpose_weight ? weight.size(1) : weight.size(0); // true是RRR，正常使用是false，对应linear层的RCR
+    int32_t n = output.size(1); // is_transpose_weight ? weight.size(1) : weight.size(0); // true是RRR，正常使用是false，对应linear层的RCR
 
     std::unique_ptr<RtArguments> rt_args;
     if (weight_scale.has_value()) {
@@ -112,7 +112,7 @@ struct TorchDefaultConfig {
       }
       else {
         ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_A = nullptr;
-        rt_args->g = weight.size(1) * 2 / weight_scale.value().size(1); // w4a16，2*w4=1*int8
+        rt_args->g = 128; // TODO weight.size(1) * 2 / weight_scale.value().size(1); // w4a16，2*w4=1*int8
         *default_schema = UnifiedMetaEnum::GemmW4A16;
       }
     }
