@@ -305,10 +305,12 @@ def run(M, args, xop_perf, torch_perf):
             weights_scale.append(y_scale.clone().contiguous())
     else:
         for i in range(problem_count):
-            # inputs.append(torch.ones((M, K), device="cuda", dtype=dtype))
+            inputs.append(torch.ones((M, K), device="cuda", dtype=dtype))
             # weights.append(torch.ones((N, K), device="cuda", dtype=dtype))
-            inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
-            weights.append(xutil.rand_tensor((N, K), dtype=dtype))
+            # inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
+            # weights.append(xutil.rand_tensor((N, K), dtype=dtype))
+            weights.append(xop.create_matrix_arange_row(N, K, dtype=dtype))
+            
             inputs_scale.append(None)
             weights_scale.append(None)
 
@@ -438,21 +440,21 @@ if __name__ == "__main__":
     print(f"M: {1}, N: {args.N}, K: {args.K}")
     run(1, args, xop_perf, torch_perf)
 
-    if 0:
-        for m in range(2, args.M, args.step):
-            print(f"M: {m}, N: {args.N}, K: {args.K}")
-            run(m, args, xop_perf, torch_perf)
-        plot_x = [1] + list(range(2, args.M, args.step))
-    else:
-        exponent = args.M # 65536: 17
-        for m in range(1, exponent):
-            m = 2**m
-            print(f"M: {m}, N: {args.N}, K: {args.K}")
-            run(m, args, xop_perf, torch_perf)
+    # if 0:
+    #     for m in range(2, args.M, args.step):
+    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
+    #         run(m, args, xop_perf, torch_perf)
+    #     plot_x = [1] + list(range(2, args.M, args.step))
+    # else:
+    #     exponent = args.M # 65536: 17
+    #     for m in range(1, exponent):
+    #         m = 2**m
+    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
+    #         run(m, args, xop_perf, torch_perf)
         
-        plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
-        plot_x = range(len(plot_x_value))
-        plt.xticks(plot_x, plot_x_value, rotation=45)
+    #     plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
+    #     plot_x = range(len(plot_x_value))
+    #     plt.xticks(plot_x, plot_x_value, rotation=45)
 
     print("xop_perf  [tflops]:", xop_perf['tflops'])
     print("torch_perf[tflops]:", torch_perf['tflops'])

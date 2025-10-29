@@ -109,7 +109,7 @@ public:
       CollectiveEpilogue
   >;
 
-  using GemmScaleOnly = cutlass::gemm::device::GemmUniversalAdapter<GemmKernelScaleOnly>;
+  using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernelScaleOnly>;
 
 
   // ScaleOnlyShuffled
@@ -131,12 +131,12 @@ public:
       CollectiveEpilogue
     >;
 
-  using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernelScaleOnlyShuffled>; // GemmScaleOnlyShuffled
+  using Gemm0 = cutlass::gemm::device::GemmUniversalAdapter<GemmKernelScaleOnlyShuffled>; // GemmScaleOnlyShuffled
   
   using StrideS = typename CollectiveMainloopScaleOnly::StrideScale;
   // using StrideS = typename CollectiveMainloopScaleOnlyShuffled::StrideScale;
-  using StrideC = typename GemmKernelScaleOnlyShuffled::StrideC;
-  using StrideD = typename GemmKernelScaleOnlyShuffled::StrideD;
+  using StrideC = typename GemmKernelScaleOnly::StrideC;
+  using StrideD = typename GemmKernelScaleOnly::StrideD;
   ////////////////
   
 public:
@@ -189,7 +189,7 @@ private:
     auto layout_B = make_layout(shape_B, stride_B);
 
     LayoutB_Reordered layout_B_reordered;
-    if (true) { // shuffle
+    if (false) { // shuffle
       // Repeat the reorder layout atom to tile the whole tensor shape 
       layout_B_reordered = cute::tile_to_shape(LayoutAtomQuant{}, shape_B);
       cutlass::reorder_tensor((ElementB *)rt_args->ptr_B, layout_B, layout_B_reordered);
@@ -197,14 +197,14 @@ private:
 
     using Args = typename Gemm::Arguments;
     auto&& dB = [&]() {
-      return layout_B_reordered; // offline swizzling is enabled.
+      // return layout_B_reordered; // offline swizzling is enabled.
       // if constexpr (cute::is_same_v<Gemm, GemmScaleOnlyShuffled> ||
       //               cute::is_same_v<Gemm, GemmScaleWithZeroPointShuffled>) {
       //   // offline swizzling is enabled.
       //   return layout_B_reordered;
       // }
       // else {
-      //   return stride_B;
+        return stride_B;
       // }
     }();
 

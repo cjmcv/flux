@@ -24,6 +24,16 @@ def rand_tensor(shape: list[int], dtype: torch.dtype):
     else:
         return torch.rand(shape, dtype=dtype).cuda() * 2 - 1
     
+def create_matrix_arange_row(M, N, dtype=torch.bfloat16, device='cuda'):
+    row_indices = torch.arange(M, dtype=dtype, device=device)
+    matrix = row_indices.unsqueeze(1).expand(M, N)
+    return matrix
+
+def create_matrix_arange_col(M, N, dtype=torch.bfloat16, device='cuda'):
+    col_indices = torch.arange(N, dtype=dtype, device=device)
+    matrix = col_indices.unsqueeze(0).expand(M, N)
+    return matrix
+        
 def calculate_tflops(m, k, n, time_ms):
     total_flops = m * n * k * 2
     time_s = time_ms / 1000.0

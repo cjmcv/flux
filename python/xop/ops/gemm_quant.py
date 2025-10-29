@@ -159,7 +159,7 @@ def symmetric_group_w4a16_pack_bf16(w_bf16: torch.Tensor,
     packed_w = (w_even_uint8 << 4) | w_odd_uint8
     packed_w = packed_w.to(torch.int8).contiguous()   # [N, K//2]
     
-    return packed_w, scale_bf16
+    return packed_w, scale_bf16.t().contiguous()
 
 def symmetric_group_w4a16_pack_bf16_t(w_bf16: torch.Tensor,
                                       group_size: int = 128):
@@ -168,6 +168,7 @@ def symmetric_group_w4a16_pack_bf16_t(w_bf16: torch.Tensor,
     打包 int4 权重和 bfloat16 scale。
     输入维度为 [K, N]（行主序），输出 scale 为 [scale_k, N]，权重为 [K, N//2]
     """
+    w_bf16 = w_bf16.t().contiguous()
     assert w_bf16.dim() == 2, "only support 2-D weight"
     K, N = w_bf16.shape
     assert K % group_size == 0, "K must be divisible by group_size"
@@ -228,7 +229,7 @@ class GemmQuant:
             w_fp, q_int4, s_int4 = marlin_quant_int4(weight.t())
             return q_int4, s_int4
         else: # 44
-            q_int4, s_int4 = symmetric_group_w4a16_pack_bf16_t(weight.t(), 128)
+            q_int4, s_int4 = symmetric_group_w4a16_pack_bf16(weight, 128)
             print(weight.shape, q_int4.shape, q_int4.dtype, s_int4.shape, s_int4.dtype)
             return q_int4, s_int4
     
