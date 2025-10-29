@@ -167,10 +167,10 @@ private:
     auto layout_B = make_layout(shape_B, stride_B);
 
     LayoutB_Reordered layout_B_reordered;
-    if (false) { // shuffle
+    if (true) { // shuffle
       // Repeat the reorder layout atom to tile the whole tensor shape 
       layout_B_reordered = cute::tile_to_shape(LayoutAtomQuant{}, shape_B);
-      cutlass::reorder_tensor((ElementScale *)rt_args->ptr_blockscale_B, layout_B, layout_B_reordered);
+      cutlass::reorder_tensor((ElementB *)rt_args->ptr_B, layout_B, layout_B_reordered);
     }
 
     using Args = typename Gemm::Arguments;
