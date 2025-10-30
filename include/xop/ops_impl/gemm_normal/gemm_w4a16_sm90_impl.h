@@ -53,7 +53,9 @@ public:
   using LayoutAtomQuant = decltype(cutlass::compute_memory_reordering_atom<MmaType, MmaAtomShape, ValueShuffle>());
   using LayoutB_Reordered = decltype(cute::tile_to_shape(LayoutAtomQuant{}, cutlass::Layout<cutlass::Shape<int,int,int>, StrideB>{}));
 
-  using LayoutB_Specify = LayoutB_Reordered; // LayoutB_Reordered : LayoutB_Transpose = Shuffle / No shuffle
+  // LayoutB_Reordered : LayoutB_Transpose = Shuffle / No shuffle 
+  // => symmetric_group_w4a16_pack_bf16+GemmW4A16Sm90ReorderWeight(Shuffle) / symmetric_group_w4a16_pack_bf16
+  using LayoutB_Specify = LayoutB_Reordered; 
 
   using ElementScale = MmaType;
   using ElementZero = ElementScale;
@@ -165,19 +167,17 @@ private:
     // Reverse stride here due to swap and transpose
     StrideC stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(n, m, l));
     StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(n, m, l));
-    
-    auto layout_B = make_layout(shape_B, stride_B);
-
+      
     LayoutB_Reordered layout_B_reordered;
     if constexpr (cute::is_same_v<LayoutB_Specify, LayoutB_Reordered>) {
-      // Shuffle, Repeat the reorder layout atom to tile the whole tensor shape 
+      auto layout_B = make_layout(shape_B, stride_B);
       layout_B_reordered = cute::tile_to_shape(LayoutAtomQuant{}, shape_B);
-      cutlass::reorder_tensor((ElementB *)rt_args->ptr_B, layout_B, layout_B_reordered);
+      // // Shuffle, Repeat the reorder layout atom to tile the whole tensor shape 
+      // cutlass::reorder_tensor((ElementB *)rt_args->ptr_B, layout_B, layout_B_reordered);
     }
 
     using Args = typename Gemm::Arguments;
     auto&& dB = [&]() {
-      // return layout_B_reordered; // offline swizzling is enabled.
       if constexpr (cute::is_same_v<LayoutB_Specify, LayoutB_Reordered>) {
         // offline swizzling is enabled.
         return layout_B_reordered;

@@ -36,4 +36,7 @@ private:
   GemmNormalImpl *impl_ = nullptr;
 };
 
+// Preprocess Funcs
+void GemmW4A16Sm90ReorderWeight(torch::Tensor weight);
+
 }  // namespace xop

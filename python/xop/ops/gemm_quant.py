@@ -153,7 +153,7 @@ def symmetric_group_w4a16_pack_bf16(w_bf16: torch.Tensor,
     w_even = w_int4[:, 1::2]          # 偶数列
     w_odd  = w_int4[:, 0::2]          # 奇数列
     
-    # 安全的打包方式
+    # pack
     w_even_uint8 = (w_even & 0x0F).to(torch.uint8)
     w_odd_uint8 = (w_odd & 0x0F).to(torch.uint8)
     packed_w = (w_even_uint8 << 4) | w_odd_uint8
@@ -191,6 +191,7 @@ class GemmQuant:
             return q_int4, s_int4
         else: # 44
             q_int4, s_int4 = symmetric_group_w4a16_pack_bf16(weight, 128)
+            xop.GemmW4A16Sm90ReorderWeight(q_int4)
             print(weight.shape, q_int4.shape, q_int4.dtype, s_int4.shape, s_int4.dtype)
             return q_int4, s_int4
     
