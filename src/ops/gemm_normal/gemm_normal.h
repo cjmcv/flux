@@ -37,6 +37,6 @@ private:
 };
 
 // Preprocess Funcs
-void GemmW4A16Sm90ReorderWeight(torch::Tensor weight);
+void gemm_w4a16_sm90_reorder_weight(torch::Tensor weight);
 
 }  // namespace xop

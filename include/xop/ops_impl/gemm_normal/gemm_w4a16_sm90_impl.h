@@ -54,7 +54,7 @@ public:
   using LayoutB_Reordered = decltype(cute::tile_to_shape(LayoutAtomQuant{}, cutlass::Layout<cutlass::Shape<int,int,int>, StrideB>{}));
 
   // LayoutB_Reordered : LayoutB_Transpose = Shuffle / No shuffle 
-  // => symmetric_group_w4a16_pack_bf16+GemmW4A16Sm90ReorderWeight(Shuffle) / symmetric_group_w4a16_pack_bf16
+  // => symmetric_group_w4a16_pack_bf16+xop.gemm_w4a16_sm90_reorder_weight(Shuffle) / symmetric_group_w4a16_pack_bf16
   using LayoutB_Specify = LayoutB_Reordered; 
 
   using ElementScale = MmaType;
@@ -173,7 +173,11 @@ private:
       auto layout_B = make_layout(shape_B, stride_B);
       layout_B_reordered = cute::tile_to_shape(LayoutAtomQuant{}, shape_B);
       // // Shuffle, Repeat the reorder layout atom to tile the whole tensor shape 
-      // cutlass::reorder_tensor((ElementB *)rt_args->ptr_B, layout_B, layout_B_reordered);
+      // static bool is_inited = false;
+      // if (!is_inited) {
+      //   is_inited = true;
+      //   cutlass::reorder_tensor((ElementB *)rt_args->ptr_B, layout_B, layout_B_reordered);
+      // }
     }
 
     using Args = typename Gemm::Arguments;

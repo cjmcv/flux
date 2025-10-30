@@ -1,5 +1,5 @@
 // clang-format off
-#if XOP_CUDA_ARCHS>=89
+#if XOP_CUDA_ARCHS>=90
 #include "xop/ops_impl/gemm_normal/gemm_w4a16_sm90_impl.h"
 
 namespace xop {

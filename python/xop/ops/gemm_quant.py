@@ -191,7 +191,7 @@ class GemmQuant:
             return q_int4, s_int4
         else: # 44
             q_int4, s_int4 = symmetric_group_w4a16_pack_bf16(weight, 128)
-            xop.GemmW4A16Sm90ReorderWeight(q_int4)
+            xop.gemm_w4a16_sm90_reorder_weight(q_int4)
             print(weight.shape, q_int4.shape, q_int4.dtype, s_int4.shape, s_int4.dtype)
             return q_int4, s_int4
     

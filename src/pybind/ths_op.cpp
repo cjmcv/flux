@@ -57,8 +57,8 @@ static int _register_gemm_normal_ops [[maybe_unused]] = []() {
             py::arg("weights_scale") = py::none(),
             py::arg("tuning") = py::none());
 
-    m.def("GemmW4A16Sm90ReorderWeight",
-        &GemmW4A16Sm90ReorderWeight,
+    m.def("gemm_w4a16_sm90_reorder_weight",
+        &gemm_w4a16_sm90_reorder_weight,
         py::arg("weight"));
   });
   return 0;

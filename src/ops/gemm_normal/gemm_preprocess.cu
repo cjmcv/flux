@@ -20,20 +20,22 @@
 #include <cuda_runtime_api.h>
 #include <utility>
 
-
 /////////////////////////////
 #include "xop/xop.h"
+#if XOP_CUDA_ARCHS>=90
 #include "xop/ops_impl/gemm_normal/gemm_w4a16_sm90_impl.h"
+#endif
 //////////////////////////////
+
 namespace xop {
 
-void GemmW4A16Sm90ReorderWeight(torch::Tensor weight) {
+void gemm_w4a16_sm90_reorder_weight(torch::Tensor weight) {
   XOP_CHECK_INPUT(weight, c10::ScalarType::Char); // 2 x int4 => 1 x int8
-#if XOP_CUDA_ARCHS>=89
+#if XOP_CUDA_ARCHS>=90
   int32_t n = weight.size(0);
   int32_t k = weight.size(1) * 2;
   int32_t l = 1;
-  printf("GemmW4A16Sm90ReorderWeight n: %d, k:%d\n", n,k);
+  printf("gemm_w4a16_sm90_reorder_weight n: %d, k:%d\n", n,k);
   
   using GemmW4A16Sm90 = GemmW4A16Sm90Impl<
     /*meta*/cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::arch::Sm90,
@@ -56,7 +58,7 @@ void GemmW4A16Sm90ReorderWeight(torch::Tensor weight) {
   // Shuffle, Repeat the reorder layout atom to tile the whole tensor shape 
   cutlass::reorder_tensor((ElementB *)weight.data_ptr(), layout_B, layout_B_reordered);
 #else
-  printf("The function (GemmW4A16Sm90ReorderWeight) is valid only when condition (XOP_CUDA_ARCHS>=89) is satisfied.\n");
+  printf("The function (gemm_w4a16_sm90_reorder_weight) is valid only when condition (XOP_CUDA_ARCHS>=90) is satisfied.\n");
 #endif
 }
 

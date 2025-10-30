@@ -32,7 +32,7 @@ def _get_xop_member(member):
     return getattr(xop_mod, member, NotCompiled())
 
 GemmNormal = _get_xop_member("GemmNormal")
-GemmW4A16Sm90ReorderWeight = _get_xop_member("GemmW4A16Sm90ReorderWeight")
+gemm_w4a16_sm90_reorder_weight = _get_xop_member("gemm_w4a16_sm90_reorder_weight")
 
 marlin_fp16xint4_matmul = _get_xop_member("marlin_fp16xint4_matmul")
 helloABCM = _get_xop_member("helloABCM")
