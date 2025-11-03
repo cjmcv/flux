@@ -100,67 +100,6 @@ def marlin_quant_int4(w, groupsize=-1):
     qo, so = pack2int4(m,n,groupsize, w_fp, s)
     return w_fp, qo, so
 
-def symmetric_group_w4a16_pack_bf16(w_bf16: torch.Tensor,
-                                    group_size: int = 128):
-    # """
-    # 将 bfloat16 权重做分组对称量化，生成 CUTLASS W4A16 所需
-    # 打包 int4 权重和 bfloat16 scale。
-    
-    # 参数
-    # ----
-    # w_bf16 : torch.Tensor
-    #     二维权重 [N, K], dtype=torch.bfloat16
-    # group_size : int
-    #     每组通道数，必须整除 K
-    
-    # 返回
-    # ----
-    # packed_w : torch.Tensor
-    #     打包后权重 [N, K//2], dtype=torch.int8
-    # scale : torch.Tensor
-    #     每组 scale [N, K//group_size], dtype=torch.bfloat16
-    # """
-    
-    assert w_bf16.dim() == 2, "only support 2-D weight"
-    N, K = w_bf16.shape
-    assert K % group_size == 0, "K must be divisible by group_size"
-    num_groups = K // group_size
-    
-    # 转成行主序连续内存，方便后续处理
-    w = w_bf16.contiguous()   # [N, K]
-    # torch.set_printoptions(threshold=float('inf'), linewidth=200, precision=4)
-
-    # 按组计算 scale（对称量化，zero=0）
-    w_groups = w.reshape(N, num_groups, group_size)        # [N, G, GS]
-    w_max = w_groups.abs().amax(dim=-1, keepdim=True)      # [N, G, 1]
-    # print("w_max", w_max)
-    scale_ = w_max / 8.0                                   # int4 范围 [-7,7]
-    scale_ = scale_.clamp(min=1e-12)
-    # print("scale_", scale_)
-    # 量化 & -round- 到整数
-    w_int4 = torch.round(w_groups / scale_).clamp(-8, 7).to(torch.int8)  # [N, G, GS]
-    # 将 scale 保持为 bfloat16，维度为 [N, G]
-    scale_bf16 = scale_.squeeze(-1).contiguous().to(torch.bfloat16)   # [N, G]
-    
-    # temp = w_int4 * scale_
-    # w_bf16 = temp.reshape(N, K)
-    # print("w_bf16", w_bf16, w_bf16.shape, temp.shape, scale_.shape)
-    
-    # 打包：int4 两两合并成一个 int8
-    # 先 reshape 成 [N, K] 再按列两两打包
-    w_int4 = w_int4.reshape(N, K)
-    assert K % 2 == 0, "K must be even for packing"
-    w_even = w_int4[:, 1::2]          # 偶数列
-    w_odd  = w_int4[:, 0::2]          # 奇数列
-    
-    # pack
-    w_even_uint8 = (w_even & 0x0F).to(torch.uint8)
-    w_odd_uint8 = (w_odd & 0x0F).to(torch.uint8)
-    packed_w = (w_even_uint8 << 4) | w_odd_uint8
-    packed_w = packed_w.to(torch.int8).contiguous()   # [N, K//2]
-    
-    return packed_w, scale_bf16.t().contiguous()
-
 class GemmQuant:
     def __init__(
         self,
@@ -190,8 +129,7 @@ class GemmQuant:
             w_fp, q_int4, s_int4 = marlin_quant_int4(weight.t())
             return q_int4, s_int4
         else: # 44
-            q_int4, s_int4 = symmetric_group_w4a16_pack_bf16(weight, 128)
-            xop.gemm_w4a16_sm90_reorder_weight(q_int4)
+            q_int4, s_int4 = xop.symmetric_group_w4a16_pack_bf16_reorder(weight, 128)
             print(weight.shape, q_int4.shape, q_int4.dtype, s_int4.shape, s_int4.dtype)
             return q_int4, s_int4
     

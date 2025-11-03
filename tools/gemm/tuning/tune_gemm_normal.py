@@ -10,6 +10,7 @@ import torch
 
 import xop
 import xop.util as xutil
+
 from tune_common import Meta, TuningConfig
 import tune_common as common 
 
@@ -93,7 +94,8 @@ class GemmW4A16Sm90Schema:
     test_input_dtype = torch.bfloat16
     space_dtype = [(torch.bfloat16,torch.bfloat16,torch.bfloat16)]
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
-        return input, None, weight, None
+        q_int4, s_int4 = xop.symmetric_group_w4a16_pack_bf16_reorder(weight, 128)
+        return input, None, q_int4, s_int4
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
                        input_scale: torch.Tensor, weight_scale: torch.Tensor,
                        bias: torch.Tensor):
