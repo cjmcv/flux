@@ -128,7 +128,7 @@ def get_allclose_threshold(k, dtype, quant_bits=0):
     # print("aaa", DTYPE_MAP[args.dtype], args.dtype, torch.float8_e4m3fn)
     if (quant_bits == 8):
         return 2e-1*np.sqrt(k), 2e-2
-    if (quant_bits == 4):
+    if (quant_bits == 4 or quant_bits == 44):
         return 2e-1*np.sqrt(k), 2e-2
     if (dtype == "float8_e4m3fn" or dtype == "float8_e5m2"):
         return 2e-1*np.sqrt(k), 2e-2

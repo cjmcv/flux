@@ -16,24 +16,25 @@
 
 namespace xop {
 
-template <class ElementA, class ElementC, 
+template <class ElementA, class ElementB, class ElementC, class ElementAccumulator,
+          class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, class TileShapeMN, class ClusterShape, 
           class KernelSchedule, class EpilogueSchedule>
 
 class GemmW4A16Sm90Impl : public GemmBase {
 public:
   using MmaType = ElementA;
-  using QuantType = cutlass::int4b_t;
+  using QuantType = cutlass::int4b_t; // ElementB
   static constexpr int TileShapeK = 128 * 8 / cutlass::sizeof_bits<MmaType>::value;
 
   // A matrix configuration
   // using         ElementA    = MmaType;                                        // Element type for A matrix operand
-  using         LayoutA     = cutlass::layout::RowMajor;                      // Layout type for A matrix operand
+  // using         LayoutA     = cutlass::layout::RowMajor;                      // Layout type for A matrix operand
   static constexpr int AlignmentA  = 128 / cutlass::sizeof_bits<ElementA>::value;    // Memory access granularity/alignment of A matrix in units of elements (up to 16 bytes)
 
   // B matrix configuration
   using         ElementB    = QuantType;                                      // Element type for B matrix operand
-  using         LayoutB     = cutlass::layout::ColumnMajor;                   // Layout type for B matrix operand
+  // using         LayoutB     = cutlass::layout::ColumnMajor;                   // Layout type for B matrix operand
   static constexpr int AlignmentB  = 128 / cutlass::sizeof_bits<ElementB>::value;    // Memory access granularity/alignment of B matrix in units of elements (up to 16 bytes)
 
   // This example manually swaps and transposes, so keep transpose of input layouts
@@ -63,7 +64,7 @@ public:
 
   // C/D matrix configuration
   // using         ElementC    = cutlass::bfloat16_t;                                // Element type for C and D matrix operands
-  using         LayoutC     = cutlass::layout::RowMajor;                      // Layout type for C and D matrix operands
+  // using         LayoutC     = cutlass::layout::RowMajor;                      // Layout type for C and D matrix operands
   static constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 
   // D matrix configuration
@@ -72,8 +73,8 @@ public:
   static constexpr int AlignmentD  = 128 / cutlass::sizeof_bits<ElementD>::value;
 
   // Core kernel configurations
-  using ElementAccumulator  = float;                                          // Element type for internal accumulation
-  using ElementCompute      = float;                                          // Element type for epilogue computation
+  using ElementAccumulator  = ElementAccumulator;                                          // Element type for internal accumulation
+  using ElementCompute      = ElementAccumulator;                                          // Element type for epilogue computation
   // using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
   using TileShape           = cutlass::Shape<size<0>(TileShapeMN),size<1>(TileShapeMN),cute::Int<TileShapeK>>;         // Threadblock-level tile size
