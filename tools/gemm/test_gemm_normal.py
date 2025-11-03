@@ -397,8 +397,8 @@ def parse_args():
     parser.add_argument("--num_groups", default=-1, type=int, help="whether to use GemmGrouped.")
     parser.add_argument("--quant_bits", default=-1, type=int, help="whether to use GemmQuant.")
     parser.add_argument("--step", default=5, type=int, help="m step")
-    parser.add_argument("--warmup_iters", default=0, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=1, type=int, help="perf iterations")
+    parser.add_argument("--warmup_iters", default=10, type=int, help="perf warmup iterations")
+    parser.add_argument("--iters", default=20, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
         default="bfloat16", # float16, float8_e4m3fn
@@ -441,21 +441,21 @@ if __name__ == "__main__":
     print(f"M: {1}, N: {args.N}, K: {args.K}")
     run(1, args, xop_perf, torch_perf)
 
-    # if 0:
-    #     for m in range(2, args.M, args.step):
-    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
-    #         run(m, args, xop_perf, torch_perf)
-    #     plot_x = [1] + list(range(2, args.M, args.step))
-    # else:
-    #     exponent = args.M # 65536: 17
-    #     for m in range(1, exponent):
-    #         m = 2**m
-    #         print(f"M: {m}, N: {args.N}, K: {args.K}")
-    #         run(m, args, xop_perf, torch_perf)
+    if 0:
+        for m in range(2, args.M, args.step):
+            print(f"M: {m}, N: {args.N}, K: {args.K}")
+            run(m, args, xop_perf, torch_perf)
+        plot_x = [1] + list(range(2, args.M, args.step))
+    else:
+        exponent = args.M # 65536: 17
+        for m in range(1, exponent):
+            m = 2**m
+            print(f"M: {m}, N: {args.N}, K: {args.K}")
+            run(m, args, xop_perf, torch_perf)
         
-    #     plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
-    #     plot_x = range(len(plot_x_value))
-    #     plt.xticks(plot_x, plot_x_value, rotation=45)
+        plot_x_value = [1] + list(2**x for x in list(range(1, exponent)))
+        plot_x = range(len(plot_x_value))
+        plt.xticks(plot_x, plot_x_value, rotation=45)
 
     print("xop_perf  [tflops]:", xop_perf['tflops'])
     print("torch_perf[tflops]:", torch_perf['tflops'])

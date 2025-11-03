@@ -17,7 +17,7 @@
 namespace xop {
 
 template <class ElementA, class ElementC, 
-          class ArchTag, class TileShapetemp0, class ClusterShape, 
+          class ArchTag, class TileShapeMN, class ClusterShape, 
           class KernelSchedule, class EpilogueSchedule>
 
 class GemmW4A16Sm90Impl : public GemmBase {
@@ -76,7 +76,7 @@ public:
   using ElementCompute      = float;                                          // Element type for epilogue computation
   // using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
-  using TileShape           = cutlass::Shape<cute::_128,cute::_128,cute::Int<TileShapeK>>;         // Threadblock-level tile size
+  using TileShape           = cutlass::Shape<size<0>(TileShapeMN),size<1>(TileShapeMN),cute::Int<TileShapeK>>;         // Threadblock-level tile size
   // using ClusterShape        = cutlass::Shape<cute::_1,cute::_1,cute::_1>;                                // Shape of the threadblocks in a cluster
   // using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperative;  // Kernel to launch based on the default setting in the Collective Builder 
   // using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
