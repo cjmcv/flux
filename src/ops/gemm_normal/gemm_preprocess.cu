@@ -38,12 +38,12 @@ void gemm_w4a16_sm90_reorder_weight(torch::Tensor weight) {
   printf("gemm_w4a16_sm90_reorder_weight n: %d, k:%d\n", n,k);
   
   using GemmW4A16Sm90 = GemmW4A16Sm90Impl<
-    /*meta*/cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::arch::Sm90,
-    /*hparam*/
-    cute::Shape<cute::_128,cute::_128,cute::_128>,
-    cute::Shape<cute::_1,cute::_1,cute::_1>,
+    /*meta*/cutlass::bfloat16_t, int8_t, cutlass::bfloat16_t, float, 
+    cutlass::layout::RowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor, cutlass::arch::Sm90,
+    /*hparam*/cute::Shape<cute::_128,cute::_128>,cute::Shape<cute::_1,cute::_1,cute::_1>,
     cutlass::gemm::KernelTmaWarpSpecializedCooperative,
-    cutlass::epilogue::TmaWarpSpecializedCooperative>;
+    cutlass::epilogue::TmaWarpSpecializedCooperative,
+    cutlass::gemm::PersistentScheduler>;
 
   using StrideB = typename GemmW4A16Sm90::StrideB;
   using ElementB = typename GemmW4A16Sm90::ElementB;

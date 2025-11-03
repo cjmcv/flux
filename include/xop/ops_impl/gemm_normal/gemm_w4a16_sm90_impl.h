@@ -16,10 +16,10 @@
 
 namespace xop {
 
-template <class ElementA, class ElementB, class ElementC, class ElementAccumulator,
+template <class ElementA, class ElementB_t, class ElementC, class ElementAccumulator,
           class LayoutA, class LayoutB, class LayoutC,
           class ArchTag, class TileShapeMN, class ClusterShape, 
-          class KernelSchedule, class EpilogueSchedule>
+          class KernelSchedule, class EpilogueSchedule, class TileScheduler>
 
 class GemmW4A16Sm90Impl : public GemmBase {
 public:
@@ -73,11 +73,13 @@ public:
   static constexpr int AlignmentD  = 128 / cutlass::sizeof_bits<ElementD>::value;
 
   // Core kernel configurations
-  using ElementAccumulator  = ElementAccumulator;                                          // Element type for internal accumulation
+  // using ElementAccumulator  = ElementAccumulator;                                          // Element type for internal accumulation
   using ElementCompute      = ElementAccumulator;                                          // Element type for epilogue computation
   // using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
-  using TileShape           = cutlass::Shape<size<0>(TileShapeMN),size<1>(TileShapeMN),cute::Int<TileShapeK>>;         // Threadblock-level tile size
+  using TileShape           = cutlass::Shape<decltype(cute::get<0>(TileShapeMN{})), 
+                                             decltype(cute::get<1>(TileShapeMN{})), 
+                                             cute::Int<TileShapeK>>;         // Threadblock-level tile size
   // using ClusterShape        = cutlass::Shape<cute::_1,cute::_1,cute::_1>;                                // Shape of the threadblocks in a cluster
   // using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperative;  // Kernel to launch based on the default setting in the Collective Builder 
   // using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
