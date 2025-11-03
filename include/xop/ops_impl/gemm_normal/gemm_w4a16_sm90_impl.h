@@ -23,18 +23,16 @@ template <class ElementA, class ElementB_t, class ElementC, class ElementAccumul
 
 class GemmW4A16Sm90Impl : public GemmBase {
 public:
+  // RCR Only
   using MmaType = ElementA;
   using QuantType = cutlass::int4b_t; // ElementB
   static constexpr int TileShapeK = 128 * 8 / cutlass::sizeof_bits<MmaType>::value;
 
   // A matrix configuration
-  // using         ElementA    = MmaType;                                        // Element type for A matrix operand
-  // using         LayoutA     = cutlass::layout::RowMajor;                      // Layout type for A matrix operand
   static constexpr int AlignmentA  = 128 / cutlass::sizeof_bits<ElementA>::value;    // Memory access granularity/alignment of A matrix in units of elements (up to 16 bytes)
 
   // B matrix configuration
   using         ElementB    = QuantType;                                      // Element type for B matrix operand
-  // using         LayoutB     = cutlass::layout::ColumnMajor;                   // Layout type for B matrix operand
   static constexpr int AlignmentB  = 128 / cutlass::sizeof_bits<ElementB>::value;    // Memory access granularity/alignment of B matrix in units of elements (up to 16 bytes)
 
   // This example manually swaps and transposes, so keep transpose of input layouts
@@ -63,8 +61,6 @@ public:
   using LayoutScale = cutlass::layout::RowMajor;
 
   // C/D matrix configuration
-  // using         ElementC    = cutlass::bfloat16_t;                                // Element type for C and D matrix operands
-  // using         LayoutC     = cutlass::layout::RowMajor;                      // Layout type for C and D matrix operands
   static constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 
   // D matrix configuration
@@ -73,16 +69,11 @@ public:
   static constexpr int AlignmentD  = 128 / cutlass::sizeof_bits<ElementD>::value;
 
   // Core kernel configurations
-  // using ElementAccumulator  = ElementAccumulator;                                          // Element type for internal accumulation
   using ElementCompute      = ElementAccumulator;                                          // Element type for epilogue computation
-  // using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
   using TileShape           = cutlass::Shape<decltype(cute::get<0>(TileShapeMN{})), 
                                              decltype(cute::get<1>(TileShapeMN{})), 
                                              cute::Int<TileShapeK>>;         // Threadblock-level tile size
-  // using ClusterShape        = cutlass::Shape<cute::_1,cute::_1,cute::_1>;                                // Shape of the threadblocks in a cluster
-  // using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperative;  // Kernel to launch based on the default setting in the Collective Builder 
-  // using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
 
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
@@ -114,7 +105,8 @@ public:
   using GemmKernelScaleOnlyShuffled = cutlass::gemm::kernel::GemmUniversal<
       cute::Shape<int,int,int,int>, // Indicates ProblemShape
       CollectiveMainloopScaleOnlyShuffled,
-      CollectiveEpilogue
+      CollectiveEpilogue,
+      TileScheduler
     >;
 
   using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernelScaleOnlyShuffled>; // GemmScaleOnlyShuffled

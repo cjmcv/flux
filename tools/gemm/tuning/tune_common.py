@@ -14,8 +14,10 @@ import xop.util as xutil
 class Meta(IntEnum):
     GemmNormal = 0           # meta type
     GemmNormalSimt = auto()
+    GemmGrouped = auto()
     GemmBlockScaleFp8 = auto()
     GemmGroupedBlockScaleFp8 = auto()
+    GemmW4A16 = auto()
     GemmLt = auto()
     GemmAllreduce = 20
     Void = 50                # data type
