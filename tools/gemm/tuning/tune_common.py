@@ -38,8 +38,10 @@ class Meta(IntEnum):
         return {
             Meta.GemmNormal: "GemmNormal",
             Meta.GemmNormalSimt: "GemmNormalSimt",
+            Meta.GemmGrouped: "GemmGrouped",
             Meta.GemmBlockScaleFp8: "GemmBlockScaleFp8",
             Meta.GemmGroupedBlockScaleFp8: "GemmGroupedBlockScaleFp8",
+            Meta.GemmW4A16: "GemmW4A16",
             Meta.GemmLt: "GemmLt",
             Meta.GemmAllreduce: "GemmAllreduce",
             Meta.Void: "Void",

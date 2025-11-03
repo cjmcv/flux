@@ -199,7 +199,7 @@ def symmetric_group_w4a16_pack_bf16(w_bf16: torch.Tensor,
     # and pack the int4 weights and bfloat16 scales in the format required by CUTLASS W4A16.
     # <input>
     # w_bf16 : torch.Tensor [N, K], dtype=torch.bfloat16
-    # group_size : int£¬ The number of channels per group must be divisible by K.
+    # group_size : int, The number of channels per group must be divisible by K.
     # <return>
     # packed_w : torch.Tensor [N, K//2], dtype=torch.int8
     # scale : torch.Tensor [N, K//group_size], dtype=torch.bfloat16
