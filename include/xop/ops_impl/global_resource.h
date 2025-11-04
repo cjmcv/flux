@@ -179,7 +179,11 @@ public:
       return;
     }
     // else {
-    //   printf("total normal_tuned_map.size: %d.\n", normal_tuned_map.size());
+    //   printf("Target key: ");
+    //   for (int i=0; i<key.size(); i++) {
+    //     printf("%d, ", key[i]);
+    //   }
+    //   printf("\ntotal normal_tuned_map.size: %d.\n", normal_tuned_map.size());
     //   for (auto it = normal_tuned_map.begin(); it != normal_tuned_map.end(); ++it) {
     //     const auto& key = it->first;
     //     const auto& value = it->second;
@@ -191,7 +195,7 @@ public:
     //       std::cout << "\n";
     //   }
     // }
-  }  
+  }
   
   void Add2Comm(const std::vector<int32_t> &key, const std::vector<int16_t> &select_config) {
     comm_tuned_map[key] = select_config;

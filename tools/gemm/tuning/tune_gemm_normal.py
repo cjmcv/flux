@@ -162,7 +162,7 @@ def str2schema(schema_name):
 
 # schema 1: [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192]
 def get_tuning_space(schema):
-    space_G = [1]
+    space_G = [128]
     space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192] #,16384,32768,65536 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
     # qwen3_4b: (2560,9728), (6144,2560), (2560,4096), (19456,2560) 
     space_NK = [(4096, 4096)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
@@ -237,7 +237,7 @@ def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
         n = weight.size(1)
     else:
         n = weight.size(0)
-    g = 1
+    g = TuningConfig.G
 
     output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
     op = xop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)

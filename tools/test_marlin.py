@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 
 import xop
-from xop.ops.gemm_quant import MarlinLayer
 
 seed = 0
 np.random.seed(seed)
@@ -13,57 +12,14 @@ torch.random.manual_seed(seed)
 
 DEV = torch.device('cuda:0')
 
-def gen_quant4(m, n, groupsize=-1):
-    tile = 16
-    maxq = 2 ** 4 - 1
-    w = torch.randn((m, n), dtype=torch.half, device=DEV)
-    if groupsize != -1:
-        w = w.reshape((-1, groupsize, n))
-        w = w.permute(1, 0, 2)
-        w = w.reshape((groupsize, -1))
-    # s[1, n], the maximum absolute value of each row.
-    s = torch.max(torch.abs(w), 0, keepdim=True)[0]
-    # maxq = 15, In symmetric quantization, only the range [-8, 7] is actually used. 
-    # The effective "half-span" is 8, so maxq_half = (maxq + 1) // 2 = 8
-    # a / 8 = a / ((maxq + 1) / 2) = a x 2 / (maxq + 1), maxq is taken as 15, omitting the "+1"
-    # so: a x 2 / maxq
-    s *= 2 / maxq
-    w = torch.round(w / s).int()
-    w += (maxq + 1) // 2
-    w = torch.clamp(w, 0, maxq)
-    ref = (w - (maxq + 1) // 2).half() * s
-    if groupsize != -1:
-        def reshape(w):
-            w = w.reshape((groupsize, -1, n))
-            w = w.permute(1, 0, 2)
-            w = w.reshape((m, n)).contiguous()
-            return w
-        ref = reshape(ref)
-        w = reshape(w)
-    s = s.reshape((-1, n)).contiguous()
-    linear = nn.Linear(m, n)
-    linear.weight.data = ref.t()
-    # Workaround to test some special cases that are forbidden by the API
-    layer = MarlinLayer(256, 256, groupsize=groupsize)
-    if groupsize == -1:
-        groupsize = m
-    layer.k = m
-    layer.n = n
-    layer.groupsize = groupsize
-    layer.B = torch.empty((m // 16, n * 16 // 8), dtype=torch.int, device=DEV)
-    layer.s = torch.empty((m // groupsize, n), dtype=torch.half, device=DEV)
-    layer.pack(linear, s.t())
-    q = layer.B
-    s = layer.s
-    return ref, q, s
-
 class Test(unittest.TestCase):
 
     def run_problem(self, m, n, k, thread_k, thread_n, groupsize=-1):
         print('% 5d % 6d % 6d % 4d % 4d % 4d' % (m, n, k, thread_k, thread_n, groupsize))
         A = torch.randn((m, k), dtype=torch.half, device=DEV)
-        w = torch.randn((k, n), dtype=torch.half, device=DEV)
-        B_ref, B, s = xop.marlin_quant_int4(w, groupsize=groupsize)
+        w = torch.randn((n, k), dtype=torch.half, device=DEV)
+        B_ref = w.t()
+        _, B, s = xop.marlin_quant_int4(w, groupsize=groupsize)
         C = torch.zeros((m, n), dtype=torch.half, device=DEV)
         C_ref = torch.matmul(A, B_ref)
         workspace = torch.zeros(n // 128 * 16, device=DEV)

@@ -143,7 +143,8 @@ def perf_xop(
         op = xop.GemmQuant(
             input_dtype=inputs[0].dtype,
             output_dtype=output_dtype,
-            quant_bits=quant_bits
+            quant_bits=quant_bits,
+            num_groups=num_groups
         )
         weights_fp8 = []
         weights_fp8_scale = []
@@ -166,80 +167,75 @@ def perf_xop(
                 fast_accum=fast_accum,
             )
             return output
-    elif (num_groups != -1):
+    else:   
         op = xop.GemmNormal(
             input_dtype=inputs[0].dtype,
             output_dtype=output_dtype,
             transpose_weight=transpose_weight
         )
-        
-        output_list = [output.clone() for _ in range(num_groups)]
-        def fn(iter_id):
-            input_list = [inputs[(iter_id+i) % problem_cnt] for i in range(num_groups)]
-            weight_list = [weights[(iter_id+i) % problem_cnt] for i in range(num_groups)]
-            op.grouped_forward(
-                inputs=input_list,
-                weights=weight_list,
-                outputs=output_list,
-                inputs_scale=None,
-                weights_scale=None,
-                tuning = None,
-            )
-            return output_list
-    else:
-        op = xop.GemmNormal(
-            input_dtype=inputs[0].dtype,
-            output_dtype=output_dtype,
-            transpose_weight=transpose_weight
-        )
-        if 0:
-            problem_idx = 0
-            def forward_fn(problem_idx):
-                op.forward(inputs[problem_idx],
-                    weights[problem_idx],
-                    output=output,
-                    bias=bias,
-                    input_scale=inputs_scale[problem_idx],
-                    weight_scale=weights_scale[problem_idx],
-                    output_scale=None,
-                    tuning = None,
-                    fast_accum=fast_accum,
-                )
-                
-            # pre allocate for cuda graph
-            forward_fn(problem_idx)
-            
-            stream = torch.cuda.Stream()
-            graph = torch.cuda.CUDAGraph()
-            with torch.cuda.stream(stream):
-                with torch.cuda.graph(graph):
-                    problem_idx = 0
-                    forward_fn(problem_idx)
-                    
+        if (num_groups != -1):
+            output_list = [output.clone() for _ in range(num_groups)]
             def fn(iter_id):
-                graph.replay()
-                return output
+                input_list = [inputs[(iter_id+i) % problem_cnt] for i in range(num_groups)]
+                weight_list = [weights[(iter_id+i) % problem_cnt] for i in range(num_groups)]
+                op.grouped_forward(
+                    inputs=input_list,
+                    weights=weight_list,
+                    outputs=output_list,
+                    inputs_scale=None,
+                    weights_scale=None,
+                    tuning = None,
+                )
+                return output_list
         else:
-            def fn(iter_id):
-                problem_idx = iter_id % problem_cnt
-                op.forward(
-                    inputs[problem_idx],
-                    weights[problem_idx],
-                    output=output,
-                    bias=bias,
-                    input_scale=inputs_scale[problem_idx],
-                    weight_scale=weights_scale[problem_idx],
-                    output_scale=None,
-                    tuning = None,
-                    fast_accum=fast_accum,
-                )
-                # print("bias:", bias, iter_id)
-                # print("inputs[problem_idx]:", inputs[problem_idx])
-                # print("weights[problem_idx]:", weights[problem_idx])
-                # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
-                # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
-                # print("output:", output)
-                return output
+            if 0:
+                problem_idx = 0
+                def forward_fn(problem_idx):
+                    op.forward(inputs[problem_idx],
+                        weights[problem_idx],
+                        output=output,
+                        bias=bias,
+                        input_scale=inputs_scale[problem_idx],
+                        weight_scale=weights_scale[problem_idx],
+                        output_scale=None,
+                        tuning = None,
+                        fast_accum=fast_accum,
+                    )
+                    
+                # pre allocate for cuda graph
+                forward_fn(problem_idx)
+                
+                stream = torch.cuda.Stream()
+                graph = torch.cuda.CUDAGraph()
+                with torch.cuda.stream(stream):
+                    with torch.cuda.graph(graph):
+                        problem_idx = 0
+                        forward_fn(problem_idx)
+                        
+                def fn(iter_id):
+                    graph.replay()
+                    return output
+            else:
+                def fn(iter_id):
+                    problem_idx = iter_id % problem_cnt
+                    op.forward(
+                        inputs[problem_idx],
+                        weights[problem_idx],
+                        output=output,
+                        bias=bias,
+                        input_scale=inputs_scale[problem_idx],
+                        weight_scale=weights_scale[problem_idx],
+                        output_scale=None,
+                        tuning = None,
+                        fast_accum=fast_accum,
+                    )
+                    # print("bias:", bias, iter_id)
+                    # print("inputs[problem_idx]:", inputs[problem_idx])
+                    # print("weights[problem_idx]:", weights[problem_idx])
+                    # print("inputs_scale[problem_idx]:", inputs_scale[problem_idx])
+                    # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
+                    # print("output:", output)
+                    return output
     return xutil.perf_gemm(warmup_iters, iters, "xop", fn)
 
 THRESHOLD_MAP = {

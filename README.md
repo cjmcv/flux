@@ -38,5 +38,5 @@ python3 tools/gen_search_space.py --schema=GemmNormal
 python3 tools/tuning/tune_gemm_normal.py --schema=GemmNormal
 
 # Now you can test it.
-python3 tools/test_gemm_normal.py 100 12288 6144 --dtype=float16
+python3 tools/test_gemm_normal.py 12 12288 6144 1 --dtype=float16
 ```
