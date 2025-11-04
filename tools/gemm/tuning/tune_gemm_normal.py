@@ -237,7 +237,7 @@ def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor,
         n = weight.size(1)
     else:
         n = weight.size(0)
-    g = TuningConfig.G
+    g = config.G
 
     output = torch.empty([m, n], dtype=config.dtypeC, device=input.device, requires_grad=False)
     op = xop.GemmNormal(input_dtype=config.dtypeA, output_dtype=config.dtypeC, transpose_weight=config.transpose_weight)

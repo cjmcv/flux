@@ -453,10 +453,11 @@ if __name__ == "__main__":
         plot_x = range(len(plot_x_value))
         plt.xticks(plot_x, plot_x_value, rotation=45)
 
-    print("xop_perf  [tflops]:", xop_perf['tflops'])
-    print("torch_perf[tflops]:", torch_perf['tflops'])
-    print("xop_perf  [ms]:", xop_perf['ms'])
-    print("torch_perf[ms]:", torch_perf['ms'])
+    fc = lambda tflops_list: [round(num, 3) for num in tflops_list]
+    print("xop_perf  [tflops]:", fc(xop_perf['tflops']))
+    print("torch_perf[tflops]:", fc(torch_perf['tflops']))
+    print("xop_perf  [ms]:", fc(xop_perf['ms']))
+    print("torch_perf[ms]:", fc(torch_perf['ms']))
     
     plt.plot(plot_x, xop_perf['tflops'], label='xop', marker='o', markersize=3)
     plt.plot(plot_x, torch_perf['tflops'], label='torch', marker='s', markersize=3)

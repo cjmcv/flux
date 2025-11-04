@@ -37,7 +37,9 @@ class GemmQuant:
             y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
             return y_fp8, y_scale
         elif (self.quant_bits == 4):
-            w_fp, q_int4, s_int4 = xop.marlin_quant_int4(weight, self.num_groups)
+            n = weight.shape[0]
+            self.workspace = torch.zeros(n // 128 * 16, device=weight.device)
+            w_fp, q_int4, s_int4 = xop.marlin_quant_int4(weight, -1) # self.num_groups: Can not support 128 on h20? 
             return q_int4, s_int4
         else: # 44
             q_int4, s_int4 = xop.symmetric_group_w4a16_pack_bf16_reorder(weight, self.num_groups)
@@ -79,11 +81,8 @@ class GemmQuant:
                 fast_accum=fast_accum,
             )
         elif (self.quant_bits == 4):
-            m = output.shape[0]
-            n = output.shape[1]
-            workspace = torch.zeros(n // 128 * 16, device=input.device)
             thread_k, thread_n = -1, -1 # 64, 256
-            xop.marlin_fp16xint4_matmul(input, weight, output, weight_scale, workspace, thread_k, thread_n, -1, 16)
+            xop.marlin_fp16xint4_matmul(input, weight, output, weight_scale, self.workspace, thread_k, thread_n, -1, 16)
             return 0
         else: # 44
             # out = torch.matmul(input, weight.t())

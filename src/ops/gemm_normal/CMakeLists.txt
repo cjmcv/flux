@@ -15,6 +15,8 @@ set(TUNING_CONFIGS
     ${CMAKE_CURRENT_LIST_DIR}/tuning_config/search_space_gemmw4a16sm90.cu
     ### tuning ###
     # ${CMAKE_CURRENT_LIST_DIR}/tuning_config/tuned_config_gemmsm80.cu
+    # ${CMAKE_CURRENT_LIST_DIR}/tuning_config/tuned_config_gemmsm90.cu
+    # ${CMAKE_CURRENT_LIST_DIR}/tuning_config/tuned_config_gemmw4a16sm90.cu
 )
 message(STATUS "TUNING_CONFIGS: ${TUNING_CONFIGS}")
 

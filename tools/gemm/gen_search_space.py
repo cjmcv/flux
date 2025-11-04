@@ -244,8 +244,8 @@ class GemmSm90Schema:
         mainloop_schedules = ["MSTmaWarpSpecializedPingpong", "MSTmaWarpSpecializedCooperative", "MSTmaWarpSpecialized", "MSTma"]
         epilogue_schedules = ["ESTmaWarpSpecialized", "ESTmaWarpSpecializedCooperative"] # "ESNoSmemWarpSpecialized": EVT are currently only support by the TMA warp specialized epi.
         tile_schedulers = ["TSPersistent", "TSStreamK"]
-        tile_shapes = [(128, 128, 128), (128, 128, 64)]
-        cluster_shapes = [(1, 2, 1), (2, 1, 1)]
+        tile_shapes = [(128, 128, 128), (128, 128, 64), (128, 128, 32)]
+        cluster_shapes = [(2, 2, 1), (1, 2, 1), (2, 1, 1)]
 
         res = []
         for tile_shape, cluster_shape, mainloop_schedule, epilogue_schedule, tile_scheduler in itertools.product(
@@ -294,8 +294,8 @@ class GemmW4A16Sm90Schema:
         mainloop_schedules = ["MSTmaWarpSpecializedPingpong", "MSTmaWarpSpecializedCooperative", "MSTmaWarpSpecialized", "MSTma"]
         epilogue_schedules = ["ESTmaWarpSpecialized", "ESTmaWarpSpecializedCooperative"] # "ESNoSmemWarpSpecialized": EVT are currently only support by the TMA warp specialized epi.
         tile_schedulers = ["TSPersistent", "TSStreamK"]
-        tile_shapes = [(128, 128), (128, 64)]
-        cluster_shapes = [(1, 2, 1), (2, 1, 1)]
+        tile_shapes = [(128, 128), (128, 64), (128, 32)]
+        cluster_shapes = [(1, 2, 1), (2, 1, 1), (1, 1, 1)]
 
         res = []
         for tile_shape, cluster_shape, mainloop_schedule, epilogue_schedule, tile_scheduler in itertools.product(
