@@ -112,7 +112,9 @@ struct TorchDefaultConfig {
       }
       else {
         ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_A = nullptr;
-        rt_args->g = 128; // TODO weight.size(1) * 2 / weight_scale.value().size(1); // w4a16£¬2*w4=1*int8
+        // w4a16, 2*w4=1*int8, weight_int8[N,K/2], weight_scale[group_num, N] (weight_scale has been transposed in w4a16)
+        // group_size = K / group_num.
+        rt_args->g = weight.size(1) * 2 / weight_scale.value().size(0); 
         *default_schema = UnifiedMetaEnum::GemmW4A16;
       }
     }
