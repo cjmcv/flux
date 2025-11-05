@@ -153,6 +153,11 @@ def perf_xop(
             weights_fp8.append(weight_fp8)
             weights_fp8_scale.append(weight_fp8_scale)
 
+        # tuned_hparam = torch.zeros(2, dtype=torch.int16, device='cpu')
+        # tuned_hparam[0] = 2
+        # tuned_hparam[1] = 4096 # chunk_size
+        tuned_hparam = None # [2, 4096]
+        
         def fn(iter_id):
             problem_idx = iter_id % problem_cnt
             op.forward(
@@ -163,7 +168,7 @@ def perf_xop(
                 input_scale=None,
                 weight_scale=weights_fp8_scale[problem_idx],
                 output_scale=None,
-                tuning = None,
+                tuning = tuned_hparam,
                 fast_accum=fast_accum,
             )
             return output
@@ -290,7 +295,7 @@ def run(M, args, xop_perf, torch_perf):
             x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone(), args.fast_accum) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
             y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone(), args.fast_accum)
             # print("data_ptr: ", x_fp8.data_ptr(), y_fp8.data_ptr(), (x_fp8.data_ptr() % 128) == 0, (y_fp8.data_ptr() % 128) == 0)
-            x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
+            x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale, 16384)
 
             fp8_org_inputs.append(x)
             fp8_org_weights.append(y)

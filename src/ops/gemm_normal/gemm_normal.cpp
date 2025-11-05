@@ -98,7 +98,7 @@ public:
       if (rt_args->n%8 != 0 || rt_args->k%8 != 0) {
         return RunTorch(input, weight, output, bias);
       }
-      int max_m = 8192;
+      int max_m = 16384;
       if (run_mode == kRunWithHparam) {
         int16_t *tdata = (int16_t *)tuning.value().data_ptr();
         max_m = tdata[1];
@@ -140,29 +140,28 @@ public:
         GemmBase *op = ins.GetOp(id_meta, false);
 
         cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
+
+        RtArguments *base_args = rt_args.get();
+        std::vector<int> split_m = Strategy::SplitChunkM(base_args->m, max_m);
+        // bias == out_features == N £¨K == in_features£©
+        // so bias needn't split.
+        void *ptr_A = rt_args->ptr_A;
+        void *ptr_D = rt_args->ptr_D;
+        void *ptr_scale_A = nullptr;
         if (default_schema_ == UnifiedMetaEnum::GemmBlockScaleFp8) {
-          if (split_m.size() > 1) {
-            printf("Warning: split_m is not supported in blockscale a.\n");
+          ptr_scale_A = ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_A;
+        }
+        for (int i=0; i<split_m.size(); i++) {
+          rt_args->m = split_m[i];
+
+          printf("m: %d, in: %d, out: %d.\n", rt_args->m, at::elementSize(this->input_dtype), at::elementSize(this->output_dtype));
+          rt_args->ptr_A = (void*)((char*)ptr_A + i*split_m[0]*rt_args->k*at::elementSize(this->input_dtype));
+          rt_args->ptr_D = (void*)((char*)ptr_D + i*split_m[0]*rt_args->n*at::elementSize(this->output_dtype));
+          if (ptr_scale_A != nullptr) {
+            ((RtBlockScaleArguments *)rt_args.get())->ptr_blockscale_A = (void*)((char*)ptr_scale_A + i*split_m[0]*rt_args->k/128*sizeof(float));
           }
           op->initialize(rt_args.get(), nullptr, stream);
           op->run(stream);
-        }
-        else {
-          RtArguments *base_args = rt_args.get();
-          std::vector<int> split_m = Strategy::SplitChunkM(base_args->m, max_m);
-          // bias == out_features == N £¨K == in_features£©
-          // so bias needn't split.
-          void *ptr_A = rt_args->ptr_A;
-          void *ptr_D = rt_args->ptr_D;
-          for (int i=0; i<split_m.size(); i++) {
-            rt_args->m = split_m[i];
-
-            size_t bytes = at::elementSize(this->input_dtype);
-            rt_args->ptr_A = (void*)((char*)ptr_A + i*split_m[0]*rt_args->k*bytes);
-            rt_args->ptr_D = (void*)((char*)ptr_D + i*split_m[0]*rt_args->n*bytes);
-            op->initialize(rt_args.get(), nullptr, stream);
-            op->run(stream);
-          }          
         }
       }
     }

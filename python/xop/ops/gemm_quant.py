@@ -62,12 +62,16 @@ class GemmQuant:
         # y_fp8, y_scale = xutil.per_block_cast_to_fp8(weight, fast_accum)
 
         if (self.quant_bits == 8):
+            chunk_size = 16384
+            if (tuning is not None and tuning[0] == 2):
+                chunk_size = tuning[1]
+
             if (weight_scale is None):
                 y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
             else:
                 y_fp8, y_scale = weight, weight_scale
             x_fp8, x_scale = xop.triton_per_token_cast_to_fp8(input, fast_accum)
-            x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale)
+            x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale, chunk_size)
 
             return self.gemm_normal.forward(
                 x_fp8,

@@ -87,42 +87,42 @@ struct AdaBlockwiseGemm {
   }
 
   Status run(cudaStream_t stream = nullptr) {
-    std::vector<int> split_m = Strategy::SplitChunkM(params_.problem_size.m(), 16384);
+    // std::vector<int> split_m = Strategy::SplitChunkM(params_.problem_size.m(), 4096);
 
-    for (int i=0; i<split_m.size(); i++) {
-      // printf("Run m=%d, %d.\n", split_m[i], kSmemSize);
-      int shape_m = split_m[i];
-      int shape_n = params_.problem_size.n();
-      int shape_k = params_.problem_size.k();
-      int grid_m = (shape_m + KT::kTileM - 1) / KT::kTileM;
-      int grid_n = (shape_n + KT::kTileN - 1) / KT::kTileN;
-      int grid_k = 1;
-      dim3 grid = dim3(grid_m, grid_n, grid_k);
-      dim3 block = dim3(kThreadCount, 1, 1);
+    // for (int i=0; i<split_m.size(); i++) {
+    //   // printf("Run m=%d, %d.\n", split_m[i], kSmemSize);
+    //   int shape_m = split_m[i];
+    //   int shape_n = params_.problem_size.n();
+    //   int shape_k = params_.problem_size.k();
+    //   int grid_m = (shape_m + KT::kTileM - 1) / KT::kTileM;
+    //   int grid_n = (shape_n + KT::kTileN - 1) / KT::kTileN;
+    //   int grid_k = 1;
+    //   dim3 grid = dim3(grid_m, grid_n, grid_k);
+    //   dim3 block = dim3(kThreadCount, 1, 1);
 
-      const void* adjusted_ptr_a = static_cast<const char*>(params_.ptr_a) + i*split_m[0]*shape_k;
-      void* adjusted_ptr_d;
-      if constexpr (cute::is_same_v<float, typename KT::ElementOutput>) {
-        adjusted_ptr_d = static_cast<float*>(params_.ptr_d) + i*split_m[0]*shape_n;
-      }
-      else {
-        adjusted_ptr_d = static_cast<short*>(params_.ptr_d) + i*split_m[0]*shape_n;
-      }
-      const float* adjusted_ptr_scale_a = static_cast<const float*>(params_.ptr_scale_a) + i*split_m[0]*shape_k/128;
-      kernel::ada_blockwise_fp8_gemm_run_kernel<GemmKernel>
-          <<<grid, block, kSmemSize, stream>>>(shape_m, shape_n, shape_k, adjusted_ptr_a, params_.ptr_b, adjusted_ptr_d, adjusted_ptr_scale_a, params_.ptr_scale_b);
-    }
+    //   const void* adjusted_ptr_a = static_cast<const char*>(params_.ptr_a) + i*split_m[0]*shape_k;
+    //   void* adjusted_ptr_d;
+    //   if constexpr (cute::is_same_v<float, typename KT::ElementOutput>) {
+    //     adjusted_ptr_d = static_cast<float*>(params_.ptr_d) + i*split_m[0]*shape_n;
+    //   }
+    //   else {
+    //     adjusted_ptr_d = static_cast<short*>(params_.ptr_d) + i*split_m[0]*shape_n;
+    //   }
+    //   const float* adjusted_ptr_scale_a = static_cast<const float*>(params_.ptr_scale_a) + i*split_m[0]*shape_k/128;
+    //   kernel::ada_blockwise_fp8_gemm_run_kernel<GemmKernel>
+    //       <<<grid, block, kSmemSize, stream>>>(shape_m, shape_n, shape_k, adjusted_ptr_a, params_.ptr_b, adjusted_ptr_d, adjusted_ptr_scale_a, params_.ptr_scale_b);
+    // }
 
-    // int shape_m = params_.problem_size.m();
-    // int shape_n = params_.problem_size.n();
-    // int shape_k = params_.problem_size.k();
-    // int grid_m = (shape_m + KT::kTileM - 1) / KT::kTileM;
-    // int grid_n = (shape_n + KT::kTileN - 1) / KT::kTileN;
-    // int grid_k = 1;
-    // dim3 grid = dim3(grid_m, grid_n, grid_k);
-    // dim3 block = dim3(kThreadCount, 1, 1);
-    // kernel::ada_blockwise_fp8_gemm_run_kernel<GemmKernel>
-    //     <<<grid, block, kSmemSize, stream>>>(shape_m, shape_n, shape_k, params_.ptr_a, params_.ptr_b, params_.ptr_d, params_.ptr_scale_a, params_.ptr_scale_b);
+    int shape_m = params_.problem_size.m();
+    int shape_n = params_.problem_size.n();
+    int shape_k = params_.problem_size.k();
+    int grid_m = (shape_m + KT::kTileM - 1) / KT::kTileM;
+    int grid_n = (shape_n + KT::kTileN - 1) / KT::kTileN;
+    int grid_k = 1;
+    dim3 grid = dim3(grid_m, grid_n, grid_k);
+    dim3 block = dim3(kThreadCount, 1, 1);
+    kernel::ada_blockwise_fp8_gemm_run_kernel<GemmKernel>
+        <<<grid, block, kSmemSize, stream>>>(shape_m, shape_n, shape_k, params_.ptr_a, params_.ptr_b, params_.ptr_d, params_.ptr_scale_a, params_.ptr_scale_b);
 
     return Status::kSuccess;
   }
