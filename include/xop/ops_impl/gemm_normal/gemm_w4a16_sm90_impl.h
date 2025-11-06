@@ -14,6 +14,8 @@
 #include "cutlass/util/mixed_dtype_utils.hpp" // cutlass::compute_memory_reordering_atom
 #include "cutlass/util/packed_stride.hpp"
 
+// machete: https://github.com/vllm-project/vllm/tree/d1dd5f53e4bdb78d5e3b7b4dc1c03f6e2a991e1e/csrc/quantization/machete
+
 namespace xop {
 
 template <class ElementA, class ElementB_t, class ElementC, class ElementAccumulator,
