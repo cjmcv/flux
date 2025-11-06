@@ -295,7 +295,7 @@ def run(M, args, xop_perf, torch_perf):
             x_fp8, x_scale = xutil.per_token_cast_to_fp8(x.clone(), args.fast_accum) # x_fp8[m, k], x_scale[m, k//128] => cutlass x_scale[m,k]
             y_fp8, y_scale = xutil.per_block_cast_to_fp8(y.clone(), args.fast_accum)
             # print("data_ptr: ", x_fp8.data_ptr(), y_fp8.data_ptr(), (x_fp8.data_ptr() % 128) == 0, (y_fp8.data_ptr() % 128) == 0)
-            x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale, 16384)
+            x_scale = xop.gemm_blockscale_fp8_scale_a_preprocess(x_scale, 16384)
 
             fp8_org_inputs.append(x)
             fp8_org_weights.append(y)

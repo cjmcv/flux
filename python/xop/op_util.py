@@ -20,12 +20,15 @@ def pad_row_to_alignment(x, align):
     padding = torch.zeros(pad_rows, x.size(1), dtype=x.dtype, device="cuda")
     return torch.cat([x, padding], dim=0)
 
-# scale_a[m, k//128]
+# input: scale_a[m, k//128]
+# output: 1. pad        : scale_a[pad(m,4), k//128]; 
+#         2. split_chunk: scale_a[M/chunk_size, chunk_size, k//128];  
+#         3. transpose  : scale_a[M/chunk_size, k//128, chunk_size];
 # x and x_scale are internally read in multiples of 4, and use predicate tensors handle boundary cases.
 # But x_scale is transposed before input, if the m-dimension is not padded to a multiple of 4, the transposed data will be mismatched.
 # org: [[1,1]] =>transpose [[1],[1]], in memory, they are the same, like [1,1]
 # org: [[1,1]] =>pad [[1,1], [0,0], [0,0], [0,0]] =>transpose [[1,0,0,0], [1,0,0,0]] => it looks like [1,0,0,0,1,0,0,0]
-def gemm_v2_blockscale_fp8_scale_a_preprocess(scale_a, chunk_size):
+def gemm_blockscale_fp8_scale_a_preprocess(scale_a, chunk_size):
     # torch.set_printoptions(precision=8)
     if (scale_a.size(0) <= chunk_size):
         return pad_row_to_alignment(scale_a, 4).t().contiguous()

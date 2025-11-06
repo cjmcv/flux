@@ -132,7 +132,8 @@ private:
     StrideC stride_C = cutlass::make_cute_packed_stride(StrideC{}, cute::make_shape(rt_args->m, rt_args->n, rt_args->l));
     StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(rt_args->m, rt_args->n, rt_args->l));
     StrideAux stride_aux = stride_D;
-    LayoutSFA layout_SFA = ScaleConfig::tile_atom_to_shape_SFA(cute::make_shape(rt_args->m, rt_args->n, rt_args->k, rt_args->l));
+    // The m in layout_SFA is already padded by function gemm_blockscale_fp8_scale_a_preprocess.
+    LayoutSFA layout_SFA = ScaleConfig::tile_atom_to_shape_SFA(cute::make_shape((rt_args->m+3)/4*4, rt_args->n, rt_args->k, rt_args->l));
     LayoutSFB layout_SFB = ScaleConfig::tile_atom_to_shape_SFB(cute::make_shape(rt_args->m, rt_args->n, rt_args->k, rt_args->l));
     
     typename Gemm::Arguments arguments{

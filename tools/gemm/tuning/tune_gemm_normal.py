@@ -58,8 +58,8 @@ class GemmBlockScaleFp8Sm89Schema:
         y, y_scale = xutil.per_block_cast_to_fp8(weight, is_use_fp16_acc) 
         # Pad and split chunk.
         # No need to set chunks for tuning, as this allows the most authentic state to be presented for manual configuration during project application. 
-        x_scale = xop.gemm_v2_blockscale_fp8_scale_a_preprocess(x_scale, 16384)
-        return x, x_scale, y, y_scale.contiguous()
+        x_scale = xop.gemm_blockscale_fp8_scale_a_preprocess(x_scale, 16384)
+        return x, x_scale, y, y_scale.t().contiguous()
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
                        input_scale: torch.Tensor, weight_scale: torch.Tensor,
                        bias: torch.Tensor):
@@ -114,7 +114,10 @@ class GemmBlockScaleFp8Sm90Schema:
     def gen_scale(self, input: torch.Tensor, weight: torch.Tensor):
         x, x_scale = xutil.per_token_cast_to_fp8(input)
         y, y_scale = xutil.per_block_cast_to_fp8(weight)
-        return x, x_scale.t().contiguous(), y, y_scale.t().contiguous()
+        # Pad and split chunk.
+        # No need to set chunks for tuning, as this allows the most authentic state to be presented for manual configuration during project application. 
+        x_scale = xop.gemm_blockscale_fp8_scale_a_preprocess(x_scale, 16384)
+        return x, x_scale, y, y_scale.t().contiguous()
     def get_ref_output(self, input: torch.Tensor, weight: torch.Tensor, 
                        input_scale: torch.Tensor, weight_scale: torch.Tensor,
                        bias: torch.Tensor):
