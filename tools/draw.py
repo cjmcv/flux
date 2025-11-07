@@ -29,16 +29,17 @@ if __name__ == "__main__":
     # xop_perf   = [0.6,  0.8,  2,  3,  5,   8,   13,  22,  27,  31,   33,   34.7,   35,  34.7,   34.7 ]      # gemmcomm_2048_sm89-l40x2
     # torch_perf = [0.5,  0.7,  1,  2,  3,   6,   11,  16,   24,  30,  32,   33.8,   34,  34.7,   34.7 ]    
     
-    # h20
+    # h20-gemmquant-15-4096
     torch_bf16    = [0.377, 0.78, 1.575, 3.13, 6.255, 12.34, 23.362, 39.492, 60.583, 82.915, 102.774, 117.797, 121.772, 128.134, 133.108]
     xop_bf16      = [0.559, 1.123, 2.251, 4.473, 9.107, 18.127, 36.341, 72.609, 93.666, 103.382, 125.062, 127.589, 135.107, 136.883, 137.246]
     xop_hopper_q4 = [1.002, 2.046, 4.081, 8.156, 15.621, 32.861, 60.088, 79.306, 98.184, 116.035, 123.832, 132.092, 132.001, 138.782, 139.046]
     xop_amphere_q4 = [1.427, 3.157, 6.196, 12.496, 24.786, 34.405, 46.321, 65.27, 76.96, 82.739, 85.982, 86.099, 86.07, 86.243, 86.245]
+    xop_hopper_dynamic_q8 = [0.175, 0.351, 0.948, 1.888, 3.821, 7.627, 14.876, 29.378, 54.527, 85.179, 119.662, 156.494, 182.774, 200.567, 212.61]
     plt.plot(plot_x, torch_bf16, label='torch_bf16', marker='o', markersize=3)
     plt.plot(plot_x, xop_bf16, label='xop_bf16', marker='s', markersize=3)
     plt.plot(plot_x, xop_hopper_q4, label='xop_hopper_q4', marker='s', markersize=3)
     plt.plot(plot_x, xop_amphere_q4, label='xop_amphere_q4', marker='s', markersize=3)
-    
+    plt.plot(plot_x, xop_hopper_dynamic_q8, label='xop_hopper_dynamic_q8', marker='s', markersize=3)
     # plt.ylim(bottom=0)  # 
 
     plt.title(f'perf-N{N}-K{K}')

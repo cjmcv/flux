@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// https://github.com/IST-DASLab/marlin
+// https://github.com/IST-DASLab/marlin/tree/1f25790bdd49fba53106164a24666dade68d7c90
+// https://github.com/vllm-project/vllm/tree/4bf56c79cc252d285d0cb4f5edf323f02af735ca/csrc/quantization/gptq_marlin
 
 #ifndef MARLIN_CUDA_KERNEL_CUH
 #define MARLIN_CUDA_KERNEL_CUH

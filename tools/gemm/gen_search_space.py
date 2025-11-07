@@ -294,13 +294,16 @@ class GemmW4A16Sm90Schema:
         mainloop_schedules = ["MSTmaWarpSpecializedPingpong", "MSTmaWarpSpecializedCooperative", "MSTmaWarpSpecialized", "MSTma"]
         epilogue_schedules = ["ESTmaWarpSpecialized", "ESTmaWarpSpecializedCooperative"] # "ESNoSmemWarpSpecialized": EVT are currently only support by the TMA warp specialized epi.
         tile_schedulers = ["TSPersistent", "TSStreamK"]
-        tile_shapes = [(128, 128), (128, 64), (128, 32)]
+        tile_shapes = [(128, 128), (128, 64), (128, 32), (64, 128), (64, 64)]
         cluster_shapes = [(2, 2, 1), (1, 2, 1), (2, 1, 1), (1, 1, 1)]
 
         res = []
         for tile_shape, cluster_shape, mainloop_schedule, epilogue_schedule, tile_scheduler in itertools.product(
             tile_shapes, cluster_shapes, mainloop_schedules, epilogue_schedules, tile_schedulers):
-            
+
+            # "Cooperative kernel requires Tile Size to be greater than or equal to 128 along the M-dimension."
+            if (mainloop_schedule == "MSTmaWarpSpecializedCooperative" and tile_shape[0] < 128):
+                continue
             # TmaWarpSpecializedPingpong / TmaWarpSpecialized -> TmaWarpSpecialized
             # "TMA warp-specialized kernel does not support specializing the tile scheduler." - cutlass 4.2
             if (mainloop_schedule == "MSTmaWarpSpecialized" and 
