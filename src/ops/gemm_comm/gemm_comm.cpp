@@ -248,7 +248,7 @@ private:
       tuning_data[i+1] = id_meta[i];
     }
 
-    if (tuning_pass_mode == 2) return 0;
+    if (tuning_pass_mode == -1) return 0;
 
     GemmConfigRegister& ins = GemmConfigRegister::instance();
     GemmBase *op = ins.GetOp(id_meta, true);

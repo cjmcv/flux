@@ -102,7 +102,9 @@ public:
       if (run_mode == kRunWithHparam) {
         int16_t *tdata = (int16_t *)tuning.value().data_ptr();
         max_m = tdata[1];
-        // printf("set max_m = %d.\n", max_m);
+        if (tdata[2] != -1)
+          id_meta[kMetaArch] = tdata[2];
+        printf("set max_m = %d, arch = %d.\n", max_m, id_meta[kMetaArch]);
       }
       int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, max_m);
       PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
@@ -154,7 +156,7 @@ public:
         for (int i=0; i<split_m.size(); i++) {
           rt_args->m = split_m[i];
 
-          printf("m: %d, in: %d, out: %d.\n", rt_args->m, at::elementSize(this->input_dtype), at::elementSize(this->output_dtype));
+          PRINTF("m: %d, in: %ld, out: %ld.\n", rt_args->m, at::elementSize(this->input_dtype), at::elementSize(this->output_dtype));
           rt_args->ptr_A = (void*)((char*)ptr_A + i*split_m[0]*rt_args->k*at::elementSize(this->input_dtype));
           rt_args->ptr_D = (void*)((char*)ptr_D + i*split_m[0]*rt_args->n*at::elementSize(this->output_dtype));
           if (ptr_scale_A != nullptr) {
@@ -276,8 +278,9 @@ private:
     XOP_CHECK_EQ(tuning_data[0], 1);
     id_meta[kMetaId] = tuning_data[1];
     id_meta[kMetaSchema] = tuning_data[2];
+    id_meta[kMetaArch] = tuning_data[3];
     
-    PRINTF("[tuning normal] selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
+    PRINTF("[tuning normal] selected_id: %d, selected_schema: %d, selected_arch: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema], id_meta[kMetaArch]);
     if (id_meta[kMetaSchema] == (int16_t)UnifiedMetaEnum::GemmLt) {
       if constexpr (TUNING_WITH_CUBLASLT == false) {
         return -1;

@@ -7,6 +7,7 @@ import torch
 
 import xop
 import xop.util as xutil
+from xop.common import Meta, gen_tuned_hparam, uupdate_tuned_hparam
 
 import os
 import random
@@ -139,6 +140,10 @@ def perf_xop(
             raise ValueError("weight_scale's shape should be (1, n) for S8 GEMM")
 
     output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
+    # tuned_hparam = gen_tuned_hparam(4096, Meta.Sm80)
+    # uupdate_tuned_hparam(tuned_hparam, 512, -1)
+    # tuned_hparam = gen_tuned_hparam(1024, -1)
+    tuned_hparam = None # [2, 4096]
     if (quant_bits != -1): #  and m > 256
         op = xop.GemmQuant(
             input_dtype=inputs[0].dtype,
@@ -152,11 +157,6 @@ def perf_xop(
             weight_fp8, weight_fp8_scale = op.weight_preprocess(weights[i], fast_accum)
             weights_fp8.append(weight_fp8)
             weights_fp8_scale.append(weight_fp8_scale)
-
-        # tuned_hparam = torch.zeros(2, dtype=torch.int16, device='cpu')
-        # tuned_hparam[0] = 2
-        # tuned_hparam[1] = 4096 # chunk_size
-        tuned_hparam = None # [2, 4096]
         
         def fn(iter_id):
             problem_idx = iter_id % problem_cnt
@@ -189,7 +189,7 @@ def perf_xop(
                     outputs=output_list,
                     inputs_scale=None,
                     weights_scale=None,
-                    tuning = None,
+                    tuning = tuned_hparam,
                 )
                 return output_list
         else:
@@ -203,7 +203,7 @@ def perf_xop(
                         input_scale=inputs_scale[problem_idx],
                         weight_scale=weights_scale[problem_idx],
                         output_scale=None,
-                        tuning = None,
+                        tuning = tuned_hparam,
                         fast_accum=fast_accum,
                     )
                     
@@ -231,7 +231,7 @@ def perf_xop(
                         input_scale=inputs_scale[problem_idx],
                         weight_scale=weights_scale[problem_idx],
                         output_scale=None,
-                        tuning = None,
+                        tuning = tuned_hparam,
                         fast_accum=fast_accum,
                     )
                     # print("bias:", bias, iter_id)

@@ -10,8 +10,9 @@ import torch
 
 import xop
 import xop.util as xutil
+from xop.common import Meta
 
-from tune_common import Meta, TuningConfig
+from tune_common import TuningConfig
 import tune_common as common 
 
 common.init_test_env(3)
@@ -24,6 +25,7 @@ is_use_fp16_acc = False # True
 
 class GemmSm80Schema:
     name = "GemmSm80"
+    arch = Meta.Sm80
     sub_schema = [Meta.GemmNormal] # GemmNormalSimt, Meta.GemmLt
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
@@ -46,6 +48,7 @@ class GemmSm80Schema:
 class GemmBlockScaleFp8Sm89Schema:
     impl = "GemmBlockScaleFp8Sm89"
     sub_schema = [Meta.GemmBlockScaleFp8]
+    arch = Meta.Sm89
     
     if is_use_fp16_acc:
         test_input_dtype = torch.float16
@@ -69,6 +72,7 @@ class GemmBlockScaleFp8Sm89Schema:
 
 class GemmSm90Schema:
     name = "GemmSm90"
+    arch = Meta.Sm90
     sub_schema = [Meta.GemmNormal] # GemmNormalSimt, Meta.GemmLt
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
@@ -90,6 +94,7 @@ class GemmSm90Schema:
     
 class GemmW4A16Sm90Schema:
     name = "GemmW4A16Sm90"
+    arch = Meta.Sm90
     sub_schema = [Meta.GemmW4A16] # GemmNormalSimt, Meta.GemmLt
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
@@ -108,6 +113,7 @@ class GemmW4A16Sm90Schema:
         return None
 class GemmBlockScaleFp8Sm90Schema:
     impl = "GemmBlockScaleFp8Sm90"
+    arch = Meta.Sm90
     sub_schema = [Meta.GemmBlockScaleFp8]
     test_input_dtype = torch.bfloat16
     space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
@@ -127,6 +133,7 @@ class GemmBlockScaleFp8Sm90Schema:
 
 class GemmGroupedBlockScaleFp8Sm90Schema:
     impl = "GemmGroupedBlockScaleFp8Sm90Impl"
+    arch = Meta.Sm90
     sub_schema = [Meta.GemmGroupedBlockScaleFp8]
     test_input_dtype = torch.bfloat16
     space_dtype = [(torch.float8_e4m3fn,torch.float8_e4m3fn,torch.bfloat16)]
@@ -168,7 +175,7 @@ def str2schema(schema_name):
 # schema 1: [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192]
 def get_tuning_space(schema):
     space_G = [128]
-    space_M = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192] #,16384,32768,65536 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
+    space_M = [1,2,4,8,16,32,64,128,256,512] #,1024,2048,4096,8192,16384,32768,65536 [8192] # list(range(1, 31)) # [8,16,32,64,128,512,1024] #, 2048, 4096   # , 16384
     # qwen3_4b: (2560,9728), (6144,2560), (2560,4096), (19456,2560) 
     space_NK = [(4096, 4096)] #(576, 7168) (3584,5120), (5120,2560), (5120,13824), (27648,5120), 49152
     space_has_bias = [False]    
@@ -201,14 +208,15 @@ def run_xop_profiling_graph(schema, input: torch.Tensor, weight: torch.Tensor,
         
     schema_cnt = 100
     func_graph = []
-    tuning_data = []
+    tuned_data = []
 
+    arch = schema.arch
     sub_schema = schema.sub_schema[0]
     for id in range(schema_cnt):
         # preallocate
-        tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
+        xop.set_tuning_target(tuning, 1, id, sub_schema, arch)
         fn(tuning)
-        tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
+        xop.set_tuning_target(tuning, 1, id, sub_schema, arch)
         
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
@@ -225,10 +233,10 @@ def run_xop_profiling_graph(schema, input: torch.Tensor, weight: torch.Tensor,
             graph.replay()
         torch.cuda.synchronize()
         elapsed_time = time.time() - start
-        tuning_data.append((elapsed_time, id, sub_schema))
+        tuned_data.append((elapsed_time, id, sub_schema, arch))
 
-    # print("tuning_data", tuning_data)
-    common.write_tuning_result(fp, "add", fn, [m,n,k,g], tuning, tuning_data, pref_iters)
+    # print("tuned_data", tuned_data)
+    common.write_tuning_result(fp, "add", fn, [m,n,k,g], tuning, tuned_data, pref_iters)
     return output.cpu()
   
 def run_xop_profiling(schema, input: torch.Tensor, weight: torch.Tensor, 

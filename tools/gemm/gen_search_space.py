@@ -106,7 +106,7 @@ def make_meta_space(w, data_type, layout, arch):
 class GemmSm80Schema:
     impl = "GemmSm80Impl"
     impl_header = "gemm_normal/gemm_sm80_impl.h"
-    arch_limit = "XOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89"
+    arch_limit = "XOP_CUDA_ARCHS==80 || XOP_CUDA_ARCHS==86 || XOP_CUDA_ARCHS==89 || XOP_CUDA_ARCHS==90"
     
     def get_meta_space(self, w):
         # ('BF16', 'BF16', 'BF16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP32'), ('FP16', 'FP16', 'FP16', 'FP16')

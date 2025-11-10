@@ -15,7 +15,9 @@ from torch.distributed import ProcessGroup
 
 import xop
 import xop.util as xutil
-from tune_common import Meta, TuningConfig
+from xop.common import Meta
+
+from tune_common import TuningConfig
 import tune_common as common 
 
 common.init_test_env(3)
@@ -28,6 +30,7 @@ is_use_fp16_acc = False # True
 
 class GemmAllreduceSm80Schema:
     name = "GemmAllreduceSm80"
+    arch = Meta.Sm80
     sub_schema = [Meta.GemmAllreduce]
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
@@ -49,6 +52,7 @@ class GemmAllreduceSm80Schema:
 
 class GemmAllreduceSm90Schema:
     name = "GemmAllreduceSm90"
+    arch = Meta.Sm90
     sub_schema = [Meta.GemmAllreduce]
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
@@ -120,9 +124,8 @@ def run_xop_profiling_graph(rank: int, group: ProcessGroup,
     sub_schema = schema.sub_schema[0]
     for id in range(schema_cnt):
         # preallocate
-        tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
+        xop.set_tuning_target(tuning, 1, id, sub_schema, schema.arch)
         fn(tuning)
-        tuning[0], tuning[1], tuning[2] = 1, id, sub_schema
         
         stream = torch.cuda.Stream()
         graph = torch.cuda.CUDAGraph()
@@ -139,10 +142,10 @@ def run_xop_profiling_graph(rank: int, group: ProcessGroup,
             graph.replay()
         torch.cuda.synchronize()
         elapsed_time = time.time() - start
-        tuning_data.append((elapsed_time, id, sub_schema))
+        tuning_data.append((elapsed_time, id, sub_schema, schema.arch))
     
     if (rank == 0):
-        common.write_tuning_result(fp, "Add2Comm", fn, [m,n,k,g], tuning, tuning_data, pref_iters, mode=2)
+        common.write_tuning_result(fp, "Add2Comm", fn, [m,n,k,g], tuning, tuning_data, pref_iters, mode=-1)
     return None # output.cpu()
 
 def run_xop_profiling(rank: int, group: ProcessGroup, 
