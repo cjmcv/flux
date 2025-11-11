@@ -347,14 +347,14 @@ class GemmBlockScaleFp8Sm90Schema:
         mainloop_schedules = ["MSTmaWarpSpecializedPingpongFP8BlockScaledAccum", "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum"]
         epilogue_schedules = ["ESTmaWarpSpecialized", "ESTmaWarpSpecializedCooperative"]
         tile_schedulers = ["TSPersistent", "TSStreamK"]
-        tile_shapes = [(128, 128, 128), (128, 128, 64), (128, 128, 32), (128, 64, 128)]
+        tile_shapes = [(128, 128, 128)]
         cluster_shapes = [(1, 2, 1), (2, 1, 1), (2, 2, 1)]
-        raster_orders = ["Heuristic"] #, "AlongM", "AlongN"
+        raster_orders = ["Heuristic", "AlongM", "AlongN"] #
         swizzles = [8] # 1,2,4,8
 
         res = []
         for tile_shape, cluster_shape, mainloop_schedule, epilogue_schedule, tile_scheduler, raster_order, swizzle in itertools.product(
-            mainloop_schedules, epilogue_schedules, tile_shapes, cluster_shapes, tile_schedulers, raster_orders, swizzles):
+            tile_shapes, cluster_shapes, mainloop_schedules, epilogue_schedules, tile_schedulers, raster_orders, swizzles):
             
             # "Cooperative kernel requires Tile Size to be greater than or equal to 128 along the M-dimension."
             if (mainloop_schedule == "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum" and tile_shape[0] < 128):
@@ -367,7 +367,7 @@ class GemmBlockScaleFp8Sm90Schema:
             if (mainloop_schedule == "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum" and epilogue_schedule != "ESTmaWarpSpecializedCooperative"):
                 continue
             
-            hparam_str = '{0},{1},{2},{3},{4}'.format(
+            hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
                 w.cstw(tile_shape,3), w.cstw(cluster_shape,3), 
                 w.xop_to_cutlasstype(mainloop_schedule), 
                 w.xop_to_cutlasstype(epilogue_schedule), 
