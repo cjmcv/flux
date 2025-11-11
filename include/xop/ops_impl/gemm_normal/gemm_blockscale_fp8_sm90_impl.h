@@ -18,7 +18,8 @@ namespace xop {
 using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90Params::RasterOrderOptions;
 template <class ElementA, class ElementB, class ElementC, class ElementAccumulator, 
           class LayoutA, class LayoutB, class LayoutC,
-          class ArchTag, class TileScheduler, class TileShape, class ClusterShape, 
+          class ArchTag, class TileShape, class ClusterShape, 
+          class MainloopScheduleType, class EpilogueScheduleType, class TileScheduler, 
           RasterOrderOptions RasterOrder, int Swizzle>
 class GemmBlockScaleFp8Sm90Impl : public GemmBase {
 public:
@@ -41,8 +42,8 @@ public:
 
   using LayoutSFA     = decltype(ScaleConfig::deduce_layoutSFA());    // Layout type for SFA matrix operand
   using LayoutSFB     = decltype(ScaleConfig::deduce_layoutSFB());    // Layout type for SFB matrix operand
-  using MainloopScheduleType = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum;
-  using EpilogueScheduleType     = cutlass::epilogue::TmaWarpSpecializedCooperative;
+  // using MainloopScheduleType = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum; // KernelTmaWarpSpecializedPingpongFP8BlockScaledAccum
+  // using EpilogueScheduleType     = cutlass::epilogue::TmaWarpSpecializedCooperative;
   using EpilogueTileType     = cutlass::epilogue::collective::EpilogueTileAuto;
 
 #ifdef BLOCKSCALE_FP8_FUSED_COMPLEX

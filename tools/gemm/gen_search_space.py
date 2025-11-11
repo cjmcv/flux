@@ -72,6 +72,8 @@ class TypeWarpper:
             "MSTmaWarpSpecialized": "cutlass::gemm::KernelTmaWarpSpecialized",
             "MSTmaWarpSpecializedPingpong": "cutlass::gemm::KernelTmaWarpSpecializedPingpong",
             "MSTmaWarpSpecializedCooperative": "cutlass::gemm::KernelTmaWarpSpecializedCooperative",
+            "MSTmaWarpSpecializedPingpongFP8BlockScaledAccum": "cutlass::gemm::KernelTmaWarpSpecializedPingpongFP8BlockScaledAccum",
+            "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum": "cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum",
             
             "ESNoSmemWarpSpecialized": "cutlass::epilogue::NoSmemWarpSpecialized",
             "ESTmaWarpSpecialized": "cutlass::epilogue::TmaWarpSpecialized",
@@ -342,17 +344,34 @@ class GemmBlockScaleFp8Sm90Schema:
         return res
 
     def get_hparam_space(self, w):
+        mainloop_schedules = ["MSTmaWarpSpecializedPingpongFP8BlockScaledAccum", "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum"]
+        epilogue_schedules = ["ESTmaWarpSpecialized", "ESTmaWarpSpecializedCooperative"]
         tile_schedulers = ["TSPersistent", "TSStreamK"]
-        tile_shapes = [(128, 128, 128)]
-        cluster_shapes = [(1, 2, 1), (2, 1, 1)]
-        raster_orders = ["Heuristic", "AlongM", "AlongN"]
-        swizzles = [2,4,8] # 1,2,4,8
+        tile_shapes = [(128, 128, 128), (128, 128, 64), (128, 128, 32), (128, 64, 128)]
+        cluster_shapes = [(1, 2, 1), (2, 1, 1), (2, 2, 1)]
+        raster_orders = ["Heuristic"] #, "AlongM", "AlongN"
+        swizzles = [8] # 1,2,4,8
 
         res = []
-        for tile_scheduler, tile_shape, cluster_shape, raster_order, swizzle in itertools.product(
-            tile_schedulers, tile_shapes, cluster_shapes, raster_orders, swizzles):
+        for tile_shape, cluster_shape, mainloop_schedule, epilogue_schedule, tile_scheduler, raster_order, swizzle in itertools.product(
+            mainloop_schedules, epilogue_schedules, tile_shapes, cluster_shapes, tile_schedulers, raster_orders, swizzles):
+            
+            # "Cooperative kernel requires Tile Size to be greater than or equal to 128 along the M-dimension."
+            if (mainloop_schedule == "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum" and tile_shape[0] < 128):
+                continue
+            # "Ping-pong kernel does not currently support stream-K scheduler" - cutlass 4.2
+            if (mainloop_schedule == "MSTmaWarpSpecializedPingpongFP8BlockScaledAccum" and 
+                (epilogue_schedule != "ESTmaWarpSpecialized" or tile_scheduler != "TSPersistent")):
+                continue
+            # TmaWarpSpecializedCooperative -> TmaWarpSpecializedCooperative
+            if (mainloop_schedule == "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum" and epilogue_schedule != "ESTmaWarpSpecializedCooperative"):
+                continue
+            
             hparam_str = '{0},{1},{2},{3},{4}'.format(
-                w.xop_to_cutlasstype(tile_scheduler), w.cstw(tile_shape,3), w.cstw(cluster_shape,3),
+                w.cstw(tile_shape,3), w.cstw(cluster_shape,3), 
+                w.xop_to_cutlasstype(mainloop_schedule), 
+                w.xop_to_cutlasstype(epilogue_schedule), 
+                w.xop_to_cutlasstype(tile_scheduler), 
                 w.xop_to_cutlasstype(raster_order), str(swizzle))
             res.append(hparam_str)
         return res
