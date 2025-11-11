@@ -12,8 +12,7 @@ ENABLE_QUANT_8 = 1
 ENABLE_QUANT_4 = 1
 
 # tuning
-# ${CMAKE_CURRENT_LIST_DIR}/tuning_config/tuned_config_gemmsm80_l40.cu
-# ${CMAKE_CURRENT_LIST_DIR}/tuning_config/tuned_config_gemmblockscalefp8sm89_l40.cu
+
 class XopGemmSpecify:
     def __init__(
         self,

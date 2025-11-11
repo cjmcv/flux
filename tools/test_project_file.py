@@ -7,7 +7,7 @@ from xop.project.qwen3_4b_l40 import XopGemmSpecify
     
 # python tools/test_torch_compile.py
 def main():
-    M = 1
+    M = 256
     N = 4096
     K = 4096
     A = torch.randn((M, K), device='cuda', dtype=torch.bfloat16, requires_grad=False)
