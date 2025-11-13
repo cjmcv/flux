@@ -14,7 +14,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 DTYPE_MAP = {
     "bfloat16": torch.bfloat16,
@@ -91,7 +91,8 @@ def perf_torch(
             if bias is not None:
                 output = output + bias
         else:
-            output = alpha_scale * torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)
+            # alpha_scale * 
+            output = torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)
         return output
 
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
@@ -139,7 +140,7 @@ def perf_xop(
         if not _check_tensor_shape(weights_scale, (1, n)):
             raise ValueError("weight_scale's shape should be (1, n) for S8 GEMM")
 
-    output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
+    # output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
     # tuned_hparam = gen_tuned_hparam(4096, Meta.Sm80)
     # uupdate_tuned_hparam(tuned_hparam, 512, -1)
     # tuned_hparam = gen_tuned_hparam(1024, -1)
@@ -160,10 +161,10 @@ def perf_xop(
         
         def fn(iter_id):
             problem_idx = iter_id % problem_cnt
-            op.forward(
+            return op.forward(
                 inputs[problem_idx],
                 weights_fp8[problem_idx],
-                output=output,
+                output=None,
                 bias=bias,
                 input_scale=None,
                 weight_scale=weights_fp8_scale[problem_idx],
@@ -171,13 +172,13 @@ def perf_xop(
                 tuning = tuned_hparam,
                 fast_accum=fast_accum,
             )
-            return output
     else:   
         op = xop.GemmNormal(
             input_dtype=inputs[0].dtype,
             output_dtype=output_dtype,
             transpose_weight=transpose_weight
         )
+        output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
         if (num_groups != -1):
             output_list = [output.clone() for _ in range(num_groups)]
             def fn(iter_id):
@@ -198,7 +199,7 @@ def perf_xop(
                 def forward_fn(problem_idx):
                     op.forward(inputs[problem_idx],
                         weights[problem_idx],
-                        output=output,
+                        output=None,
                         bias=bias,
                         input_scale=inputs_scale[problem_idx],
                         weight_scale=weights_scale[problem_idx],
@@ -223,10 +224,10 @@ def perf_xop(
             else:
                 def fn(iter_id):
                     problem_idx = iter_id % problem_cnt
-                    op.forward(
+                    output = op.forward(
                         inputs[problem_idx],
                         weights[problem_idx],
-                        output=output,
+                        output=None,
                         bias=bias,
                         input_scale=inputs_scale[problem_idx],
                         weight_scale=weights_scale[problem_idx],

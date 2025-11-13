@@ -8,6 +8,9 @@ import numpy as np
 import xop
 from xop.common import Meta
 
+from torch.library import Library
+from .common import direct_register_custom_op
+
 ENABLE_QUANT_8 = 1
 ENABLE_QUANT_4 = 1
 
@@ -16,6 +19,7 @@ ENABLE_QUANT_4 = 1
 class XopGemmSpecify:
     def __init__(
         self,
+        weight,
         input_dtype: torch.dtype,
         output_dtype: torch.dtype,
         fast_accum: bool,
@@ -38,7 +42,7 @@ class XopGemmSpecify:
                 output_dtype=output_dtype,
                 quant_bits=8
             )
-            self.weight_quant8_ready = False
+            self.q8_y, self.q8_y_scale = self.gemm_quant8.weight_preprocess(weight, self.fast_accum)
         
         if (ENABLE_QUANT_4):
             self.gemm_quant4 = xop.GemmQuant(
@@ -46,34 +50,29 @@ class XopGemmSpecify:
                 output_dtype=output_dtype,
                 quant_bits=4
             )
-            self.weight_quant4_ready = False
+            self.q4_y, self.q4_y_scale = self.gemm_quant4.weight_preprocess(weight, self.fast_accum)
 
     def get_run_mode(self, M, N, K) -> int:
         
-        #######################################
+        self.hparam[1] = 8192
+        self.hparam[2] = -1
         mode = 0
-        if (M >= 128):
-            mode = 1
-            if (M >= 2048 and ENABLE_QUANT_8 == 1):
-                mode = 8 
-        elif (M <= 32):
-            if (ENABLE_QUANT_4):
-                mode = 4
         #######################################
         
-        # N K => max_m
-        if mode == 1:
-            if (N == 2560 and K == 9728) or (N == 19456 and K == 2560):
-                self.hparam[1] = 512
-            else:  # if (N == 2560 and K == 4096) or (N == 6144 and K == 2560)
-                self.hparam[1] = 1024
-        elif mode == 8:
-            if (N == 2560 and K == 4096) or (N == 6144 and K == 2560):
-                self.hparam[1] = 1024
-            elif (N == 2560 and K == 9728):
-                self.hparam[1] = 2048
-            else:
-                self.hparam[1] = 512
+        # if ((M <= 64) or 
+        #     (M <= 256 and N == 2560 and K == 4096) or 
+        #     (M <= 128 and N == 2560 and K == 9728) or
+        #     (M <= 256 and N == 6144 and K == 2560)):
+
+        if (M <= 32):
+            mode = 4
+            # self.hparam[2] = Meta.Sm80
+
+        # if ((M >= 512 and N == 19456 and K == 2560) or 
+        #     (M >= 2048 and N == 6144 and K == 2560) or 
+        #     (M >= 2048 and N == 2560 and K == 9728) or 
+        #     (M >= 4096 and N == 2560 and K == 4096)):
+        #     mode = 8
             
         return mode
     
@@ -82,10 +81,9 @@ class XopGemmSpecify:
         run_mode,
         input: torch.Tensor,
         weight: torch.Tensor,
+        output: torch.Tensor,
         bias: Optional[torch.Tensor] = None
     ) -> int: 
-        output = torch.empty(input.shape[0], weight.shape[0], dtype=input.dtype, device="cuda")
-        
         if (run_mode == 0):
             assert(0)
         elif (run_mode == 1):
@@ -95,21 +93,11 @@ class XopGemmSpecify:
                                     self.hparam, self.fast_accum)
         elif (run_mode == 8):
             print("xop_quant8")
-            if (self.weight_quant8_ready == False):
-                self.q8_y, self.q8_y_scale = self.gemm_quant8.weight_preprocess(weight, self.fast_accum)
-                self.weight_quant8_ready = True
-                
             self.gemm_quant8.forward(input, self.q8_y, output, bias, 
                                     None, self.q8_y_scale, None, 
                                     self.hparam, self.fast_accum)
         elif (run_mode == 4):
             print("xop_quant4")
-            if (self.weight_quant4_ready == False):
-                self.q4_y, self.q4_y_scale = self.gemm_quant4.weight_preprocess(weight, self.fast_accum)
-                self.weight_quant4_ready = True
-                
             self.gemm_quant4.forward(input, self.q4_y, output, bias, 
                                     None, self.q4_y_scale, None, 
                                     None, self.fast_accum)
-        
-        return output

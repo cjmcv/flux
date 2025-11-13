@@ -38,8 +38,9 @@ class GemmQuant:
             return y_fp8, y_scale.t().contiguous()
         elif (self.quant_bits == 4):
             n = weight.shape[0]
+            print(n)
             self.workspace = torch.zeros(n // 128 * 16, device=weight.device)
-            w_fp, q_int4, s_int4 = xop.marlin_quant_int4(weight, -1) # self.num_groups: Can not support 128 on h20? 
+            w_fp, q_int4, s_int4 = xop.marlin_quant_int4(weight, -1) # self.num_groups: Can not support 128 on h20? This size is set specifically for groupsize = 128.
             return q_int4, s_int4
         else: # 44
             q_int4, s_int4 = xop.symmetric_group_w4a16_pack_bf16_reorder(weight, self.num_groups)

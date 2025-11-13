@@ -12,10 +12,10 @@ public:
       bool transpose_weight);
   ~GemmNormal();
 
-  int forward(
+  torch::Tensor forward(
       torch::Tensor lhs,
       torch::Tensor rhs,
-      torch::Tensor output,
+      c10::optional<torch::Tensor> output,
       c10::optional<torch::Tensor> bias,
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,

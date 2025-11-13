@@ -29,7 +29,7 @@
 /////////////////////////////
 #include "xop/xop.h"
 
-#define PRINTF printf
+#define PRINTF // printf
 #define NOT_TUNING_SCHEMA "" // "TORCH"
 #define TUNING_WITH_CUBLASLT false
 
@@ -65,16 +65,18 @@ public:
       }
     }
   }
+
   // tuning：tensor进入，先构建meta，依次添加序号充当key，取获取op，计算性能，并进行排序，取top5, 保留整个meta。获取不到新op时表示结束。
   //         top1的meta从cpp端写入文件，信息包括shape+序号+meta。保存时，meta信息需要按python脚本的生成方式，转为字符串。
   // python脚本根据tuning结果文件，再次生成op注册表+tuning注册表，
   //       op注册表：按第一次生成的流程再走一遍，同时检索序号+meta的字符串, 匹配者留下，不匹配的不生成。
   //       tuning注册表：key是shape+meta，value是序号，test时输入tensor，构建meta，结合shape，获取序号。组成序号+meta，充当op注册表的key，检索搜索op。
   // python1生成搜索空间op注册表，编译，python2执行tuning脚本，生成tuned表，python1生成top1的op注册表以及tuning注册表。
-  int forward(
+  torch::Tensor
+  forward(
       torch::Tensor input,
       torch::Tensor weight,
-      torch::Tensor output,
+      c10::optional<torch::Tensor> output_buf,
       c10::optional<torch::Tensor> bias,
       c10::optional<torch::Tensor> input_scale,
       c10::optional<torch::Tensor> weight_scale,
@@ -86,25 +88,32 @@ public:
     std::vector<int16_t> id_meta = TorchDefaultConfig::MakeDefaultMeta(arch_, this->input_dtype, weight.scalar_type(), this->output_dtype, fast_accum, transpose_weight, false);       // id + meta
     RunModeEnum run_mode = TorchDefaultConfig::GetRunMode(tuning);
     ///////
+    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
+    torch::Tensor output;
+    if (output_buf.has_value()) {
+      output = output_buf.value();
+    } else {
+      output = create_output_tensor(input, weight, stream);
+    }
     std::unique_ptr<RtArguments> rt_args = TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, 
                                                                              this->input_dtype, this->output_dtype, transpose_weight, &default_schema_);
 
     if (run_mode == kRunWithTuning) {
-      return forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
-                            (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get());
+      forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
+                      (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get());
     }
     else {
       // Misalignment case.
-      if (rt_args->n%8 != 0 || rt_args->k%8 != 0) {
-        return RunTorch(input, weight, output, bias);
-      }
+      // if (rt_args->n%8 != 0 || rt_args->k%8 != 0) {
+      //   return RunTorch(input, weight, output, bias);
+      // }
       int max_m = 16384;
       if (run_mode == kRunWithHparam) {
         int16_t *tdata = (int16_t *)tuning.value().data_ptr();
         max_m = tdata[1];
         if (tdata[2] != -1)
           id_meta[kMetaArch] = tdata[2];
-        printf("set max_m = %d, arch = %d.\n", max_m, id_meta[kMetaArch]);
+        PRINTF("set max_m = %d, arch = %d.\n", max_m, id_meta[kMetaArch]);
       }
       int tuned_m = Strategy::CoarseGrainedTuningM(rt_args->m, max_m);
       PRINTF("actual_m: %d, tuned_m: %d.\n", rt_args->m, tuned_m);
@@ -117,18 +126,18 @@ public:
 
       // If the required configuration is not registered in the tuning config, directly use torch for computation.
       if (id_meta[kMetaId] == -1) {
-        if constexpr (NOT_TUNING_SCHEMA == "TORCH")
-          return RunTorch(input, weight, output, bias);
-        else {
+        // if constexpr (NOT_TUNING_SCHEMA == "TORCH")
+        //   return RunTorch(input, weight, output, bias);
+        // else {
           id_meta[kMetaId] = 0;
           id_meta[kMetaSchema] = (int16_t)default_schema_;
-        }
+        // }
       }
       PRINTF("[runing normal] selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
       if (id_meta[kMetaSchema] == (int16_t)UnifiedMetaEnum::GemmLt) {
-        if constexpr (TUNING_WITH_CUBLASLT == false) {
-          return RunTorch(input, weight, output, bias);
-        }
+        // if constexpr (TUNING_WITH_CUBLASLT == false) {
+        //   return RunTorch(input, weight, output, bias);
+        // }
         cudaDataType_t type_input = WarpIdMeta2CublasLtType(id_meta[kMetaTypeA]);
         cudaDataType_t type_output = WarpIdMeta2CublasLtType(id_meta[kMetaTypeCD]);
         cublasComputeType_t type_compute = WarpIdMeta2CublasLtComputeType(id_meta[kMetaTypeAcc]);
@@ -140,8 +149,6 @@ public:
       else {
         GemmConfigRegister& ins = GemmConfigRegister::instance();
         GemmBase *op = ins.GetOp(id_meta, false);
-
-        cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
 
         RtArguments *base_args = rt_args.get();
         std::vector<int> split_m = Strategy::SplitChunkM(base_args->m, max_m);
@@ -172,7 +179,7 @@ public:
     // for(int i=0; i<id_meta.size(); i++) {
     //   PRINTF("%d, ", id_meta[i]);
     // }
-    return 0;
+    return output;
   }
 
   int grouped_forward(
@@ -266,6 +273,23 @@ public:
   }
 
 private:
+  torch::Tensor
+  create_output_tensor(torch::Tensor input, torch::Tensor weight, cudaStream_t stream) {
+    int32_t m = input.size(0);
+    int32_t n = weight.size(0);
+    
+    int32_t malloc_m = 8192;
+    if (malloc_m < m) 
+      malloc_m = m;
+    
+    void *buffer_ptr = GlobalBuffer::instance().ResizeOutputDeviceBufferIfNeeded(malloc_m*n*at::elementSize(output_dtype), stream);
+    auto opts = torch::TensorOptions()
+                  .dtype(weight.dtype())
+                  .device(weight.device());
+    return torch::from_blob(buffer_ptr, {m, n}, opts);  
+    // return torch::empty({m, n}, weight.options().dtype(output_dtype));
+  }
+
   int forward_tuning(torch::Tensor input,
                     torch::Tensor weight,
                     torch::Tensor output,
@@ -275,7 +299,7 @@ private:
                     int16_t *tuning_data, 
                     std::vector<int16_t>& id_meta, 
                     RtArguments *rt_args) {
-    XOP_CHECK_EQ(tuning_data[0], 1);
+    XOP_CHECK_EQ(tuning_data[0], 1); // 1 for tuning
     id_meta[kMetaId] = tuning_data[1];
     id_meta[kMetaSchema] = tuning_data[2];
     id_meta[kMetaArch] = tuning_data[3];
@@ -323,6 +347,7 @@ private:
         // printf("} not found.\n");
 
         // ins.PrintRegistered("abc:");
+        tuning_data[0] = -1; // close the tuning flag
         return -1;        
       }
       cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
@@ -384,10 +409,11 @@ GemmNormal::GemmNormal(
 
 GemmNormal::~GemmNormal() { delete impl_; }
 
-int GemmNormal::forward(
+torch::Tensor
+GemmNormal::forward(
     torch::Tensor input,
     torch::Tensor weight,
-    torch::Tensor output,
+    c10::optional<torch::Tensor> output,
     c10::optional<torch::Tensor> bias,
     c10::optional<torch::Tensor> input_scale,
     c10::optional<torch::Tensor> weight_scale,

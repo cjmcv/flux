@@ -32,8 +32,14 @@ private:
   GlobalBuffer(const GlobalBuffer&) = delete;
   GlobalBuffer& operator=(const GlobalBuffer&) = delete;
 
-  cutlass::device_memory::allocation<uint8_t> device_buffer_;
-  cutlass::device_memory::allocation<uint8_t> device_buffer2_;
+  int device_buffer_size_ = 0;
+  uint8_t* device_buffer_ = nullptr;
+  int device_buffer_size_2_ = 0;
+  uint8_t* device_buffer_2_ = nullptr;
+
+  int output_device_buffer_size_ = 0;
+  uint8_t* output_device_buffer_ = nullptr;
+
   std::vector<uint8_t> host_buffer_;
 
 public:
@@ -42,20 +48,40 @@ public:
     return instance;
   }
 
-  uint8_t* ResizeDeviceBufferIfNeeded(size_t workspace_size) {
-    workspace_size = (workspace_size + 127) / 128 * 128;
-    if (device_buffer_.size() < workspace_size) {
-      device_buffer_.reset(workspace_size);
+  uint8_t* ResizeDeviceBufferIfNeeded(size_t size, cudaStream_t stream) {
+    size = (size + 127) / 128 * 128;
+    if (device_buffer_size_ < size) {
+      if (device_buffer_ != nullptr) {
+        cudaFreeAsync(device_buffer_, stream);
+      }
+      cudaMallocAsync(&device_buffer_, size, stream);
+      device_buffer_size_ = size;
     }
-    return device_buffer_.get();
+    return device_buffer_;
   }
 
-  uint8_t* ResizeDeviceBuffer2IfNeeded(size_t size) {
+  uint8_t* ResizeDeviceBuffer2IfNeeded(size_t size, cudaStream_t stream) {
     size = (size + 127) / 128 * 128;
-    if (device_buffer2_.size() < size) {
-      device_buffer2_.reset(size);
+    if (device_buffer_size_2_ < size) {
+      if (device_buffer_2_ != nullptr) {
+        cudaFreeAsync(device_buffer_2_, stream);
+      }
+      cudaMallocAsync(&device_buffer_2_, size, stream);
+      device_buffer_size_2_ = size;
     }
-    return device_buffer2_.get();
+    return device_buffer_2_;
+  }
+
+  uint8_t* ResizeOutputDeviceBufferIfNeeded(size_t size, cudaStream_t stream) {
+    size = (size + 127) / 128 * 128;
+    if (output_device_buffer_size_ < size) {
+      if (output_device_buffer_ != nullptr) {
+        cudaFreeAsync(output_device_buffer_, stream);
+      }
+      cudaMallocAsync(&output_device_buffer_, size, stream);
+      output_device_buffer_size_ = size;
+    }
+    return output_device_buffer_;
   }
 
   uint8_t* ResizeHostBufferIfNeeded(size_t size) {

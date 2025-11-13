@@ -244,7 +244,7 @@ public:
     size_t done_flag_idx_size = sizeof(int);
     size_t done_flag_size = (m_+ThreadblockShape::kM-1)/ThreadblockShape::kM * (n_+ThreadblockShape::kN-1)/ThreadblockShape::kN * sizeof(int);
     ar_args_.aux_local_size = done_flag_idx_size + done_flag_size * 3;
-    ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size);
+    ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size, cu_stream);
     ar_args_.aux_buffer_streamk_reduce_mark_step = done_flag_idx_size + done_flag_size;
     ar_args_.aux_buffer_reduce_arrival_step = done_flag_idx_size + done_flag_size + done_flag_size;
     CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_local_buffer, 0, ar_args_.aux_local_size, cu_stream));
@@ -263,7 +263,8 @@ public:
     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
 
     // Allocate workspace memory
-    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size);
+    
+    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size, cu_stream);
 
     // Check the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));

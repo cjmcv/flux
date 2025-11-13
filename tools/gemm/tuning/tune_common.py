@@ -106,7 +106,7 @@ def write_tuning_result(fp, add_func_name, fn, shape, tuning, tuned_data, pref_i
     if (fastest_id != tuning[1].item() or fastest_schema != tuning[2].item()):
         print("fastest_config is not matched: {0},{1} vs {2},{3}".format(str(fastest_id), str(fastest_schema), str(tuning[1].item()), str(tuning[2].item())))
         raise RuntimeError
- 
+    # return output
  
 def profiling_core_cudagraph(fn: callable, tuning, ret, add_func_name, shape, schema, warmup_iters, pref_iters, fp):
     tuned_data = []
@@ -144,16 +144,13 @@ def profiling_core(fn: callable, add_func_name, shape, schema, warmup_iters, pre
         for id in range(500):
             # warmup and check if exist.
             set_tuning_target(tuning, 1, id, sub_schema, schema.arch)
-            ret = fn(tuning)
-            code = 0
-            if (isinstance(ret, torch.Tensor) and ret is None):
-                code = -1
-            else:
-                code = ret
-            print(1, id, sub_schema, "-> code: ", code)
-            if (code == -1):
+            print(tuning[0].item())
+            fn(tuning)
+            current_mode = tuning[0].item()
+            print(1, id, sub_schema, "-> code: ", current_mode)
+            if (current_mode == -1):
                 break
-
+            
             for i in range(warmup_iters + pref_iters):
                 if (i == warmup_iters):
                     torch.cuda.synchronize()

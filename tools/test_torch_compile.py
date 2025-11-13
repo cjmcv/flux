@@ -1,7 +1,9 @@
 
 import torch
-
+import torch.nn.functional as F
 import xop
+
+print(torch.__version__)
 
 op = xop.GemmNormal(
     input_dtype=torch.bfloat16,
@@ -45,17 +47,22 @@ def test_cuda_graph(A, B, C):
         )
         
     # pre allocate for cuda graph   
-    forward_fn()
+    # forward_fn()
     
     stream = torch.cuda.Stream()
-    graph = torch.cuda.CUDAGraph()
+    g = torch.cuda.CUDAGraph()
     with torch.cuda.stream(stream):
-        with torch.cuda.graph(graph):
+        with torch.cuda.graph(g):
             forward_fn()
             
-    print("Cuda graph replay")
-    graph.replay()
+    print("Cuda graph replay: ", g.pool())
+    g.replay()
     print(C)
+    print(g)
+    
+    with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CUDA]) as prof:
+        g.replay()
+    prof.export_chrome_trace("trace.json")
     
 # python tools/test_torch_compile.py
 def main():

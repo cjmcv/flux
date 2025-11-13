@@ -63,13 +63,14 @@ public:
 
     // Allocate workspace memory
     // cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
-    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size);
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size, cu_stream);
 
     // Check if the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
 
     // Initialize CUTLASS kernel with arguments and workspace pointer
-    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_ptr));
+    CUTLASS_CHECK(gemm_dev_.initialize(arguments, workspace_ptr, cu_stream));
   }
 
   void run(void *stream = nullptr) {
@@ -80,17 +81,17 @@ public:
 private:
   typename Gemm::Arguments args_from_options(const RtGroupedArguments *rt_args, void *stream)
   {
-    /// 
+    ///
+    auto cu_stream = static_cast<cudaStream_t>(stream);
+    
     std::vector<int> sizes;
     std::vector<int> offsets;
     int total_size;
     get_buffer_info(rt_args, sizes, offsets, total_size);
     uint8_t *host_buffer = GlobalBuffer::instance().ResizeHostBufferIfNeeded(total_size);
-    uint8_t *device_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(total_size);
+    uint8_t *device_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(total_size, cu_stream);
 
     cpy_args2host_buffer(rt_args, sizes, offsets, host_buffer);
-
-    auto cu_stream = static_cast<cudaStream_t>(stream);
     CUDA_CHECK(cudaMemcpyAsync(device_buffer, host_buffer, total_size, cudaMemcpyHostToDevice, cu_stream));
 
     cutlass::gemm::GemmCoord *problem_sizes = (cutlass::gemm::GemmCoord *)(device_buffer + offsets[0]);
