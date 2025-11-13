@@ -62,7 +62,7 @@ def main():
     g.replay()
     print(E)
     # print(g)
-    
+    xop.print_used_size_of_device_buffer()
     
 if __name__ == '__main__':
     main()

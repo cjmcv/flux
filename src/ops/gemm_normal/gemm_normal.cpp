@@ -456,5 +456,8 @@ return impl_->grouped_forward(
     std::move(tuning));
 }
 
+void print_used_size_of_device_buffer() {
+  GlobalBuffer::instance().PrintUsedBufferSize();
+}
 
 }  // namespace xop

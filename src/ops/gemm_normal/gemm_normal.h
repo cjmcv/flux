@@ -38,5 +38,6 @@ private:
 
 // Preprocess Funcs
 void gemm_w4a16_sm90_reorder_weight(torch::Tensor weight);
+void print_used_size_of_device_buffer();
 
 }  // namespace xop

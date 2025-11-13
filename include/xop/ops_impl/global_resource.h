@@ -74,10 +74,21 @@ public:
   }
 
   void PrintUsedBufferSize() {
-    printf("GlobalBuffer::kDevBufferPoolWorkspace: %ld.\n", (used_buffers_size_[kDevBufferPoolWorkspace] + 127) / 128 * 128);
-    printf("GlobalBuffer::kDevBufferPoolAux: %ld.\n", (used_buffers_size_[kDevBufferPoolAux] + 127) / 128 * 128);
-    printf("GlobalBuffer::kDevBufferPoolOutput: %ld.\n", (used_buffers_size_[kDevBufferPoolOutput] + 127) / 128 * 128);
+    size_t workspace_size = (used_buffers_size_[kDevBufferPoolWorkspace] + 127) / 128 * 128;
+    size_t aux_size = (used_buffers_size_[kDevBufferPoolAux] + 127) / 128 * 128;
+    size_t output_size = (used_buffers_size_[kDevBufferPoolOutput] + 127) / 128 * 128;
+
+    printf("GlobalBuffer::kDevBufferPoolWorkspace: total %ld vs used %ld (%f %%).\n", 
+      buffers_size_[kDevBufferPoolWorkspace], workspace_size, 
+      workspace_size * 1.0 / buffers_size_[kDevBufferPoolWorkspace]);
+    printf("GlobalBuffer::kDevBufferPoolAux: total %ld vs used %ld (%f %%).\n", 
+      buffers_size_[kDevBufferPoolAux], aux_size,
+      aux_size * 1.0 / buffers_size_[kDevBufferPoolAux]);
+    printf("GlobalBuffer::kDevBufferPoolOutput: total %ld vs used %ld (%f %%).\n", 
+      buffers_size_[kDevBufferPoolOutput], output_size,
+      output_size * 1.0 / buffers_size_[kDevBufferPoolOutput]);
   }
+
 
   // void* ResizeDeviceBufferIfNeeded(DeviceBufferPoolKindEnum pool_id, size_t size, cudaStream_t stream) {
   //   size = (size + 127) / 128 * 128;

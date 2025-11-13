@@ -60,7 +60,13 @@ static int _register_gemm_normal_ops [[maybe_unused]] = []() {
     m.def("gemm_w4a16_sm90_reorder_weight",
         &gemm_w4a16_sm90_reorder_weight,
         py::arg("weight"));
+        
+    m.def("print_used_size_of_device_buffer",
+        &print_used_size_of_device_buffer);
   });
+
+
+
   return 0;
 }();
 #endif // ENABLE_GEMM_NORMAL

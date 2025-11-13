@@ -33,6 +33,7 @@ def _get_xop_member(member):
 
 GemmNormal = _get_xop_member("GemmNormal")
 gemm_w4a16_sm90_reorder_weight = _get_xop_member("gemm_w4a16_sm90_reorder_weight")
+print_used_size_of_device_buffer = _get_xop_member("print_used_size_of_device_buffer")
 
 marlin_fp16xint4_matmul = _get_xop_member("marlin_fp16xint4_matmul")
 helloABCM = _get_xop_member("helloABCM")
