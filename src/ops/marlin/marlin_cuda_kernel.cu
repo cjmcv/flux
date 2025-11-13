@@ -989,7 +989,7 @@ torch::Tensor marlin_fp16xint4_matmul(
     if (malloc_m < m) 
       malloc_m = m;
 
-    void *buffer_ptr = xop::GlobalBuffer::instance().ResizeOutputDeviceBufferIfNeeded(malloc_m*prob_n*at::elementSize(A.scalar_type()), stream);
+    void *buffer_ptr = xop::GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolOutput, malloc_m*prob_n*at::elementSize(A.scalar_type()));
     auto opts = torch::TensorOptions()
                   .dtype(A.dtype())
                   .device(A.device());
@@ -1002,7 +1002,7 @@ torch::Tensor marlin_fp16xint4_matmul(
   } else {
     int32_t num = prob_n / 128 * max_par;
     // self.workspace = torch.zeros(n // 128 * 16, device=weight.device)
-    void *buffer_ptr = xop::GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(num * sizeof(float), stream);
+    void *buffer_ptr = xop::GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolWorkspace, num * sizeof(float));
     auto opts = torch::TensorOptions()
                   .dtype(torch::kFloat)
                   .device(A.device());

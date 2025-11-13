@@ -269,7 +269,7 @@ public:
     output_len_ = rt_args->m * rt_args->n;
     ar_args_.output = rt_args->ptr_D;
     ar_args_.aux_local_size = output_len_ * sizeof(ElementD);  // todo: 不需要这么大
-    ar_args_.aux_local_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(ar_args_.aux_local_size, cu_stream);
+    ar_args_.aux_local_buffer = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolAux, ar_args_.aux_local_size);
     CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_local_buffer, 0, ar_args_.aux_local_size, cu_stream));
     
     fetch_comm_args(fusion_args, cu_stream);
@@ -288,7 +288,7 @@ public:
     // Allocate workspace memory
     // cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
     auto cu_stream = static_cast<cudaStream_t>(stream);
-    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size, cu_stream);
+    void *workspace_ptr = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolWorkspace, workspace_size);
 
     // Check if the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));

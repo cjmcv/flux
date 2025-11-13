@@ -64,7 +64,7 @@ public:
     // Allocate workspace memory
     // cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
     auto cu_stream = static_cast<cudaStream_t>(stream);
-    void *workspace_ptr = GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(workspace_size, cu_stream);
+    void *workspace_ptr = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolWorkspace, workspace_size);
 
     // Check if the problem size is supported or not
     CUTLASS_CHECK(gemm_dev_.can_implement(arguments));
@@ -89,7 +89,7 @@ private:
     int total_size;
     get_buffer_info(rt_args, sizes, offsets, total_size);
     uint8_t *host_buffer = GlobalBuffer::instance().ResizeHostBufferIfNeeded(total_size);
-    uint8_t *device_buffer = GlobalBuffer::instance().ResizeDeviceBuffer2IfNeeded(total_size, cu_stream);
+    uint8_t *device_buffer = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolAux, total_size);
 
     cpy_args2host_buffer(rt_args, sizes, offsets, host_buffer);
     CUDA_CHECK(cudaMemcpyAsync(device_buffer, host_buffer, total_size, cudaMemcpyHostToDevice, cu_stream));

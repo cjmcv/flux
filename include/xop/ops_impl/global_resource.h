@@ -25,21 +25,26 @@ public:
   virtual void run(void *stream = nullptr) = 0;
 };
 
+enum DeviceBufferPoolKindEnum {
+  kDevBufferPoolWorkspace = 0, 
+  kDevBufferPoolAux = 1,
+  kDevBufferPoolOutput = 2,
+  kDevBufferPoolKindSize,
+};
 
 class GlobalBuffer {
 private:
-  GlobalBuffer() = default;
+  GlobalBuffer() {
+    device_buffers_.resize(kDevBufferPoolKindSize, nullptr);
+    buffers_size_.resize(kDevBufferPoolKindSize, 0);
+    used_buffers_size_.resize(kDevBufferPoolKindSize, 0);
+  }
   GlobalBuffer(const GlobalBuffer&) = delete;
   GlobalBuffer& operator=(const GlobalBuffer&) = delete;
 
-  int device_buffer_size_ = 0;
-  uint8_t* device_buffer_ = nullptr;
-  int device_buffer_size_2_ = 0;
-  uint8_t* device_buffer_2_ = nullptr;
-
-  int output_device_buffer_size_ = 0;
-  uint8_t* output_device_buffer_ = nullptr;
-
+  std::vector<uint8_t *> device_buffers_;
+  std::vector<size_t> buffers_size_;
+  std::vector<size_t> used_buffers_size_;
   std::vector<uint8_t> host_buffer_;
 
 public:
@@ -48,41 +53,43 @@ public:
     return instance;
   }
 
-  uint8_t* ResizeDeviceBufferIfNeeded(size_t size, cudaStream_t stream) {
-    size = (size + 127) / 128 * 128;
-    if (device_buffer_size_ < size) {
-      if (device_buffer_ != nullptr) {
-        cudaFreeAsync(device_buffer_, stream);
-      }
-      cudaMallocAsync(&device_buffer_, size, stream);
-      device_buffer_size_ = size;
+  void CheckDeviceBufferAllocate(DeviceBufferPoolKindEnum pool_id, size_t size) {
+    if (device_buffers_[pool_id] == nullptr) {
+      size = (size + 127) / 128 * 128;
+      cudaMalloc(&device_buffers_[pool_id], size);
+      buffers_size_[pool_id] = size;      
     }
-    return device_buffer_;
   }
 
-  uint8_t* ResizeDeviceBuffer2IfNeeded(size_t size, cudaStream_t stream) {
-    size = (size + 127) / 128 * 128;
-    if (device_buffer_size_2_ < size) {
-      if (device_buffer_2_ != nullptr) {
-        cudaFreeAsync(device_buffer_2_, stream);
+  uint8_t* GetDeviceBuffer(DeviceBufferPoolKindEnum pool_id, size_t size) {
+    if (buffers_size_[pool_id] >= size) {
+      if (used_buffers_size_[pool_id] < size) {
+        used_buffers_size_[pool_id] = size;
       }
-      cudaMallocAsync(&device_buffer_2_, size, stream);
-      device_buffer_size_2_ = size;
+      return device_buffers_[pool_id];
     }
-    return device_buffer_2_;
+    printf("GetDeviceBuffer Failed: %ld < %ld\n", buffers_size_[pool_id], size);
+    assert(0);
+    return nullptr;
   }
 
-  uint8_t* ResizeOutputDeviceBufferIfNeeded(size_t size, cudaStream_t stream) {
-    size = (size + 127) / 128 * 128;
-    if (output_device_buffer_size_ < size) {
-      if (output_device_buffer_ != nullptr) {
-        cudaFreeAsync(output_device_buffer_, stream);
-      }
-      cudaMallocAsync(&output_device_buffer_, size, stream);
-      output_device_buffer_size_ = size;
-    }
-    return output_device_buffer_;
+  void PrintUsedBufferSize() {
+    printf("GlobalBuffer::kDevBufferPoolWorkspace: %ld.\n", (used_buffers_size_[kDevBufferPoolWorkspace] + 127) / 128 * 128);
+    printf("GlobalBuffer::kDevBufferPoolAux: %ld.\n", (used_buffers_size_[kDevBufferPoolAux] + 127) / 128 * 128);
+    printf("GlobalBuffer::kDevBufferPoolOutput: %ld.\n", (used_buffers_size_[kDevBufferPoolOutput] + 127) / 128 * 128);
   }
+
+  // void* ResizeDeviceBufferIfNeeded(DeviceBufferPoolKindEnum pool_id, size_t size, cudaStream_t stream) {
+  //   size = (size + 127) / 128 * 128;
+  //   if (buffers_size_[pool_id] < size) {
+  //     if (device_buffers_[pool_id] != nullptr) {
+  //       cudaFreeAsync(device_buffers_[pool_id], stream);
+  //     }
+  //     cudaMallocAsync(&device_buffers_[pool_id], size, stream);
+  //     buffers_size_[pool_id] = size;
+  //   }
+  //   return device_buffers_[pool_id];
+  // }
 
   uint8_t* ResizeHostBufferIfNeeded(size_t size) {
     size = (size + 127) / 128 * 128;

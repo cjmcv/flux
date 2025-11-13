@@ -54,6 +54,11 @@ public:
       CUBLASLT_CHECK(cublasLtCreate(&cublaslt_handle_));
     }
     
+    // Check device memory pool
+    GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolWorkspace, 8192*20000*sizeof(short));
+    GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolAux, 8192*20000*sizeof(short));
+    GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolOutput, 8192*20000*sizeof(short));
+
     // cuda graph里不允许有resize，1) 在创建时先按最大值分配；2）每次capture前先按对应数据规模正常推理一次。
     // GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(5000000);
   } 
@@ -282,11 +287,12 @@ private:
     if (malloc_m < m) 
       malloc_m = m;
     
-    void *buffer_ptr = GlobalBuffer::instance().ResizeOutputDeviceBufferIfNeeded(malloc_m*n*at::elementSize(output_dtype), stream);
+    void *buffer_ptr = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolOutput, malloc_m*n*at::elementSize(output_dtype));
     auto opts = torch::TensorOptions()
                   .dtype(output_dtype)
                   .device(weight.device());
-    return torch::from_blob(buffer_ptr, {m, n}, opts);  
+    return torch::from_blob(buffer_ptr, {m, n}, opts);
+
     // return torch::empty({m, n}, weight.options().dtype(output_dtype));
   }
 
