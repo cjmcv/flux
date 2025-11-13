@@ -81,23 +81,22 @@ class XopGemmSpecify:
         run_mode,
         input: torch.Tensor,
         weight: torch.Tensor,
-        output: torch.Tensor,
         bias: Optional[torch.Tensor] = None
     ) -> int: 
         if (run_mode == 0):
             assert(0)
         elif (run_mode == 1):
             print("xop_noquant")
-            self.gemm_normal.forward(input, weight, output, bias, 
+            return self.gemm_normal.forward(input, weight, None, bias, 
                                     None, None, None, 
                                     self.hparam, self.fast_accum)
         elif (run_mode == 8):
             print("xop_quant8")
-            self.gemm_quant8.forward(input, self.q8_y, output, bias, 
+            return self.gemm_quant8.forward(input, self.q8_y, None, bias, 
                                     None, self.q8_y_scale, None, 
                                     self.hparam, self.fast_accum)
         elif (run_mode == 4):
             print("xop_quant4")
-            self.gemm_quant4.forward(input, self.q4_y, output, bias, 
+            return self.gemm_quant4.forward(input, self.q4_y, None, bias, 
                                     None, self.q4_y_scale, None, 
                                     None, self.fast_accum)

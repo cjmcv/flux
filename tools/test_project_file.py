@@ -29,21 +29,19 @@ def main():
     def xop_gemm_normal(
         run_mode: int,
         input: torch.Tensor,
-        weight: torch.Tensor,
-        output: torch.Tensor) -> None:
-        xop_gemm.forward(run_mode=run_mode, input=input, weight=weight, output=output)
+        weight: torch.Tensor) -> torch.Tensor:
+        return xop_gemm.forward(run_mode=run_mode, input=input, weight=weight)
         
     def xop_gemm_normal_fake(
         run_mode: int,
         input: torch.Tensor,
-        weight: torch.Tensor,
-        output: torch.Tensor) -> None:
+        weight: torch.Tensor) -> torch.Tensor:
         pass
     
     direct_register_custom_op(
         op_name="xop_gemm_normal",
         op_func=xop_gemm_normal,
-        mutates_args=["output"],
+        mutates_args=[], # "output"
         fake_impl=xop_gemm_normal_fake,
         target_lib=xop_lib,
     )
@@ -61,29 +59,36 @@ def main():
 
     run_mode = xop_gemm.get_run_mode(A.shape[0], B.shape[0], A.shape[1])
     run_mode = 1
-    if (run_mode != 0):
-        torch.ops.xop.xop_gemm_normal(run_mode=run_mode,input=A,weight=B,output=C)
-        print("Xop1 : ", C.shape)
-    else:
-        C = F.linear(A, B, None)
-        print("Xop0 : ", C.shape)
+    # if (run_mode != 0):
+    #     C = torch.ops.xop.xop_gemm_normal(run_mode=run_mode,input=A,weight=B)
+    #     print("Xop1 : ", C.shape)
+    # else:
+    #     C = F.linear(A, B, None)
+    #     print("Xop0 : ", C.shape)
             
     
-    print("Compiling...")
-    compiled_func = torch.compile(torch.ops.xop.xop_gemm_normal, backend="inductor")
-    compiled_func(run_mode, A,B,C)
+    # print("Compiling...")
+    # compiled_func = torch.compile(torch.ops.xop.xop_gemm_normal, backend="inductor")
+    # # compiled_func(run_mode, A, B)
     
-    print("Capturing...")
+    # print("Warm-up compile...")
     stream = torch.cuda.Stream()
+    # with torch.cuda.stream(stream):
+    #     compiled_func(run_mode, A, B)
+    # torch.cuda.synchronize() 
+
+    print("Capturing...")
     g = torch.cuda.CUDAGraph()
     with torch.cuda.stream(stream):
         with torch.cuda.graph(g):
-            compiled_func(run_mode, A,B,C)
-            # torch.ops.xop.xop_gemm_normal(run_mode=run_mode,input=A,weight=B,output=C)
+            # compiled_func(run_mode, A, B)
+            E = torch.ops.xop.xop_gemm_normal(run_mode=run_mode,input=A,weight=B)
             
     print("Cuda graph replay: ", g.pool())
+    
+    C.zero_()
     g.replay()
-    print(C)
+    print(E)
     # print(g)
     
     

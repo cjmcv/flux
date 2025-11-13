@@ -985,7 +985,7 @@ torch::Tensor marlin_fp16xint4_matmul(
     C = C_buf.value();
   } else {
     int32_t m = A.size(0);
-    int32_t malloc_m = 8192;
+    int32_t malloc_m = 256;
     if (malloc_m < m) 
       malloc_m = m;
 

@@ -20,7 +20,7 @@ class GemmNormal:
         output_scale: Optional[torch.Tensor] = None,
         tuning: Optional[torch.Tensor] = None,
         fast_accum: bool = False,
-    ) -> int: ...
+    ) -> torch.Tensor: ...
     def grouped_forward(
         self,
         inputs: List[torch.Tensor],
