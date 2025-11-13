@@ -37,14 +37,14 @@ class GemmQuant:
             y_fp8, y_scale = xop.triton_per_block_cast_to_fp8(weight, fast_accum)
             return y_fp8, y_scale.t().contiguous()
         elif (self.quant_bits == 4):
-            n = weight.shape[0]
-            print(n)
-            self.workspace = torch.zeros(n // 128 * 16, device=weight.device)
+            # n = weight.shape[0]
+            # self.workspace = torch.zeros(n // 128 * 16, device=weight.device)
             w_fp, q_int4, s_int4 = xop.marlin_quant_int4(weight, -1) # self.num_groups: Can not support 128 on h20? This size is set specifically for groupsize = 128.
+            # print(n, q_int4.shape[0], q_int4.shape[1], s_int4.shape[0], s_int4.shape[1])
             return q_int4, s_int4
         else: # 44
             q_int4, s_int4 = xop.symmetric_group_w4a16_pack_bf16_reorder(weight, self.num_groups)
-            print(weight.shape, q_int4.shape, q_int4.dtype, s_int4.shape, s_int4.dtype)
+            # print(weight.shape, q_int4.shape, q_int4.dtype, s_int4.shape, s_int4.dtype)
             return q_int4, s_int4
     
     def forward(
@@ -84,8 +84,7 @@ class GemmQuant:
             )
         elif (self.quant_bits == 4):
             thread_k, thread_n = -1, -1 # 64, 256
-            xop.marlin_fp16xint4_matmul(input, weight, output, weight_scale, self.workspace, thread_k, thread_n, -1, 16)
-            return 0
+            return xop.marlin_fp16xint4_matmul(input, weight, None, weight_scale, None, thread_k, thread_n, -1, 16)
         else: # 44
             # out = torch.matmul(input, weight.t())
             # print("out", out)            

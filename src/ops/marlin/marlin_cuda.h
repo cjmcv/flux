@@ -17,12 +17,12 @@ void helloABCM(int a);
 // @thread_n: `n` size of a thread_tile in `B` (can usually be left as auto -1)
 // @sms: number of SMs to use for the kernel (can usually be left as auto -1)
 // @max_par: maximum number of batch 64 problems to solve in parallel for large input sizes
-void marlin_fp16xint4_matmul(
+torch::Tensor marlin_fp16xint4_matmul(
   const torch::Tensor& A,
   const torch::Tensor& B,
-        torch::Tensor& C,
+  c10::optional<torch::Tensor> C_buf,
   const torch::Tensor& s,
-        torch::Tensor& workspace,
+  c10::optional<torch::Tensor> workspace_buf,
   int thread_k = -1,
   int thread_n = -1,
   int sms = -1,

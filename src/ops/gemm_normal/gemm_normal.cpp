@@ -284,7 +284,7 @@ private:
     
     void *buffer_ptr = GlobalBuffer::instance().ResizeOutputDeviceBufferIfNeeded(malloc_m*n*at::elementSize(output_dtype), stream);
     auto opts = torch::TensorOptions()
-                  .dtype(weight.dtype())
+                  .dtype(output_dtype)
                   .device(weight.device());
     return torch::from_blob(buffer_ptr, {m, n}, opts);  
     // return torch::empty({m, n}, weight.options().dtype(output_dtype));

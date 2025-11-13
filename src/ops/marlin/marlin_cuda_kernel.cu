@@ -29,6 +29,8 @@
 #include <torch/all.h>
 #include <ATen/cuda/CUDAContext.h>
 
+#include "xop/ops_impl/global_resource.h"
+
 #define STATIC_ASSERT_SCALAR_TYPE_VALID(scalar_t)               \
   static_assert(std::is_same<scalar_t, half>::value ||          \
                     std::is_same<scalar_t, nv_bfloat16>::value, \
@@ -957,27 +959,58 @@ void helloABCM(int a) {
 const int ERR_PROB_SHAPE = 1;
 const int ERR_KERN_SHAPE = 2;
 
-void marlin_fp16xint4_matmul(
+torch::Tensor marlin_fp16xint4_matmul(
   const torch::Tensor& A,
   const torch::Tensor& B,
-        torch::Tensor& C,
+  c10::optional<torch::Tensor> C_buf,
   const torch::Tensor& s,
-        torch::Tensor& workspace,
+  c10::optional<torch::Tensor> workspace_buf,
   int thread_k,
   int thread_n,
   int sms,
   int max_par
 ) {
   int prob_m = A.size(0);
-  int prob_n = C.size(1);
+  int prob_n = B.size(1) / 2;
   int prob_k = A.size(1);
   int groupsize = (s.size(0) == 1) ? -1 : prob_k / s.size(0);
   if (groupsize != -1 && groupsize * s.size(0) != prob_k)
     AT_ERROR("k=", prob_k, " not compatible with ", s.size(0), " groups.");
-  if (workspace.numel() < prob_n / 128 * max_par)
-    AT_ERROR("workspace must be of size at least ", prob_n / 128 * max_par, ".");
   int dev = A.get_device();
   int err = 0;
+
+  cudaStream_t stream = c10::cuda::getCurrentCUDAStream(dev);
+  torch::Tensor C;
+  if (C_buf.has_value()) {
+    C = C_buf.value();
+  } else {
+    int32_t m = A.size(0);
+    int32_t malloc_m = 8192;
+    if (malloc_m < m) 
+      malloc_m = m;
+
+    void *buffer_ptr = xop::GlobalBuffer::instance().ResizeOutputDeviceBufferIfNeeded(malloc_m*prob_n*at::elementSize(A.scalar_type()), stream);
+    auto opts = torch::TensorOptions()
+                  .dtype(A.dtype())
+                  .device(A.device());
+    C = torch::from_blob(buffer_ptr, {m, prob_n}, opts);  
+  }
+
+  torch::Tensor workspace;
+  if (workspace_buf.has_value()) {
+    workspace = workspace_buf.value();
+  } else {
+    int32_t num = prob_n / 128 * max_par;
+    // self.workspace = torch.zeros(n // 128 * 16, device=weight.device)
+    void *buffer_ptr = xop::GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(num * sizeof(float), stream);
+    auto opts = torch::TensorOptions()
+                  .dtype(torch::kFloat)
+                  .device(A.device());
+    workspace = torch::from_blob(buffer_ptr, {num}, opts);  
+  }
+  // if (workspace.numel() < prob_n / 128 * max_par)
+  //   AT_ERROR("workspace must be of size at least ", prob_n / 128 * max_par, ".");
+
   if (A.dtype() == at::ScalarType::Half) {
     err = marlin_cuda<half>(
       A.data_ptr(),
@@ -988,7 +1021,7 @@ void marlin_fp16xint4_matmul(
       workspace.data_ptr(),
       groupsize,
       dev,
-      at::cuda::getCurrentCUDAStream(dev),
+      stream,
       thread_k,
       thread_n,
       sms,
@@ -1005,7 +1038,7 @@ void marlin_fp16xint4_matmul(
       workspace.data_ptr(),
       groupsize,
       dev,
-      at::cuda::getCurrentCUDAStream(dev),
+      stream,
       thread_k,
       thread_n,
       sms,
@@ -1022,6 +1055,7 @@ void marlin_fp16xint4_matmul(
       "No kernel implementation for thread_k=", thread_k, ", thread_n=", thread_n, ", groupsize=", groupsize, "."
     );
   }
+  return C;
 }
 
 } // namespace xop
