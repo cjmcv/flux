@@ -13,7 +13,7 @@ class GemmNormal:
         self,
         input: torch.Tensor,
         weight: torch.Tensor,
-        output: torch.Tensor,
+        output: Optional[torch.Tensor] = None,
         bias: Optional[torch.Tensor] = None,
         input_scale: Optional[torch.Tensor] = None,
         weight_scale: Optional[torch.Tensor] = None,

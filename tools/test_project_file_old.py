@@ -3,7 +3,13 @@ import torch
 import torch.nn.functional as F
 
 import xop
-from xop.project.qwen3_4b_h20_compile import XopGemmSpecify
+from xop.project.qwen3_4b_h20 import XopGemmSpecify
+    
+###########################################
+from torch.library import Library
+from xop.project.qwen3_4b_h20 import register_xop_gemm
+
+xop_lib = Library("xop", "FRAGMENT")
 
 
 # python tools/test_torch_compile.py
@@ -20,17 +26,23 @@ def main():
     
     xop_gemm = XopGemmSpecify(B, input_dtype=torch.bfloat16, output_dtype=torch.bfloat16, fast_accum=False)
 
+    register_xop_gemm(xop_gemm, op_name="xop_gemm_normal", target_lib=xop_lib)
+
     run_mode = xop_gemm.get_run_mode(A.shape[0], B.shape[0], A.shape[1])
     run_mode = 4
-    G = xop_gemm.forward(run_mode, A, B)
-    print("G: ", G.shape[0], G.shape[1], G.dtype, A.dtype, G.stride())
-
+    # if (run_mode != 0):
+    #     C = torch.ops.xop.xop_gemm_normal(run_mode=run_mode,input=A,weight=B)
+    #     print("Xop1 : ", C.shape)
+    # else:
+    #     C = F.linear(A, B, None)
+    #     print("Xop0 : ", C.shape)
+            
+    
     print("Compiling...")
-    compiled_func = torch.compile(xop_gemm.forward, backend="inductor")
+    compiled_func = torch.compile(torch.ops.xop.xop_gemm_normal, backend="inductor")
     G = compiled_func(run_mode, A, B)
     print("G", G)
     
-
     # print("Warm-up compile...")
     stream = torch.cuda.Stream()
     # with torch.cuda.stream(stream):

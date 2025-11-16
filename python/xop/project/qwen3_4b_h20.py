@@ -16,6 +16,34 @@ ENABLE_QUANT_4 = 1
 
 # tuning
 
+def register_xop_gemm(xop_gemm: Any,
+                         op_name: str = "xop_gemm_normal",
+                         target_lib: Any = None) -> None:
+    
+    def xop_gemm_normal(
+        run_mode: int,
+        input: torch.Tensor,
+        weight: torch.Tensor) -> torch.Tensor:
+        return xop_gemm.forward(run_mode=run_mode, input=input, weight=weight)
+        
+    def xop_gemm_normal_fake(
+        run_mode: int,
+        input: torch.Tensor,
+        weight: torch.Tensor) -> torch.Tensor:
+        return torch.empty(
+            (input.shape[0], weight.shape[0]),
+            dtype=input.dtype,
+            device=input.device
+        )
+    
+    direct_register_custom_op(
+        op_name=op_name,
+        op_func=xop_gemm_normal,
+        mutates_args=[], # "output"
+        fake_impl=xop_gemm_normal_fake,
+        target_lib=target_lib,
+    )
+    
 class XopGemmSpecify:
     def __init__(
         self,
@@ -100,31 +128,4 @@ class XopGemmSpecify:
             return self.gemm_quant4.forward(input, self.q4_y, None, bias, 
                                     None, self.q4_y_scale, None, 
                                     None, self.fast_accum)
-
-def register_xop_gemm(xop_gemm: Any,
-                         op_name: str = "xop_gemm_normal",
-                         target_lib: Any = None) -> None:
-    
-    def xop_gemm_normal(
-        run_mode: int,
-        input: torch.Tensor,
-        weight: torch.Tensor) -> torch.Tensor:
-        return xop_gemm.forward(run_mode=run_mode, input=input, weight=weight)
-        
-    def xop_gemm_normal_fake(
-        run_mode: int,
-        input: torch.Tensor,
-        weight: torch.Tensor) -> torch.Tensor:
-        return torch.empty(
-            (input.shape[0], weight.shape[0]),
-            dtype=input.dtype,
-            device=input.device
-        )
-    
-    direct_register_custom_op(
-        op_name=op_name,
-        op_func=xop_gemm_normal,
-        mutates_args=[], # "output"
-        fake_impl=xop_gemm_normal_fake,
-        target_lib=target_lib,
-    )
+            

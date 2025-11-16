@@ -144,7 +144,7 @@ def profiling_core(fn: callable, add_func_name, shape, schema, warmup_iters, pre
         for id in range(500):
             # warmup and check if exist.
             set_tuning_target(tuning, 1, id, sub_schema, schema.arch)
-            print(tuning[0].item())
+            # print(tuning[0].item())
             fn(tuning)
             current_mode = tuning[0].item()
             print(1, id, sub_schema, "-> code: ", current_mode)
