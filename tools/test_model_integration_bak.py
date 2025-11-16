@@ -5,12 +5,8 @@ from xop.project.qwen3_4b_h20_compile import XopGemmSpecify
 
 import torch.cuda.nvtx as nvtx
 
-get_data = torch.randn
-# get_data = torch.ones
-
 ENABLE_XOP = 1
 ENABLE_CUDAGRAPH = 0
-ENABLE_TORCHCOMPILE = 0
 
 class LinearLayer(nn.Module):
     """A custom linear layer implementation using functional linear"""
@@ -21,13 +17,14 @@ class LinearLayer(nn.Module):
         self.out_features = out_features
         
         # Initialize weights with random values and convert to bfloat16
-        self.weight = nn.Parameter(get_data(out_features, in_features, dtype=torch.bfloat16, device="cuda") * 0.1)
-        self.bias = nn.Parameter(get_data(out_features, dtype=torch.bfloat16, device="cuda") * 0.1)
+        self.weight = nn.Parameter(torch.randn(out_features, in_features, dtype=torch.bfloat16, device="cuda") * 0.1)
+        self.bias = nn.Parameter(torch.randn(out_features, dtype=torch.bfloat16, device="cuda") * 0.1)
         
         if ENABLE_XOP:
             print(self.weight.device)
             self.xop_gemm = XopGemmSpecify(self.weight, input_dtype=torch.bfloat16, output_dtype=torch.bfloat16, fast_accum=False)
 
+            
     def forward(self, x):
         # Use functional linear for inference computation
         if ENABLE_XOP:
@@ -35,7 +32,7 @@ class LinearLayer(nn.Module):
             run_mode = 1
             return self.xop_gemm.forward(run_mode, x, self.weight)
         else:
-            return F.linear(x, self.weight)#, self.bias
+            return F.linear(x, self.weight, self.bias)
 
 class MultiLinearModel(nn.Module):
     """Model containing multiple linear layers"""
@@ -47,8 +44,7 @@ class MultiLinearModel(nn.Module):
         # Create multiple linear layers based on layer_sizes
         for i in range(len(layer_sizes) - 1):
             self.layers.append(LinearLayer(layer_sizes[i], layer_sizes[i + 1]))
-    
-    @torch.no_grad()
+            
     def forward(self, x):
         for i, layer in enumerate(self.layers):
             x = layer(x)
@@ -67,7 +63,7 @@ if __name__ == "__main__":
     device = torch.device('cuda')
     
     # Enable mixed precision training for bfloat16
-    # torch.set_float32_matmul_precision('high')
+    torch.set_float32_matmul_precision('high')
     
     # Define model architecture: input_size -> 512 -> 256 -> 128 -> output_size
     layer_sizes = [4096, 4096, 4096, 4096, 128]
@@ -78,42 +74,35 @@ if __name__ == "__main__":
     
     # Compile the model using torch.compile for performance optimization
     print("Compiling model with torch.compile...")
-    if ENABLE_TORCHCOMPILE:
-        # torch.compile(model, backend="eager") # eager / aot_eager / inductor
-        compiled_model = torch.compile(model, backend="inductor")
-    else:
-        compiled_model = model 
+    model = torch.compile(model)
     
     # Create sample input data in bfloat16
     batch_size = 16
-    input_tensor = get_data(batch_size, layer_sizes[0], device=device, dtype=torch.bfloat16)
+    input_tensor = torch.randn(batch_size, layer_sizes[0], device=device, dtype=torch.bfloat16)
     print(f"Input tensor dtype: {input_tensor.dtype}")
     
     # Warm up the model (important for CUDA graphs)
     with nvtx.range("Graph Replay warmup", color="green"):
         print("Warming up model...")
         for _ in range(10):
-            _ = compiled_model(input_tensor)
+            _ = model(input_tensor)
         
     # Create and use CUDA graph for optimized execution
     print("Creating CUDA graph...")
     graph = torch.cuda.CUDAGraph()
     
     # Set model to evaluation mode for inference
-    compiled_model.eval()
-
+    model.eval()
+    
     # Capture the computation in CUDA graph
     stream = torch.cuda.Stream()
     with torch.cuda.stream(stream):
         with torch.cuda.graph(graph):
-            output = compiled_model(input_tensor)
+            output = model(input_tensor)
     
     # Execute the captured graph
     print("Executing CUDA graph...")
-    with torch.cuda.stream(stream):
-        graph.replay()
-    stream.synchronize()
-    print(output)
+    graph.replay()
     
     # Print output statistics
     print(f"Output shape: {output.shape}")
@@ -124,7 +113,8 @@ if __name__ == "__main__":
     start_event = torch.cuda.Event(enable_timing=True)
     end_event = torch.cuda.Event(enable_timing=True)  
     
-    TEST_ROUNDS = 1000
+    
+    TEST_ROUNDS = 10
     with nvtx.range("Graph Replay testing", color="red"):
         if ENABLE_CUDAGRAPH:    
             with stream:
@@ -137,7 +127,7 @@ if __name__ == "__main__":
             with stream:
                 start_event.record()
                 for _ in range(TEST_ROUNDS):
-                    compiled_model(input_tensor)
+                    model(input_tensor)
                 end_event.record()
             stream.synchronize()
         

@@ -151,17 +151,17 @@ class XopGemmSpecify:
         if (run_mode == 0):
             assert(0)
         elif (run_mode == 1):
-            print("xop_noquant")
+            # print("xop_noquant")
             return torch.ops.xop.gemm_normal_forward(input, weight, None, bias, 
                                     None, None, None, 
                                     self.hparam, self.fast_accum)
         elif (run_mode == 8):
-            print("xop_quant8")
+            # print("xop_quant8")
             return torch.ops.xop.gemm_quant8_forward(input, self.q8_y, None, bias, 
                                     None, self.q8_y_scale, None, 
                                     self.hparam, self.fast_accum)
         elif (run_mode == 4):
-            print("xop_quant4", input.shape[0], self.q4_y.shape[1]//2)
+            # print("xop_quant4", input.shape[0], self.q4_y.shape[1]//2)
             return torch.ops.xop.gemm_quant4_forward(input, self.q4_y, None, bias, 
                                     None, self.q4_y_scale, None, 
                                     None, self.fast_accum)
