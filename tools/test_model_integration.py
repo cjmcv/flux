@@ -8,7 +8,7 @@ import torch.cuda.nvtx as nvtx
 get_data = torch.randn
 # get_data = torch.ones
 
-ENABLE_XOP = 0
+ENABLE_XOP = 1
 ENABLE_CUDAGRAPH = 1
 ENABLE_TORCHCOMPILE = 0
 ENABLE_MEASURE_OP = 0
@@ -33,7 +33,7 @@ class LinearLayer(nn.Module):
         # Use functional linear for inference computation
         if ENABLE_XOP:
             # run_mode = self.xop_gemm.get_run_mode(x.shape[0], self.weight.shape[0], x.shape[1])
-            run_mode = 1
+            run_mode = 4
             return self.xop_gemm.forward(run_mode, x, self.weight)
         else:
             return F.linear(x, self.weight) #, self.bias
@@ -82,8 +82,8 @@ if __name__ == "__main__":
     # Enable mixed precision training for bfloat16
     # torch.set_float32_matmul_precision('high')
     
-    # Define model architecture: input_size -> 512 -> 256 -> 128 -> output_size4096, 4096, 4096, 
-    layer_sizes = [4096, 128]
+    # Define model architecture: input_size -> 512 -> 256 -> 128 -> output_size 4096, 4096, 4096, 4096, 128
+    layer_sizes = [9728, 2560, 6144] # 4096, 2560, 19456
     model = MultiLinearModel(layer_sizes).to(device, dtype=torch.bfloat16)
     
     # Print model dtype information
