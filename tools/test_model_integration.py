@@ -8,9 +8,10 @@ import torch.cuda.nvtx as nvtx
 get_data = torch.randn
 # get_data = torch.ones
 
-ENABLE_XOP = 1
+ENABLE_XOP = 0
 ENABLE_CUDAGRAPH = 1
 ENABLE_TORCHCOMPILE = 0
+ENABLE_MEASURE_OP = 0
 
 class LinearLayer(nn.Module):
     """A custom linear layer implementation using functional linear"""
@@ -31,11 +32,11 @@ class LinearLayer(nn.Module):
     def forward(self, x):
         # Use functional linear for inference computation
         if ENABLE_XOP:
-            run_mode = self.xop_gemm.get_run_mode(x.shape[0], self.weight.shape[0], x.shape[1])
+            # run_mode = self.xop_gemm.get_run_mode(x.shape[0], self.weight.shape[0], x.shape[1])
             run_mode = 1
             return self.xop_gemm.forward(run_mode, x, self.weight)
         else:
-            return F.linear(x, self.weight)#, self.bias
+            return F.linear(x, self.weight) #, self.bias
 
 class MultiLinearModel(nn.Module):
     """Model containing multiple linear layers"""
@@ -51,16 +52,18 @@ class MultiLinearModel(nn.Module):
     @torch.no_grad()
     def forward(self, x):
         for i, layer in enumerate(self.layers):
-            # start = torch.cuda.Event(enable_timing=True)
-            # end = torch.cuda.Event(enable_timing=True)
-            # start.record()
-            
+            if ENABLE_MEASURE_OP:
+                start = torch.cuda.Event(enable_timing=True)
+                end = torch.cuda.Event(enable_timing=True)
+                start.record()
+                
             x = layer(x)
             
-            # end.record()
-            # torch.cuda.synchronize()
-            # elapsed = start.elapsed_time(end)
-            # print(f"Layer {i} forward time: {elapsed:.3f} ms")
+            if ENABLE_MEASURE_OP:
+                end.record()
+                torch.cuda.synchronize()
+                elapsed = start.elapsed_time(end)
+                print(f"Layer {i} forward time: {elapsed:.3f} ms")
         
             # Apply ReLU activation for all but the last layer
             if i < len(self.layers) - 1:
@@ -79,8 +82,8 @@ if __name__ == "__main__":
     # Enable mixed precision training for bfloat16
     # torch.set_float32_matmul_precision('high')
     
-    # Define model architecture: input_size -> 512 -> 256 -> 128 -> output_size
-    layer_sizes = [4096, 4096, 4096, 4096, 128]
+    # Define model architecture: input_size -> 512 -> 256 -> 128 -> output_size4096, 4096, 4096, 
+    layer_sizes = [4096, 128]
     model = MultiLinearModel(layer_sizes).to(device, dtype=torch.bfloat16)
     
     # Print model dtype information
@@ -102,9 +105,12 @@ if __name__ == "__main__":
     # Warm up the model (important for CUDA graphs)
     with nvtx.range("Graph Replay warmup", color="green"):
         print("Warming up model...")
-        for _ in range(10):
+        for _ in range(100):
             _ = compiled_model(input_tensor)
         
+    if ENABLE_MEASURE_OP:
+        exit()
+    
     # Create and use CUDA graph for optimized execution
     print("Creating CUDA graph...")
     graph = torch.cuda.CUDAGraph()

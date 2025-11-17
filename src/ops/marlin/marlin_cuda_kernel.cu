@@ -985,15 +985,17 @@ torch::Tensor marlin_fp16xint4_matmul(
     C = C_buf.value();
   } else {
     int32_t m = A.size(0);
-    int32_t malloc_m = 256;
-    if (malloc_m < m) 
-      malloc_m = m;
+    C = torch::empty({m, prob_n}, A.options().dtype(A.dtype()));
 
-    void *buffer_ptr = xop::GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolOutput, malloc_m*prob_n*at::elementSize(A.scalar_type()));
-    auto opts = torch::TensorOptions()
-                  .dtype(A.dtype())
-                  .device(A.device());
-    C = torch::from_blob(buffer_ptr, {m, prob_n}, opts);  
+    // int32_t malloc_m = 256;
+    // if (malloc_m < m) 
+    //   malloc_m = m;
+
+    // void *buffer_ptr = xop::GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolOutput, malloc_m*prob_n*at::elementSize(A.scalar_type()));
+    // auto opts = torch::TensorOptions()
+    //               .dtype(A.dtype())
+    //               .device(A.device());
+    // C = torch::from_blob(buffer_ptr, {m, prob_n}, opts);  
   }
 
   torch::Tensor workspace;

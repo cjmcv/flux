@@ -92,7 +92,8 @@ class XopGemmSpecify:
         #     (M <= 128 and N == 2560 and K == 9728) or
         #     (M <= 256 and N == 6144 and K == 2560)):
 
-        if (M <= 32):
+        # quant_bit=4, pass, no M<32
+        if (M <= 16):
             mode = 4
             # self.hparam[2] = Meta.Sm80
 

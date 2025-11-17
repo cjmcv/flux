@@ -57,7 +57,7 @@ public:
     // Check device memory pool
     GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolWorkspace, 8192*20000*sizeof(short));
     GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolAux, 8192*20000*sizeof(short));
-    GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolOutput, 8192*20000*sizeof(short));
+    // GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolOutput, 8192*20000*sizeof(short));
 
     // cuda graph里不允许有resize，1) 在创建时先按最大值分配；2）每次capture前先按对应数据规模正常推理一次。
     // GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(5000000);
@@ -283,17 +283,17 @@ private:
     int32_t m = input.size(0);
     int32_t n = weight.size(0);
     
-    int32_t malloc_m = 8192;
-    if (malloc_m < m) 
-      malloc_m = m;
+    // int32_t malloc_m = 8192;
+    // if (malloc_m < m) 
+    //   malloc_m = m;
     
-    void *buffer_ptr = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolOutput, malloc_m*n*at::elementSize(output_dtype));
-    auto opts = torch::TensorOptions()
-                  .dtype(output_dtype)
-                  .device(weight.device());
-    return torch::from_blob(buffer_ptr, {m, n}, opts);
+    // void *buffer_ptr = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolOutput, malloc_m*n*at::elementSize(output_dtype));
+    // auto opts = torch::TensorOptions()
+    //               .dtype(output_dtype)
+    //               .device(weight.device());
+    // return torch::from_blob(buffer_ptr, {m, n}, opts);
 
-    // return torch::empty({m, n}, weight.options().dtype(output_dtype));
+    return torch::empty({m, n}, weight.options().dtype(output_dtype));
   }
 
   int forward_tuning(torch::Tensor input,

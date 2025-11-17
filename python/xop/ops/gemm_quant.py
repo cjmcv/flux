@@ -25,7 +25,8 @@ class GemmQuant:
                 output_dtype=output_dtype,
                 transpose_weight=False
             )
-        elif (self.quant_bits == 44):
+        elif (self.quant_bits == 4 or self.quant_bits == 44):
+            # A memory pool is required in the Marlin kernel.
             self.gemm_normal = xop.GemmNormal(
                 input_dtype=input_dtype,
                 output_dtype=output_dtype,
