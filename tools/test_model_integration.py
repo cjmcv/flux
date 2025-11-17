@@ -9,7 +9,7 @@ get_data = torch.randn
 # get_data = torch.ones
 
 ENABLE_XOP = 1
-ENABLE_CUDAGRAPH = 0
+ENABLE_CUDAGRAPH = 1
 ENABLE_TORCHCOMPILE = 0
 
 class LinearLayer(nn.Module):
@@ -51,7 +51,17 @@ class MultiLinearModel(nn.Module):
     @torch.no_grad()
     def forward(self, x):
         for i, layer in enumerate(self.layers):
+            # start = torch.cuda.Event(enable_timing=True)
+            # end = torch.cuda.Event(enable_timing=True)
+            # start.record()
+            
             x = layer(x)
+            
+            # end.record()
+            # torch.cuda.synchronize()
+            # elapsed = start.elapsed_time(end)
+            # print(f"Layer {i} forward time: {elapsed:.3f} ms")
+        
             # Apply ReLU activation for all but the last layer
             if i < len(self.layers) - 1:
                 x = F.relu(x)

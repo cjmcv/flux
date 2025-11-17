@@ -19,7 +19,7 @@ ncu --set full --section "SpeedOfLight_RooflineChart" -k "ada_blockwise_fp8_gemm
 ncu --set full --section "SpeedOfLight_RooflineChart" -o my_profile python3 tools/gemm/test_gemm_mini.py --has_bias 4096 4096 4096
 ncu-ui # Open file: my_profile.ncu-rep
 
-CUDA_PROFILE_GRAPHS=1 nsys profile --trace=cuda,nvtx --output=my_nsys python tools/test_model_integration.py
+nsys profile --trace=cuda,nvtx --output=my_nsys python tools/test_model_integration.py
 nsight-sys # Open file: my_profile.ncu-rep
 ```
 

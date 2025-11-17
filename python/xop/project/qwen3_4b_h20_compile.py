@@ -107,6 +107,7 @@ class XopGemmSpecify:
     ): 
         self.hparam = torch.zeros(3, dtype=torch.int16, device='cpu')
         self.hparam[0] = 2
+        self.hparam[1] = 8192
         self.hparam[2] = -1 # Meta.Sm80
         
         self.fast_accum = fast_accum
