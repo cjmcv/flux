@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.profiler import profile, ProfilerActivity
+
 from xop.project.qwen3_4b_h20_compile import XopGemmSpecify
 
 import torch.cuda.nvtx as nvtx
@@ -8,10 +10,11 @@ import torch.cuda.nvtx as nvtx
 get_data = torch.randn
 # get_data = torch.ones
 
-ENABLE_XOP = 1
+ENABLE_XOP = 0
 ENABLE_CUDAGRAPH = 1
 ENABLE_TORCHCOMPILE = 0
 ENABLE_MEASURE_OP = 0
+ENABLE_TORCH_PROFILER = 1
 
 class LinearLayer(nn.Module):
     """A custom linear layer implementation using functional linear"""
@@ -33,7 +36,7 @@ class LinearLayer(nn.Module):
         # Use functional linear for inference computation
         if ENABLE_XOP:
             # run_mode = self.xop_gemm.get_run_mode(x.shape[0], self.weight.shape[0], x.shape[1])
-            run_mode = 4
+            run_mode = 1
             return self.xop_gemm.forward(run_mode, x, self.weight)
         else:
             return F.linear(x, self.weight) #, self.bias
@@ -82,8 +85,11 @@ if __name__ == "__main__":
     # Enable mixed precision training for bfloat16
     # torch.set_float32_matmul_precision('high')
     
-    # Define model architecture: input_size -> 512 -> 256 -> 128 -> output_size 4096, 4096, 4096, 4096, 128
-    layer_sizes = [9728, 2560, 6144] # 4096, 2560, 19456
+    # Define model architecture: input_size -> 512 -> 256 -> 128 -> output_size
+    # layer_sizes = [4096, 4096, 4096, 4096, 128]
+    layer_sizes = [4096, 128]
+    # layer_sizes = [9728, 2560, 6144]
+    # layer_sizes = [4096, 2560, 19456]
     model = MultiLinearModel(layer_sizes).to(device, dtype=torch.bfloat16)
     
     # Print model dtype information
@@ -107,6 +113,12 @@ if __name__ == "__main__":
         print("Warming up model...")
         for _ in range(100):
             _ = compiled_model(input_tensor)
+        
+    if ENABLE_TORCH_PROFILER:
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+            compiled_model(input_tensor)
+        print(prof.key_averages().table(sort_by="cuda_time_total"))
+        prof.export_chrome_trace("trace.json") # chrome://tracing/
         
     if ENABLE_MEASURE_OP:
         exit()
