@@ -212,6 +212,25 @@ public:
   void add(const std::vector<int32_t> &key, const std::vector<int16_t> &select_config) {
     normal_tuned_map[key] = select_config;
   }
+
+  void PrintRegistedConfig(const std::vector<int32_t> &key) {
+    printf("Target key: ");
+    for (int i=0; i<key.size(); i++) {
+      printf("%d, ", key[i]);
+    }
+    printf("\ntotal normal_tuned_map.size: %ld.\n", normal_tuned_map.size());
+    for (auto it = normal_tuned_map.begin(); it != normal_tuned_map.end(); ++it) {
+      const auto& key = it->first;
+      const auto& value = it->second;
+
+      std::cout << "Key: ";
+      for (int32_t k : key) std::cout << k << " ";
+        std::cout << " => Value: ";
+      for (int16_t v : value) std::cout << v << " ";
+        std::cout << "\n";
+    }
+  }
+
   void GetSelectedConfig(const std::vector<int32_t> &key, int16_t *selected_id, int16_t *schema_id, uint64_t *cublaslt_algo = nullptr) {
     auto it = normal_tuned_map.find(key);
     if (it != normal_tuned_map.end()) {
@@ -222,23 +241,6 @@ public:
       }
       return;
     }
-    // else {
-    //   printf("Target key: ");
-    //   for (int i=0; i<key.size(); i++) {
-    //     printf("%d, ", key[i]);
-    //   }
-    //   printf("\ntotal normal_tuned_map.size: %d.\n", normal_tuned_map.size());
-    //   for (auto it = normal_tuned_map.begin(); it != normal_tuned_map.end(); ++it) {
-    //     const auto& key = it->first;
-    //     const auto& value = it->second;
-
-    //     std::cout << "Key: ";
-    //     for (int32_t k : key) std::cout << k << " ";
-    //       std::cout << " => Value: ";
-    //     for (int16_t v : value) std::cout << v << " ";
-    //       std::cout << "\n";
-    //   }
-    // }
   }
   
   void Add2Comm(const std::vector<int32_t> &key, const std::vector<int16_t> &select_config) {

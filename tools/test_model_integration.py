@@ -10,11 +10,22 @@ import torch.cuda.nvtx as nvtx
 get_data = torch.randn
 # get_data = torch.ones
 
-ENABLE_XOP = 0
+ENABLE_XOP = 1
 ENABLE_CUDAGRAPH = 1
 ENABLE_TORCHCOMPILE = 0
 ENABLE_MEASURE_OP = 0
 ENABLE_TORCH_PROFILER = 1
+
+# layer_sizes = [4096, 4096, 4096, 4096, 128]
+# layer_sizes = [4096, 128]
+# layer_sizes = [9728, 2560, 6144]
+# layer_sizes = [4096, 2560, 19456]
+
+# in => k, out => n
+# 9728, 2560: xop   17(128,128) 16(256,64), ori 19
+# 2560, 6144: xop 12.3(128,128) 14(256,64), ori 9
+# 4096, 2560: xop   10(256,64), ori 8
+# 2560, 19456: xop  25, ori 35
 
 class LinearLayer(nn.Module):
     """A custom linear layer implementation using functional linear"""
@@ -86,10 +97,6 @@ if __name__ == "__main__":
     # torch.set_float32_matmul_precision('high')
     
     # Define model architecture: input_size -> 512 -> 256 -> 128 -> output_size
-    # layer_sizes = [4096, 4096, 4096, 4096, 128]
-    layer_sizes = [4096, 128]
-    # layer_sizes = [9728, 2560, 6144]
-    # layer_sizes = [4096, 2560, 19456]
     model = MultiLinearModel(layer_sizes).to(device, dtype=torch.bfloat16)
     
     # Print model dtype information

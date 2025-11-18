@@ -3,11 +3,15 @@
 
 #include "common_cublaslt.h"
 #include "xop/common_cuda.h"
+#include "xop/ops_impl/global_resource.h"
 
 #include <vector>
 #include <algorithm>
 
 namespace xop {
+
+// false is not supported for now.
+#define IS_USE_HEURISTIC true
 
 // GemmLt cublaslt_gemm;
 // cublaslt_gemm.init(handle, n, m, k, type_input, type_output, type_compute, true);
@@ -27,13 +31,15 @@ struct GemmLt {
 
   static constexpr int kAlgoMaxNum = 1024;
   cublasLtMatmulHeuristicResult_t heur_res_[kAlgoMaxNum];
+  std::vector<cublasLtMatmulAlgo_t> valid_algos_;
+
   int ret_algo_num_;
 
   float alpha_;
   float beta_;
 
   void *workspace_;
-  int workspace_size_;
+  size_t workspace_size_;
 
   // CUDA_R_16BF
   // CUBLAS_COMPUTE_16F / CUBLAS_COMPUTE_32F
@@ -75,14 +81,46 @@ struct GemmLt {
   
     ret_algo_num_ = 0;
     if (is_tuning) {
-      cublasLtMatmulPreferenceCreate(&preference_);
-      cublasLtMatmulAlgoGetHeuristic(handle_, matmul_desc_, a_desc_, b_desc_,
-                                    c_desc_, c_desc_, preference_, kAlgoMaxNum,
-                                    heur_res_, &ret_algo_num_);
-      
-      // for (int i = 0; i < ret_algo_num_; ++i) {
-      //   DebugUtils::PrintAlgo(heur_res_[i]);
-      // }      
+      if constexpr (IS_USE_HEURISTIC) {
+        cublasLtMatmulPreferenceCreate(&preference_);
+        cublasLtMatmulAlgoGetHeuristic(handle_, matmul_desc_, a_desc_, b_desc_,
+                                      c_desc_, c_desc_, preference_, kAlgoMaxNum,
+                                      heur_res_, &ret_algo_num_);
+        
+        for (int i = 0; i < ret_algo_num_; ++i) {
+          workspace_size_ = std::max(workspace_size_, heur_res_[i].workspaceSize);
+          workspace_ = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolWorkspace, workspace_size_);        
+        }
+        // for (int i = 0; i < ret_algo_num_; ++i) {
+        //   DebugUtils::PrintAlgo(heur_res_[i]);
+        // }
+      }
+      else {
+        int const max_id = 1024;
+        int algo_ids[max_id];
+        int algo_cnt = 0;
+        cublasLtMatmulAlgoGetIds(
+          handle_, type_compute, CUDA_R_32F,
+          type_input, type_input, type_output, type_output, 
+          max_id, algo_ids, &algo_cnt);
+
+        cublasLtMatmulAlgo_t algo;
+        for (int idx = 0; idx < algo_cnt; ++idx) {
+          if (cublasLtMatmulAlgoInit(handle, type_compute, CUDA_R_32F, type_input, type_input, type_output, type_output, algo_ids[idx], &algo)
+              != CUBLAS_STATUS_SUCCESS) continue;
+          if (cublasLtMatmulAlgoCheck(handle, matmul_desc_, a_desc_, b_desc_, c_desc_, c_desc_, &algo, &heur_res_[idx])
+              == CUBLAS_STATUS_SUCCESS) {
+              valid_algos_.push_back(algo);                  
+          }
+        }
+        ret_algo_num_ = valid_algos_.size();
+        printf("ret_algo_num_: %d.\n", ret_algo_num_);
+        for (int i = 0; i < ret_algo_num_; ++i) {
+          workspace_size_ = std::max(workspace_size_, heur_res_[i].workspaceSize);
+          workspace_ = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolWorkspace, workspace_size_);        
+        }
+        printf("workspace_size_: %ld.\n", workspace_size_);
+      }
     }
   }
 
@@ -92,14 +130,19 @@ struct GemmLt {
     if (algo_id >= ret_algo_num_) {
       return false;
     }
-    memcpy(&algo, &heur_res_[algo_id].algo, sizeof(algo));
+    if constexpr (IS_USE_HEURISTIC) {
+      memcpy(&algo, &heur_res_[algo_id].algo, sizeof(algo));      
+    }
+    else {
+      algo = valid_algos_[algo_id];
+    }
     return true;
   }
 
-  void run(cublasLtMatmulAlgo_t& algo, const void *a, const void *b, void *c) {
+  void run(cublasLtMatmulAlgo_t& algo, const void *a, const void *b, void *c, cudaStream_t stream) {
     CUBLASLT_CHECK(cublasLtMatmul(handle_, matmul_desc_, &alpha_, a, a_desc_, b,
                           b_desc_, &beta_, c, c_desc_, c, c_desc_,
-                          &algo, workspace_, workspace_size_, 0));
+                          &algo, workspace_, workspace_size_, stream));
   }
 };
 

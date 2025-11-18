@@ -889,6 +889,11 @@ int marlin_cuda(
       thread_k = 64;
       thread_n = 256;
     }
+
+    if (prob_k >= prob_n * 1.6) {
+      thread_k = 256;
+      thread_n = 64;      
+    }
   }
 
   int thread_k_blocks = thread_k / 16;
@@ -937,6 +942,9 @@ int marlin_cuda(
     CALL_IF(3, 16,  4,  8)
     CALL_IF(4, 16,  4, -1)
     CALL_IF(4, 16,  4,  8)
+
+    CALL_IF(1,  4, 16, -1)
+    CALL_IF(2,  4, 16, -1)
     else
       ret = ERR_KERN_SHAPE;
 

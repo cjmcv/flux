@@ -67,7 +67,6 @@ def write_tuning_result(fp, add_func_name, fn, shape, tuning, tuned_data, pref_i
     id, schema, arch = get_tuned_base_info(tuned_data[0]) # Get the fastest one.
     set_tuning_target(tuning, mode, id, schema, arch)
     fn(tuning)  # Run it once to retrieve the metadata.
-
     # tuning: 0:meta_end_idx, 1:id, 2:schema, 3:~meta
     #         [20-28): cublasLt-algo
     meta_start_idx = 3

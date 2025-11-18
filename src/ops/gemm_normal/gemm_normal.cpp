@@ -31,7 +31,7 @@
 
 #define PRINTF // printf
 #define NOT_TUNING_SCHEMA "" // "TORCH"
-#define TUNING_WITH_CUBLASLT false
+#define TUNING_WITH_CUBLASLT true
 
 //////////////////////////////
 namespace xop {
@@ -50,7 +50,6 @@ public:
     arch_ = get_arch();
 
     if (TUNING_WITH_CUBLASLT) {
-      cublaslt_gemm_ = nullptr;
       CUBLASLT_CHECK(cublasLtCreate(&cublaslt_handle_));
     }
     
@@ -58,16 +57,15 @@ public:
     GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolWorkspace, 8192*20000*sizeof(short));
     GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolAux, 8192*20000*sizeof(short));
     // GlobalBuffer::instance().CheckDeviceBufferAllocate(kDevBufferPoolOutput, 8192*20000*sizeof(short));
-
-    // cuda graph里不允许有resize，1) 在创建时先按最大值分配；2）每次capture前先按对应数据规模正常推理一次。
-    // GlobalBuffer::instance().ResizeDeviceBufferIfNeeded(5000000);
   } 
   ~GemmNormalImpl() {
     if (TUNING_WITH_CUBLASLT) {
-      CUBLASLT_CHECK(cublasLtDestroy(cublaslt_handle_));
-      if (cublaslt_gemm_ != nullptr) {
-        delete cublaslt_gemm_;
+      for (auto it = cublaslt_gemm_map_.begin(); it != cublaslt_gemm_map_.end(); ++it) {
+        const std::vector<int32_t>& key = it->first;
+        GemmLt *                    val = it->second;
+        delete val;
       }
+      CUBLASLT_CHECK(cublasLtDestroy(cublaslt_handle_));
     }
   }
 
@@ -105,7 +103,7 @@ public:
 
     if (run_mode == kRunWithTuning) {
       forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
-                      (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get());
+                      (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get(), stream);
     }
     else {
       // Misalignment case.
@@ -128,7 +126,7 @@ public:
       cublasLtMatmulAlgo_t algo;
       TunedConfigRegister& tins = TunedConfigRegister::instance();
       tins.GetSelectedConfig(shape_meta, &id_meta[kMetaId], &id_meta[kMetaSchema], algo.data);
-
+      // tins.PrintRegistedConfig(shape_meta);
       // If the required configuration is not registered in the tuning config, directly use torch for computation.
       if (id_meta[kMetaId] == -1) {
         // if constexpr (NOT_TUNING_SCHEMA == "TORCH")
@@ -140,16 +138,13 @@ public:
       }
       PRINTF("[runing normal] selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
       if (id_meta[kMetaSchema] == (int16_t)UnifiedMetaEnum::GemmLt) {
-        // if constexpr (TUNING_WITH_CUBLASLT == false) {
-        //   return RunTorch(input, weight, output, bias);
-        // }
         cudaDataType_t type_input = WarpIdMeta2CublasLtType(id_meta[kMetaTypeA]);
         cudaDataType_t type_output = WarpIdMeta2CublasLtType(id_meta[kMetaTypeCD]);
         cublasComputeType_t type_compute = WarpIdMeta2CublasLtComputeType(id_meta[kMetaTypeAcc]);
         
         GemmLt cublaslt_gemm;
         cublaslt_gemm.init(cublaslt_handle_, rt_args->n, rt_args->m, rt_args->k, type_input, type_output, type_compute, false);
-        cublaslt_gemm.run(algo, weight.data_ptr(), input.data_ptr(), output.data_ptr());
+        cublaslt_gemm.run(algo, weight.data_ptr(), input.data_ptr(), output.data_ptr(), stream);
       }
       else {
         GemmConfigRegister& ins = GemmConfigRegister::instance();
@@ -304,7 +299,8 @@ private:
                     c10::optional<torch::Tensor> weight_scale,
                     int16_t *tuning_data, 
                     std::vector<int16_t>& id_meta, 
-                    RtArguments *rt_args) {
+                    RtArguments *rt_args,
+                    cudaStream_t stream) {
     XOP_CHECK_EQ(tuning_data[0], 1); // 1 for tuning
     id_meta[kMetaId] = tuning_data[1];
     id_meta[kMetaSchema] = tuning_data[2];
@@ -320,22 +316,27 @@ private:
       cublasComputeType_t type_compute = WarpIdMeta2CublasLtComputeType(id_meta[kMetaTypeAcc]);
 
       // Only create in the first No.0
-      if (id_meta[kMetaId] == 0 && cublaslt_gemm_ == nullptr) {
-        cublaslt_gemm_ = new GemmLt;
-        cublaslt_gemm_->init(cublaslt_handle_, rt_args->n, rt_args->m, rt_args->k, type_input, type_output, type_compute, true);
+      
+      std::vector<int32_t> lt_key{rt_args->m, rt_args->n, rt_args->k, id_meta[kMetaTypeA], id_meta[kMetaTypeCD], id_meta[kMetaTypeAcc]};
+      GemmLt *gemm_lt = nullptr;
+      auto it = cublaslt_gemm_map_.find(lt_key);
+      if (it != cublaslt_gemm_map_.end()){
+        gemm_lt = it->second;
+      }
+      else {
+        gemm_lt = new GemmLt;
+        gemm_lt->init(cublaslt_handle_, rt_args->n, rt_args->m, rt_args->k, type_input, type_output, type_compute, true);
+        cublaslt_gemm_map_.emplace(lt_key, gemm_lt);
       }
 
-      if (id_meta[kMetaId] >= cublaslt_gemm_->get_algo_num()) { 
-        if (cublaslt_gemm_ != nullptr) {
-          delete cublaslt_gemm_;
-          cublaslt_gemm_ = nullptr;
-        }
+      if (id_meta[kMetaId] >= gemm_lt->get_algo_num()) { 
         printf("hello run cublasLt set true\n");
+        tuning_data[0] = -1; // close the tuning flag
         return -1;
       }
       cublasLtMatmulAlgo_t algo;
-      cublaslt_gemm_->get_algo(id_meta[kMetaId], algo);
-      cublaslt_gemm_->run(algo, weight.data_ptr(), input.data_ptr(), output.data_ptr());
+      gemm_lt->get_algo(id_meta[kMetaId], algo);
+      gemm_lt->run(algo, weight.data_ptr(), input.data_ptr(), output.data_ptr(), stream);
 
       tuning_data[0] = id_meta.size();
       for (int i=0; i<id_meta.size(); i++) {
@@ -356,7 +357,7 @@ private:
         tuning_data[0] = -1; // close the tuning flag
         return -1;        
       }
-      cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
+
       op->initialize(rt_args, nullptr, stream);
       op->run(stream);
       
@@ -395,7 +396,7 @@ private:
 
 private:
   cublasLtHandle_t cublaslt_handle_;
-  GemmLt *cublaslt_gemm_;
+  std::map<std::vector<int32_t>, GemmLt *> cublaslt_gemm_map_;
 
   const c10::ScalarType input_dtype;
   const c10::ScalarType output_dtype;

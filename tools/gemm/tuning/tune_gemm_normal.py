@@ -26,7 +26,7 @@ is_use_fp16_acc = False # True
 class GemmSm80Schema:
     name = "GemmSm80"
     arch = Meta.Sm80
-    sub_schema = [Meta.GemmNormal] # GemmNormalSimt, Meta.GemmLt
+    sub_schema = [Meta.GemmNormal, Meta.GemmLt] # GemmNormalSimt
     # test_input_dtype = torch.float16
     # space_dtype = [(torch.float16,torch.float16,torch.float16)] # (torch.bfloat16,torch.bfloat16,torch.bfloat16)
     if is_use_fp16_acc:
