@@ -188,7 +188,7 @@ if __name__ == "__main__":
     # layer_sizes = [4096, 4096, 4096, 4096, 128]
     # layer_sizes = [4096, 128]
     layer_sizes_list = [[9728, 2560, 6144], [4096, 2560, 19456]]
-    # layer_sizes = [4096, 2560, 19456]
+    # layer_sizes_list = [[9728, 2560], [2560, 6144], [4096, 2560], [2560, 19456]]
     
     fc = lambda tflops_list: [round(num, 3) for num in tflops_list]
     record_prof: List[List[Any]] = []
