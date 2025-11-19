@@ -72,11 +72,22 @@ public:
 
   // Core kernel configurations
   using ElementCompute      = ElementAccumulator;                                          // Element type for epilogue computation
+  using ElementScalar       = ElementAccumulator;
   using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
   using TileShape           = cutlass::Shape<decltype(cute::get<0>(TileShapeMN{})), 
                                              decltype(cute::get<1>(TileShapeMN{})), 
                                              cute::Int<TileShapeK>>;         // Threadblock-level tile size
   using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
+
+  static constexpr auto RoundStyle = cutlass::FloatRoundStyle::round_to_nearest;
+
+  using DefaultOperation = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementCompute, ElementC, ElementScalar, RoundStyle>;
+  using CustomEVTIdentity =  // acc
+    cutlass::epilogue::fusion::Sm90EVT<
+      cutlass::epilogue::fusion::Sm90Compute<
+        cutlass::epilogue::thread::Identity, ElementD, ElementAccumulator, RoundStyle>,
+      cutlass::epilogue::fusion::Sm90AccFetch
+    >;
 
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
       ArchTag, cutlass::arch::OpClassTensorOp,
@@ -88,7 +99,8 @@ public:
       // We can enable this if beta == 0 by changing ElementC to void below.
       ElementC, typename cutlass::layout::LayoutTranspose<LayoutC>::type, AlignmentC,
       ElementD, typename cutlass::layout::LayoutTranspose<LayoutD>::type, AlignmentD,
-      EpilogueSchedule // This is the only epi supporting the required swap + transpose.
+      EpilogueSchedule, // This is the only epi supporting the required swap + transpose.
+      DefaultOperation
     >::CollectiveOp;
 
   // ScaleOnlyShuffled

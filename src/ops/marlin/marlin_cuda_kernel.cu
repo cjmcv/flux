@@ -890,10 +890,10 @@ int marlin_cuda(
       thread_n = 256;
     }
 
-    if (prob_k >= prob_n * 1.6) {
-      thread_k = 256;
-      thread_n = 64;      
-    }
+    // if (prob_k >= prob_n * 1.6) {
+    //   thread_k = 256;
+    //   thread_n = 64;      
+    // }
   }
 
   int thread_k_blocks = thread_k / 16;
