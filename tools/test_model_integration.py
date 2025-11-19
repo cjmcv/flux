@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.profiler import profile, ProfilerActivity
+from typing import List,Any
 
 from xop.project.qwen3_4b_h20_compile import XopGemmSpecify
 
@@ -10,16 +11,12 @@ import torch.cuda.nvtx as nvtx
 get_data = torch.randn
 # get_data = torch.ones
 
-ENABLE_XOP = 1
+ENABLE_XOP = 0
 ENABLE_CUDAGRAPH = 1
 ENABLE_TORCHCOMPILE = 0
 ENABLE_MEASURE_OP = 0
-ENABLE_TORCH_PROFILER = 1
+ENABLE_TORCH_PROFILER = 0
 
-# layer_sizes = [4096, 4096, 4096, 4096, 128]
-# layer_sizes = [4096, 128]
-# layer_sizes = [9728, 2560, 6144]
-# layer_sizes = [4096, 2560, 19456]
 
 # in => k, out => n
 # 9728, 2560: xop   17(128,128) 16(256,64), ori 19
@@ -86,7 +83,7 @@ class MultiLinearModel(nn.Module):
 
 # @nvtx.annotate("Graph Replay warmup", color="green")
 
-if __name__ == "__main__":
+def profile_one_config(batch_size, layer_sizes, record_prof):
     # Set random seed for reproducibility
     torch.manual_seed(42)
     
@@ -111,7 +108,6 @@ if __name__ == "__main__":
         compiled_model = model 
     
     # Create sample input data in bfloat16
-    batch_size = 16
     input_tensor = get_data(batch_size, layer_sizes[0], device=device, dtype=torch.bfloat16)
     print(f"Input tensor dtype: {input_tensor.dtype}")
     
@@ -180,9 +176,28 @@ if __name__ == "__main__":
     avg_elapsed_ms = total_elapsed_ms / TEST_ROUNDS
     print(f"total_elapsed_ms: {total_elapsed_ms:.3f} ms")
     print(f"avg_elapsed_ms: {avg_elapsed_ms:.6f} ms")
-
+    record_prof.append(avg_elapsed_ms)
     # # Verify the model contains multiple linear layers
     # print(f"\nModel has {len(model.layers)} linear layers")
     # for i, layer in enumerate(model.layers):
     #     print(f"Layer {i}: {layer.in_features} -> {layer.out_features}")
     #     print(f"  Weight dtype: {layer.weight.dtype}, Bias dtype: {layer.bias.dtype}")
+    
+if __name__ == "__main__":
+    batch_sizes = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192]#
+    # layer_sizes = [4096, 4096, 4096, 4096, 128]
+    # layer_sizes = [4096, 128]
+    layer_sizes_list = [[9728, 2560, 6144], [4096, 2560, 19456]]
+    # layer_sizes = [4096, 2560, 19456]
+    
+    fc = lambda tflops_list: [round(num, 3) for num in tflops_list]
+    record_prof: List[List[Any]] = []
+    for layer_sizes in layer_sizes_list:
+        prof_one_group: List[Any] = []
+        for batch_size in batch_sizes:
+            profile_one_config(batch_size, layer_sizes, prof_one_group)
+        record_prof.append(prof_one_group)
+    
+    for idx, layer_sizes in enumerate(layer_sizes_list):
+        print(layer_sizes, ":", fc(record_prof[idx]))
+    
