@@ -92,8 +92,10 @@ if (ENABLE_QUANT_4):
 
 xop_lib = Library("xop", "FRAGMENT")
 register_xop_gemm(g_gemm_normal, False, op_name="gemm_normal_forward", target_lib=xop_lib)
-register_xop_gemm(g_gemm_quant8, False, op_name="gemm_quant8_forward", target_lib=xop_lib)
-register_xop_gemm(g_gemm_quant4, True, op_name="gemm_quant4_forward", target_lib=xop_lib)
+if (ENABLE_QUANT_8):
+    register_xop_gemm(g_gemm_quant8, False, op_name="gemm_quant8_forward", target_lib=xop_lib)
+if (ENABLE_QUANT_4):
+    register_xop_gemm(g_gemm_quant4, True, op_name="gemm_quant4_forward", target_lib=xop_lib)
 
 class XopGemmSpecify:
     def __init__(
@@ -134,10 +136,11 @@ class XopGemmSpecify:
         
         # N K => max_m
         if mode == 1:
+            
             if (N == 2560 and K == 9728) or (N == 19456 and K == 2560):
-                self.hparam[1] = 512
-            else:  # if (N == 2560 and K == 4096) or (N == 6144 and K == 2560)
                 self.hparam[1] = 1024
+            else:  # if (N == 2560 and K == 4096) or (N == 6144 and K == 2560)
+                self.hparam[1] = 4096
         elif mode == 8:
             if (N == 2560 and K == 4096) or (N == 6144 and K == 2560):
                 self.hparam[1] = 1024

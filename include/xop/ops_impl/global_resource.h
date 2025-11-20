@@ -38,6 +38,7 @@ private:
     device_buffers_.resize(kDevBufferPoolKindSize, nullptr);
     buffers_size_.resize(kDevBufferPoolKindSize, 0);
     used_buffers_size_.resize(kDevBufferPoolKindSize, 0);
+    is_tuning_ = 0;
   }
   GlobalBuffer(const GlobalBuffer&) = delete;
   GlobalBuffer& operator=(const GlobalBuffer&) = delete;
@@ -46,6 +47,7 @@ private:
   std::vector<size_t> buffers_size_;
   std::vector<size_t> used_buffers_size_;
   std::vector<uint8_t> host_buffer_;
+  bool is_tuning_;
 
 public:
   static GlobalBuffer& instance() {
@@ -53,6 +55,9 @@ public:
     return instance;
   }
 
+  void SetTuningFlag(bool is_tuning) {
+    is_tuning_ = is_tuning;
+  }
   void CheckDeviceBufferAllocate(DeviceBufferPoolKindEnum pool_id, size_t size) {
     if (device_buffers_[pool_id] == nullptr) {
       size = (size + 127) / 128 * 128;
@@ -66,6 +71,15 @@ public:
       if (used_buffers_size_[pool_id] < size) {
         used_buffers_size_[pool_id] = size;
       }
+      return device_buffers_[pool_id];
+    }
+    else if (is_tuning_ == true) {
+      cudaFree(device_buffers_[pool_id]);
+
+      size = (size + 127) / 128 * 128;
+      cudaMalloc(&device_buffers_[pool_id], size);
+      used_buffers_size_[pool_id] = size;
+      buffers_size_[pool_id] = size;
       return device_buffers_[pool_id];
     }
     printf("GetDeviceBuffer Failed: %ld < %ld\n", buffers_size_[pool_id], size);

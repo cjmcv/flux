@@ -94,8 +94,10 @@ if (ENABLE_QUANT_4):
 
 xop_lib = Library("xop", "FRAGMENT")
 register_xop_gemm(g_gemm_normal, False, op_name="gemm_normal_forward", target_lib=xop_lib)
-register_xop_gemm(g_gemm_quant8, False, op_name="gemm_quant8_forward", target_lib=xop_lib)
-register_xop_gemm(g_gemm_quant4, True, op_name="gemm_quant4_forward", target_lib=xop_lib)
+if (ENABLE_QUANT_8):
+    register_xop_gemm(g_gemm_quant8, False, op_name="gemm_quant8_forward", target_lib=xop_lib)
+if (ENABLE_QUANT_4):
+    register_xop_gemm(g_gemm_quant4, True, op_name="gemm_quant4_forward", target_lib=xop_lib)
 
 class XopGemmSpecify:
     def __init__(

@@ -102,6 +102,8 @@ public:
                                                                              this->input_dtype, this->output_dtype, transpose_weight, &default_schema_);
 
     if (run_mode == kRunWithTuning) {
+      GlobalBuffer::instance().SetTuningFlag(true);
+      // GlobalBuffer::instance().PrintUsedBufferSize();
       forward_tuning(input, weight, output, bias, input_scale, weight_scale, 
                       (int16_t *)tuning.value().data_ptr(), id_meta, rt_args.get(), stream);
     }
