@@ -11,12 +11,10 @@ from xop.common import Meta
 from torch.library import Library
 from .common import direct_register_custom_op
 
-ENABLE_QUANT_8 = 1
-ENABLE_QUANT_4 = 1
+ENABLE_QUANT_8 = 0
+ENABLE_QUANT_4 = 0
 
 # tuning
-
-
 
 def register_xop_gemm(xop_gemm: Any,
                     is_quant4: bool,
@@ -125,20 +123,28 @@ class XopGemmSpecify:
         mode = 0
         #######################################
         
-        # if ((M <= 64) or 
-        #     (M <= 256 and N == 2560 and K == 4096) or 
-        #     (M <= 128 and N == 2560 and K == 9728) or
-        #     (M <= 256 and N == 6144 and K == 2560)):
-
-        if (M <= 16):
-            mode = 4
-            # self.hparam[2] = Meta.Sm80
-
-        # if ((M >= 512 and N == 19456 and K == 2560) or 
-        #     (M >= 2048 and N == 6144 and K == 2560) or 
-        #     (M >= 2048 and N == 2560 and K == 9728) or 
-        #     (M >= 4096 and N == 2560 and K == 4096)):
-        #     mode = 8
+        if (M >= 128):
+            mode = 1
+            if (M >= 2048 and ENABLE_QUANT_8 == 1):
+                mode = 8 
+        elif (M <= 32):
+            if (ENABLE_QUANT_4):
+                mode = 4
+        #######################################
+        
+        # N K => max_m
+        if mode == 1:
+            if (N == 2560 and K == 9728) or (N == 19456 and K == 2560):
+                self.hparam[1] = 512
+            else:  # if (N == 2560 and K == 4096) or (N == 6144 and K == 2560)
+                self.hparam[1] = 1024
+        elif mode == 8:
+            if (N == 2560 and K == 4096) or (N == 6144 and K == 2560):
+                self.hparam[1] = 1024
+            elif (N == 2560 and K == 9728):
+                self.hparam[1] = 2048
+            else:
+                self.hparam[1] = 512
             
         return mode
     

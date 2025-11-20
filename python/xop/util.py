@@ -55,16 +55,24 @@ def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
         torch.cuda.synchronize()
         return PerfResult(name=name, output=output, gemm_time_ms=1 / 1 * 1000)
     
-    total_time = 0
-    for i in range(warmup_iters + iters):
-        if (i == warmup_iters):
-            torch.cuda.synchronize()
-            start = time.time()
-        output = fn(i)
+    my_stream = torch.cuda.Stream()          # 也可传外部流
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event   = torch.cuda.Event(enable_timing=True)
 
-    torch.cuda.synchronize()
-    end = time.time()
-    total_time = end - start
+    with my_stream:
+        for i in range(warmup_iters):
+            output = fn(i)
+            
+    with my_stream:
+        start_event.record()
+        for i in range(iters):
+            fn(i)
+        end_event.record()
+        my_stream.synchronize()
+            
+    my_stream.record_event(end_event)
+    my_stream.synchronize()
+    total_time = start_event.elapsed_time(end_event) * 1e-3
 
     # Clean up and run it once to confirm the results are correct.
     if isinstance(output, torch.Tensor):

@@ -81,6 +81,8 @@ public:
 
   static constexpr auto RoundStyle = cutlass::FloatRoundStyle::round_to_nearest;
 
+  static constexpr bool UseCustomEVT = true;
+
   using DefaultOperation = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementCompute, ElementC, ElementScalar, RoundStyle>;
   using CustomEVTIdentity =  // acc
     cutlass::epilogue::fusion::Sm90EVT<
@@ -100,7 +102,7 @@ public:
       ElementC, typename cutlass::layout::LayoutTranspose<LayoutC>::type, AlignmentC,
       ElementD, typename cutlass::layout::LayoutTranspose<LayoutD>::type, AlignmentD,
       EpilogueSchedule, // This is the only epi supporting the required swap + transpose.
-      DefaultOperation
+      cute::conditional_t<UseCustomEVT, CustomEVTIdentity, DefaultOperation>
     >::CollectiveOp;
 
   // ScaleOnlyShuffled
@@ -205,7 +207,12 @@ private:
       cutlass::gemm::GemmUniversalMode::kGemm,
       {n, m, k, l},
       {(ElementB *)rt_args->ptr_B, dB, (ElementA *)rt_args->ptr_A, stride_A, (ElementScale *)rt_args->ptr_blockscale_B, stride_S, g},
-      {{rt_args->alpha, rt_args->beta}, (ElementC *)rt_args->ptr_C, stride_C, (ElementD *)rt_args->ptr_D, stride_D}
+      {{/*rt_args->alpha, rt_args->beta*/}, (ElementC *)rt_args->ptr_C, stride_C, (ElementD *)rt_args->ptr_D, stride_D}
+
+      if constexpr (!UseCustomEVT) {
+        arguments.epilogue.thread.alpha = rt_args->alpha;
+        arguments.epilogue.thread.beta = rt_args->beta;
+      }
     };
 
     return arguments;
