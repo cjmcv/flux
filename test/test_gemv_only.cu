@@ -177,7 +177,7 @@ public:
 
   /// Initializes data structures
   // problem_size.row() == M, GEMV B矩阵的行
-  // problem_size.column() == M, GEMV B矩阵的列
+  // problem_size.column() == K, GEMV B矩阵的列
   void initialize(
     cutlass::MatrixCoord problem_size,
     int32_t batch_count
@@ -186,11 +186,12 @@ public:
     //
     // Allocate the GEMV workspace
     //
-
+    // A[b*m,k], B[b*k,1], C[b*m,1]
     if(std::is_same<LayoutA, cutlass::layout::ColumnMajor>::value) {
       tensor_A.resize({problem_size.row(), batch_count * problem_size.column()});
     }
     else {
+      // 行优先时，stride(0) == k.
       tensor_A.resize({batch_count * problem_size.row(), problem_size.column()});
     }
     
@@ -233,6 +234,14 @@ public:
     EXPECT_GT(cutlass::reference::host::TensorNorm(reference_D.host_view()), 0);
 
     bool passed = cutlass::reference::host::TensorEquals(reference_D.host_view(), tensor_D.host_view());
+
+    // std::cout << "shape = [" << t.extent(0) << ", " << t.extent(1) << "]\n";
+    for (int i = 0; i < tensor_D.extent()[0]; ++i) {
+      for (int j = 0; j < tensor_D.extent()[1]; ++j) {
+        std::cout << float(tensor_D.at({i, j})) << " ";
+      }
+    }
+
 
     if (!passed) {
 
@@ -311,6 +320,7 @@ public:
     // Initialize the GEMV operator
     //
 
+    printf("stride(0): %d.\n", tensor_A.device_ref().stride(0));
     typename Gemv::Arguments arguments{
       problem_size,
       batch_count,

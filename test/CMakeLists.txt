@@ -10,8 +10,8 @@ include_directories(${COMMON_HEADER_DIRS})
 # add_executable(test_single_gemm test_single_gemm.cc)
 # target_link_libraries(test_single_gemm PUBLIC xop)
 
-# add_executable(test_gemv_only test_gemv_only.cu)
-# target_link_libraries(test_gemv_only PUBLIC xop)
+add_executable(test_gemv_only test_gemv_only.cu)
+target_link_libraries(test_gemv_only PUBLIC xop)
 
 # add_executable(test_gemm_simt test_gemm_simt.cu)
 # target_link_libraries(test_gemm_simt PUBLIC xop)
