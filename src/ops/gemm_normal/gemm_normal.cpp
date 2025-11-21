@@ -100,6 +100,7 @@ public:
     }
     std::unique_ptr<RtArguments> rt_args = TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, 
                                                                              this->input_dtype, this->output_dtype, transpose_weight, &default_schema_);
+    rt_args->n /= 2; // !!! splitk [hardcode]
 
     if (run_mode == kRunWithTuning) {
       GlobalBuffer::instance().SetTuningFlag(true);
@@ -139,7 +140,13 @@ public:
         // }
       }
 
-      id_meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemvSimt;
+
+
+      id_meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemvSimt;    // todo: !!! [hardcode]
+
+
+
+
       PRINTF("[runing normal] selected_id: %d, selected_schema: %d.\n", id_meta[kMetaId], id_meta[kMetaSchema]);
       if (id_meta[kMetaSchema] == (int16_t)UnifiedMetaEnum::GemmLt) {
         cudaDataType_t type_input = WarpIdMeta2CublasLtType(id_meta[kMetaTypeA]);
@@ -149,23 +156,6 @@ public:
         GemmLt cublaslt_gemm;
         cublaslt_gemm.init(cublaslt_handle_, rt_args->n, rt_args->m, rt_args->k, type_input, type_output, type_compute, false);
         cublaslt_gemm.run(algo, weight.data_ptr(), input.data_ptr(), output.data_ptr(), stream);
-      }
-      else if (id_meta[kMetaSchema] == (int16_t)UnifiedMetaEnum::GemvSimt) {
-        GemmConfigRegister& ins = GemmConfigRegister::instance();
-        GemmBase *op = ins.GetOp(id_meta, false);
-
-        RtArguments *base_args = rt_args.get();
-        // gemv: weight A[m,k] * input B[1,k] = C[1,m]
-        base_args->m = weight.size(0);
-        base_args->k = weight.size(1);
-        base_args->n = 1;
-
-        void *t = base_args->ptr_A;
-        base_args->ptr_A = base_args->ptr_B;
-        base_args->ptr_B = t;
-
-        op->initialize(rt_args.get(), nullptr, stream);
-        op->run(stream);
       }
       else {
         GemmConfigRegister& ins = GemmConfigRegister::instance();
@@ -309,7 +299,7 @@ private:
     //               .device(weight.device());
     // return torch::from_blob(buffer_ptr, {m, n}, opts);
 
-    return torch::empty({m, n}, weight.options().dtype(output_dtype));
+    return torch::empty({m, n*2}, weight.options().dtype(output_dtype));  // !!! splitk [hardcode]
   }
 
   int forward_tuning(torch::Tensor input,
