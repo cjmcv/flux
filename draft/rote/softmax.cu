@@ -8,6 +8,7 @@ const int N = 2048;
 constexpr size_t BLOCK_SIZE = 256;
 const int repeat_times = 10;
 
+// todo: online softmax
 // 求最大值，减最大值求e指数，e指数除以e指数的和（归一化）
 int softmax(const float* x, int len, float* output) {
     // 输入合法性检查
