@@ -26,12 +26,12 @@ def rand_tensor(shape: list[int], dtype: torch.dtype):
     
 def create_matrix_arange_row(M, N, dtype=torch.bfloat16, device='cuda'):
     row_indices = torch.arange(M, dtype=dtype, device=device)
-    matrix = row_indices.unsqueeze(1).expand(M, N)
+    matrix = row_indices.unsqueeze(1).expand(M, N).contiguous()  # contiguous is very important!
     return matrix
 
 def create_matrix_arange_col(M, N, dtype=torch.bfloat16, device='cuda'):
     col_indices = torch.arange(N, dtype=dtype, device=device)
-    matrix = col_indices.unsqueeze(0).expand(M, N)
+    matrix = col_indices.unsqueeze(0).expand(M, N).contiguous()
     return matrix
         
 def calculate_tflops(m, k, n, time_ms):
