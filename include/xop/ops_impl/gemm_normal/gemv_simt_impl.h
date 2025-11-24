@@ -313,11 +313,12 @@ public:
         // rows of the rolling tile
         int const tileA_k = kThreadsPerRow * kElementsPerAccess;
         
-        int tile_align_col = params.problem_size.column() / tileA_k * tileA_k;
-        int unroll_col_k = batch_idx * tile_align_col / params.splitk_num;
+        int tile_align_col = params.problem_size.column() / params.splitk_num / tileA_k * tileA_k;
+        int unroll_col_k = 0; // batch_idx * tile_align_col;
 
+        // printf("(%d,%d, %d,%d)", unroll_col_k, tile_align_col, tileA_k, params.splitk_num);
         // for (; unroll_col_k < params.problem_size.column() / tileA_k * tileA_k; unroll_col_k += tileA_k) {
-        for (; unroll_col_k < (batch_idx+1) * tile_align_col / params.splitk_num; unroll_col_k += tileA_k) {
+        for (; unroll_col_k < tile_align_col; unroll_col_k += tileA_k) {
 
           // fetch from matrix A
           arch::global_load<FragmentA,
@@ -342,7 +343,7 @@ public:
         // calculate the rest of K elements
         // each thread fetch 1 element each time
         // for (int k = unroll_col_k + idx_col_k; k < params.problem_size.column(); k += kThreadsPerRow) {
-        for (int k = unroll_col_k + idx_col_k; k < (batch_idx+1) * params.problem_size.column() / params.splitk_num; k += kThreadsPerRow) {
+        for (int k = unroll_col_k + idx_col_k; k < params.problem_size.column() / params.splitk_num; k += kThreadsPerRow) {
           ElementB b = *(ptr_B - idx_col_k * kElementsPerAccess + k);
           ElementA a = *(ptr_A - idx_col_k * kElementsPerAccess + k);
 
@@ -360,6 +361,19 @@ public:
     }
   }
 };
+
+template <class T>
+__global__
+void ElementWiseAdd(T *out, const T *in, int n, int splitk_num) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  T accum = T(0);
+  for (int s=0; s<splitk_num; s++) {
+    const T *sin = in + s * n;
+    accum += sin[i];
+  }
+  if (i < n) 
+    out[i] = accum;
+}
 
 } // namespace kernel
 } // namespace gemm
@@ -445,6 +459,7 @@ public:
     // Initialize CUTLASS kernel with arguments and workspace pointer
     CUTLASS_CHECK(gemv_.initialize(arguments, nullptr, cu_stream));
 
+    output_len_ = rt_args->m;
     ptr_D_ = (void *)rt_args->ptr_D; // [hardcode]
     workspace_size_ = workspace_size;
   }
@@ -453,13 +468,18 @@ public:
     auto cu_stream = static_cast<cudaStream_t>(stream);
     CUTLASS_CHECK(gemv_.run(cu_stream));
 
-    cudaMemcpyAsync(ptr_D_, splitk_out_, workspace_size_, cudaMemcpyDeviceToDevice, cu_stream);
+    int threads = 256;
+    int blocks  = (output_len_ + threads - 1) / threads;
+    // printf("SplitKNum: %d.\n", SplitKNum);
+    gemm::kernel::ElementWiseAdd<<<blocks, threads, 0, cu_stream>>>((ElementC*)ptr_D_, (ElementC*)splitk_out_, output_len_, SplitKNum);
+    // cudaMemcpyAsync(ptr_D_, splitk_out_, workspace_size_, cudaMemcpyDeviceToDevice, cu_stream);
   }
 
 private:
   Gemv gemv_;
   void *splitk_out_;
   void *ptr_D_;
+  size_t output_len_;
   size_t workspace_size_;
 };
 

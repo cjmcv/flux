@@ -100,7 +100,6 @@ public:
     }
     std::unique_ptr<RtArguments> rt_args = TorchDefaultConfig::GetBaseRtConf(input, weight, output, bias, input_scale, weight_scale, 
                                                                              this->input_dtype, this->output_dtype, transpose_weight, &default_schema_);
-    rt_args->n /= 2; // !!! splitk [hardcode]
 
     if (run_mode == kRunWithTuning) {
       GlobalBuffer::instance().SetTuningFlag(true);
@@ -299,7 +298,7 @@ private:
     //               .device(weight.device());
     // return torch::from_blob(buffer_ptr, {m, n}, opts);
 
-    return torch::empty({m, n*2}, weight.options().dtype(output_dtype));  // !!! splitk [hardcode]
+    return torch::empty({m, n}, weight.options().dtype(output_dtype));
   }
 
   int forward_tuning(torch::Tensor input,
