@@ -114,6 +114,7 @@ template <
 >
 struct XopGemv;
 
+
 template <
     typename ElementA_,
     typename ElementB_,
@@ -267,8 +268,8 @@ public:
   CUTLASS_DEVICE
   void operator()(Params const &params, SharedStorage &shared_storage) {
     
-    // block: (16, 8£¬ 1) => 128 threads
-    // grid:  (m//8, 1£¬ 1)
+    // block: (16, 8, 1) => 128 threads
+    // grid:  (m//8, 1, 1)
     // kElementsPerAccess: 8 => one thread for 8 data
     // kThreadsPerRow: 16
 
@@ -394,7 +395,8 @@ class GemvSimtImpl : public GemmBase {
       ElementC,               // Element C
       ElementAccumulator,     // Element accumulator
       EpilogueOpIdentity,     // Output operator
-      ElementsPerAccess       // Element access granularity
+      ElementsPerAccess,       // Element access granularity
+      ThreadCount
     >
   >;
 

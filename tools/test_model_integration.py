@@ -17,12 +17,9 @@ ENABLE_TORCHCOMPILE = 0
 ENABLE_MEASURE_OP = 0
 ENABLE_TORCH_PROFILER = 0
 
-
+WARNUP_ROUNDS = 200
+TEST_ROUNDS = 5000
 # in => k, out => n
-# 9728, 2560: xop   17(128,128) 16(256,64), ori 19
-# 2560, 6144: xop 12.3(128,128) 14(256,64), ori 9
-# 4096, 2560: xop   10(256,64), ori 8
-# 2560, 19456: xop  25, ori 35
 
 class LinearLayer(nn.Module):
     """A custom linear layer implementation using functional linear"""
@@ -44,7 +41,7 @@ class LinearLayer(nn.Module):
         # Use functional linear for inference computation
         if ENABLE_XOP:
             # run_mode = self.xop_gemm.get_run_mode(x.shape[0], self.weight.shape[0], x.shape[1])
-            run_mode = 4
+            run_mode = 1
             return self.xop_gemm.forward(run_mode, x, self.weight)
         else:
             return F.linear(x, self.weight) #, self.bias
@@ -114,7 +111,7 @@ def profile_one_config(batch_size, layer_sizes, record_prof):
     # Warm up the model (important for CUDA graphs)
     with nvtx.range("Graph Replay warmup", color="green"):
         print("Warming up model...")
-        for _ in range(100):
+        for _ in range(WARNUP_ROUNDS):
             _ = compiled_model(input_tensor)
         
     if ENABLE_TORCH_PROFILER:
@@ -155,7 +152,7 @@ def profile_one_config(batch_size, layer_sizes, record_prof):
     start_event = torch.cuda.Event(enable_timing=True)
     end_event = torch.cuda.Event(enable_timing=True)  
     
-    TEST_ROUNDS = 1000
+    TEST_ROUNDS = 5
     with nvtx.range("Graph Replay testing", color="red"):
         if ENABLE_CUDAGRAPH:    
             with stream:
@@ -184,18 +181,12 @@ def profile_one_config(batch_size, layer_sizes, record_prof):
     #     print(f"  Weight dtype: {layer.weight.dtype}, Bias dtype: {layer.bias.dtype}")
     
 if __name__ == "__main__":
-    batch_sizes = [1,2,4,8,16,32,64,128,256,512]#,128,256,512,1024,2048,4096,8192
+    batch_sizes = [1]#,2,4,8,16,32,64,128,256,5121024,2048,4096,8192
     # layer_sizes_list = [[4096, 4096, 4096], [4096, 128]]
     # layer_sizes_list = [[9728, 2560, 6144], [4096, 2560, 19456]]
     # layer_sizes_list = [[9728, 2560], [2560, 6144], [4096, 2560], [2560, 19456]]
-    layer_sizes_list = [[2560, 19456]]
-    # xop_perf  [tflops]: [0.185, 0.361, 0.728, 1.423, 2.86, 4.012, 4.657, 7.13, 13.295, 24.031]
-    # torch_perf[tflops]: [0.186, 0.363, 0.731, 1.45, 2.882, 3.89, 6.597, 7.205, 13.224, 24.127]
-    # xop_perf  [ms]: [0.538, 0.552, 0.547, 0.56, 0.557, 0.795, 1.369, 1.788, 1.918, 2.122]
-    # torch_perf[ms]: [0.537, 0.548, 0.545, 0.55, 0.553, 0.819, 0.966, 1.77, 1.928, 2.114]
-    # [0.137, 0.135, 0.135, 0.135, 0.135, 0.137, 0.253, 0.499, 0.99, 1.98]
-    # [0.529, 0.539, 0.536, 0.544, 0.544, 0.554, 0.582, 0.627, 1.031, 2.016]
-    
+    layer_sizes_list = [[128, 128]]
+
     fc = lambda tflops_list: [round(num, 3) for num in tflops_list]
     record_prof: List[List[Any]] = []
     for layer_sizes in layer_sizes_list:
@@ -206,4 +197,14 @@ if __name__ == "__main__":
     
     for idx, layer_sizes in enumerate(layer_sizes_list):
         print(layer_sizes, ":", fc(record_prof[idx]))
-    
+        
+# 0
+# [9728, 2560] : [0.266]
+# [2560, 6144] : [0.168]
+# [4096, 2560] : [0.117]
+# [2560, 19456] : [0.53]
+# 1
+# [9728, 2560] : [0.266]
+# [2560, 6144] : [0.169]
+# [4096, 2560] : [0.114]
+# [2560, 19456] : [0.527]
