@@ -5,27 +5,27 @@ import torch.nn.functional as F
 from torch.profiler import profile, ProfilerActivity
 from typing import List,Any
 
+import flashinfer.activation as act
 from xop.project.qwen3_4b_h20_compile import XopGemmSpecify
-from xop.project.dsl_kernels import splitk_gemv_vectorized_tvm # , fused_gemv_gemv
-from models.modeling_qwen3 import Qwen3ForCausalLM
 
 import torch.cuda.nvtx as nvtx       # for torch profiler
 
-from torch._inductor import config   # for debuging torch compile
-config.trace.enabled = True          
-config.trace.log_autotuning_results = True
-os.environ["TORCH_COMPILE_DEBUG"] = "1"
-os.environ["TORCH_LOGS"] = "fusion,graph,graph_breaks"
-os.environ["TORCHDYNAMO_VERBOSE"] = "1"
+# from torch._inductor import config   # for debuging torch compile
+# config.trace.enabled = True          
+# config.trace.log_autotuning_results = True
+# os.environ["TORCH_COMPILE_DEBUG"] = "1"
+# os.environ["TORCH_LOGS"] = "fusion,graph,graph_breaks"
+# os.environ["TORCHDYNAMO_VERBOSE"] = "1"
 
 get_data = torch.randn
 # get_data = torch.ones
 
-ENABLE_XOP = 1
+ENABLE_XOP = 0
 ENABLE_CUDAGRAPH = 1
 ENABLE_TORCHCOMPILE = 0
 ENABLE_MEASURE_OP = 0
 ENABLE_TORCH_PROFILER = 1
+ENABLE_FUSED_GEMM = 0
 
 WARNUP_ROUNDS = 200
 TEST_ROUNDS = 5000
@@ -46,7 +46,6 @@ class LinearLayer(nn.Module):
         if ENABLE_XOP:
             print(self.weight.device)
             self.xop_gemm = XopGemmSpecify(self.weight, input_dtype=torch.bfloat16, output_dtype=torch.bfloat16, fast_accum=False)
-            self.tilelang_gemm = splitk_gemv_vectorized_tvm(self.weight.shape[0], self.weight.shape[1], 2, 32)
 
     def forward(self, x):
         # Use functional linear for inference computation
@@ -54,7 +53,6 @@ class LinearLayer(nn.Module):
             # run_mode = self.xop_gemm.get_run_mode(x.shape[0], self.weight.shape[0], x.shape[1])
             run_mode = 1
             return self.xop_gemm.forward(run_mode, x, self.weight)
-            # return self.tilelang_gemm(x.squeeze(0), self.weight).unsqueeze(0)
         else:
             return F.linear(x, self.weight) #, self.bias
 
@@ -69,8 +67,14 @@ class MultiLinearModel(nn.Module):
         for i in range(len(layer_sizes) - 1):
             self.layers.append(LinearLayer(layer_sizes[i], layer_sizes[i + 1]))
 
+        if (ENABLE_FUSED_GEMM):
+            self.tilelang_fused_gemm = fused_gemv_gemv(self.layers[0].weight.shape[0], self.layers[0].weight.shape[1], self.layers[1].weight.shape[0], 2, 2, 32)
+    
     @torch.no_grad()
     def forward(self, x):
+        if (ENABLE_FUSED_GEMM):
+            return self.tilelang_fused_gemm(x.squeeze(0), self.layers[0].weight, self.layers[1].weight)
+
         for i, layer in enumerate(self.layers):
             if ENABLE_MEASURE_OP:
                 start = torch.cuda.Event(enable_timing=True)
@@ -85,10 +89,9 @@ class MultiLinearModel(nn.Module):
                 elapsed = start.elapsed_time(end)
                 print(f"Layer {i} forward time: {elapsed:.3f} ms")
         
-            # # Apply ReLU activation for all but the last layer
-            # if i < len(self.layers) - 1:
-            #     x = x[:, :x.shape[1]/2]
-            #     # x = F.relu(x)
+            # Apply activation for all but the last layer
+            if i < len(self.layers) - 1:
+                x = act.silu_and_mul(x)
         return x
 
 # @nvtx.annotate("Graph Replay warmup", color="green")
@@ -165,7 +168,7 @@ def profile_one_config(batch_size, layer_sizes, record_prof):
     start_event = torch.cuda.Event(enable_timing=True)
     end_event = torch.cuda.Event(enable_timing=True)  
     
-    TEST_ROUNDS = 500
+    TEST_ROUNDS = 5
     with nvtx.range("Graph Replay testing", color="red"):
         if ENABLE_CUDAGRAPH:    
             with stream:
@@ -194,16 +197,11 @@ def profile_one_config(batch_size, layer_sizes, record_prof):
     #     print(f"  Weight dtype: {layer.weight.dtype}, Bias dtype: {layer.bias.dtype}")
     
 if __name__ == "__main__":
-    with torch.device("cuda"):
-        model_name = "/home/cjmcv/project/llm_models/Qwen/Qwen3-0.6B"
-        model = Qwen3ForCausalLM.from_pretrained(model_name, world_size=1, max_num_pages=16, page_size=4096).to("cuda")
-        
     batch_sizes = [1]#,2,4,8,16,32,64,128,256,5121024,2048,4096,8192
     # layer_sizes_list = [[4096, 4096, 4096], [4096, 128]]
     # layer_sizes_list = [[9728, 2560, 6144], [4096, 2560, 19456]]
     # layer_sizes_list = [[9728, 2560], [2560, 6144], [4096, 2560], [2560, 19456]]
-    layer_sizes_list = [[2560, 19456], [9728, 2560]]
-    # layer_sizes_list = [[2560, 19456, 2560]]
+    layer_sizes_list = [[4096, 2560, 19456]]
 
     fc = lambda tflops_list: [round(num, 3) for num in tflops_list]
     record_prof: List[List[Any]] = []
@@ -216,40 +214,7 @@ if __name__ == "__main__":
     for idx, layer_sizes in enumerate(layer_sizes_list):
         print(layer_sizes, ":", fc(record_prof[idx]))
 
-    ######################################################################
         
-    # def silu_and_mul(x: torch.Tensor) -> torch.Tensor:
-    #     d = x.shape[-1] // 2
-    #     return torch.nn.functional.silu(x[..., :d]) * x[..., d:]
-    
-    # def test_torch_mlp2(x, w_gatedup, w_down_proj):
-    #     import torch.nn.functional as F
-    #     O1 = F.linear(x, w_gatedup)
-    #     D = silu_and_mul(O1)
-    #     return F.linear(D, w_down_proj)
-
-    # batch_size = 1
-    # hidden_size = 2560
-    # intermediate_size = 9728
-    # x_torch = torch.randn((batch_size, hidden_size), dtype=torch.bfloat16, device="cuda")
-    # w_gatedup_torch = torch.randn((intermediate_size*2, hidden_size), dtype=torch.bfloat16, device="cuda")
-    # w_down_proj_torch = torch.randn((hidden_size, intermediate_size), dtype=torch.bfloat16, device="cuda")
-
-    # warnup_iter = 20
-    # test_iter = 100
-    # for _ in range(warnup_iter):
-    #     test_torch_mlp2(x_torch, w_gatedup_torch, w_down_proj_torch)
-        
-    # starter = torch.cuda.Event(enable_timing=True)
-    # ender = torch.cuda.Event(enable_timing=True)
-    # starter.record()
-    # for _ in range(test_iter):
-    #     test_torch_mlp2(x_torch, w_gatedup_torch, w_down_proj_torch)
-    # ender.record()
-    # torch.cuda.synchronize()
-    # run_time = starter.elapsed_time(ender)
-    # print("torch run time (ms): ", run_time / test_iter)
-    
 # 0
 # [9728, 2560] : [0.266]
 # [2560, 6144] : [0.168]
