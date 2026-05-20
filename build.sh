@@ -1,8 +1,8 @@
 #!/bin/bash
 
 if [[ "$1" == "--env" ]]; then
-    HOME=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-    TARGET_DIR="${HOME}/python/xop/ops/dsl/gen"
+    CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    TARGET_DIR="${CUR_DIR}/python/xop/ops/dsl/gen"
 
     if [[ ! -d "$TARGET_DIR" ]]; then
         mkdir -p "$TARGET_DIR"
