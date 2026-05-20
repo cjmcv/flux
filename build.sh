@@ -1,4 +1,19 @@
 #!/bin/bash
+
+if [[ "$1" == "--env" ]]; then
+    HOME=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    TARGET_DIR="${HOME}/python/xop/ops/dsl/gen"
+
+    if [[ ! -d "$TARGET_DIR" ]]; then
+        mkdir -p "$TARGET_DIR"
+        echo "Created directory: $TARGET_DIR"
+    fi
+
+    export DSL_HOME="$TARGET_DIR"
+    echo "DSL_HOME set to: $DSL_HOME"
+    return 0 2>/dev/null || exit 0
+fi
+
 set -x
 set -e
 

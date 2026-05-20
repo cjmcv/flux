@@ -6,7 +6,7 @@ from torch.profiler import profile, ProfilerActivity
 from typing import List,Any
 
 from xop.project.qwen3_4b_h20_compile import XopGemmSpecify
-from xop.project.dsl_kernels import splitk_gemv_vectorized_tvm # , fused_gemv_gemv
+# from xop.project.dsl_kernels import splitk_gemv_vectorized_tvm # , fused_gemv_gemv
 from models.modeling_qwen3 import Qwen3ForCausalLM
 
 import torch.cuda.nvtx as nvtx       # for torch profiler
@@ -46,7 +46,7 @@ class LinearLayer(nn.Module):
         if ENABLE_XOP:
             print(self.weight.device)
             self.xop_gemm = XopGemmSpecify(self.weight, input_dtype=torch.bfloat16, output_dtype=torch.bfloat16, fast_accum=False)
-            self.tilelang_gemm = splitk_gemv_vectorized_tvm(self.weight.shape[0], self.weight.shape[1], 2, 32)
+            # self.tilelang_gemm = splitk_gemv_vectorized_tvm(self.weight.shape[0], self.weight.shape[1], 2, 32)
 
     def forward(self, x):
         # Use functional linear for inference computation

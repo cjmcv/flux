@@ -4,6 +4,8 @@
 ```bash
 git clone 
 
+# Set env path
+source ./build.sh --env
 # For Ampere(sm80) GPU
 ./build.sh --arch 80 --jobs 6
 # For Ada Lovelace(sm89) GPU
@@ -26,7 +28,8 @@ nsight-sys # Open file: my_profile.ncu-rep
 #### Dependencies
 1. cutlass
 2. cublasLt
-3. triton
+3. tilelang
+4. triton
 
 ## Quick Start
 
@@ -41,5 +44,5 @@ python3 tools/gen_search_space.py --schema=GemmNormal
 python3 tools/tuning/tune_gemm_normal.py --schema=GemmNormal
 
 # Now you can test it.
-python3 tools/test_gemm_normal.py 12 12288 6144 1 --dtype=float16
+python3 tools/gemm/test_gemm_normal.py 12 12288 6144 --dtype=bfloat16
 ```

@@ -49,6 +49,66 @@ class PerfResult:
     def __repr__(self) -> str:
         return f"{self.name}: gemm {self.gemm_time_ms:.3f} ms"
 
+def torch_profile(func):
+    from torch.profiler import profile, ProfilerActivity
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+        func(0)
+    print(prof.key_averages().table(sort_by="cuda_time_total"))
+    
+    prof.export_chrome_trace("trace.json") # chrome://tracing/     
+def assert_similar(x, y, eps=1e-2, name="tensor", assert_=False, print_=True):
+    def print_red_warning(msg):
+        print(f"\033[91m{msg}\033[0m")
+
+    def calc_sim(x, y, name="tensor"):
+        x, y = x.data.double(), y.data.double()
+        denominator = (x * x + y * y).sum()
+        if denominator == 0:
+            print_red_warning(f"{name} all zero")
+            return 1
+        sim = 2 * (x * y).sum() / denominator
+        return sim
+    
+    sim = calc_sim(x, y, name)
+    diff = 1.0 - sim
+    if not (0 <= diff <= eps):
+        print_red_warning(f"{name} Error: {diff}")
+        if assert_:
+            raise AssertionError(f"{name} Error: {diff}")
+        return False
+    else:
+        if print_:
+            print(f"passed: {name} diff={diff}")
+        return True
+            
+def check_allclose_ret(target_run, torch_run, iters, print_mode):
+    if (print_mode==2):
+        torch.set_printoptions(threshold=float('inf'))
+    torch.cuda.synchronize()
+    
+    # print("inner: ", torch_out, torch_out.data_ptr())
+    for i in range(iters):
+        target_result = target_run(i)
+        torch_result = torch_run(i)
+        torch.cuda.synchronize()
+        
+        total_num = torch_result.numel()
+        if (torch.allclose(target_result, torch_result, rtol=1e-2, atol=0)):
+            print("allclose: True")
+        else:
+            if (print_mode >= 1):
+                print("target_out:", target_result.shape, "\n", target_result)
+                print("torch_out:", torch_result.shape, "\n", torch_result)
+                print("diff: ", target_result - torch_result)
+            
+            radio = abs((target_result - torch_result)/torch_result)
+            
+            threshold = [0.05, 0.10]
+            count0 = (radio > threshold[0]).sum().item()
+            count1 = (radio > threshold[1]).sum().item()
+            print("radio > ", threshold[0], ": ", count0, "-", count0/total_num, " / ", threshold[1], ": ", count1, "-", count1/total_num)
+        assert_similar(target_result, torch_result, name="similar")    
+            
 def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
     if (warmup_iters + iters == 0):
         output = fn(0)
