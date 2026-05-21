@@ -8,7 +8,7 @@ import tilelang
 
 
 ENABLE_MEGAKERNEL = True
-ENABLE_PROFILING = False
+ENABLE_PROFILING = True
 
 target_arch = torch.cuda.get_device_properties(0).major * 10 + torch.cuda.get_device_properties(0).minor
 if target_arch == 120:
@@ -18,7 +18,7 @@ elif target_arch == 90:
 else:
     TARGET_ARCH = "sm_89"
     
-# TARGET_ARCH = "sm_120" # "sm_120" / "sm_90" / "sm_89"
+# TARGET_ARCH = "sm_89" # "sm_120" / "sm_90" / "sm_89"
 
 # =============================================================================
 # Utility Functions

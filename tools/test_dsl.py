@@ -196,7 +196,7 @@ def profile(target_func: callable, torch_ref_func: callable):
     
     perf_result_xop = xutil.perf_gemm(warmup_iters=100, iters=500, name="target", fn=target_func)
     perf_result_torch = xutil.perf_gemm(warmup_iters=100, iters=500, name="torch", fn=torch_ref_func)
-    print(f"Latency: {perf_result_xop.gemm_time_ms}ms vs {perf_result_torch.gemm_time_ms}(torch) ms")
+    print(f"Latency: {perf_result_xop.gemm_time_ms:0.5}ms vs {perf_result_torch.gemm_time_ms:0.5}(torch) ms")
 
 def test_silu_mul():
     M, N = 32, 9728
@@ -256,12 +256,12 @@ def test_gemm():
     # K = 9728
     # config = [64,64,64,2,128,0,true]
     micro = MicroLinear(MicroLinearStrategy.GEMM, M,N,K, dtype=T.bfloat16, accum_dtype=T.float32)
-    kernel, name, info = micro.get_kernel(HparamSelectMode.HEURISTIC) # HEURISTIC, TUNING, TUNED
+    kernel, name, info = micro.get_kernel(HparamSelectMode.TUNED) # HEURISTIC, TUNING, TUNED
 
     test_data = micro.gen_test_data(kernel.config)
-    def target_func():
+    def target_func(iter):
         return kernel(*test_data)
-    def torch_ref():
+    def torch_ref(iter):
         return TorchRef.linear(*test_data) 
     profile(target_func, torch_ref)
 
@@ -314,13 +314,13 @@ def test_gqa_decode(num_heads, num_kv_heads, head_dim):
     
     # config = [64,64,64,2,128,0,true]
     micro = MicroGqaDecode(batch, max_kv_seqlen, target_kv_seqlen, num_heads, num_kv_heads, head_dim, is_causal, dtype=T.bfloat16, accum_dtype=T.float32)
-    kernel, name, info  = micro.get_kernel(HparamSelectMode.TUNED) # HEURISTIC, TUNING, TUNED
+    kernel, name, info  = micro.get_kernel(HparamSelectMode.HEURISTIC) # HEURISTIC, TUNING, TUNED
     
     test_data = micro.gen_test_data(kernel.config)
     q, k, v, edge, mask, glse, Output_partial = test_data
     
     edge[0].fill_(valid_kv_seqlen)
-    def target_func():
+    def target_func(iter):
         return kernel(q, k, v, edge, mask, glse, Output_partial)
     
     k_slice = k[:, :valid_kv_seqlen, :, :]
@@ -338,7 +338,7 @@ def test_gqa_decode(num_heads, num_kv_heads, head_dim):
     #         q_for_sdpa, k_for_sdpa, v_for_sdpa, is_causal=is_causal, enable_gqa=True
     #     )
         
-    def torch_ref():
+    def torch_ref(iter):
         return TorchRef.attention_sdpa(q, k_slice, v_slice, is_causal)
         # return TorchRef.attention(q, k, v, mask, glse, Output_partial)
         # return TorchRef.attention_split(q, k, v, mask, glse, Output_partial)

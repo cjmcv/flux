@@ -145,6 +145,7 @@ string(REGEX REPLACE "compute_90" "compute_90a" CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FL
 
 set(COMMON_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include
+  ${PROJECT_SOURCE_DIR}/include/xop/dsl
   ${CUDAToolkit_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}
   ${PROJECT_SOURCE_DIR}/3rdparty/cutlass/include

@@ -2,7 +2,7 @@
 
 if [[ "$1" == "--env" ]]; then
     CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    TARGET_DIR="${CUR_DIR}/python/xop/ops/dsl/gen"
+    TARGET_DIR="${CUR_DIR}/python/xop/ops/dsl/"
 
     if [[ ! -d "$TARGET_DIR" ]]; then
         mkdir -p "$TARGET_DIR"

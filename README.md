@@ -28,7 +28,7 @@ nsight-sys # Open file: my_profile.ncu-rep
 #### Dependencies
 1. cutlass
 2. cublasLt
-3. tilelang
+3. tilelang=0.1.8
 4. triton
 
 ## Quick Start

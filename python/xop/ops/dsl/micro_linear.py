@@ -9,13 +9,14 @@ from pathlib import Path
 # from concurrent.futures import ProcessPoolExecutor, as_completed
 # from concurrent.futures import ThreadPoolExecutor
 import torch
+import tvm
 from tvm import DataType
 from tvm.tir import stmt_functor, Block, For, PrimFunc
 import tilelang
 import tilelang.language as T
 
 from xop.ops.dsl.pkt_util import TestUtil, TorchRef
-from xop.ops.dsl.micro_base import BaseMicroKernel, HparamSelectMode, get_launch_info
+from xop.ops.dsl.micro_base import BaseMicroKernel, HparamSelectMode, get_launch_info, get_dispatch_source
 from xop.ops.dsl.micro_config import get_arch, get_thread_num, get_target_str, is_megakernel_enabled, get_pass_configs
 
 # TODO: megakernel约束线程维度是一维128/256，而目前gemv方案是二维线程，且语法糖约束下，
@@ -355,23 +356,18 @@ template <typename T,
     int TILE_DIM_Z,
     int M,
     int N,
-    int K,
-    int O_STRIDE = N,
-    int PIPE_MAX = 3,
-    bool FUSE_RES = false>
+    int K>
     __device__ __forceinline__ void <kernel_name>(const int bx, const int by, const int bz,
-                                                <io_params>
-                                                int num_active_tokens,
-                                                bool residual) {
+                                                <io_params>) {
   // static_assert(THREAD_NUM==<threads>);
   static_assert(TILE_DIM_X==<BLOCK_N>); static_assert(TILE_DIM_Y==<BLOCK_M>); static_assert(TILE_DIM_Z==<BLOCK_K>);
   static_assert(M==<M>); static_assert(N==<N>); static_assert(K==<K>);
   if (bx >= <gridx_0> || by >= <gridy_0> || bz >= <gridz_0>) { return; }
 '''
         sm89_io_str = \
-'''const void* __restrict__ input_ptr, const void* __restrict__ weight_ptr, const void* __restrict__ residual_ptr, void* __restrict__ output_ptr, '''
+'''const void* __restrict__ input_ptr, const void* __restrict__ weight_ptr, const void* __restrict__ residual_ptr, void* __restrict__ output_ptr '''
         sm90_io_str = \
-'''uint64_t* mbarrier_mem, const CUtensorMap *A_desc, const CUtensorMap *B_desc, const void* __restrict__ residual_ptr, const CUtensorMap *C_desc, '''
+'''uint64_t* mbarrier_mem, const CUtensorMap *A_desc, const CUtensorMap *B_desc, const void* __restrict__ residual_ptr, const CUtensorMap *C_desc '''
         sm89_io_warp_str = \
 '''
   const <dtype>* __restrict__ A = static_cast<const <dtype>*>(input_ptr);
@@ -402,9 +398,9 @@ template <typename T,
         head_str = head_str.replace('<kernel_name>', self.strategy.name)
 
         source = kernel.get_kernel_source()
-        print(kernel.artifact)
-        grid_dim, block_dim, dynamic_smem_buf, use_cooperative_groups = get_launch_info(kernel.artifact)[0]
+        grid_dim, block_dim, dynamic_smem_buf, use_cooperative_groups = get_launch_info(kernel)[0]
         self.layout = f"({grid_dim['blockIdx.x']}, {grid_dim['blockIdx.y']}, {grid_dim['blockIdx.z']}), ({BLOCK_N}, {BLOCK_M}, {BLOCK_K})"        
+        # print("layout", self.layout)
         
         if self.dtype == T.bfloat16:
             dtype = "bfloat16_t"
@@ -441,7 +437,8 @@ template <typename T,
         extra_attr += f"\n// block_dim=({block_dim['threadIdx.x']}, {block_dim['threadIdx.y']}, {block_dim['threadIdx.z']})."
         source += extra_attr
         
-        dispatch_source = kernel.get_dispatch_source().replace('call', "create_"+self.strategy.name)
+        dispatch_source = get_dispatch_source(kernel).replace('call', "create_"+self.strategy.name)
+        dispatch_source = dispatch_source.replace('LAUNCH_INFO', "LAUNCH_INFO_"+self.strategy.name)
         source += "\n\n" + dispatch_source + "\n"
         return source
     

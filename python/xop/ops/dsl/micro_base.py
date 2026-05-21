@@ -35,7 +35,17 @@ class HparamSelectMode(IntEnum):
     TUNED = 2
     SPECIFY = 3
 
-def get_launch_info(artifact):
+def get_launch_info(kernel):
+    with tvm.transform.PassContext(opt_level=3, config=kernel.pass_configs), kernel.target:
+        artifact = tilelang.lower(
+            kernel.prim_func,
+            target=kernel.target,
+            target_host=kernel.target_host,
+            enable_host_codegen=True,
+            enable_device_compile=True,
+        )
+    # print(artifact)
+        
     infos = []
     for g_var, func in artifact.device_mod.functions.items():
         grid_dim = {"blockIdx.x": 1, "blockIdx.y": 1, "blockIdx.z": 1}
@@ -58,7 +68,216 @@ def get_launch_info(artifact):
                     block_dim[tag] = extent
         infos.append((grid_dim, block_dim, dynamic_smem_buf, use_cooperative_groups))
     return infos
+    
+def create_dispatch_func(cuda_src_warpper, code, function_informations):
+    from tilelang.jit.adapter.wrapper import L2_PERSISTENT_MAP_CREATE_HANDLE, L2_PERSISTENT_MAP_RESET_HANDLE, PREDEF_HOST_FUNC, match_declare_kernel, parse_function_call_args
+    # Extract the set of dynamic symbolic names used in the primary function
+    dynamic_symbolic_set = cuda_src_warpper.get_dynamic_symbolic_set(cuda_src_warpper.prim_func)
 
+    function_args = []
+
+    # Collect function arguments based on primary function's parameters and buffer mappings
+    # QA(@lei): Why not use device_mod.params?
+    # device func lack buffer map (to convert buffer handle to buffer)
+    for param in cuda_src_warpper.prim_func.params:
+        if param in cuda_src_warpper.prim_func.buffer_map:
+            buffer = cuda_src_warpper.prim_func.buffer_map[param]
+            function_args.append(
+                {
+                    "name": buffer.data.name,
+                    "type": cuda_src_warpper._lookup_type(buffer.dtype) + "* __restrict__",
+                }
+            )
+        elif isinstance(param, tvm.tir.Var):
+            function_args.append({"name": param.name, "type": cuda_src_warpper._lookup_type(param.dtype)})
+        else:
+            raise ValueError(f"Parameter {param} is not in the buffer map of the primary function.")
+
+    # Add dynamic symbols as integer arguments
+    for dyn_sym, dyn_sym_dtype in dynamic_symbolic_set:
+        if dyn_sym not in [arg["name"] for arg in function_args]:
+            function_args.append({"name": dyn_sym, "type": cuda_src_warpper._lookup_type(dyn_sym_dtype)})
+    
+    # function_args.append(cuda_src_warpper.get_stream_type())
+
+    has_l2_persistent_map = False
+    for function_name, _ in function_informations.items():
+        if function_name in cuda_src_warpper.l2_persistent_map:
+            has_l2_persistent_map = True
+            break
+
+    kernel_launch_code = """"""
+    if has_l2_persistent_map:
+        kernel_launch_code += L2_PERSISTENT_MAP_CREATE_HANDLE
+    desc_name_map: dict[str, str] = {}
+    desc_name_var_map: dict[str, tvm.tir.Var] = {}
+    for function_name, function_info in function_informations.items():
+        block_info = function_info["block_info"]
+        grid_info = function_info["grid_info"]
+        dynamic_smem_buf = function_info["dynamic_smem_buf"]
+        function_params = function_info["function_params"]
+
+        # Find the location of the global kernel function in the code
+        index = match_declare_kernel(code, function_name + "(")
+
+        # Analyze the function declaration to prepare for argument extraction
+        declaration = code[index:].split(";")[0]
+
+        # Identify the start of the function body to insert arguments
+        index = code.index("{", index)
+
+        block_str = (
+            f"dim3({cuda_src_warpper._pythonic_expr(block_info[0])}, {cuda_src_warpper._pythonic_expr(block_info[1])}, {cuda_src_warpper._pythonic_expr(block_info[2])})"
+        )
+        grid_str = (
+            f"dim3({cuda_src_warpper._pythonic_expr(grid_info[0])}, {cuda_src_warpper._pythonic_expr(grid_info[1])}, {cuda_src_warpper._pythonic_expr(grid_info[2])})"
+        )
+        smem_str = 0 if dynamic_smem_buf is None else dynamic_smem_buf
+        init_l2_persistent_map = cuda_src_warpper.generate_l2_persistent_map(function_name)
+        kernel_launch_code += init_l2_persistent_map
+
+        if cuda_src_warpper.use_cooperative_groups[function_name]:
+            args_list = parse_function_call_args(declaration, function_args, function_params, desc_name_map, desc_name_var_map)
+            assert len(function_params) == len(args_list), (
+                f"Function {function_name} has {len(function_params)} parameters, but {len(args_list)} arguments"
+            )
+            args_array = [f"(void*)&{arg}" for arg in args_list]
+            call_args = f"\tvoid* {function_name}_args[] = {{{', '.join(args_array)}}};\n"
+            kernel_launch_code += call_args
+            # Using cudaLaunchCooperativeKernel to launch the kernel
+            # kernel_launch_code += "\tTILELANG_CHECK(cudaLaunchCooperativeKernel((void*){}, {}, {}, {}, {}, stream));\n".format(
+            #     function_name, grid_str, block_str, function_name + "_args", smem_str
+            # )
+        else:
+            args_list = parse_function_call_args(declaration, function_args, function_params, desc_name_map, desc_name_var_map)
+            assert len(function_params) == len(args_list), (
+                f"Function {function_name} has {len(function_params)} parameters, but {len(args_list)} arguments"
+            )
+            call_args = ", ".join(args_list)
+            kernel_launch_code += f"\t{function_name}<<<{grid_str}, {block_str}, {smem_str}, stream>>>({call_args});\n"
+            # kernel_launch_code += f'\tTILELANG_CHECK_LAST_ERROR("{function_name}");\n'
+        if has_l2_persistent_map:
+            kernel_launch_code += L2_PERSISTENT_MAP_RESET_HANDLE
+
+    # Add output descriptor pointers for TMA descriptors        
+    desc_output_code = ""
+    if len(desc_name_var_map) != 0:
+        for var_name in desc_name_var_map:
+            function_args.append({"name": f"out_{var_name}", "type": "CUtensorMap*"})
+        function_args.append({"name": f"to_device", "type": "bool"})
+        
+        desc_output_code += f"\tif (to_device) {{\n"
+        for var_name in desc_name_var_map:
+            desc_output_code += f"\t\tcudaMemcpy(out_{var_name}, &{var_name}, sizeof(CUtensorMap), cudaMemcpyHostToDevice);\n"                
+        desc_output_code += f"\t}} else {{\n"
+        for var_name in desc_name_var_map:
+            desc_output_code += f"\t\t*out_{var_name} = {var_name};\n"
+        desc_output_code += f"\t}}\n"
+    
+    # Add launch func    
+    launch_info = f"#define LAUNCH_INFO {grid_str}, {block_str}, {smem_str}, stream"
+        
+        # launch_args = []
+        # for var_name in desc_name_var_map:
+        #     launch_args.append({"name": f"{var_name}", "type": "CUtensorMap"})
+        # launch_args.append({"name": f"stream=cudaStreamDefault", "type": "cudaStream_t"})
+        
+        # def_args = ", ".join([f"{arg['type']} {arg['name']}" for arg in launch_args])
+        # launch_func = PREDEF_HOST_FUNC.format(def_args, kernel_launch_code)
+        
+    # print("function_args", function_args)        
+    # Format the function arguments for declaration
+    def_args = ", ".join([f"{arg['type']} {arg['name']}" for arg in function_args])
+    
+    init_tma_descriptor_args = cuda_src_warpper.generate_tma_descriptor_args(desc_name_map, desc_name_var_map)
+    # hardcode: R因“Warning: Layout inference failed for buffer R_sh. The buffer cannot be inferred with current layout inference rules”，被更名为“R_1”，需要改回来
+    # init_tma_descriptor_args = init_tma_descriptor_args.replace("void *R_desc_globalAddress= R_1", "void *R_desc_globalAddress= R")
+    # print("init_tma_descriptor_args", init_tma_descriptor_args)
+    # kernel_launch_code = init_tma_descriptor_args + desc_output_code + "\t//" +kernel_launch_code
+
+    # Wrap the kernel dispatch logic in an external C function
+    host_func = PREDEF_HOST_FUNC.format(def_args, init_tma_descriptor_args + desc_output_code)
+    return host_func + launch_info
+
+def update_lib_code(cuda_src_warpper, code: str):
+    # Get the function names
+    function_names = cuda_src_warpper.function_names
+    # Get the CUDA initialization function
+    init_func = cuda_src_warpper.get_init_func()
+
+    # Organize function information for code generation
+    function_informations = {}
+    for function_name in function_names:
+        # Do not update function with dispatch host function
+        if (function_name not in cuda_src_warpper.block_info) or (function_name not in cuda_src_warpper.grid_info):
+            continue
+        assert function_name in cuda_src_warpper.device_mod, f"Function {function_name} not found in device module"
+        device_func = cuda_src_warpper.device_mod[function_name]
+        kernel_params_cnt = len(device_func.params)
+        function_params: list[str] = None
+
+        def visitor(node, fn=function_name, param_cnt=kernel_params_cnt):
+            nonlocal function_params
+            if isinstance(node, tvm.tir.Call):
+                if not (hasattr(node, "op") and node.op == tvm.ir.Op.get("tir.tvm_call_packed")):
+                    return
+                args = node.args
+                if not args or args[0] != fn:
+                    return
+                if len(args) < 1 + param_cnt:
+                    raise AssertionError("tvm_call_packed should have at least 1 argument and match device function parameters")
+                function_params = args[1 : 1 + param_cnt]
+
+        stmt_functor.post_order_visit(cuda_src_warpper.host_func.body, visitor)
+        assert function_params is not None, "function_params should not be None"
+
+        function_informations[function_name] = {
+            "function_name": function_name,
+            "block_info": cuda_src_warpper.block_info[function_name],
+            "grid_info": cuda_src_warpper.grid_info[function_name],
+            "dynamic_smem_buf": cuda_src_warpper.dynamic_smem_buf[function_name],
+            "function_params": function_params,
+        }
+
+    # Create the host function wrapper for the CUDA kernel
+    host_func = create_dispatch_func(cuda_src_warpper, code, function_informations)
+    # Combine the source, initialization function, and host function to form the complete library code
+    lib_code = cuda_src_warpper.source + init_func + host_func
+    # return lib_code
+    return host_func
+    
+def get_dispatch_source(kernel, kernel_only: bool = True) -> str:
+    with tvm.transform.PassContext(opt_level=3, config=kernel.pass_configs), kernel.target:
+        my_artifact = tilelang.lower(
+            kernel.prim_func,
+            target=kernel.target,
+            target_host=kernel.target_host,
+            enable_host_codegen=False,
+            enable_device_compile=False,
+        )
+        
+    from tilelang.jit.adapter.wrapper import TLWrapper, TLCUDASourceWrapper
+    if isinstance(kernel.prim_func, PrimFunc):
+        ir_module = tvm.IRModule({kernel.prim_func.attrs["global_symbol"]: kernel.prim_func})
+    else:
+        ir_module = kernel.prim_func
+    wrapper = TLWrapper(kernel.target)
+    wrapper.assign_optimized_module(ir_module)
+    wrapper.assign_pass_configs(kernel.pass_configs)
+    wrapper.assign_host_module(my_artifact.host_mod)
+    wrapper.assign_device_module(my_artifact.device_mod)
+
+    wrapper_o = TLCUDASourceWrapper(
+        scheduled_ir_module=wrapper.scheduled_ir_module,
+        source=my_artifact.kernel_source,
+        target=wrapper.target,
+        device_mod=wrapper.device_mod,
+        host_mod=wrapper.host_mod,
+        pass_configs=wrapper.pass_configs,
+    )
+    return update_lib_code(wrapper_o, my_artifact.kernel_source)
+    # return wrapper.wrap(my_artifact.kernel_source)
+    
 # print("artifact: ", artifact)
 # T.func_attr({"calling_conv": 2, "dyn_shared_memory_buf": 49152, "target": T.target({"arch": "sm_89", "keys": ["cuda", "gpu"], "kind": "cuda", "max_num_threads": 1024, "tag": "", "thread_warp_size": 32}), "thread_extent": {"blockIdx.x": 304, "blockIdx.y": 1, "threadIdx.x": 128, "threadIdx.y": 1, "threadIdx.z": 1}, "tir.is_global_func": T.bool(True), "tir.kernel_launch_params": ["blockIdx.x", "blockIdx.y", "threadIdx.x", "threadIdx.y", "threadIdx.z", "tir.use_dyn_shared_memory"], "tir.noalias": True, "tl.non_restrict_params": [], "tl.readonly_param_indices": [0, 1]})
 
@@ -163,7 +382,7 @@ class BaseMicroKernel:
             raise EnvironmentError("The environment variable DSL_HOME is not set.")
         # prop = torch.cuda.get_device_properties(0)
         # str(prop.major) + str(prop.minor)
-        self.base_path = self.dsl_home + "/demo/gen/" + get_arch() + "/"
+        self.base_path = self.dsl_home + "/gen/" + get_arch() + "/"
         target_dir = Path(self.base_path)
         target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -257,8 +476,8 @@ class BaseMicroKernel:
         def ref_run(iter):
             return ref_func(*test_data)
         
-        target_result = target_run()
-        ref_result = ref_run()
+        target_result = target_run(0)
+        ref_result = ref_run(0)
         if isinstance(target_result, list):
             sim = self._calc_sim(target_result[0], ref_result[0])
         else:

@@ -2,7 +2,8 @@
 #pragma once
 
 #include <torch/all.h>
-  
+#include <cuda_runtime_api.h>
+
 namespace xop {
 class GemmNormal {
 public:
@@ -40,4 +41,6 @@ private:
 void gemm_w4a16_sm90_reorder_weight(torch::Tensor weight);
 void print_used_size_of_device_buffer();
 
+// 
+void gemm_dsl(torch::Tensor input, torch::Tensor weight, c10::optional<torch::Tensor> output_buf, cudaStream_t stream);
 }  // namespace xop
