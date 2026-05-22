@@ -102,8 +102,8 @@ public:
                                                                              this->input_dtype, this->output_dtype, transpose_weight, &default_schema_);
 
 
-    gemm_dsl(input, weight, output, stream);
-    return output;
+    // gemm_dsl(input, weight, output, stream);
+    // return output;
 
     if (run_mode == kRunWithTuning) {
       GlobalBuffer::instance().SetTuningFlag(true);

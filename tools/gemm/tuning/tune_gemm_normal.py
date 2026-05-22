@@ -19,8 +19,8 @@ common.init_test_env(3)
 print = partial(print, flush=True)
 
 GEMM_NORMAL_ENABLE_CUDA_GRAPH = 0
-warmup_iters = 20
-pref_iters = 50        # If a cuda graph is used, more iterations are required (100)
+warmup_iters = 500
+pref_iters = 2000        # If a cuda graph is used, more iterations are required (100)
 is_use_fp16_acc = False # True
 
 class GemmSm80Schema:
