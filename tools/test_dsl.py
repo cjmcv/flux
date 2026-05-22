@@ -256,13 +256,26 @@ def test_gemm():
     # K = 9728
     # config = [64,64,64,2,128,0,true]
     micro = MicroLinear(MicroLinearStrategy.GEMM, M,N,K, dtype=T.bfloat16, accum_dtype=T.float32)
-    kernel, name, info = micro.get_kernel(HparamSelectMode.TUNED) # HEURISTIC, TUNING, TUNED
+    kernel, name, info = micro.get_kernel(HparamSelectMode.TUNING) # HEURISTIC, TUNING, TUNED
 
-    test_data = micro.gen_test_data(kernel.config)
+    test_data_list = []
+    for _ in range(5):
+        test_data = micro.gen_test_data(kernel.config)
+        test_data_list.append(test_data)
+    
     def target_func(iter):
+        test_data = test_data_list[iter % len(test_data_list)]
         return kernel(*test_data)
     def torch_ref(iter):
-        return TorchRef.linear(*test_data) 
+        test_data = test_data_list[iter % len(test_data_list)]
+        return TorchRef.linear(*test_data)
+        
+    # test_data = micro.gen_test_data(kernel.config)
+    # def target_func(iter):
+    #     return kernel(*test_data)
+    # def torch_ref(iter):
+    #     return TorchRef.linear(*test_data)
+    
     profile(target_func, torch_ref)
 
 # def test_silu_mul_gemm():

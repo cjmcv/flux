@@ -72,30 +72,47 @@ def perf_torch(
         for i in range(len(weights)):
             weights[i] = weights[i].to(torch.bfloat16)
     
-    def fn(iter_id):
+    def fn_groups(iter_id):
         problem_idx = iter_id%problem_cnt
-        if num_groups != -1:
-            output = []
-            input_list = [inputs[(iter_id+i) % problem_cnt] for i in range(num_groups)]
-            weight_list = [weights[(iter_id+i) % problem_cnt] for i in range(num_groups)]
-            for i in range(len(input_list)):
-                output.append(torch.nn.functional.linear(input_list[i], weight_list[i], bias))
-        elif is_s8_dequant:
-            accum = matmul_int8(inputs[problem_idx], weights[problem_idx].t()).to(torch.float32)
-            output = input_scale * weight_scale * accum
-            output = output.to(torch.bfloat16)
-            if bias is not None:
-                output = output + bias
-        elif inputs[problem_idx].dtype == torch.int8:
-            output = matmul_int8(inputs[problem_idx], weights[problem_idx].t())
-            if bias is not None:
-                output = output + bias
-        else:
-            # alpha_scale * 
-            output = torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx], bias)
+        output = []
+        input_list = [inputs[(iter_id+i) % problem_cnt] for i in range(num_groups)]
+        weight_list = [weights[(iter_id+i) % problem_cnt] for i in range(num_groups)]
+        for i in range(len(input_list)):
+            output.append(torch.nn.functional.linear(input_list[i], weight_list[i], bias))
         return output
+            
+    def fn_s8_dequant(iter_id):
+        problem_idx = iter_id%problem_cnt
+        accum = matmul_int8(inputs[problem_idx], weights[problem_idx].t()).to(torch.float32)
+        output = input_scale * weight_scale * accum
+        output = output.to(torch.bfloat16)
+        if bias is not None:
+            output = output + bias
+        return output
+    
+    def fn_int8(iter_id):
+        problem_idx = iter_id%problem_cnt        
+        output = matmul_int8(inputs[problem_idx], weights[problem_idx].t())
+        if bias is not None:
+            output = output + bias
+        return output
+            
+    def fn_normal(iter_id):
+        problem_idx = iter_id%problem_cnt
+        # alpha_scale * 
+        output = torch.nn.functional.linear(inputs[problem_idx], weights[problem_idx])
+        return output
+    
+    if num_groups != -1:
+        fn = fn_groups
+    elif is_s8_dequant:
+        fn = fn_s8_dequant
+    elif inputs[0].dtype == torch.int8:
+        fn = fn_int8
+    else:
+        fn = fn_normal
 
-    return xutil.perf_gemm(warmup_iters, iters, "torch", fn)
+    return xutil.perf_gemm(warmup_iters, iters, "torch", fn, True)
 
 def perf_xop(
     inputs: list[torch.Tensor],
@@ -242,7 +259,18 @@ def perf_xop(
                     # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
                     # print("output:", output)
                     return output
-    return xutil.perf_gemm(warmup_iters, iters, "xop", fn)
+                
+    # import tilelang.language as T
+    # from xop.ops.dsl.micro_base import HparamSelectMode
+    # from xop.ops.dsl.micro_linear import MicroLinearStrategy, MicroLinear            
+    # micro = MicroLinear(MicroLinearStrategy.GEMM, 1,6144,1024, dtype=T.bfloat16, accum_dtype=T.float32)
+    # kernel, name, info = micro.get_kernel(HparamSelectMode.TUNED) # HEURISTIC, TUNING, TUNED
+
+    # def target_func(iter_id):
+    #     problem_idx = iter_id % problem_cnt
+    #     return kernel(inputs[problem_idx], weights[problem_idx])
+    
+    return xutil.perf_gemm(warmup_iters, iters, "xop", fn, True)
 
 THRESHOLD_MAP = {
     torch.float16: 10,  # 1e-1,
@@ -400,7 +428,7 @@ def parse_args():
     parser.add_argument("--quant_bits", default=-1, type=int, help="whether to use GemmQuant.")
     parser.add_argument("--smallest_m", default=1, type=int, help="The smallest m for testing") # for hopper fp8
     parser.add_argument("--step", default=5, type=int, help="m step")
-    parser.add_argument("--warmup_iters", default=100, type=int, help="perf warmup iterations")
+    parser.add_argument("--warmup_iters", default=500, type=int, help="perf warmup iterations")
     parser.add_argument("--iters", default=2000, type=int, help="perf iterations")
     parser.add_argument(
         "--dtype",
@@ -426,6 +454,7 @@ def parse_args():
 
     return parser.parse_args()
 
+# python3 tools/gemm/test_gemm_normal.py 1 6144 1024 --show_ms
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --num_groups 4
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8 --dtype=float16 --output_dtype=float16
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8
@@ -475,19 +504,19 @@ if __name__ == "__main__":
     
     # plt.ylim(bottom=0)  # 
 
-    plt.title(f'perf-N{args.N}-K{args.K}')
-    plt.xlabel('m_size')
-    if args.show_ms:
-        plt.ylabel('ms')
-    else:
-        plt.ylabel('tflops')
+    # plt.title(f'perf-N{args.N}-K{args.K}')
+    # plt.xlabel('m_size')
+    # if args.show_ms:
+    #     plt.ylabel('ms')
+    # else:
+    #     plt.ylabel('tflops')
 
-    plt.legend()
-    plt.grid(True)
+    # plt.legend()
+    # plt.grid(True)
 
-    # plt.xticks(plot_x)
-    plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
-    plt.show()
+    # # plt.xticks(plot_x)
+    # plt.savefig('perf-N-{0}-K-{1}.png'.format(args.N, args.K))
+    # plt.show()
 
 
 # # The usage within torch.compile of vllm.

@@ -24,6 +24,7 @@ class TestUtil:
         col_indices = torch.arange(N, dtype=dtype, device=device)
         matrix = col_indices.unsqueeze(0).expand(M, N).contiguous()
         return matrix
+
 class TorchRef:
     @staticmethod
     def compile_capture(fn, is_compile):

@@ -16,7 +16,7 @@ import tilelang
 import tilelang.language as T
 
 from xop.ops.dsl.pkt_util import TestUtil, TorchRef
-from xop.ops.dsl.micro_base import BaseMicroKernel, HparamSelectMode, get_launch_info, get_dispatch_source
+from xop.ops.dsl.micro_base import BaseMicroKernel, HparamSelectMode, get_artifact, get_launch_info, get_dispatch_source
 from xop.ops.dsl.micro_config import get_arch, get_thread_num, get_target_str, is_megakernel_enabled, get_pass_configs
 
 # TODO: megakernel约束线程维度是一维128/256，而目前gemv方案是二维线程，且语法糖约束下，
@@ -157,6 +157,8 @@ class _GemmStrategy:
     
     def gen_test_data(self, selected_hparams):
         import torch
+        # a = torch.rand((self.M, self.K), dtype=torch.bfloat16).cuda() * 2 - 1
+        # b = torch.rand((self.N, self.K), dtype=torch.bfloat16).cuda() * 2 - 1
         a = torch.randn((self.M, self.K), dtype=torch.bfloat16, device="cuda")
         b = torch.randn((self.N, self.K), dtype=torch.bfloat16, device="cuda")
         if self.strategy == MicroLinearStrategy.GEMM_ADD:
@@ -398,9 +400,10 @@ template <typename T,
         head_str = head_str.replace('<kernel_name>', self.strategy.name)
 
         source = kernel.get_kernel_source()
-        grid_dim, block_dim, dynamic_smem_buf, use_cooperative_groups = get_launch_info(kernel)[0]
+        artifact = get_artifact(kernel)
+        grid_dim, block_dim, dynamic_smem_buf, use_cooperative_groups = get_launch_info(artifact)[0]
         self.layout = f"({grid_dim['blockIdx.x']}, {grid_dim['blockIdx.y']}, {grid_dim['blockIdx.z']}), ({BLOCK_N}, {BLOCK_M}, {BLOCK_K})"        
-        # print("layout", self.layout)
+        print("layout", self.layout)
         
         if self.dtype == T.bfloat16:
             dtype = "bfloat16_t"
@@ -437,7 +440,7 @@ template <typename T,
         extra_attr += f"\n// block_dim=({block_dim['threadIdx.x']}, {block_dim['threadIdx.y']}, {block_dim['threadIdx.z']})."
         source += extra_attr
         
-        dispatch_source = get_dispatch_source(kernel).replace('call', "create_"+self.strategy.name)
+        dispatch_source = get_dispatch_source(kernel, artifact).replace('call', "create_"+self.strategy.name)
         dispatch_source = dispatch_source.replace('LAUNCH_INFO', "LAUNCH_INFO_"+self.strategy.name)
         source += "\n\n" + dispatch_source + "\n"
         return source

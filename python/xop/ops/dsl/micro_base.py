@@ -35,17 +35,19 @@ class HparamSelectMode(IntEnum):
     TUNED = 2
     SPECIFY = 3
 
-def get_launch_info(kernel):
+
+def get_artifact(kernel):
     with tvm.transform.PassContext(opt_level=3, config=kernel.pass_configs), kernel.target:
         artifact = tilelang.lower(
             kernel.prim_func,
             target=kernel.target,
             target_host=kernel.target_host,
-            enable_host_codegen=True,
-            enable_device_compile=True,
+            enable_host_codegen=False,
+            enable_device_compile=False,
         )
-    # print(artifact)
-        
+    return artifact
+
+def get_launch_info(artifact):        
     infos = []
     for g_var, func in artifact.device_mod.functions.items():
         grid_dim = {"blockIdx.x": 1, "blockIdx.y": 1, "blockIdx.z": 1}
@@ -246,16 +248,7 @@ def update_lib_code(cuda_src_warpper, code: str):
     # return lib_code
     return host_func
     
-def get_dispatch_source(kernel, kernel_only: bool = True) -> str:
-    with tvm.transform.PassContext(opt_level=3, config=kernel.pass_configs), kernel.target:
-        my_artifact = tilelang.lower(
-            kernel.prim_func,
-            target=kernel.target,
-            target_host=kernel.target_host,
-            enable_host_codegen=False,
-            enable_device_compile=False,
-        )
-        
+def get_dispatch_source(kernel, artifact, kernel_only: bool = True) -> str:
     from tilelang.jit.adapter.wrapper import TLWrapper, TLCUDASourceWrapper
     if isinstance(kernel.prim_func, PrimFunc):
         ir_module = tvm.IRModule({kernel.prim_func.attrs["global_symbol"]: kernel.prim_func})
@@ -264,18 +257,18 @@ def get_dispatch_source(kernel, kernel_only: bool = True) -> str:
     wrapper = TLWrapper(kernel.target)
     wrapper.assign_optimized_module(ir_module)
     wrapper.assign_pass_configs(kernel.pass_configs)
-    wrapper.assign_host_module(my_artifact.host_mod)
-    wrapper.assign_device_module(my_artifact.device_mod)
+    wrapper.assign_host_module(artifact.host_mod)
+    wrapper.assign_device_module(artifact.device_mod)
 
     wrapper_o = TLCUDASourceWrapper(
         scheduled_ir_module=wrapper.scheduled_ir_module,
-        source=my_artifact.kernel_source,
+        source=artifact.kernel_source,
         target=wrapper.target,
         device_mod=wrapper.device_mod,
         host_mod=wrapper.host_mod,
         pass_configs=wrapper.pass_configs,
     )
-    return update_lib_code(wrapper_o, my_artifact.kernel_source)
+    return update_lib_code(wrapper_o, artifact.kernel_source)
     # return wrapper.wrap(my_artifact.kernel_source)
     
 # print("artifact: ", artifact)
@@ -468,12 +461,21 @@ class BaseMicroKernel:
         return sim
         
     def _run_profile(self, kernel, strategy, hparams):
-        test_data = strategy.gen_test_data(hparams)
-        ref_func = strategy.get_torch_ref()
+        warnup_iters = 500
+        test_iters = 2000
+        problem_cnt = 10
         
+        test_data_list = []
+        for _ in range(problem_cnt):
+            test_data = strategy.gen_test_data(hparams)
+            test_data_list.append(test_data)
+        
+        ref_func = strategy.get_torch_ref()
         def target_run(iter):
+            test_data = test_data_list[iter % len(test_data_list)]
             return kernel(*test_data)
         def ref_run(iter):
+            test_data = test_data_list[iter % len(test_data_list)]
             return ref_func(*test_data)
         
         target_result = target_run(0)
@@ -483,8 +485,6 @@ class BaseMicroKernel:
         else:
             sim = self._calc_sim(target_result, ref_result)
         
-        warnup_iters = 500
-        test_iters = 100
         perf_result_xop = xutil.perf_gemm(warmup_iters=warnup_iters, iters=test_iters, name="target", fn=target_run)
         perf_result_torch = xutil.perf_gemm(warmup_iters=warnup_iters, iters=test_iters, name="torch", fn=ref_run)
         # do_bench(lambda: ref_run(), warmup=warnup_iter*2, rep=test_iter*2, backend="event") # extra warnup

@@ -108,8 +108,15 @@ def check_allclose_ret(target_run, torch_run, iters, print_mode):
             count1 = (radio > threshold[1]).sum().item()
             print("radio > ", threshold[0], ": ", count0, "-", count0/total_num, " / ", threshold[1], ": ", count1, "-", count1/total_num)
         assert_similar(target_result, torch_result, name="similar")    
-            
-def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
+
+def torch_profile(func):
+    from torch.profiler import profile, ProfilerActivity
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+        func(0)
+    print(prof.key_averages().table(sort_by="cuda_time_total"))
+    prof.export_chrome_trace("trace.json") # chrome://tracing/     
+                    
+def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable, enable_torch_prof: bool = False):
     if (warmup_iters + iters == 0):
         output = fn(0)
         torch.cuda.synchronize()
@@ -134,6 +141,9 @@ def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable):
     my_stream.synchronize()
     total_time = start_event.elapsed_time(end_event) * 1e-3
 
+    if enable_torch_prof:
+        torch_profile(fn)
+        
     # Clean up and run it once to confirm the results are correct.
     if isinstance(output, torch.Tensor):
         output.zero_()
