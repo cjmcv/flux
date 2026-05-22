@@ -39,15 +39,15 @@ class MkLayers:
         self.Qwen3MegaConfig = None
         if (model_tag == "qwen3_4b"):
             if get_arch() == "sm_89":
-                from common.autogen.sm_89.qwen3_4b_mega_config import Qwen3MegaConfig4b
+                from xop.ops.dsl.autogen.sm_89.qwen3_4b_mega_config import Qwen3MegaConfig4b
             elif get_arch() == "sm_120":
-                from common.autogen.sm_120.qwen3_4b_mega_config import Qwen3MegaConfig4b
+                from xop.ops.dsl.autogen.sm_120.qwen3_4b_mega_config import Qwen3MegaConfig4b
             self.Qwen3MegaConfig = Qwen3MegaConfig4b
         elif (model_tag == "qwen3_06b"):
             if get_arch() == "sm_89":
-                from common.autogen.sm_89.qwen3_06b_mega_config import Qwen3MegaConfig06b
+                from xop.ops.dsl.autogen.sm_89.qwen3_06b_mega_config import Qwen3MegaConfig06b
             elif get_arch() == "sm_120":
-                from common.autogen.sm_120.qwen3_06b_mega_config import Qwen3MegaConfig06b
+                from xop.ops.dsl.autogen.sm_120.qwen3_06b_mega_config import Qwen3MegaConfig06b
             self.Qwen3MegaConfig = Qwen3MegaConfig06b
 
     def get_mk(self):

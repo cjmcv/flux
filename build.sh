@@ -10,7 +10,9 @@ if [[ "$1" == "--env" ]]; then
     fi
 
     export DSL_HOME="$TARGET_DIR"
+    export XOP_HOME="${CUR_DIR}"
     echo "DSL_HOME set to: $DSL_HOME"
+    echo "XOP_HOME set to: $XOP_HOME"
     return 0 2>/dev/null || exit 0
 fi
 

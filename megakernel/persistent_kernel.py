@@ -138,7 +138,7 @@ def get_compile_command(
     cc,
     file_name,
     py_include_dir,
-    megakernel_home_path,
+    XOP_HOME_path,
     megakernel_inc_path,
     megakernel_deps_path,
     nvshmem_inc_path,
@@ -183,6 +183,7 @@ def get_compile_command(
         "-lineinfo",
         f"-I{py_include_dir}",
         f"-I{megakernel_inc_path}",
+        f"-I{os.path.join(megakernel_inc_path, 'megakernel')}",
         f"-I{os.path.join(megakernel_inc_path, 'megakernel/persistent_kernel')}",
         f"-I{os.path.join(megakernel_deps_path, 'cutlass/include')}",
         f"-I{os.path.join(megakernel_deps_path, 'cutlass/tools/util/include')}",
@@ -656,6 +657,7 @@ class PersistentKernel:
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         
         MEGAKERNEL_ROOT, INCLUDE_PATH, DEPS_PATH = get_key_paths()
+        print("get_key_paths", get_key_paths())
         # tempdir_obj = tempfile.TemporaryDirectory()
         # tempdir = "./gen/" # tempdir_obj.name
         results = self.kn_graph.generate_task_graph(num_gpus=self.world_size, my_gpu_id=self.mpi_rank)
@@ -701,11 +703,11 @@ class PersistentKernel:
         py_include_dir = sysconfig.get_paths(scheme=scheme)["include"]
 
         # find megakernel home
-        if "MEGAKERNEL_HOME" in os.environ:
-            MEGAKERNEL_HOME_PATH = os.environ.get("MEGAKERNEL_HOME")
+        if "XOP_HOME" in os.environ:
+            XOP_HOME_PATH = os.environ.get("XOP_HOME")
         else:
             raise RuntimeError(
-                "MEGAKERNEL_HOME unspecified; Please set MEGAKERNEL_HOME to be the root of the Mirage folder"
+                "XOP_HOME unspecified; Please set XOP_HOME to be the root of the Mirage folder"
             )
 
         NVSHMEM_INC_PATH = None
@@ -780,7 +782,7 @@ class PersistentKernel:
             cc=cc,
             file_name=cuda_code_path,
             py_include_dir=py_include_dir,
-            megakernel_home_path=MEGAKERNEL_HOME_PATH,
+            XOP_HOME_path=XOP_HOME_PATH,
             megakernel_inc_path=INCLUDE_PATH,
             megakernel_deps_path=DEPS_PATH,
             nvshmem_inc_path=NVSHMEM_INC_PATH,

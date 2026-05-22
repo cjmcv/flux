@@ -31,7 +31,7 @@ def config_cython():
     try:
         from Cython.Build import cythonize
         ret = []
-        cython_path = path.join(path.dirname(__file__), "python/xop/megakernel/_cython")
+        cython_path = path.join(path.dirname(__file__), "megakernel/_cython")
         megakernel_path = path.join(path.dirname(__file__), ".")
         for fn in os.listdir(cython_path):
             if not fn.endswith(".pyx"):
@@ -39,7 +39,7 @@ def config_cython():
             ret.append(Extension(
                 "megakernel.%s" % fn[:-4],
                 ["%s/%s" % (cython_path, fn)],
-                include_dirs=[path.join(megakernel_path, "src"),
+                include_dirs=[path.join(megakernel_path, "include/xop"),
                               path.join(megakernel_path, "3rdparty", "json", "include"),
                               path.join(megakernel_path, "3rdparty", "cutlass", "include"),
                               "/usr/local/cuda/include"],

@@ -9,14 +9,7 @@
                 null
             ]
         ],
-        "depends": [
-            "/home/cjmcv/project/megakernel/src/megakernel/kernel/allreduce/custom_all_reduce.h",
-            "/home/cjmcv/project/megakernel/src/megakernel/kernel/device_tensor.h",
-            "/home/cjmcv/project/megakernel/src/megakernel/kernel/graph.h",
-            "/home/cjmcv/project/megakernel/src/megakernel/kernel/runtime.h",
-            "/home/cjmcv/project/megakernel/src/megakernel/kernel/tb_graph.h",
-            "/home/cjmcv/project/megakernel/src/megakernel/type.h"
-        ],
+        "depends": [],
         "extra_compile_args": [
             "-std=c++17",
             "-fopenmp"
@@ -26,9 +19,9 @@
             "-fopenmp"
         ],
         "include_dirs": [
-            "/home/cjmcv/project/megakernel/./src",
-            "/home/cjmcv/project/megakernel/./3rdparty/json/include",
-            "/home/cjmcv/project/megakernel/./3rdparty/cutlass/include",
+            "/home/cjmcv/project/flux/./src",
+            "/home/cjmcv/project/flux/./3rdparty/json/include",
+            "/home/cjmcv/project/flux/./3rdparty/cutlass/include",
             "/usr/local/cuda/include"
         ],
         "language": "c++",
@@ -41,15 +34,15 @@
             "rt"
         ],
         "library_dirs": [
-            "/home/cjmcv/project/megakernel/./build",
-            "/home/cjmcv/project/megakernel/./3rdparty/build",
+            "/home/cjmcv/project/flux/./build",
+            "/home/cjmcv/project/flux/./3rdparty/build",
             "/usr/local/cuda/lib",
             "/usr/local/cuda/lib64",
             "/usr/local/cuda/lib64/stubs"
         ],
         "name": "megakernel.core",
         "sources": [
-            "/home/cjmcv/project/megakernel/megakernel/_cython/core.pyx"
+            "/home/cjmcv/project/flux/python/xop/megakernel/_cython/core.pyx"
         ]
     },
     "module_name": "megakernel.core"
@@ -1579,7 +1572,7 @@ static const char *__pyx_filename;
 
 static const char *__pyx_f[] = {
   "<stringsource>",
-  "megakernel/_cython/core.pyx",
+  "python/xop/megakernel/_cython/core.pyx",
   "contextvars.pxd",
   "array.pxd",
   "type.pxd",
@@ -1594,7 +1587,7 @@ static const char *__pyx_f[] = {
 
 /* #### Code section: numeric_typedefs ### */
 
-/* "megakernel/_cython/core.pyx":28
+/* "python/xop/megakernel/_cython/core.pyx":28
  * # Code snippet from OpenAI Triton
  * 
  * ctypedef unsigned long int size_t             # <<<<<<<<<<<<<<
@@ -1641,7 +1634,7 @@ struct __pyx_opt_args_7cpython_11contextvars_get_value_no_default {
   PyObject *default_value;
 };
 
-/* "megakernel/_cython/core.pyx":141
+/* "python/xop/megakernel/_cython/core.pyx":141
  *         vector[CppTBOperator*] operators
  * 
  * cdef class PyAllReduce:             # <<<<<<<<<<<<<<
@@ -1654,7 +1647,7 @@ struct __pyx_obj_10megakernel_4core_PyAllReduce {
 };
 
 
-/* "megakernel/_cython/core.pyx":305
+/* "python/xop/megakernel/_cython/core.pyx":305
  * 
  * 
  * cdef class DTensor:             # <<<<<<<<<<<<<<
@@ -1668,7 +1661,7 @@ struct __pyx_obj_10megakernel_4core_DTensor {
 };
 
 
-/* "megakernel/_cython/core.pyx":359
+/* "python/xop/megakernel/_cython/core.pyx":359
  * 
  * 
  * cdef class CyKNGraph:             # <<<<<<<<<<<<<<
@@ -1681,7 +1674,7 @@ struct __pyx_obj_10megakernel_4core_CyKNGraph {
 };
 
 
-/* "megakernel/_cython/core.pyx":447
+/* "python/xop/megakernel/_cython/core.pyx":447
  * 
  * 
  * cdef class CyTBGraph:             # <<<<<<<<<<<<<<
@@ -1695,7 +1688,7 @@ struct __pyx_obj_10megakernel_4core_CyTBGraph {
 
 
 
-/* "megakernel/_cython/core.pyx":305
+/* "python/xop/megakernel/_cython/core.pyx":305
  * 
  * 
  * cdef class DTensor:             # <<<<<<<<<<<<<<
@@ -2994,7 +2987,6 @@ static const char __pyx_k_CyKNGraph___setstate_cython[] = "CyKNGraph.__setstate_
 static const char __pyx_k_CyTBGraph___setstate_cython[] = "CyTBGraph.__setstate_cython__";
 static const char __pyx_k_PyAllReduce___reduce_cython[] = "PyAllReduce.__reduce_cython__";
 static const char __pyx_k_convert_torch_type_to_dtype[] = "convert_torch_type_to_dtype";
-static const char __pyx_k_megakernel__cython_core_pyx[] = "megakernel/_cython/core.pyx";
 static const char __pyx_k_CyKNGraph_attach_cuda_tensor[] = "CyKNGraph.attach_cuda_tensor";
 static const char __pyx_k_CyKNGraph_attach_torch_tensor[] = "CyKNGraph.attach_torch_tensor";
 static const char __pyx_k_CyKNGraph_generate_task_graph[] = "CyKNGraph.generate_task_graph";
@@ -3007,6 +2999,7 @@ static const char __pyx_k_block_dim_must_include_3_dimensi[] = "block_dim must i
 static const char __pyx_k_grid_dim_block_dim_thread_num_mu[] = "grid_dim, block_dim, thread_num must be provided";
 static const char __pyx_k_grid_dim_must_include_3_dimensio[] = "grid_dim must include 3 dimensions";
 static const char __pyx_k_no_default___reduce___due_to_non[] = "no default __reduce__ due to non-trivial __cinit__";
+static const char __pyx_k_python_xop_megakernel__cython_co[] = "python/xop/megakernel/_cython/core.pyx";
 /* #### Code section: decls ### */
 static int __pyx_pf_7cpython_5array_5array___getbuffer__(arrayobject *__pyx_v_self, Py_buffer *__pyx_v_info, CYTHON_UNUSED int __pyx_v_flags); /* proto */
 static void __pyx_pf_7cpython_5array_5array_2__releasebuffer__(CYTHON_UNUSED arrayobject *__pyx_v_self, Py_buffer *__pyx_v_info); /* proto */
@@ -3342,7 +3335,6 @@ typedef struct {
   PyObject *__pyx_kp_u_isenabled;
   PyObject *__pyx_n_u_json_file;
   PyObject *__pyx_n_s_main;
-  PyObject *__pyx_kp_s_megakernel__cython_core_pyx;
   PyObject *__pyx_n_s_megakernel_core;
   PyObject *__pyx_n_s_metaclass;
   PyObject *__pyx_n_s_module;
@@ -3361,6 +3353,7 @@ typedef struct {
   PyObject *__pyx_n_s_print;
   PyObject *__pyx_n_s_ptr;
   PyObject *__pyx_n_s_py_byte_string;
+  PyObject *__pyx_kp_s_python_xop_megakernel__cython_co;
   PyObject *__pyx_n_s_pyx_state;
   PyObject *__pyx_n_s_pyx_vtable;
   PyObject *__pyx_n_s_qualname;
@@ -3659,7 +3652,6 @@ static int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_kp_u_isenabled);
   Py_CLEAR(clear_module_state->__pyx_n_u_json_file);
   Py_CLEAR(clear_module_state->__pyx_n_s_main);
-  Py_CLEAR(clear_module_state->__pyx_kp_s_megakernel__cython_core_pyx);
   Py_CLEAR(clear_module_state->__pyx_n_s_megakernel_core);
   Py_CLEAR(clear_module_state->__pyx_n_s_metaclass);
   Py_CLEAR(clear_module_state->__pyx_n_s_module);
@@ -3678,6 +3670,7 @@ static int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_n_s_print);
   Py_CLEAR(clear_module_state->__pyx_n_s_ptr);
   Py_CLEAR(clear_module_state->__pyx_n_s_py_byte_string);
+  Py_CLEAR(clear_module_state->__pyx_kp_s_python_xop_megakernel__cython_co);
   Py_CLEAR(clear_module_state->__pyx_n_s_pyx_state);
   Py_CLEAR(clear_module_state->__pyx_n_s_pyx_vtable);
   Py_CLEAR(clear_module_state->__pyx_n_s_qualname);
@@ -3954,7 +3947,6 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
   Py_VISIT(traverse_module_state->__pyx_kp_u_isenabled);
   Py_VISIT(traverse_module_state->__pyx_n_u_json_file);
   Py_VISIT(traverse_module_state->__pyx_n_s_main);
-  Py_VISIT(traverse_module_state->__pyx_kp_s_megakernel__cython_core_pyx);
   Py_VISIT(traverse_module_state->__pyx_n_s_megakernel_core);
   Py_VISIT(traverse_module_state->__pyx_n_s_metaclass);
   Py_VISIT(traverse_module_state->__pyx_n_s_module);
@@ -3973,6 +3965,7 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
   Py_VISIT(traverse_module_state->__pyx_n_s_print);
   Py_VISIT(traverse_module_state->__pyx_n_s_ptr);
   Py_VISIT(traverse_module_state->__pyx_n_s_py_byte_string);
+  Py_VISIT(traverse_module_state->__pyx_kp_s_python_xop_megakernel__cython_co);
   Py_VISIT(traverse_module_state->__pyx_n_s_pyx_state);
   Py_VISIT(traverse_module_state->__pyx_n_s_pyx_vtable);
   Py_VISIT(traverse_module_state->__pyx_n_s_qualname);
@@ -4357,7 +4350,6 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 #define __pyx_kp_u_isenabled __pyx_mstate_global->__pyx_kp_u_isenabled
 #define __pyx_n_u_json_file __pyx_mstate_global->__pyx_n_u_json_file
 #define __pyx_n_s_main __pyx_mstate_global->__pyx_n_s_main
-#define __pyx_kp_s_megakernel__cython_core_pyx __pyx_mstate_global->__pyx_kp_s_megakernel__cython_core_pyx
 #define __pyx_n_s_megakernel_core __pyx_mstate_global->__pyx_n_s_megakernel_core
 #define __pyx_n_s_metaclass __pyx_mstate_global->__pyx_n_s_metaclass
 #define __pyx_n_s_module __pyx_mstate_global->__pyx_n_s_module
@@ -4376,6 +4368,7 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 #define __pyx_n_s_print __pyx_mstate_global->__pyx_n_s_print
 #define __pyx_n_s_ptr __pyx_mstate_global->__pyx_n_s_ptr
 #define __pyx_n_s_py_byte_string __pyx_mstate_global->__pyx_n_s_py_byte_string
+#define __pyx_kp_s_python_xop_megakernel__cython_co __pyx_mstate_global->__pyx_kp_s_python_xop_megakernel__cython_co
 #define __pyx_n_s_pyx_state __pyx_mstate_global->__pyx_n_s_pyx_state
 #define __pyx_n_s_pyx_vtable __pyx_mstate_global->__pyx_n_s_pyx_vtable
 #define __pyx_n_s_qualname __pyx_mstate_global->__pyx_n_s_qualname
@@ -5665,7 +5658,7 @@ static CYTHON_INLINE void __pyx_f_7cpython_5array_zero(arrayobject *__pyx_v_self
   /* function exit code */
 }
 
-/* "megakernel/_cython/core.pyx":144
+/* "python/xop/megakernel/_cython/core.pyx":144
  *     cdef AllReduce* handle  # C++
  * 
  *     def __cinit__(self, int thread_num):             # <<<<<<<<<<<<<<
@@ -5755,7 +5748,7 @@ static int __pyx_pw_10megakernel_4core_11PyAllReduce_1__cinit__(PyObject *__pyx_
 static int __pyx_pf_10megakernel_4core_11PyAllReduce___cinit__(struct __pyx_obj_10megakernel_4core_PyAllReduce *__pyx_v_self, int __pyx_v_thread_num) {
   int __pyx_r;
 
-  /* "megakernel/_cython/core.pyx":146
+  /* "python/xop/megakernel/_cython/core.pyx":146
  *     def __cinit__(self, int thread_num):
  *         # C++ AllReduce
  *         self.handle = new AllReduce(thread_num)             # <<<<<<<<<<<<<<
@@ -5764,7 +5757,7 @@ static int __pyx_pf_10megakernel_4core_11PyAllReduce___cinit__(struct __pyx_obj_
  */
   __pyx_v_self->handle = new xop::AllReduce(__pyx_v_thread_num);
 
-  /* "megakernel/_cython/core.pyx":144
+  /* "python/xop/megakernel/_cython/core.pyx":144
  *     cdef AllReduce* handle  # C++
  * 
  *     def __cinit__(self, int thread_num):             # <<<<<<<<<<<<<<
@@ -5777,7 +5770,7 @@ static int __pyx_pf_10megakernel_4core_11PyAllReduce___cinit__(struct __pyx_obj_
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":148
+/* "python/xop/megakernel/_cython/core.pyx":148
  *         self.handle = new AllReduce(thread_num)
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
@@ -5801,7 +5794,7 @@ static void __pyx_pw_10megakernel_4core_11PyAllReduce_3__dealloc__(PyObject *__p
 static void __pyx_pf_10megakernel_4core_11PyAllReduce_2__dealloc__(struct __pyx_obj_10megakernel_4core_PyAllReduce *__pyx_v_self) {
   int __pyx_t_1;
 
-  /* "megakernel/_cython/core.pyx":150
+  /* "python/xop/megakernel/_cython/core.pyx":150
  *     def __dealloc__(self):
  *         #
  *         if self.handle:             # <<<<<<<<<<<<<<
@@ -5811,7 +5804,7 @@ static void __pyx_pf_10megakernel_4core_11PyAllReduce_2__dealloc__(struct __pyx_
   __pyx_t_1 = (__pyx_v_self->handle != 0);
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":151
+    /* "python/xop/megakernel/_cython/core.pyx":151
  *         #
  *         if self.handle:
  *             del self.handle             # <<<<<<<<<<<<<<
@@ -5820,7 +5813,7 @@ static void __pyx_pf_10megakernel_4core_11PyAllReduce_2__dealloc__(struct __pyx_
  */
     delete __pyx_v_self->handle;
 
-    /* "megakernel/_cython/core.pyx":150
+    /* "python/xop/megakernel/_cython/core.pyx":150
  *     def __dealloc__(self):
  *         #
  *         if self.handle:             # <<<<<<<<<<<<<<
@@ -5829,7 +5822,7 @@ static void __pyx_pf_10megakernel_4core_11PyAllReduce_2__dealloc__(struct __pyx_
  */
   }
 
-  /* "megakernel/_cython/core.pyx":148
+  /* "python/xop/megakernel/_cython/core.pyx":148
  *         self.handle = new AllReduce(thread_num)
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
@@ -6054,7 +6047,7 @@ static PyObject *__pyx_pf_10megakernel_4core_11PyAllReduce_6__setstate_cython__(
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":165
+/* "python/xop/megakernel/_cython/core.pyx":165
  *     FP_TYPES = ['fp16', 'bf16', 'fp32', 'fp64']
  * 
  *     def __init__(self, name):             # <<<<<<<<<<<<<<
@@ -6185,7 +6178,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype___init__(CYTHON_UNUSED PyObj
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__init__", 1);
 
-  /* "megakernel/_cython/core.pyx":166
+  /* "python/xop/megakernel/_cython/core.pyx":166
  * 
  *     def __init__(self, name):
  *         self.name = name             # <<<<<<<<<<<<<<
@@ -6194,7 +6187,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype___init__(CYTHON_UNUSED PyObj
  */
   if (__Pyx_PyObject_SetAttrStr(__pyx_v_self, __pyx_n_s_name, __pyx_v_name) < 0) __PYX_ERR(1, 166, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":167
+  /* "python/xop/megakernel/_cython/core.pyx":167
  *     def __init__(self, name):
  *         self.name = name
  *         assert name in dtype.SINT_TYPES + dtype.UINT_TYPES + dtype.FP_TYPES, name             # <<<<<<<<<<<<<<
@@ -6240,7 +6233,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype___init__(CYTHON_UNUSED PyObj
   if ((1)); else __PYX_ERR(1, 167, __pyx_L1_error)
   #endif
 
-  /* "megakernel/_cython/core.pyx":165
+  /* "python/xop/megakernel/_cython/core.pyx":165
  *     FP_TYPES = ['fp16', 'bf16', 'fp32', 'fp64']
  * 
  *     def __init__(self, name):             # <<<<<<<<<<<<<<
@@ -6263,7 +6256,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype___init__(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":169
+/* "python/xop/megakernel/_cython/core.pyx":169
  *         assert name in dtype.SINT_TYPES + dtype.UINT_TYPES + dtype.FP_TYPES, name
  * 
  *     def is_fp16(self):             # <<<<<<<<<<<<<<
@@ -6377,7 +6370,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_2is_fp16(CYTHON_UNUSED PyObj
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_fp16", 1);
 
-  /* "megakernel/_cython/core.pyx":170
+  /* "python/xop/megakernel/_cython/core.pyx":170
  * 
  *     def is_fp16(self):
  *         return self.name == 'fp16'             # <<<<<<<<<<<<<<
@@ -6393,7 +6386,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_2is_fp16(CYTHON_UNUSED PyObj
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":169
+  /* "python/xop/megakernel/_cython/core.pyx":169
  *         assert name in dtype.SINT_TYPES + dtype.UINT_TYPES + dtype.FP_TYPES, name
  * 
  *     def is_fp16(self):             # <<<<<<<<<<<<<<
@@ -6413,7 +6406,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_2is_fp16(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":172
+/* "python/xop/megakernel/_cython/core.pyx":172
  *         return self.name == 'fp16'
  * 
  *     def is_bf16(self):             # <<<<<<<<<<<<<<
@@ -6527,7 +6520,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_4is_bf16(CYTHON_UNUSED PyObj
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_bf16", 1);
 
-  /* "megakernel/_cython/core.pyx":173
+  /* "python/xop/megakernel/_cython/core.pyx":173
  * 
  *     def is_bf16(self):
  *         return self.name == 'bf16'             # <<<<<<<<<<<<<<
@@ -6543,7 +6536,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_4is_bf16(CYTHON_UNUSED PyObj
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":172
+  /* "python/xop/megakernel/_cython/core.pyx":172
  *         return self.name == 'fp16'
  * 
  *     def is_bf16(self):             # <<<<<<<<<<<<<<
@@ -6563,7 +6556,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_4is_bf16(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":175
+/* "python/xop/megakernel/_cython/core.pyx":175
  *         return self.name == 'bf16'
  * 
  *     def is_fp32(self):             # <<<<<<<<<<<<<<
@@ -6677,7 +6670,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_6is_fp32(CYTHON_UNUSED PyObj
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_fp32", 1);
 
-  /* "megakernel/_cython/core.pyx":176
+  /* "python/xop/megakernel/_cython/core.pyx":176
  * 
  *     def is_fp32(self):
  *         return self.name == 'fp32'             # <<<<<<<<<<<<<<
@@ -6693,7 +6686,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_6is_fp32(CYTHON_UNUSED PyObj
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":175
+  /* "python/xop/megakernel/_cython/core.pyx":175
  *         return self.name == 'bf16'
  * 
  *     def is_fp32(self):             # <<<<<<<<<<<<<<
@@ -6713,7 +6706,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_6is_fp32(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":178
+/* "python/xop/megakernel/_cython/core.pyx":178
  *         return self.name == 'fp32'
  * 
  *     def is_fp64(self):             # <<<<<<<<<<<<<<
@@ -6827,7 +6820,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_8is_fp64(CYTHON_UNUSED PyObj
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_fp64", 1);
 
-  /* "megakernel/_cython/core.pyx":179
+  /* "python/xop/megakernel/_cython/core.pyx":179
  * 
  *     def is_fp64(self):
  *         return self.name == 'fp64'             # <<<<<<<<<<<<<<
@@ -6843,7 +6836,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_8is_fp64(CYTHON_UNUSED PyObj
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":178
+  /* "python/xop/megakernel/_cython/core.pyx":178
  *         return self.name == 'fp32'
  * 
  *     def is_fp64(self):             # <<<<<<<<<<<<<<
@@ -6863,7 +6856,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_8is_fp64(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":181
+/* "python/xop/megakernel/_cython/core.pyx":181
  *         return self.name == 'fp64'
  * 
  *     def is_int1(self):             # <<<<<<<<<<<<<<
@@ -6977,7 +6970,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_10is_int1(CYTHON_UNUSED PyOb
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_int1", 1);
 
-  /* "megakernel/_cython/core.pyx":182
+  /* "python/xop/megakernel/_cython/core.pyx":182
  * 
  *     def is_int1(self):
  *         return self.name == 'int1'             # <<<<<<<<<<<<<<
@@ -6993,7 +6986,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_10is_int1(CYTHON_UNUSED PyOb
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":181
+  /* "python/xop/megakernel/_cython/core.pyx":181
  *         return self.name == 'fp64'
  * 
  *     def is_int1(self):             # <<<<<<<<<<<<<<
@@ -7013,7 +7006,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_10is_int1(CYTHON_UNUSED PyOb
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":184
+/* "python/xop/megakernel/_cython/core.pyx":184
  *         return self.name == 'int1'
  * 
  *     def is_int8(self):             # <<<<<<<<<<<<<<
@@ -7127,7 +7120,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_12is_int8(CYTHON_UNUSED PyOb
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_int8", 1);
 
-  /* "megakernel/_cython/core.pyx":185
+  /* "python/xop/megakernel/_cython/core.pyx":185
  * 
  *     def is_int8(self):
  *         return self.name == 'int8'             # <<<<<<<<<<<<<<
@@ -7143,7 +7136,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_12is_int8(CYTHON_UNUSED PyOb
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":184
+  /* "python/xop/megakernel/_cython/core.pyx":184
  *         return self.name == 'int1'
  * 
  *     def is_int8(self):             # <<<<<<<<<<<<<<
@@ -7163,7 +7156,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_12is_int8(CYTHON_UNUSED PyOb
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":187
+/* "python/xop/megakernel/_cython/core.pyx":187
  *         return self.name == 'int8'
  * 
  *     def is_int16(self):             # <<<<<<<<<<<<<<
@@ -7277,7 +7270,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_14is_int16(CYTHON_UNUSED PyO
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_int16", 1);
 
-  /* "megakernel/_cython/core.pyx":188
+  /* "python/xop/megakernel/_cython/core.pyx":188
  * 
  *     def is_int16(self):
  *         return self.name == 'int16'             # <<<<<<<<<<<<<<
@@ -7293,7 +7286,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_14is_int16(CYTHON_UNUSED PyO
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":187
+  /* "python/xop/megakernel/_cython/core.pyx":187
  *         return self.name == 'int8'
  * 
  *     def is_int16(self):             # <<<<<<<<<<<<<<
@@ -7313,7 +7306,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_14is_int16(CYTHON_UNUSED PyO
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":190
+/* "python/xop/megakernel/_cython/core.pyx":190
  *         return self.name == 'int16'
  * 
  *     def is_int32(self):             # <<<<<<<<<<<<<<
@@ -7427,7 +7420,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_16is_int32(CYTHON_UNUSED PyO
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_int32", 1);
 
-  /* "megakernel/_cython/core.pyx":191
+  /* "python/xop/megakernel/_cython/core.pyx":191
  * 
  *     def is_int32(self):
  *         return self.name == 'int32'             # <<<<<<<<<<<<<<
@@ -7443,7 +7436,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_16is_int32(CYTHON_UNUSED PyO
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":190
+  /* "python/xop/megakernel/_cython/core.pyx":190
  *         return self.name == 'int16'
  * 
  *     def is_int32(self):             # <<<<<<<<<<<<<<
@@ -7463,7 +7456,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_16is_int32(CYTHON_UNUSED PyO
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":193
+/* "python/xop/megakernel/_cython/core.pyx":193
  *         return self.name == 'int32'
  * 
  *     def is_int64(self):             # <<<<<<<<<<<<<<
@@ -7577,7 +7570,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_18is_int64(CYTHON_UNUSED PyO
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_int64", 1);
 
-  /* "megakernel/_cython/core.pyx":194
+  /* "python/xop/megakernel/_cython/core.pyx":194
  * 
  *     def is_int64(self):
  *         return self.name == 'int64'             # <<<<<<<<<<<<<<
@@ -7593,7 +7586,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_18is_int64(CYTHON_UNUSED PyO
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":193
+  /* "python/xop/megakernel/_cython/core.pyx":193
  *         return self.name == 'int32'
  * 
  *     def is_int64(self):             # <<<<<<<<<<<<<<
@@ -7613,7 +7606,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_18is_int64(CYTHON_UNUSED PyO
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":196
+/* "python/xop/megakernel/_cython/core.pyx":196
  *         return self.name == 'int64'
  * 
  *     def is_uint8(self):             # <<<<<<<<<<<<<<
@@ -7727,7 +7720,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_20is_uint8(CYTHON_UNUSED PyO
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_uint8", 1);
 
-  /* "megakernel/_cython/core.pyx":197
+  /* "python/xop/megakernel/_cython/core.pyx":197
  * 
  *     def is_uint8(self):
  *         return self.name == 'uint8'             # <<<<<<<<<<<<<<
@@ -7743,7 +7736,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_20is_uint8(CYTHON_UNUSED PyO
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":196
+  /* "python/xop/megakernel/_cython/core.pyx":196
  *         return self.name == 'int64'
  * 
  *     def is_uint8(self):             # <<<<<<<<<<<<<<
@@ -7763,7 +7756,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_20is_uint8(CYTHON_UNUSED PyO
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":199
+/* "python/xop/megakernel/_cython/core.pyx":199
  *         return self.name == 'uint8'
  * 
  *     def is_uint16(self):             # <<<<<<<<<<<<<<
@@ -7877,7 +7870,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_22is_uint16(CYTHON_UNUSED Py
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_uint16", 1);
 
-  /* "megakernel/_cython/core.pyx":200
+  /* "python/xop/megakernel/_cython/core.pyx":200
  * 
  *     def is_uint16(self):
  *         return self.name == 'uint16'             # <<<<<<<<<<<<<<
@@ -7893,7 +7886,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_22is_uint16(CYTHON_UNUSED Py
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":199
+  /* "python/xop/megakernel/_cython/core.pyx":199
  *         return self.name == 'uint8'
  * 
  *     def is_uint16(self):             # <<<<<<<<<<<<<<
@@ -7913,7 +7906,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_22is_uint16(CYTHON_UNUSED Py
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":202
+/* "python/xop/megakernel/_cython/core.pyx":202
  *         return self.name == 'uint16'
  * 
  *     def is_uint32(self):             # <<<<<<<<<<<<<<
@@ -8027,7 +8020,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_24is_uint32(CYTHON_UNUSED Py
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_uint32", 1);
 
-  /* "megakernel/_cython/core.pyx":203
+  /* "python/xop/megakernel/_cython/core.pyx":203
  * 
  *     def is_uint32(self):
  *         return self.name == 'uint32'             # <<<<<<<<<<<<<<
@@ -8043,7 +8036,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_24is_uint32(CYTHON_UNUSED Py
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":202
+  /* "python/xop/megakernel/_cython/core.pyx":202
  *         return self.name == 'uint16'
  * 
  *     def is_uint32(self):             # <<<<<<<<<<<<<<
@@ -8063,7 +8056,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_24is_uint32(CYTHON_UNUSED Py
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":205
+/* "python/xop/megakernel/_cython/core.pyx":205
  *         return self.name == 'uint32'
  * 
  *     def is_uint64(self):             # <<<<<<<<<<<<<<
@@ -8177,7 +8170,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_26is_uint64(CYTHON_UNUSED Py
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_uint64", 1);
 
-  /* "megakernel/_cython/core.pyx":206
+  /* "python/xop/megakernel/_cython/core.pyx":206
  * 
  *     def is_uint64(self):
  *         return self.name == 'uint64'             # <<<<<<<<<<<<<<
@@ -8193,7 +8186,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_26is_uint64(CYTHON_UNUSED Py
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":205
+  /* "python/xop/megakernel/_cython/core.pyx":205
  *         return self.name == 'uint32'
  * 
  *     def is_uint64(self):             # <<<<<<<<<<<<<<
@@ -8213,7 +8206,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_26is_uint64(CYTHON_UNUSED Py
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":208
+/* "python/xop/megakernel/_cython/core.pyx":208
  *         return self.name == 'uint64'
  * 
  *     def __eq__(self, other: dtype):             # <<<<<<<<<<<<<<
@@ -8345,7 +8338,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_28__eq__(CYTHON_UNUSED PyObj
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__eq__", 1);
 
-  /* "megakernel/_cython/core.pyx":209
+  /* "python/xop/megakernel/_cython/core.pyx":209
  * 
  *     def __eq__(self, other: dtype):
  *         if not isinstance(other, dtype):             # <<<<<<<<<<<<<<
@@ -8359,7 +8352,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_28__eq__(CYTHON_UNUSED PyObj
   __pyx_t_3 = (!__pyx_t_2);
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":210
+    /* "python/xop/megakernel/_cython/core.pyx":210
  *     def __eq__(self, other: dtype):
  *         if not isinstance(other, dtype):
  *             return False             # <<<<<<<<<<<<<<
@@ -8371,7 +8364,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_28__eq__(CYTHON_UNUSED PyObj
     __pyx_r = Py_False;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":209
+    /* "python/xop/megakernel/_cython/core.pyx":209
  * 
  *     def __eq__(self, other: dtype):
  *         if not isinstance(other, dtype):             # <<<<<<<<<<<<<<
@@ -8380,7 +8373,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_28__eq__(CYTHON_UNUSED PyObj
  */
   }
 
-  /* "megakernel/_cython/core.pyx":211
+  /* "python/xop/megakernel/_cython/core.pyx":211
  *         if not isinstance(other, dtype):
  *             return False
  *         return self.name == other.name             # <<<<<<<<<<<<<<
@@ -8399,7 +8392,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_28__eq__(CYTHON_UNUSED PyObj
   __pyx_t_5 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":208
+  /* "python/xop/megakernel/_cython/core.pyx":208
  *         return self.name == 'uint64'
  * 
  *     def __eq__(self, other: dtype):             # <<<<<<<<<<<<<<
@@ -8420,7 +8413,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_28__eq__(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":213
+/* "python/xop/megakernel/_cython/core.pyx":213
  *         return self.name == other.name
  * 
  *     def __ne__(self, other: dtype):             # <<<<<<<<<<<<<<
@@ -8552,7 +8545,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_30__ne__(CYTHON_UNUSED PyObj
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__ne__", 1);
 
-  /* "megakernel/_cython/core.pyx":214
+  /* "python/xop/megakernel/_cython/core.pyx":214
  * 
  *     def __ne__(self, other: dtype):
  *         return not self.__eq__(other)             # <<<<<<<<<<<<<<
@@ -8592,7 +8585,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_30__ne__(CYTHON_UNUSED PyObj
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":213
+  /* "python/xop/megakernel/_cython/core.pyx":213
  *         return self.name == other.name
  * 
  *     def __ne__(self, other: dtype):             # <<<<<<<<<<<<<<
@@ -8613,7 +8606,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_30__ne__(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":216
+/* "python/xop/megakernel/_cython/core.pyx":216
  *         return not self.__eq__(other)
  * 
  *     def __hash__(self):             # <<<<<<<<<<<<<<
@@ -8728,7 +8721,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_32__hash__(CYTHON_UNUSED PyO
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__hash__", 1);
 
-  /* "megakernel/_cython/core.pyx":217
+  /* "python/xop/megakernel/_cython/core.pyx":217
  * 
  *     def __hash__(self):
  *         return hash((self.name, ))             # <<<<<<<<<<<<<<
@@ -8751,7 +8744,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_32__hash__(CYTHON_UNUSED PyO
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":216
+  /* "python/xop/megakernel/_cython/core.pyx":216
  *         return not self.__eq__(other)
  * 
  *     def __hash__(self):             # <<<<<<<<<<<<<<
@@ -8771,7 +8764,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_32__hash__(CYTHON_UNUSED PyO
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":219
+/* "python/xop/megakernel/_cython/core.pyx":219
  *         return hash((self.name, ))
  * 
  *     def __str__(self):             # <<<<<<<<<<<<<<
@@ -8884,7 +8877,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_34__str__(CYTHON_UNUSED PyOb
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__str__", 1);
 
-  /* "megakernel/_cython/core.pyx":220
+  /* "python/xop/megakernel/_cython/core.pyx":220
  * 
  *     def __str__(self):
  *         return self.name             # <<<<<<<<<<<<<<
@@ -8898,7 +8891,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_34__str__(CYTHON_UNUSED PyOb
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":219
+  /* "python/xop/megakernel/_cython/core.pyx":219
  *         return hash((self.name, ))
  * 
  *     def __str__(self):             # <<<<<<<<<<<<<<
@@ -8917,7 +8910,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_34__str__(CYTHON_UNUSED PyOb
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":222
+/* "python/xop/megakernel/_cython/core.pyx":222
  *         return self.name
  * 
  *     def is_dtype(type_str):             # <<<<<<<<<<<<<<
@@ -9033,7 +9026,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_36is_dtype(CYTHON_UNUSED PyO
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("is_dtype", 1);
 
-  /* "megakernel/_cython/core.pyx":223
+  /* "python/xop/megakernel/_cython/core.pyx":223
  * 
  *     def is_dtype(type_str):
  *         return type_str in dtype.SINT_TYPES + dtype.UINT_TYPES + dtype.FP_TYPES             # <<<<<<<<<<<<<<
@@ -9072,7 +9065,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_36is_dtype(CYTHON_UNUSED PyO
   __pyx_t_3 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":222
+  /* "python/xop/megakernel/_cython/core.pyx":222
  *         return self.name
  * 
  *     def is_dtype(type_str):             # <<<<<<<<<<<<<<
@@ -9093,7 +9086,7 @@ static PyObject *__pyx_pf_10megakernel_4core_5dtype_36is_dtype(CYTHON_UNUSED PyO
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":240
+/* "python/xop/megakernel/_cython/core.pyx":240
  * 
  * 
  * def convert_dtype_to_ctype(type : dtype):             # <<<<<<<<<<<<<<
@@ -9210,7 +9203,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("convert_dtype_to_ctype", 1);
 
-  /* "megakernel/_cython/core.pyx":241
+  /* "python/xop/megakernel/_cython/core.pyx":241
  * 
  * def convert_dtype_to_ctype(type : dtype):
  *     if type.is_int8():             # <<<<<<<<<<<<<<
@@ -9245,7 +9238,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_5) {
 
-    /* "megakernel/_cython/core.pyx":242
+    /* "python/xop/megakernel/_cython/core.pyx":242
  * def convert_dtype_to_ctype(type : dtype):
  *     if type.is_int8():
  *         return DT_INT8             # <<<<<<<<<<<<<<
@@ -9259,7 +9252,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":241
+    /* "python/xop/megakernel/_cython/core.pyx":241
  * 
  * def convert_dtype_to_ctype(type : dtype):
  *     if type.is_int8():             # <<<<<<<<<<<<<<
@@ -9268,7 +9261,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
  */
   }
 
-  /* "megakernel/_cython/core.pyx":243
+  /* "python/xop/megakernel/_cython/core.pyx":243
  *     if type.is_int8():
  *         return DT_INT8
  *     elif type.is_uint8():             # <<<<<<<<<<<<<<
@@ -9303,7 +9296,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_5) {
 
-    /* "megakernel/_cython/core.pyx":244
+    /* "python/xop/megakernel/_cython/core.pyx":244
  *         return DT_INT8
  *     elif type.is_uint8():
  *         return DT_UINT8             # <<<<<<<<<<<<<<
@@ -9317,7 +9310,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":243
+    /* "python/xop/megakernel/_cython/core.pyx":243
  *     if type.is_int8():
  *         return DT_INT8
  *     elif type.is_uint8():             # <<<<<<<<<<<<<<
@@ -9326,7 +9319,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
  */
   }
 
-  /* "megakernel/_cython/core.pyx":245
+  /* "python/xop/megakernel/_cython/core.pyx":245
  *     elif type.is_uint8():
  *         return DT_UINT8
  *     elif type.is_uint16():             # <<<<<<<<<<<<<<
@@ -9361,7 +9354,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_5) {
 
-    /* "megakernel/_cython/core.pyx":246
+    /* "python/xop/megakernel/_cython/core.pyx":246
  *         return DT_UINT8
  *     elif type.is_uint16():
  *         return DT_UINT16             # <<<<<<<<<<<<<<
@@ -9375,7 +9368,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":245
+    /* "python/xop/megakernel/_cython/core.pyx":245
  *     elif type.is_uint8():
  *         return DT_UINT8
  *     elif type.is_uint16():             # <<<<<<<<<<<<<<
@@ -9384,7 +9377,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
  */
   }
 
-  /* "megakernel/_cython/core.pyx":247
+  /* "python/xop/megakernel/_cython/core.pyx":247
  *     elif type.is_uint16():
  *         return DT_UINT16
  *     elif type.is_fp16():             # <<<<<<<<<<<<<<
@@ -9419,7 +9412,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_5) {
 
-    /* "megakernel/_cython/core.pyx":248
+    /* "python/xop/megakernel/_cython/core.pyx":248
  *         return DT_UINT16
  *     elif type.is_fp16():
  *         return DT_FLOAT16             # <<<<<<<<<<<<<<
@@ -9433,7 +9426,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":247
+    /* "python/xop/megakernel/_cython/core.pyx":247
  *     elif type.is_uint16():
  *         return DT_UINT16
  *     elif type.is_fp16():             # <<<<<<<<<<<<<<
@@ -9442,7 +9435,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
  */
   }
 
-  /* "megakernel/_cython/core.pyx":249
+  /* "python/xop/megakernel/_cython/core.pyx":249
  *     elif type.is_fp16():
  *         return DT_FLOAT16
  *     elif type.is_bf16():             # <<<<<<<<<<<<<<
@@ -9477,7 +9470,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_5) {
 
-    /* "megakernel/_cython/core.pyx":250
+    /* "python/xop/megakernel/_cython/core.pyx":250
  *         return DT_FLOAT16
  *     elif type.is_bf16():
  *         return DT_BFLOAT16             # <<<<<<<<<<<<<<
@@ -9491,7 +9484,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":249
+    /* "python/xop/megakernel/_cython/core.pyx":249
  *     elif type.is_fp16():
  *         return DT_FLOAT16
  *     elif type.is_bf16():             # <<<<<<<<<<<<<<
@@ -9500,7 +9493,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
  */
   }
 
-  /* "megakernel/_cython/core.pyx":251
+  /* "python/xop/megakernel/_cython/core.pyx":251
  *     elif type.is_bf16():
  *         return DT_BFLOAT16
  *     elif type.is_fp32():             # <<<<<<<<<<<<<<
@@ -9535,7 +9528,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_5) {
 
-    /* "megakernel/_cython/core.pyx":252
+    /* "python/xop/megakernel/_cython/core.pyx":252
  *         return DT_BFLOAT16
  *     elif type.is_fp32():
  *         return DT_FLOAT32             # <<<<<<<<<<<<<<
@@ -9549,7 +9542,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":251
+    /* "python/xop/megakernel/_cython/core.pyx":251
  *     elif type.is_bf16():
  *         return DT_BFLOAT16
  *     elif type.is_fp32():             # <<<<<<<<<<<<<<
@@ -9558,7 +9551,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
  */
   }
 
-  /* "megakernel/_cython/core.pyx":253
+  /* "python/xop/megakernel/_cython/core.pyx":253
  *     elif type.is_fp32():
  *         return DT_FLOAT32
  *     elif type.is_int32():             # <<<<<<<<<<<<<<
@@ -9593,7 +9586,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_5) {
 
-    /* "megakernel/_cython/core.pyx":254
+    /* "python/xop/megakernel/_cython/core.pyx":254
  *         return DT_FLOAT32
  *     elif type.is_int32():
  *         return DT_INT32             # <<<<<<<<<<<<<<
@@ -9607,7 +9600,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":253
+    /* "python/xop/megakernel/_cython/core.pyx":253
  *     elif type.is_fp32():
  *         return DT_FLOAT32
  *     elif type.is_int32():             # <<<<<<<<<<<<<<
@@ -9616,7 +9609,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
  */
   }
 
-  /* "megakernel/_cython/core.pyx":255
+  /* "python/xop/megakernel/_cython/core.pyx":255
  *     elif type.is_int32():
  *         return DT_INT32
  *     elif type.is_int64():             # <<<<<<<<<<<<<<
@@ -9651,7 +9644,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_5) {
 
-    /* "megakernel/_cython/core.pyx":256
+    /* "python/xop/megakernel/_cython/core.pyx":256
  *         return DT_INT32
  *     elif type.is_int64():
  *         return DT_INT64             # <<<<<<<<<<<<<<
@@ -9665,7 +9658,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":255
+    /* "python/xop/megakernel/_cython/core.pyx":255
  *     elif type.is_int32():
  *         return DT_INT32
  *     elif type.is_int64():             # <<<<<<<<<<<<<<
@@ -9674,7 +9667,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
  */
   }
 
-  /* "megakernel/_cython/core.pyx":257
+  /* "python/xop/megakernel/_cython/core.pyx":257
  *     elif type.is_int64():
  *         return DT_INT64
  *     elif type.is_fp64():             # <<<<<<<<<<<<<<
@@ -9709,7 +9702,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (likely(__pyx_t_5)) {
 
-    /* "megakernel/_cython/core.pyx":258
+    /* "python/xop/megakernel/_cython/core.pyx":258
  *         return DT_INT64
  *     elif type.is_fp64():
  *         return DT_DOUBLE             # <<<<<<<<<<<<<<
@@ -9723,7 +9716,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":257
+    /* "python/xop/megakernel/_cython/core.pyx":257
  *     elif type.is_int64():
  *         return DT_INT64
  *     elif type.is_fp64():             # <<<<<<<<<<<<<<
@@ -9732,7 +9725,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
  */
   }
 
-  /* "megakernel/_cython/core.pyx":260
+  /* "python/xop/megakernel/_cython/core.pyx":260
  *         return DT_DOUBLE
  *     else:
  *         raise RuntimeError(f"Unsupported dtype: {dtype}")             # <<<<<<<<<<<<<<
@@ -9756,7 +9749,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
     __PYX_ERR(1, 260, __pyx_L1_error)
   }
 
-  /* "megakernel/_cython/core.pyx":240
+  /* "python/xop/megakernel/_cython/core.pyx":240
  * 
  * 
  * def convert_dtype_to_ctype(type : dtype):             # <<<<<<<<<<<<<<
@@ -9777,7 +9770,7 @@ static PyObject *__pyx_pf_10megakernel_4core_convert_dtype_to_ctype(CYTHON_UNUSE
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":262
+/* "python/xop/megakernel/_cython/core.pyx":262
  *         raise RuntimeError(f"Unsupported dtype: {dtype}")
  * 
  * def convert_ctype_to_dtype(type):             # <<<<<<<<<<<<<<
@@ -9892,7 +9885,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("convert_ctype_to_dtype", 1);
 
-  /* "megakernel/_cython/core.pyx":263
+  /* "python/xop/megakernel/_cython/core.pyx":263
  * 
  * def convert_ctype_to_dtype(type):
  *     if type == DT_INT8:             # <<<<<<<<<<<<<<
@@ -9907,7 +9900,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":264
+    /* "python/xop/megakernel/_cython/core.pyx":264
  * def convert_ctype_to_dtype(type):
  *     if type == DT_INT8:
  *         return int8             # <<<<<<<<<<<<<<
@@ -9921,7 +9914,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":263
+    /* "python/xop/megakernel/_cython/core.pyx":263
  * 
  * def convert_ctype_to_dtype(type):
  *     if type == DT_INT8:             # <<<<<<<<<<<<<<
@@ -9930,7 +9923,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
  */
   }
 
-  /* "megakernel/_cython/core.pyx":265
+  /* "python/xop/megakernel/_cython/core.pyx":265
  *     if type == DT_INT8:
  *         return int8
  *     elif type == DT_UINT16:             # <<<<<<<<<<<<<<
@@ -9945,7 +9938,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":266
+    /* "python/xop/megakernel/_cython/core.pyx":266
  *         return int8
  *     elif type == DT_UINT16:
  *         return uint16             # <<<<<<<<<<<<<<
@@ -9959,7 +9952,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":265
+    /* "python/xop/megakernel/_cython/core.pyx":265
  *     if type == DT_INT8:
  *         return int8
  *     elif type == DT_UINT16:             # <<<<<<<<<<<<<<
@@ -9968,7 +9961,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
  */
   }
 
-  /* "megakernel/_cython/core.pyx":267
+  /* "python/xop/megakernel/_cython/core.pyx":267
  *     elif type == DT_UINT16:
  *         return uint16
  *     elif type == DT_FLOAT16:             # <<<<<<<<<<<<<<
@@ -9983,7 +9976,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":268
+    /* "python/xop/megakernel/_cython/core.pyx":268
  *         return uint16
  *     elif type == DT_FLOAT16:
  *         return float16             # <<<<<<<<<<<<<<
@@ -9997,7 +9990,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":267
+    /* "python/xop/megakernel/_cython/core.pyx":267
  *     elif type == DT_UINT16:
  *         return uint16
  *     elif type == DT_FLOAT16:             # <<<<<<<<<<<<<<
@@ -10006,7 +9999,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
  */
   }
 
-  /* "megakernel/_cython/core.pyx":269
+  /* "python/xop/megakernel/_cython/core.pyx":269
  *     elif type == DT_FLOAT16:
  *         return float16
  *     elif type == DT_BFLOAT16:             # <<<<<<<<<<<<<<
@@ -10021,7 +10014,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":270
+    /* "python/xop/megakernel/_cython/core.pyx":270
  *         return float16
  *     elif type == DT_BFLOAT16:
  *         return bfloat16             # <<<<<<<<<<<<<<
@@ -10035,7 +10028,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":269
+    /* "python/xop/megakernel/_cython/core.pyx":269
  *     elif type == DT_FLOAT16:
  *         return float16
  *     elif type == DT_BFLOAT16:             # <<<<<<<<<<<<<<
@@ -10044,7 +10037,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
  */
   }
 
-  /* "megakernel/_cython/core.pyx":271
+  /* "python/xop/megakernel/_cython/core.pyx":271
  *     elif type == DT_BFLOAT16:
  *         return bfloat16
  *     elif type == DT_INT32:             # <<<<<<<<<<<<<<
@@ -10059,7 +10052,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":272
+    /* "python/xop/megakernel/_cython/core.pyx":272
  *         return bfloat16
  *     elif type == DT_INT32:
  *         return int32             # <<<<<<<<<<<<<<
@@ -10073,7 +10066,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":271
+    /* "python/xop/megakernel/_cython/core.pyx":271
  *     elif type == DT_BFLOAT16:
  *         return bfloat16
  *     elif type == DT_INT32:             # <<<<<<<<<<<<<<
@@ -10082,7 +10075,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
  */
   }
 
-  /* "megakernel/_cython/core.pyx":273
+  /* "python/xop/megakernel/_cython/core.pyx":273
  *     elif type == DT_INT32:
  *         return int32
  *     elif type == DT_FLOAT32:             # <<<<<<<<<<<<<<
@@ -10097,7 +10090,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":274
+    /* "python/xop/megakernel/_cython/core.pyx":274
  *         return int32
  *     elif type == DT_FLOAT32:
  *         return float32             # <<<<<<<<<<<<<<
@@ -10111,7 +10104,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":273
+    /* "python/xop/megakernel/_cython/core.pyx":273
  *     elif type == DT_INT32:
  *         return int32
  *     elif type == DT_FLOAT32:             # <<<<<<<<<<<<<<
@@ -10120,7 +10113,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
  */
   }
 
-  /* "megakernel/_cython/core.pyx":275
+  /* "python/xop/megakernel/_cython/core.pyx":275
  *     elif type == DT_FLOAT32:
  *         return float32
  *     elif type == DT_DOUBLE:             # <<<<<<<<<<<<<<
@@ -10135,7 +10128,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":276
+    /* "python/xop/megakernel/_cython/core.pyx":276
  *         return float32
  *     elif type == DT_DOUBLE:
  *         return float64             # <<<<<<<<<<<<<<
@@ -10149,7 +10142,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":275
+    /* "python/xop/megakernel/_cython/core.pyx":275
  *     elif type == DT_FLOAT32:
  *         return float32
  *     elif type == DT_DOUBLE:             # <<<<<<<<<<<<<<
@@ -10158,7 +10151,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
  */
   }
 
-  /* "megakernel/_cython/core.pyx":278
+  /* "python/xop/megakernel/_cython/core.pyx":278
  *         return float64
  *     else:
  *         return None             # <<<<<<<<<<<<<<
@@ -10171,7 +10164,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
     goto __pyx_L0;
   }
 
-  /* "megakernel/_cython/core.pyx":262
+  /* "python/xop/megakernel/_cython/core.pyx":262
  *         raise RuntimeError(f"Unsupported dtype: {dtype}")
  * 
  * def convert_ctype_to_dtype(type):             # <<<<<<<<<<<<<<
@@ -10191,7 +10184,7 @@ static PyObject *__pyx_pf_10megakernel_4core_2convert_ctype_to_dtype(CYTHON_UNUS
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":280
+/* "python/xop/megakernel/_cython/core.pyx":280
  *         return None
  * 
  * def convert_torch_type_to_dtype(type):             # <<<<<<<<<<<<<<
@@ -10306,7 +10299,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("convert_torch_type_to_dtype", 1);
 
-  /* "megakernel/_cython/core.pyx":281
+  /* "python/xop/megakernel/_cython/core.pyx":281
  * 
  * def convert_torch_type_to_dtype(type):
  *     if type is torch.int8:             # <<<<<<<<<<<<<<
@@ -10322,7 +10315,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":282
+    /* "python/xop/megakernel/_cython/core.pyx":282
  * def convert_torch_type_to_dtype(type):
  *     if type is torch.int8:
  *         return int8             # <<<<<<<<<<<<<<
@@ -10336,7 +10329,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":281
+    /* "python/xop/megakernel/_cython/core.pyx":281
  * 
  * def convert_torch_type_to_dtype(type):
  *     if type is torch.int8:             # <<<<<<<<<<<<<<
@@ -10345,7 +10338,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
  */
   }
 
-  /* "megakernel/_cython/core.pyx":283
+  /* "python/xop/megakernel/_cython/core.pyx":283
  *     if type is torch.int8:
  *         return int8
  *     elif type is torch.uint8:             # <<<<<<<<<<<<<<
@@ -10361,7 +10354,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":284
+    /* "python/xop/megakernel/_cython/core.pyx":284
  *         return int8
  *     elif type is torch.uint8:
  *         return uint8             # <<<<<<<<<<<<<<
@@ -10375,7 +10368,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":283
+    /* "python/xop/megakernel/_cython/core.pyx":283
  *     if type is torch.int8:
  *         return int8
  *     elif type is torch.uint8:             # <<<<<<<<<<<<<<
@@ -10384,7 +10377,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
  */
   }
 
-  /* "megakernel/_cython/core.pyx":285
+  /* "python/xop/megakernel/_cython/core.pyx":285
  *     elif type is torch.uint8:
  *         return uint8
  *     elif type is torch.uint16:             # <<<<<<<<<<<<<<
@@ -10400,7 +10393,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":286
+    /* "python/xop/megakernel/_cython/core.pyx":286
  *         return uint8
  *     elif type is torch.uint16:
  *         return uint16             # <<<<<<<<<<<<<<
@@ -10414,7 +10407,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":285
+    /* "python/xop/megakernel/_cython/core.pyx":285
  *     elif type is torch.uint8:
  *         return uint8
  *     elif type is torch.uint16:             # <<<<<<<<<<<<<<
@@ -10423,7 +10416,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
  */
   }
 
-  /* "megakernel/_cython/core.pyx":287
+  /* "python/xop/megakernel/_cython/core.pyx":287
  *     elif type is torch.uint16:
  *         return uint16
  *     elif type is torch.int32:             # <<<<<<<<<<<<<<
@@ -10439,7 +10432,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":288
+    /* "python/xop/megakernel/_cython/core.pyx":288
  *         return uint16
  *     elif type is torch.int32:
  *         return int32             # <<<<<<<<<<<<<<
@@ -10453,7 +10446,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":287
+    /* "python/xop/megakernel/_cython/core.pyx":287
  *     elif type is torch.uint16:
  *         return uint16
  *     elif type is torch.int32:             # <<<<<<<<<<<<<<
@@ -10462,7 +10455,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
  */
   }
 
-  /* "megakernel/_cython/core.pyx":289
+  /* "python/xop/megakernel/_cython/core.pyx":289
  *     elif type is torch.int32:
  *         return int32
  *     elif type is torch.float16:             # <<<<<<<<<<<<<<
@@ -10478,7 +10471,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":290
+    /* "python/xop/megakernel/_cython/core.pyx":290
  *         return int32
  *     elif type is torch.float16:
  *         return float16             # <<<<<<<<<<<<<<
@@ -10492,7 +10485,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":289
+    /* "python/xop/megakernel/_cython/core.pyx":289
  *     elif type is torch.int32:
  *         return int32
  *     elif type is torch.float16:             # <<<<<<<<<<<<<<
@@ -10501,7 +10494,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
  */
   }
 
-  /* "megakernel/_cython/core.pyx":291
+  /* "python/xop/megakernel/_cython/core.pyx":291
  *     elif type is torch.float16:
  *         return float16
  *     elif type is torch.bfloat16:             # <<<<<<<<<<<<<<
@@ -10517,7 +10510,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":292
+    /* "python/xop/megakernel/_cython/core.pyx":292
  *         return float16
  *     elif type is torch.bfloat16:
  *         return bfloat16             # <<<<<<<<<<<<<<
@@ -10531,7 +10524,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":291
+    /* "python/xop/megakernel/_cython/core.pyx":291
  *     elif type is torch.float16:
  *         return float16
  *     elif type is torch.bfloat16:             # <<<<<<<<<<<<<<
@@ -10540,7 +10533,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
  */
   }
 
-  /* "megakernel/_cython/core.pyx":293
+  /* "python/xop/megakernel/_cython/core.pyx":293
  *     elif type is torch.bfloat16:
  *         return bfloat16
  *     elif type is torch.float32:             # <<<<<<<<<<<<<<
@@ -10556,7 +10549,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":294
+    /* "python/xop/megakernel/_cython/core.pyx":294
  *         return bfloat16
  *     elif type is torch.float32:
  *         return float32             # <<<<<<<<<<<<<<
@@ -10570,7 +10563,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":293
+    /* "python/xop/megakernel/_cython/core.pyx":293
  *     elif type is torch.bfloat16:
  *         return bfloat16
  *     elif type is torch.float32:             # <<<<<<<<<<<<<<
@@ -10579,7 +10572,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
  */
   }
 
-  /* "megakernel/_cython/core.pyx":295
+  /* "python/xop/megakernel/_cython/core.pyx":295
  *     elif type is torch.float32:
  *         return float32
  *     elif type is torch.int64:             # <<<<<<<<<<<<<<
@@ -10595,7 +10588,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   if (__pyx_t_3) {
 
-    /* "megakernel/_cython/core.pyx":296
+    /* "python/xop/megakernel/_cython/core.pyx":296
  *         return float32
  *     elif type is torch.int64:
  *         return int64             # <<<<<<<<<<<<<<
@@ -10609,7 +10602,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __pyx_t_1 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":295
+    /* "python/xop/megakernel/_cython/core.pyx":295
  *     elif type is torch.float32:
  *         return float32
  *     elif type is torch.int64:             # <<<<<<<<<<<<<<
@@ -10618,7 +10611,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
  */
   }
 
-  /* "megakernel/_cython/core.pyx":297
+  /* "python/xop/megakernel/_cython/core.pyx":297
  *     elif type is torch.int64:
  *         return int64
  *     elif type is torch.float64:             # <<<<<<<<<<<<<<
@@ -10634,7 +10627,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   if (likely(__pyx_t_3)) {
 
-    /* "megakernel/_cython/core.pyx":298
+    /* "python/xop/megakernel/_cython/core.pyx":298
  *         return int64
  *     elif type is torch.float64:
  *         return float64             # <<<<<<<<<<<<<<
@@ -10648,7 +10641,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":297
+    /* "python/xop/megakernel/_cython/core.pyx":297
  *     elif type is torch.int64:
  *         return int64
  *     elif type is torch.float64:             # <<<<<<<<<<<<<<
@@ -10657,7 +10650,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
  */
   }
 
-  /* "megakernel/_cython/core.pyx":300
+  /* "python/xop/megakernel/_cython/core.pyx":300
  *         return float64
  *     else:
  *         raise RuntimeError(f"Unsupported dtype: {type}")             # <<<<<<<<<<<<<<
@@ -10678,7 +10671,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
     __PYX_ERR(1, 300, __pyx_L1_error)
   }
 
-  /* "megakernel/_cython/core.pyx":280
+  /* "python/xop/megakernel/_cython/core.pyx":280
  *         return None
  * 
  * def convert_torch_type_to_dtype(type):             # <<<<<<<<<<<<<<
@@ -10698,7 +10691,7 @@ static PyObject *__pyx_pf_10megakernel_4core_4convert_torch_type_to_dtype(CYTHON
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":308
+/* "python/xop/megakernel/_cython/core.pyx":308
  *     cdef CppDTensor* c_ptr # Hold a Tensor instance
  * 
  *     cdef inline _set_tensor(self, tensor):             # <<<<<<<<<<<<<<
@@ -10722,7 +10715,7 @@ static CYTHON_INLINE PyObject *__pyx_f_10megakernel_4core_7DTensor__set_tensor(s
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("_set_tensor", 1);
 
-  /* "megakernel/_cython/core.pyx":310
+  /* "python/xop/megakernel/_cython/core.pyx":310
  *     cdef inline _set_tensor(self, tensor):
  *         cdef unsigned long long ptr
  *         if tensor is None:             # <<<<<<<<<<<<<<
@@ -10732,7 +10725,7 @@ static CYTHON_INLINE PyObject *__pyx_f_10megakernel_4core_7DTensor__set_tensor(s
   __pyx_t_1 = (__pyx_v_tensor == Py_None);
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":311
+    /* "python/xop/megakernel/_cython/core.pyx":311
  *         cdef unsigned long long ptr
  *         if tensor is None:
  *             self.c_ptr = <CppDTensor*>(NULL)             # <<<<<<<<<<<<<<
@@ -10741,7 +10734,7 @@ static CYTHON_INLINE PyObject *__pyx_f_10megakernel_4core_7DTensor__set_tensor(s
  */
     __pyx_v_self->c_ptr = ((struct megakernel::kernel::DTensor *)NULL);
 
-    /* "megakernel/_cython/core.pyx":310
+    /* "python/xop/megakernel/_cython/core.pyx":310
  *     cdef inline _set_tensor(self, tensor):
  *         cdef unsigned long long ptr
  *         if tensor is None:             # <<<<<<<<<<<<<<
@@ -10751,7 +10744,7 @@ static CYTHON_INLINE PyObject *__pyx_f_10megakernel_4core_7DTensor__set_tensor(s
     goto __pyx_L3;
   }
 
-  /* "megakernel/_cython/core.pyx":313
+  /* "python/xop/megakernel/_cython/core.pyx":313
  *             self.c_ptr = <CppDTensor*>(NULL)
  *         else:
  *             ptr = ctypes.cast(tensor, ctypes.c_void_p).value             # <<<<<<<<<<<<<<
@@ -10799,7 +10792,7 @@ static CYTHON_INLINE PyObject *__pyx_f_10megakernel_4core_7DTensor__set_tensor(s
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_ptr = __pyx_t_7;
 
-    /* "megakernel/_cython/core.pyx":314
+    /* "python/xop/megakernel/_cython/core.pyx":314
  *         else:
  *             ptr = ctypes.cast(tensor, ctypes.c_void_p).value
  *             self.c_ptr = <CppDTensor*>(ptr)             # <<<<<<<<<<<<<<
@@ -10810,7 +10803,7 @@ static CYTHON_INLINE PyObject *__pyx_f_10megakernel_4core_7DTensor__set_tensor(s
   }
   __pyx_L3:;
 
-  /* "megakernel/_cython/core.pyx":308
+  /* "python/xop/megakernel/_cython/core.pyx":308
  *     cdef CppDTensor* c_ptr # Hold a Tensor instance
  * 
  *     cdef inline _set_tensor(self, tensor):             # <<<<<<<<<<<<<<
@@ -10834,7 +10827,7 @@ static CYTHON_INLINE PyObject *__pyx_f_10megakernel_4core_7DTensor__set_tensor(s
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":317
+/* "python/xop/megakernel/_cython/core.pyx":317
  * 
  *     property guid:
  *         def __get__(self):             # <<<<<<<<<<<<<<
@@ -10867,7 +10860,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_4guid___get__(struct __pyx
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__get__", 1);
 
-  /* "megakernel/_cython/core.pyx":318
+  /* "python/xop/megakernel/_cython/core.pyx":318
  *     property guid:
  *         def __get__(self):
  *             if self.c_ptr == NULL:             # <<<<<<<<<<<<<<
@@ -10877,7 +10870,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_4guid___get__(struct __pyx
   __pyx_t_1 = (__pyx_v_self->c_ptr == NULL);
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":319
+    /* "python/xop/megakernel/_cython/core.pyx":319
  *         def __get__(self):
  *             if self.c_ptr == NULL:
  *                 return None             # <<<<<<<<<<<<<<
@@ -10888,7 +10881,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_4guid___get__(struct __pyx
     __pyx_r = Py_None; __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":318
+    /* "python/xop/megakernel/_cython/core.pyx":318
  *     property guid:
  *         def __get__(self):
  *             if self.c_ptr == NULL:             # <<<<<<<<<<<<<<
@@ -10897,7 +10890,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_4guid___get__(struct __pyx
  */
   }
 
-  /* "megakernel/_cython/core.pyx":321
+  /* "python/xop/megakernel/_cython/core.pyx":321
  *                 return None
  *             else:
  *                 return self.c_ptr.guid             # <<<<<<<<<<<<<<
@@ -10913,7 +10906,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_4guid___get__(struct __pyx
     goto __pyx_L0;
   }
 
-  /* "megakernel/_cython/core.pyx":317
+  /* "python/xop/megakernel/_cython/core.pyx":317
  * 
  *     property guid:
  *         def __get__(self):             # <<<<<<<<<<<<<<
@@ -10932,7 +10925,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_4guid___get__(struct __pyx
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":324
+/* "python/xop/megakernel/_cython/core.pyx":324
  * 
  *     property tensor:
  *         def __get__(self):             # <<<<<<<<<<<<<<
@@ -10970,7 +10963,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_6tensor___get__(struct __p
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__get__", 1);
 
-  /* "megakernel/_cython/core.pyx":325
+  /* "python/xop/megakernel/_cython/core.pyx":325
  *     property tensor:
  *         def __get__(self):
  *             if self.c_ptr == NULL:             # <<<<<<<<<<<<<<
@@ -10980,7 +10973,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_6tensor___get__(struct __p
   __pyx_t_1 = (__pyx_v_self->c_ptr == NULL);
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":326
+    /* "python/xop/megakernel/_cython/core.pyx":326
  *         def __get__(self):
  *             if self.c_ptr == NULL:
  *                 return None             # <<<<<<<<<<<<<<
@@ -10991,7 +10984,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_6tensor___get__(struct __p
     __pyx_r = Py_None; __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":325
+    /* "python/xop/megakernel/_cython/core.pyx":325
  *     property tensor:
  *         def __get__(self):
  *             if self.c_ptr == NULL:             # <<<<<<<<<<<<<<
@@ -11000,7 +10993,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_6tensor___get__(struct __p
  */
   }
 
-  /* "megakernel/_cython/core.pyx":328
+  /* "python/xop/megakernel/_cython/core.pyx":328
  *                 return None
  *             else:
  *                 return ctypes.cast(<unsigned long long>self.c_ptr, ctypes.c_void_p)             # <<<<<<<<<<<<<<
@@ -11050,7 +11043,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_6tensor___get__(struct __p
     goto __pyx_L0;
   }
 
-  /* "megakernel/_cython/core.pyx":324
+  /* "python/xop/megakernel/_cython/core.pyx":324
  * 
  *     property tensor:
  *         def __get__(self):             # <<<<<<<<<<<<<<
@@ -11073,7 +11066,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_6tensor___get__(struct __p
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":330
+/* "python/xop/megakernel/_cython/core.pyx":330
  *                 return ctypes.cast(<unsigned long long>self.c_ptr, ctypes.c_void_p)
  * 
  *         def __set__(self, value):             # <<<<<<<<<<<<<<
@@ -11105,7 +11098,7 @@ static int __pyx_pf_10megakernel_4core_7DTensor_6tensor_2__set__(struct __pyx_ob
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__set__", 1);
 
-  /* "megakernel/_cython/core.pyx":331
+  /* "python/xop/megakernel/_cython/core.pyx":331
  * 
  *         def __set__(self, value):
  *             self._set_tensor(value)             # <<<<<<<<<<<<<<
@@ -11116,7 +11109,7 @@ static int __pyx_pf_10megakernel_4core_7DTensor_6tensor_2__set__(struct __pyx_ob
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "megakernel/_cython/core.pyx":330
+  /* "python/xop/megakernel/_cython/core.pyx":330
  *                 return ctypes.cast(<unsigned long long>self.c_ptr, ctypes.c_void_p)
  * 
  *         def __set__(self, value):             # <<<<<<<<<<<<<<
@@ -11136,7 +11129,7 @@ static int __pyx_pf_10megakernel_4core_7DTensor_6tensor_2__set__(struct __pyx_ob
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":334
+/* "python/xop/megakernel/_cython/core.pyx":334
  * 
  *     property num_dims:
  *         def __get__(self):             # <<<<<<<<<<<<<<
@@ -11169,7 +11162,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_8num_dims___get__(struct _
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__get__", 1);
 
-  /* "megakernel/_cython/core.pyx":335
+  /* "python/xop/megakernel/_cython/core.pyx":335
  *     property num_dims:
  *         def __get__(self):
  *             if self.c_ptr == NULL:             # <<<<<<<<<<<<<<
@@ -11179,7 +11172,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_8num_dims___get__(struct _
   __pyx_t_1 = (__pyx_v_self->c_ptr == NULL);
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":336
+    /* "python/xop/megakernel/_cython/core.pyx":336
  *         def __get__(self):
  *             if self.c_ptr == NULL:
  *                 print("Error: tensor is None in num_dims property")             # <<<<<<<<<<<<<<
@@ -11190,7 +11183,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_8num_dims___get__(struct _
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-    /* "megakernel/_cython/core.pyx":337
+    /* "python/xop/megakernel/_cython/core.pyx":337
  *             if self.c_ptr == NULL:
  *                 print("Error: tensor is None in num_dims property")
  *                 return None             # <<<<<<<<<<<<<<
@@ -11201,7 +11194,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_8num_dims___get__(struct _
     __pyx_r = Py_None; __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":335
+    /* "python/xop/megakernel/_cython/core.pyx":335
  *     property num_dims:
  *         def __get__(self):
  *             if self.c_ptr == NULL:             # <<<<<<<<<<<<<<
@@ -11210,7 +11203,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_8num_dims___get__(struct _
  */
   }
 
-  /* "megakernel/_cython/core.pyx":339
+  /* "python/xop/megakernel/_cython/core.pyx":339
  *                 return None
  *             else:
  *                 return self.c_ptr.num_dims             # <<<<<<<<<<<<<<
@@ -11226,7 +11219,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_8num_dims___get__(struct _
     goto __pyx_L0;
   }
 
-  /* "megakernel/_cython/core.pyx":334
+  /* "python/xop/megakernel/_cython/core.pyx":334
  * 
  *     property num_dims:
  *         def __get__(self):             # <<<<<<<<<<<<<<
@@ -11245,7 +11238,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_8num_dims___get__(struct _
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":342
+/* "python/xop/megakernel/_cython/core.pyx":342
  * 
  *     property dtype:
  *         def __get__(self):             # <<<<<<<<<<<<<<
@@ -11282,7 +11275,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_5dtype___get__(struct __py
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__get__", 1);
 
-  /* "megakernel/_cython/core.pyx":343
+  /* "python/xop/megakernel/_cython/core.pyx":343
  *     property dtype:
  *         def __get__(self):
  *             if self.c_ptr == NULL:             # <<<<<<<<<<<<<<
@@ -11292,7 +11285,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_5dtype___get__(struct __py
   __pyx_t_1 = (__pyx_v_self->c_ptr == NULL);
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":344
+    /* "python/xop/megakernel/_cython/core.pyx":344
  *         def __get__(self):
  *             if self.c_ptr == NULL:
  *                 return None             # <<<<<<<<<<<<<<
@@ -11303,7 +11296,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_5dtype___get__(struct __py
     __pyx_r = Py_None; __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":343
+    /* "python/xop/megakernel/_cython/core.pyx":343
  *     property dtype:
  *         def __get__(self):
  *             if self.c_ptr == NULL:             # <<<<<<<<<<<<<<
@@ -11312,7 +11305,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_5dtype___get__(struct __py
  */
   }
 
-  /* "megakernel/_cython/core.pyx":346
+  /* "python/xop/megakernel/_cython/core.pyx":346
  *                 return None
  *             else:
  *                 return convert_ctype_to_dtype(self.c_ptr.data_type)             # <<<<<<<<<<<<<<
@@ -11353,7 +11346,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_5dtype___get__(struct __py
     goto __pyx_L0;
   }
 
-  /* "megakernel/_cython/core.pyx":342
+  /* "python/xop/megakernel/_cython/core.pyx":342
  * 
  *     property dtype:
  *         def __get__(self):             # <<<<<<<<<<<<<<
@@ -11375,7 +11368,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_5dtype___get__(struct __py
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":348
+/* "python/xop/megakernel/_cython/core.pyx":348
  *                 return convert_ctype_to_dtype(self.c_ptr.data_type)
  * 
  *     def __cinit__(self, tensor):             # <<<<<<<<<<<<<<
@@ -11471,7 +11464,7 @@ static int __pyx_pf_10megakernel_4core_7DTensor___cinit__(struct __pyx_obj_10meg
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__cinit__", 1);
 
-  /* "megakernel/_cython/core.pyx":349
+  /* "python/xop/megakernel/_cython/core.pyx":349
  * 
  *     def __cinit__(self, tensor):
  *         self._set_tensor(tensor)             # <<<<<<<<<<<<<<
@@ -11482,7 +11475,7 @@ static int __pyx_pf_10megakernel_4core_7DTensor___cinit__(struct __pyx_obj_10meg
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "megakernel/_cython/core.pyx":348
+  /* "python/xop/megakernel/_cython/core.pyx":348
  *                 return convert_ctype_to_dtype(self.c_ptr.data_type)
  * 
  *     def __cinit__(self, tensor):             # <<<<<<<<<<<<<<
@@ -11502,7 +11495,7 @@ static int __pyx_pf_10megakernel_4core_7DTensor___cinit__(struct __pyx_obj_10meg
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":351
+/* "python/xop/megakernel/_cython/core.pyx":351
  *         self._set_tensor(tensor)
  * 
  *     def dim(self, int idx):             # <<<<<<<<<<<<<<
@@ -11616,7 +11609,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_2dim(struct __pyx_obj_10me
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("dim", 1);
 
-  /* "megakernel/_cython/core.pyx":352
+  /* "python/xop/megakernel/_cython/core.pyx":352
  * 
  *     def dim(self, int idx):
  *         if (idx < self.c_ptr.num_dims):             # <<<<<<<<<<<<<<
@@ -11626,7 +11619,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_2dim(struct __pyx_obj_10me
   __pyx_t_1 = (__pyx_v_idx < __pyx_v_self->c_ptr->num_dims);
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":353
+    /* "python/xop/megakernel/_cython/core.pyx":353
  *     def dim(self, int idx):
  *         if (idx < self.c_ptr.num_dims):
  *             return self.c_ptr.dim[idx]             # <<<<<<<<<<<<<<
@@ -11640,7 +11633,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_2dim(struct __pyx_obj_10me
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "megakernel/_cython/core.pyx":352
+    /* "python/xop/megakernel/_cython/core.pyx":352
  * 
  *     def dim(self, int idx):
  *         if (idx < self.c_ptr.num_dims):             # <<<<<<<<<<<<<<
@@ -11649,7 +11642,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_2dim(struct __pyx_obj_10me
  */
   }
 
-  /* "megakernel/_cython/core.pyx":355
+  /* "python/xop/megakernel/_cython/core.pyx":355
  *             return self.c_ptr.dim[idx]
  *         else:
  *             assert False , "Error: index out of range"             # <<<<<<<<<<<<<<
@@ -11668,7 +11661,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_2dim(struct __pyx_obj_10me
     if ((1)); else __PYX_ERR(1, 355, __pyx_L1_error)
     #endif
 
-    /* "megakernel/_cython/core.pyx":356
+    /* "python/xop/megakernel/_cython/core.pyx":356
  *         else:
  *             assert False , "Error: index out of range"
  *             return None             # <<<<<<<<<<<<<<
@@ -11680,7 +11673,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_2dim(struct __pyx_obj_10me
     goto __pyx_L0;
   }
 
-  /* "megakernel/_cython/core.pyx":351
+  /* "python/xop/megakernel/_cython/core.pyx":351
  *         self._set_tensor(tensor)
  * 
  *     def dim(self, int idx):             # <<<<<<<<<<<<<<
@@ -11913,7 +11906,7 @@ static PyObject *__pyx_pf_10megakernel_4core_7DTensor_6__setstate_cython__(CYTHO
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":362
+/* "python/xop/megakernel/_cython/core.pyx":362
  *     cdef CppKNGraph *p_kgraph #Hold a CppKNGraph instance
  * 
  *     def __cinit__(self, graph = None):             # <<<<<<<<<<<<<<
@@ -12020,7 +12013,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__cinit__", 1);
 
-  /* "megakernel/_cython/core.pyx":365
+  /* "python/xop/megakernel/_cython/core.pyx":365
  *         cdef unsigned long long ptr
  *         cdef dim3 c_gpu_dim
  *         if graph is None:             # <<<<<<<<<<<<<<
@@ -12030,7 +12023,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
   __pyx_t_1 = (__pyx_v_graph == Py_None);
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":366
+    /* "python/xop/megakernel/_cython/core.pyx":366
  *         cdef dim3 c_gpu_dim
  *         if graph is None:
  *             c_gpu_dim.x = 1             # <<<<<<<<<<<<<<
@@ -12039,7 +12032,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
  */
     __pyx_v_c_gpu_dim.x = 1;
 
-    /* "megakernel/_cython/core.pyx":367
+    /* "python/xop/megakernel/_cython/core.pyx":367
  *         if graph is None:
  *             c_gpu_dim.x = 1
  *             c_gpu_dim.y = 1             # <<<<<<<<<<<<<<
@@ -12048,7 +12041,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
  */
     __pyx_v_c_gpu_dim.y = 1;
 
-    /* "megakernel/_cython/core.pyx":368
+    /* "python/xop/megakernel/_cython/core.pyx":368
  *             c_gpu_dim.x = 1
  *             c_gpu_dim.y = 1
  *             c_gpu_dim.z = 1             # <<<<<<<<<<<<<<
@@ -12057,7 +12050,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
  */
     __pyx_v_c_gpu_dim.z = 1;
 
-    /* "megakernel/_cython/core.pyx":369
+    /* "python/xop/megakernel/_cython/core.pyx":369
  *             c_gpu_dim.y = 1
  *             c_gpu_dim.z = 1
  *             self.p_kgraph = new CppKNGraph(c_gpu_dim)             # <<<<<<<<<<<<<<
@@ -12066,7 +12059,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
  */
     __pyx_v_self->p_kgraph = new megakernel::kernel::Graph(__pyx_v_c_gpu_dim);
 
-    /* "megakernel/_cython/core.pyx":365
+    /* "python/xop/megakernel/_cython/core.pyx":365
  *         cdef unsigned long long ptr
  *         cdef dim3 c_gpu_dim
  *         if graph is None:             # <<<<<<<<<<<<<<
@@ -12076,7 +12069,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
     goto __pyx_L3;
   }
 
-  /* "megakernel/_cython/core.pyx":371
+  /* "python/xop/megakernel/_cython/core.pyx":371
  *             self.p_kgraph = new CppKNGraph(c_gpu_dim)
  *         else:
  *             ptr = ctypes.cast(graph, ctypes.c_void_p).value             # <<<<<<<<<<<<<<
@@ -12124,7 +12117,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_ptr = __pyx_t_7;
 
-    /* "megakernel/_cython/core.pyx":372
+    /* "python/xop/megakernel/_cython/core.pyx":372
  *         else:
  *             ptr = ctypes.cast(graph, ctypes.c_void_p).value
  *             self.p_kgraph = <CppKNGraph*>(ptr)             # <<<<<<<<<<<<<<
@@ -12135,7 +12128,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
   }
   __pyx_L3:;
 
-  /* "megakernel/_cython/core.pyx":362
+  /* "python/xop/megakernel/_cython/core.pyx":362
  *     cdef CppKNGraph *p_kgraph #Hold a CppKNGraph instance
  * 
  *     def __cinit__(self, graph = None):             # <<<<<<<<<<<<<<
@@ -12158,7 +12151,7 @@ static int __pyx_pf_10megakernel_4core_9CyKNGraph___cinit__(struct __pyx_obj_10m
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":374
+/* "python/xop/megakernel/_cython/core.pyx":374
  *             self.p_kgraph = <CppKNGraph*>(ptr)
  * 
  *     def new_input(self, tuple dims, tuple strides, dtype : dtype = float16):             # <<<<<<<<<<<<<<
@@ -12325,7 +12318,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("new_input", 1);
 
-  /* "megakernel/_cython/core.pyx":377
+  /* "python/xop/megakernel/_cython/core.pyx":377
  *         cdef vector[int] cdims
  *         cdef vector[size_t] cstrides
  *         cdims.resize(len(dims))             # <<<<<<<<<<<<<<
@@ -12344,7 +12337,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
     __PYX_ERR(1, 377, __pyx_L1_error)
   }
 
-  /* "megakernel/_cython/core.pyx":378
+  /* "python/xop/megakernel/_cython/core.pyx":378
  *         cdef vector[size_t] cstrides
  *         cdims.resize(len(dims))
  *         for i in range(len(dims)):             # <<<<<<<<<<<<<<
@@ -12360,7 +12353,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "megakernel/_cython/core.pyx":379
+    /* "python/xop/megakernel/_cython/core.pyx":379
  *         cdims.resize(len(dims))
  *         for i in range(len(dims)):
  *             cdims[i] = dims[i]             # <<<<<<<<<<<<<<
@@ -12378,7 +12371,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
     (__pyx_v_cdims[__pyx_v_i]) = __pyx_t_5;
   }
 
-  /* "megakernel/_cython/core.pyx":380
+  /* "python/xop/megakernel/_cython/core.pyx":380
  *         for i in range(len(dims)):
  *             cdims[i] = dims[i]
  *         cstrides.resize(len(strides))             # <<<<<<<<<<<<<<
@@ -12397,7 +12390,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
     __PYX_ERR(1, 380, __pyx_L1_error)
   }
 
-  /* "megakernel/_cython/core.pyx":381
+  /* "python/xop/megakernel/_cython/core.pyx":381
  *             cdims[i] = dims[i]
  *         cstrides.resize(len(strides))
  *         for i in range(len(strides)):             # <<<<<<<<<<<<<<
@@ -12413,7 +12406,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "megakernel/_cython/core.pyx":382
+    /* "python/xop/megakernel/_cython/core.pyx":382
  *         cstrides.resize(len(strides))
  *         for i in range(len(strides)):
  *             cstrides[i] = strides[i]             # <<<<<<<<<<<<<<
@@ -12431,7 +12424,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
     (__pyx_v_cstrides[__pyx_v_i]) = __pyx_t_6;
   }
 
-  /* "megakernel/_cython/core.pyx":384
+  /* "python/xop/megakernel/_cython/core.pyx":384
  *             cstrides[i] = strides[i]
  * 
  *         c_type = convert_dtype_to_ctype(dtype)             # <<<<<<<<<<<<<<
@@ -12465,7 +12458,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
   __pyx_v_c_type = __pyx_t_4;
   __pyx_t_4 = 0;
 
-  /* "megakernel/_cython/core.pyx":385
+  /* "python/xop/megakernel/_cython/core.pyx":385
  * 
  *         c_type = convert_dtype_to_ctype(dtype)
  *         cdef CppDTensor* ptr = self.p_kgraph.new_input_ptr(cdims, cstrides, c_type)             # <<<<<<<<<<<<<<
@@ -12475,7 +12468,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
   __pyx_t_10 = ((enum megakernel::type::DataType)__Pyx_PyInt_As_enum__megakernel_3a__3a_type_3a__3a_DataType(__pyx_v_c_type)); if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 385, __pyx_L1_error)
   __pyx_v_ptr = __pyx_v_self->p_kgraph->new_input_ptr(__pyx_v_cdims, __pyx_v_cstrides, __pyx_t_10);
 
-  /* "megakernel/_cython/core.pyx":386
+  /* "python/xop/megakernel/_cython/core.pyx":386
  *         c_type = convert_dtype_to_ctype(dtype)
  *         cdef CppDTensor* ptr = self.p_kgraph.new_input_ptr(cdims, cstrides, c_type)
  *         t = ctypes.cast(<unsigned long long>ptr, ctypes.c_void_p)             # <<<<<<<<<<<<<<
@@ -12521,7 +12514,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
   __pyx_v_t = __pyx_t_4;
   __pyx_t_4 = 0;
 
-  /* "megakernel/_cython/core.pyx":387
+  /* "python/xop/megakernel/_cython/core.pyx":387
  *         cdef CppDTensor* ptr = self.p_kgraph.new_input_ptr(cdims, cstrides, c_type)
  *         t = ctypes.cast(<unsigned long long>ptr, ctypes.c_void_p)
  *         return DTensor(t)             # <<<<<<<<<<<<<<
@@ -12535,7 +12528,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
   __pyx_t_4 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":374
+  /* "python/xop/megakernel/_cython/core.pyx":374
  *             self.p_kgraph = <CppKNGraph*>(ptr)
  * 
  *     def new_input(self, tuple dims, tuple strides, dtype : dtype = float16):             # <<<<<<<<<<<<<<
@@ -12560,7 +12553,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_2new_input(struct __pyx_
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":389
+/* "python/xop/megakernel/_cython/core.pyx":389
  *         return DTensor(t)
  * 
  *     def customized(self, list inputs, CyTBGraph bgraph):             # <<<<<<<<<<<<<<
@@ -12703,7 +12696,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("customized", 1);
 
-  /* "megakernel/_cython/core.pyx":391
+  /* "python/xop/megakernel/_cython/core.pyx":391
  *     def customized(self, list inputs, CyTBGraph bgraph):
  *         cdef vector[const CppDTensor*] cinputs
  *         cinputs.resize(len(inputs))             # <<<<<<<<<<<<<<
@@ -12722,7 +12715,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
     __PYX_ERR(1, 391, __pyx_L1_error)
   }
 
-  /* "megakernel/_cython/core.pyx":393
+  /* "python/xop/megakernel/_cython/core.pyx":393
  *         cinputs.resize(len(inputs))
  *         cdef DTensor t
  *         for i in range(len(inputs)):             # <<<<<<<<<<<<<<
@@ -12738,7 +12731,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "megakernel/_cython/core.pyx":394
+    /* "python/xop/megakernel/_cython/core.pyx":394
  *         cdef DTensor t
  *         for i in range(len(inputs)):
  *             if inputs[i] is None:             # <<<<<<<<<<<<<<
@@ -12755,7 +12748,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     if (__pyx_t_5) {
 
-      /* "megakernel/_cython/core.pyx":395
+      /* "python/xop/megakernel/_cython/core.pyx":395
  *         for i in range(len(inputs)):
  *             if inputs[i] is None:
  *                 cinputs[i] = NULL             # <<<<<<<<<<<<<<
@@ -12764,7 +12757,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
  */
       (__pyx_v_cinputs[__pyx_v_i]) = NULL;
 
-      /* "megakernel/_cython/core.pyx":394
+      /* "python/xop/megakernel/_cython/core.pyx":394
  *         cdef DTensor t
  *         for i in range(len(inputs)):
  *             if inputs[i] is None:             # <<<<<<<<<<<<<<
@@ -12774,7 +12767,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
       goto __pyx_L5;
     }
 
-    /* "megakernel/_cython/core.pyx":397
+    /* "python/xop/megakernel/_cython/core.pyx":397
  *                 cinputs[i] = NULL
  *             else:
  *                 assert (type(inputs[i]) == DTensor)             # <<<<<<<<<<<<<<
@@ -12803,7 +12796,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
       if ((1)); else __PYX_ERR(1, 397, __pyx_L1_error)
       #endif
 
-      /* "megakernel/_cython/core.pyx":398
+      /* "python/xop/megakernel/_cython/core.pyx":398
  *             else:
  *                 assert (type(inputs[i]) == DTensor)
  *                 t = inputs[i]             # <<<<<<<<<<<<<<
@@ -12820,7 +12813,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
       __Pyx_XDECREF_SET(__pyx_v_t, ((struct __pyx_obj_10megakernel_4core_DTensor *)__pyx_t_6));
       __pyx_t_6 = 0;
 
-      /* "megakernel/_cython/core.pyx":399
+      /* "python/xop/megakernel/_cython/core.pyx":399
  *                 assert (type(inputs[i]) == DTensor)
  *                 t = inputs[i]
  *                 cinputs[i] = t.c_ptr             # <<<<<<<<<<<<<<
@@ -12833,7 +12826,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
     __pyx_L5:;
   }
 
-  /* "megakernel/_cython/core.pyx":400
+  /* "python/xop/megakernel/_cython/core.pyx":400
  *                 t = inputs[i]
  *                 cinputs[i] = t.c_ptr
  *         self.p_kgraph.customized(cinputs, bgraph.p_bgraph)             # <<<<<<<<<<<<<<
@@ -12842,7 +12835,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
  */
   __pyx_v_self->p_kgraph->customized(__pyx_v_cinputs, __pyx_v_bgraph->p_bgraph);
 
-  /* "megakernel/_cython/core.pyx":389
+  /* "python/xop/megakernel/_cython/core.pyx":389
  *         return DTensor(t)
  * 
  *     def customized(self, list inputs, CyTBGraph bgraph):             # <<<<<<<<<<<<<<
@@ -12865,7 +12858,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_4customized(struct __pyx
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":403
+/* "python/xop/megakernel/_cython/core.pyx":403
  * 
  *     # Functions for ersistent kernels
  *     def attach_torch_tensor(self, DTensor tensor, torch_tensor, str name):             # <<<<<<<<<<<<<<
@@ -13023,7 +13016,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_6attach_torch_tensor(str
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("attach_torch_tensor", 1);
 
-  /* "megakernel/_cython/core.pyx":405
+  /* "python/xop/megakernel/_cython/core.pyx":405
  *     def attach_torch_tensor(self, DTensor tensor, torch_tensor, str name):
  *         # cdef unsigned long long torch_data_ptr = ctypes.cast(torch_tensor.data_ptr(), ctypes.c_void_p).value
  *         cdef unsigned long long torch_data_ptr = <unsigned long long>(torch_tensor.data_ptr())             # <<<<<<<<<<<<<<
@@ -13058,7 +13051,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_6attach_torch_tensor(str
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_v_torch_data_ptr = ((unsigned PY_LONG_LONG)__pyx_t_5);
 
-  /* "megakernel/_cython/core.pyx":406
+  /* "python/xop/megakernel/_cython/core.pyx":406
  *         # cdef unsigned long long torch_data_ptr = ctypes.cast(torch_tensor.data_ptr(), ctypes.c_void_p).value
  *         cdef unsigned long long torch_data_ptr = <unsigned long long>(torch_tensor.data_ptr())
  *         cdef char* cname = NULL             # <<<<<<<<<<<<<<
@@ -13067,7 +13060,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_6attach_torch_tensor(str
  */
   __pyx_v_cname = NULL;
 
-  /* "megakernel/_cython/core.pyx":407
+  /* "python/xop/megakernel/_cython/core.pyx":407
  *         cdef unsigned long long torch_data_ptr = <unsigned long long>(torch_tensor.data_ptr())
  *         cdef char* cname = NULL
  *         if name is not None:             # <<<<<<<<<<<<<<
@@ -13077,7 +13070,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_6attach_torch_tensor(str
   __pyx_t_6 = (__pyx_v_name != ((PyObject*)Py_None));
   if (__pyx_t_6) {
 
-    /* "megakernel/_cython/core.pyx":408
+    /* "python/xop/megakernel/_cython/core.pyx":408
  *         cdef char* cname = NULL
  *         if name is not None:
  *             py_byte_string = name.encode('UTF-8')             # <<<<<<<<<<<<<<
@@ -13093,7 +13086,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_6attach_torch_tensor(str
     __pyx_v_py_byte_string = __pyx_t_1;
     __pyx_t_1 = 0;
 
-    /* "megakernel/_cython/core.pyx":409
+    /* "python/xop/megakernel/_cython/core.pyx":409
  *         if name is not None:
  *             py_byte_string = name.encode('UTF-8')
  *             cname = py_byte_string             # <<<<<<<<<<<<<<
@@ -13103,7 +13096,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_6attach_torch_tensor(str
     __pyx_t_7 = __Pyx_PyObject_AsWritableString(__pyx_v_py_byte_string); if (unlikely((!__pyx_t_7) && PyErr_Occurred())) __PYX_ERR(1, 409, __pyx_L1_error)
     __pyx_v_cname = __pyx_t_7;
 
-    /* "megakernel/_cython/core.pyx":407
+    /* "python/xop/megakernel/_cython/core.pyx":407
  *         cdef unsigned long long torch_data_ptr = <unsigned long long>(torch_tensor.data_ptr())
  *         cdef char* cname = NULL
  *         if name is not None:             # <<<<<<<<<<<<<<
@@ -13112,7 +13105,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_6attach_torch_tensor(str
  */
   }
 
-  /* "megakernel/_cython/core.pyx":410
+  /* "python/xop/megakernel/_cython/core.pyx":410
  *             py_byte_string = name.encode('UTF-8')
  *             cname = py_byte_string
  *         self.p_kgraph.attach_torch_tensor(tensor.c_ptr, <void *>torch_data_ptr, cname)             # <<<<<<<<<<<<<<
@@ -13121,7 +13114,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_6attach_torch_tensor(str
  */
   __pyx_v_self->p_kgraph->attach_torch_tensor(__pyx_v_tensor->c_ptr, ((void *)__pyx_v_torch_data_ptr), __pyx_v_cname);
 
-  /* "megakernel/_cython/core.pyx":403
+  /* "python/xop/megakernel/_cython/core.pyx":403
  * 
  *     # Functions for ersistent kernels
  *     def attach_torch_tensor(self, DTensor tensor, torch_tensor, str name):             # <<<<<<<<<<<<<<
@@ -13145,7 +13138,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_6attach_torch_tensor(str
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":412
+/* "python/xop/megakernel/_cython/core.pyx":412
  *         self.p_kgraph.attach_torch_tensor(tensor.c_ptr, <void *>torch_data_ptr, cname)
  * 
  *     def attach_cuda_tensor(self, DTensor tensor, str name):             # <<<<<<<<<<<<<<
@@ -13283,7 +13276,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_8attach_cuda_tensor(stru
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("attach_cuda_tensor", 1);
 
-  /* "megakernel/_cython/core.pyx":413
+  /* "python/xop/megakernel/_cython/core.pyx":413
  * 
  *     def attach_cuda_tensor(self, DTensor tensor, str name):
  *         cdef char* cname = NULL             # <<<<<<<<<<<<<<
@@ -13292,7 +13285,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_8attach_cuda_tensor(stru
  */
   __pyx_v_cname = NULL;
 
-  /* "megakernel/_cython/core.pyx":414
+  /* "python/xop/megakernel/_cython/core.pyx":414
  *     def attach_cuda_tensor(self, DTensor tensor, str name):
  *         cdef char* cname = NULL
  *         if name is not None:             # <<<<<<<<<<<<<<
@@ -13302,7 +13295,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_8attach_cuda_tensor(stru
   __pyx_t_1 = (__pyx_v_name != ((PyObject*)Py_None));
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":415
+    /* "python/xop/megakernel/_cython/core.pyx":415
  *         cdef char* cname = NULL
  *         if name is not None:
  *             py_byte_string = name.encode('UTF-8')             # <<<<<<<<<<<<<<
@@ -13318,7 +13311,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_8attach_cuda_tensor(stru
     __pyx_v_py_byte_string = __pyx_t_2;
     __pyx_t_2 = 0;
 
-    /* "megakernel/_cython/core.pyx":416
+    /* "python/xop/megakernel/_cython/core.pyx":416
  *         if name is not None:
  *             py_byte_string = name.encode('UTF-8')
  *             cname = py_byte_string             # <<<<<<<<<<<<<<
@@ -13328,7 +13321,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_8attach_cuda_tensor(stru
     __pyx_t_3 = __Pyx_PyObject_AsWritableString(__pyx_v_py_byte_string); if (unlikely((!__pyx_t_3) && PyErr_Occurred())) __PYX_ERR(1, 416, __pyx_L1_error)
     __pyx_v_cname = __pyx_t_3;
 
-    /* "megakernel/_cython/core.pyx":414
+    /* "python/xop/megakernel/_cython/core.pyx":414
  *     def attach_cuda_tensor(self, DTensor tensor, str name):
  *         cdef char* cname = NULL
  *         if name is not None:             # <<<<<<<<<<<<<<
@@ -13337,7 +13330,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_8attach_cuda_tensor(stru
  */
   }
 
-  /* "megakernel/_cython/core.pyx":417
+  /* "python/xop/megakernel/_cython/core.pyx":417
  *             py_byte_string = name.encode('UTF-8')
  *             cname = py_byte_string
  *         self.p_kgraph.attach_cuda_tensor(tensor.c_ptr, cname)             # <<<<<<<<<<<<<<
@@ -13346,7 +13339,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_8attach_cuda_tensor(stru
  */
   __pyx_v_self->p_kgraph->attach_cuda_tensor(__pyx_v_tensor->c_ptr, __pyx_v_cname);
 
-  /* "megakernel/_cython/core.pyx":412
+  /* "python/xop/megakernel/_cython/core.pyx":412
  *         self.p_kgraph.attach_torch_tensor(tensor.c_ptr, <void *>torch_data_ptr, cname)
  * 
  *     def attach_cuda_tensor(self, DTensor tensor, str name):             # <<<<<<<<<<<<<<
@@ -13368,7 +13361,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_8attach_cuda_tensor(stru
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":419
+/* "python/xop/megakernel/_cython/core.pyx":419
  *         self.p_kgraph.attach_cuda_tensor(tensor.c_ptr, cname)
  * 
  *     def attach_nvshmem_tensor(self, DTensor tensor, str name):             # <<<<<<<<<<<<<<
@@ -13506,7 +13499,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_10attach_nvshmem_tensor(
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("attach_nvshmem_tensor", 1);
 
-  /* "megakernel/_cython/core.pyx":420
+  /* "python/xop/megakernel/_cython/core.pyx":420
  * 
  *     def attach_nvshmem_tensor(self, DTensor tensor, str name):
  *         cdef char* cname = NULL             # <<<<<<<<<<<<<<
@@ -13515,7 +13508,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_10attach_nvshmem_tensor(
  */
   __pyx_v_cname = NULL;
 
-  /* "megakernel/_cython/core.pyx":421
+  /* "python/xop/megakernel/_cython/core.pyx":421
  *     def attach_nvshmem_tensor(self, DTensor tensor, str name):
  *         cdef char* cname = NULL
  *         if name is not None:             # <<<<<<<<<<<<<<
@@ -13525,7 +13518,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_10attach_nvshmem_tensor(
   __pyx_t_1 = (__pyx_v_name != ((PyObject*)Py_None));
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":422
+    /* "python/xop/megakernel/_cython/core.pyx":422
  *         cdef char* cname = NULL
  *         if name is not None:
  *             py_byte_string = name.encode('UTF-8')             # <<<<<<<<<<<<<<
@@ -13541,7 +13534,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_10attach_nvshmem_tensor(
     __pyx_v_py_byte_string = __pyx_t_2;
     __pyx_t_2 = 0;
 
-    /* "megakernel/_cython/core.pyx":423
+    /* "python/xop/megakernel/_cython/core.pyx":423
  *         if name is not None:
  *             py_byte_string = name.encode('UTF-8')
  *             cname = py_byte_string             # <<<<<<<<<<<<<<
@@ -13551,7 +13544,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_10attach_nvshmem_tensor(
     __pyx_t_3 = __Pyx_PyObject_AsWritableString(__pyx_v_py_byte_string); if (unlikely((!__pyx_t_3) && PyErr_Occurred())) __PYX_ERR(1, 423, __pyx_L1_error)
     __pyx_v_cname = __pyx_t_3;
 
-    /* "megakernel/_cython/core.pyx":421
+    /* "python/xop/megakernel/_cython/core.pyx":421
  *     def attach_nvshmem_tensor(self, DTensor tensor, str name):
  *         cdef char* cname = NULL
  *         if name is not None:             # <<<<<<<<<<<<<<
@@ -13560,7 +13553,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_10attach_nvshmem_tensor(
  */
   }
 
-  /* "megakernel/_cython/core.pyx":424
+  /* "python/xop/megakernel/_cython/core.pyx":424
  *             py_byte_string = name.encode('UTF-8')
  *             cname = py_byte_string
  *         self.p_kgraph.attach_nvshmem_tensor(tensor.c_ptr, cname)             # <<<<<<<<<<<<<<
@@ -13569,7 +13562,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_10attach_nvshmem_tensor(
  */
   __pyx_v_self->p_kgraph->attach_nvshmem_tensor(__pyx_v_tensor->c_ptr, __pyx_v_cname);
 
-  /* "megakernel/_cython/core.pyx":419
+  /* "python/xop/megakernel/_cython/core.pyx":419
  *         self.p_kgraph.attach_cuda_tensor(tensor.c_ptr, cname)
  * 
  *     def attach_nvshmem_tensor(self, DTensor tensor, str name):             # <<<<<<<<<<<<<<
@@ -13591,7 +13584,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_10attach_nvshmem_tensor(
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":426
+/* "python/xop/megakernel/_cython/core.pyx":426
  *         self.p_kgraph.attach_nvshmem_tensor(tensor.c_ptr, cname)
  * 
  *     def register_task(self, str task_type, list[int] params):             # <<<<<<<<<<<<<<
@@ -13735,7 +13728,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("register_task", 1);
 
-  /* "megakernel/_cython/core.pyx":427
+  /* "python/xop/megakernel/_cython/core.pyx":427
  * 
  *     def register_task(self, str task_type, list[int] params):
  *         cdef char* cname = NULL             # <<<<<<<<<<<<<<
@@ -13744,7 +13737,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
  */
   __pyx_v_cname = NULL;
 
-  /* "megakernel/_cython/core.pyx":428
+  /* "python/xop/megakernel/_cython/core.pyx":428
  *     def register_task(self, str task_type, list[int] params):
  *         cdef char* cname = NULL
  *         if task_type is not None:             # <<<<<<<<<<<<<<
@@ -13754,7 +13747,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
   __pyx_t_1 = (__pyx_v_task_type != ((PyObject*)Py_None));
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":429
+    /* "python/xop/megakernel/_cython/core.pyx":429
  *         cdef char* cname = NULL
  *         if task_type is not None:
  *             py_byte_string = task_type.encode('UTF-8')             # <<<<<<<<<<<<<<
@@ -13770,7 +13763,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
     __pyx_v_py_byte_string = __pyx_t_2;
     __pyx_t_2 = 0;
 
-    /* "megakernel/_cython/core.pyx":430
+    /* "python/xop/megakernel/_cython/core.pyx":430
  *         if task_type is not None:
  *             py_byte_string = task_type.encode('UTF-8')
  *             cname = py_byte_string             # <<<<<<<<<<<<<<
@@ -13780,7 +13773,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
     __pyx_t_3 = __Pyx_PyObject_AsWritableString(__pyx_v_py_byte_string); if (unlikely((!__pyx_t_3) && PyErr_Occurred())) __PYX_ERR(1, 430, __pyx_L1_error)
     __pyx_v_cname = __pyx_t_3;
 
-    /* "megakernel/_cython/core.pyx":428
+    /* "python/xop/megakernel/_cython/core.pyx":428
  *     def register_task(self, str task_type, list[int] params):
  *         cdef char* cname = NULL
  *         if task_type is not None:             # <<<<<<<<<<<<<<
@@ -13789,7 +13782,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
  */
   }
 
-  /* "megakernel/_cython/core.pyx":432
+  /* "python/xop/megakernel/_cython/core.pyx":432
  *             cname = py_byte_string
  *         cdef vector[int] cparams
  *         cparams.resize(0)             # <<<<<<<<<<<<<<
@@ -13803,7 +13796,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
     __PYX_ERR(1, 432, __pyx_L1_error)
   }
 
-  /* "megakernel/_cython/core.pyx":433
+  /* "python/xop/megakernel/_cython/core.pyx":433
  *         cdef vector[int] cparams
  *         cparams.resize(0)
  *         if params is not None:             # <<<<<<<<<<<<<<
@@ -13813,7 +13806,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
   __pyx_t_1 = (__pyx_v_params != ((PyObject*)Py_None));
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":434
+    /* "python/xop/megakernel/_cython/core.pyx":434
  *         cparams.resize(0)
  *         if params is not None:
  *             cparams.resize(len(params))             # <<<<<<<<<<<<<<
@@ -13832,7 +13825,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
       __PYX_ERR(1, 434, __pyx_L1_error)
     }
 
-    /* "megakernel/_cython/core.pyx":435
+    /* "python/xop/megakernel/_cython/core.pyx":435
  *         if params is not None:
  *             cparams.resize(len(params))
  *             for i in range(len(params)):             # <<<<<<<<<<<<<<
@@ -13848,7 +13841,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
     for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
       __pyx_v_i = __pyx_t_6;
 
-      /* "megakernel/_cython/core.pyx":436
+      /* "python/xop/megakernel/_cython/core.pyx":436
  *             cparams.resize(len(params))
  *             for i in range(len(params)):
  *                 cparams[i] = params[i]             # <<<<<<<<<<<<<<
@@ -13866,7 +13859,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
       (__pyx_v_cparams[__pyx_v_i]) = __pyx_t_7;
     }
 
-    /* "megakernel/_cython/core.pyx":433
+    /* "python/xop/megakernel/_cython/core.pyx":433
  *         cdef vector[int] cparams
  *         cparams.resize(0)
  *         if params is not None:             # <<<<<<<<<<<<<<
@@ -13875,7 +13868,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
  */
   }
 
-  /* "megakernel/_cython/core.pyx":437
+  /* "python/xop/megakernel/_cython/core.pyx":437
  *             for i in range(len(params)):
  *                 cparams[i] = params[i]
  *         self.p_kgraph.register_task(cname, cparams)             # <<<<<<<<<<<<<<
@@ -13884,7 +13877,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
  */
   __pyx_v_self->p_kgraph->register_task(__pyx_v_cname, __pyx_v_cparams);
 
-  /* "megakernel/_cython/core.pyx":426
+  /* "python/xop/megakernel/_cython/core.pyx":426
  *         self.p_kgraph.attach_nvshmem_tensor(tensor.c_ptr, cname)
  * 
  *     def register_task(self, str task_type, list[int] params):             # <<<<<<<<<<<<<<
@@ -13906,7 +13899,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_12register_task(struct _
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":439
+/* "python/xop/megakernel/_cython/core.pyx":439
  *         self.p_kgraph.register_task(cname, cparams)
  * 
  *     def generate_task_graph(self, int num_gpus, int my_gpu_id):             # <<<<<<<<<<<<<<
@@ -14036,7 +14029,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_14generate_task_graph(st
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("generate_task_graph", 1);
 
-  /* "megakernel/_cython/core.pyx":440
+  /* "python/xop/megakernel/_cython/core.pyx":440
  * 
  *     def generate_task_graph(self, int num_gpus, int my_gpu_id):
  *         cdef TaskGraphResult result = self.p_kgraph.generate_task_graph(num_gpus, my_gpu_id)             # <<<<<<<<<<<<<<
@@ -14045,7 +14038,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_14generate_task_graph(st
  */
   __pyx_v_result = __pyx_v_self->p_kgraph->generate_task_graph(__pyx_v_num_gpus, __pyx_v_my_gpu_id);
 
-  /* "megakernel/_cython/core.pyx":441
+  /* "python/xop/megakernel/_cython/core.pyx":441
  *     def generate_task_graph(self, int num_gpus, int my_gpu_id):
  *         cdef TaskGraphResult result = self.p_kgraph.generate_task_graph(num_gpus, my_gpu_id)
  *         return {             # <<<<<<<<<<<<<<
@@ -14054,7 +14047,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_14generate_task_graph(st
  */
   __Pyx_XDECREF(__pyx_r);
 
-  /* "megakernel/_cython/core.pyx":442
+  /* "python/xop/megakernel/_cython/core.pyx":442
  *         cdef TaskGraphResult result = self.p_kgraph.generate_task_graph(num_gpus, my_gpu_id)
  *         return {
  *             "cuda_code": result.cuda_code.decode("UTF-8"),             # <<<<<<<<<<<<<<
@@ -14068,7 +14061,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_14generate_task_graph(st
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_cuda_code, __pyx_t_2) < 0) __PYX_ERR(1, 442, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":443
+  /* "python/xop/megakernel/_cython/core.pyx":443
  *         return {
  *             "cuda_code": result.cuda_code.decode("UTF-8"),
  *             "json_file": result.json_file.decode("UTF-8"),             # <<<<<<<<<<<<<<
@@ -14083,7 +14076,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_14generate_task_graph(st
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":439
+  /* "python/xop/megakernel/_cython/core.pyx":439
  *         self.p_kgraph.register_task(cname, cparams)
  * 
  *     def generate_task_graph(self, int num_gpus, int my_gpu_id):             # <<<<<<<<<<<<<<
@@ -14317,7 +14310,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyKNGraph_18__setstate_cython__(CY
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":450
+/* "python/xop/megakernel/_cython/core.pyx":450
  *     cdef CppTBGraph *p_bgraph #Hold a CppTBGraph instance
  * 
  *     def __cinit__(self, tuple grid_dim = (), tuple block_dim = (), int thread_num = 128, bgraph = None):             # <<<<<<<<<<<<<<
@@ -14478,7 +14471,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__cinit__", 1);
 
-  /* "megakernel/_cython/core.pyx":454
+  /* "python/xop/megakernel/_cython/core.pyx":454
  *         cdef dim3 c_grid_dim
  *         cdef dim3 c_block_dim
  *         if bgraph is None:             # <<<<<<<<<<<<<<
@@ -14488,7 +14481,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
   __pyx_t_1 = (__pyx_v_bgraph == Py_None);
   if (__pyx_t_1) {
 
-    /* "megakernel/_cython/core.pyx":455
+    /* "python/xop/megakernel/_cython/core.pyx":455
  *         cdef dim3 c_block_dim
  *         if bgraph is None:
  *             if len(grid_dim) == 0 or len(block_dim) == 0:             # <<<<<<<<<<<<<<
@@ -14516,7 +14509,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __pyx_L5_bool_binop_done:;
     if (__pyx_t_1) {
 
-      /* "megakernel/_cython/core.pyx":456
+      /* "python/xop/megakernel/_cython/core.pyx":456
  *         if bgraph is None:
  *             if len(grid_dim) == 0 or len(block_dim) == 0:
  *                 assert False, "grid_dim, block_dim, thread_num must be provided"             # <<<<<<<<<<<<<<
@@ -14534,7 +14527,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
       if ((1)); else __PYX_ERR(1, 456, __pyx_L1_error)
       #endif
 
-      /* "megakernel/_cython/core.pyx":455
+      /* "python/xop/megakernel/_cython/core.pyx":455
  *         cdef dim3 c_block_dim
  *         if bgraph is None:
  *             if len(grid_dim) == 0 or len(block_dim) == 0:             # <<<<<<<<<<<<<<
@@ -14543,7 +14536,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
  */
     }
 
-    /* "megakernel/_cython/core.pyx":457
+    /* "python/xop/megakernel/_cython/core.pyx":457
  *             if len(grid_dim) == 0 or len(block_dim) == 0:
  *                 assert False, "grid_dim, block_dim, thread_num must be provided"
  *             assert len(grid_dim) == 3, "grid_dim must include 3 dimensions"             # <<<<<<<<<<<<<<
@@ -14567,7 +14560,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     if ((1)); else __PYX_ERR(1, 457, __pyx_L1_error)
     #endif
 
-    /* "megakernel/_cython/core.pyx":458
+    /* "python/xop/megakernel/_cython/core.pyx":458
  *                 assert False, "grid_dim, block_dim, thread_num must be provided"
  *             assert len(grid_dim) == 3, "grid_dim must include 3 dimensions"
  *             assert len(block_dim) == 3, "block_dim must include 3 dimensions"             # <<<<<<<<<<<<<<
@@ -14591,7 +14584,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     if ((1)); else __PYX_ERR(1, 458, __pyx_L1_error)
     #endif
 
-    /* "megakernel/_cython/core.pyx":459
+    /* "python/xop/megakernel/_cython/core.pyx":459
  *             assert len(grid_dim) == 3, "grid_dim must include 3 dimensions"
  *             assert len(block_dim) == 3, "block_dim must include 3 dimensions"
  *             c_grid_dim.x = grid_dim[0]             # <<<<<<<<<<<<<<
@@ -14608,7 +14601,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_c_grid_dim.x = __pyx_t_5;
 
-    /* "megakernel/_cython/core.pyx":460
+    /* "python/xop/megakernel/_cython/core.pyx":460
  *             assert len(block_dim) == 3, "block_dim must include 3 dimensions"
  *             c_grid_dim.x = grid_dim[0]
  *             c_grid_dim.y = grid_dim[1]             # <<<<<<<<<<<<<<
@@ -14625,7 +14618,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_c_grid_dim.y = __pyx_t_5;
 
-    /* "megakernel/_cython/core.pyx":461
+    /* "python/xop/megakernel/_cython/core.pyx":461
  *             c_grid_dim.x = grid_dim[0]
  *             c_grid_dim.y = grid_dim[1]
  *             c_grid_dim.z = grid_dim[2]             # <<<<<<<<<<<<<<
@@ -14642,7 +14635,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_c_grid_dim.z = __pyx_t_5;
 
-    /* "megakernel/_cython/core.pyx":462
+    /* "python/xop/megakernel/_cython/core.pyx":462
  *             c_grid_dim.y = grid_dim[1]
  *             c_grid_dim.z = grid_dim[2]
  *             c_block_dim.x = block_dim[0]             # <<<<<<<<<<<<<<
@@ -14659,7 +14652,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_c_block_dim.x = __pyx_t_5;
 
-    /* "megakernel/_cython/core.pyx":463
+    /* "python/xop/megakernel/_cython/core.pyx":463
  *             c_grid_dim.z = grid_dim[2]
  *             c_block_dim.x = block_dim[0]
  *             c_block_dim.y = block_dim[1]             # <<<<<<<<<<<<<<
@@ -14676,7 +14669,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_c_block_dim.y = __pyx_t_5;
 
-    /* "megakernel/_cython/core.pyx":464
+    /* "python/xop/megakernel/_cython/core.pyx":464
  *             c_block_dim.x = block_dim[0]
  *             c_block_dim.y = block_dim[1]
  *             c_block_dim.z = block_dim[2]             # <<<<<<<<<<<<<<
@@ -14693,7 +14686,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_c_block_dim.z = __pyx_t_5;
 
-    /* "megakernel/_cython/core.pyx":465
+    /* "python/xop/megakernel/_cython/core.pyx":465
  *             c_block_dim.y = block_dim[1]
  *             c_block_dim.z = block_dim[2]
  *             self.p_bgraph = new CppTBGraph(c_grid_dim, c_block_dim, thread_num)             # <<<<<<<<<<<<<<
@@ -14702,7 +14695,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
  */
     __pyx_v_self->p_bgraph = new megakernel::threadblock::TBGraph(__pyx_v_c_grid_dim, __pyx_v_c_block_dim, __pyx_v_thread_num);
 
-    /* "megakernel/_cython/core.pyx":454
+    /* "python/xop/megakernel/_cython/core.pyx":454
  *         cdef dim3 c_grid_dim
  *         cdef dim3 c_block_dim
  *         if bgraph is None:             # <<<<<<<<<<<<<<
@@ -14712,7 +14705,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     goto __pyx_L3;
   }
 
-  /* "megakernel/_cython/core.pyx":467
+  /* "python/xop/megakernel/_cython/core.pyx":467
  *             self.p_bgraph = new CppTBGraph(c_grid_dim, c_block_dim, thread_num)
  *         else:
  *             ptr = ctypes.cast(bgraph, ctypes.c_void_p).value             # <<<<<<<<<<<<<<
@@ -14760,7 +14753,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     __pyx_v_ptr = __pyx_t_9;
 
-    /* "megakernel/_cython/core.pyx":468
+    /* "python/xop/megakernel/_cython/core.pyx":468
  *         else:
  *             ptr = ctypes.cast(bgraph, ctypes.c_void_p).value
  *             if isinstance(bgraph, int):             # <<<<<<<<<<<<<<
@@ -14770,7 +14763,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __pyx_t_1 = PyInt_Check(__pyx_v_bgraph); 
     if (__pyx_t_1) {
 
-      /* "megakernel/_cython/core.pyx":469
+      /* "python/xop/megakernel/_cython/core.pyx":469
  *             ptr = ctypes.cast(bgraph, ctypes.c_void_p).value
  *             if isinstance(bgraph, int):
  *                 self.p_bgraph = <CppTBGraph*>(ptr)             # <<<<<<<<<<<<<<
@@ -14779,7 +14772,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
  */
       __pyx_v_self->p_bgraph = ((megakernel::threadblock::TBGraph *)__pyx_v_ptr);
 
-      /* "megakernel/_cython/core.pyx":468
+      /* "python/xop/megakernel/_cython/core.pyx":468
  *         else:
  *             ptr = ctypes.cast(bgraph, ctypes.c_void_p).value
  *             if isinstance(bgraph, int):             # <<<<<<<<<<<<<<
@@ -14789,7 +14782,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
       goto __pyx_L7;
     }
 
-    /* "megakernel/_cython/core.pyx":470
+    /* "python/xop/megakernel/_cython/core.pyx":470
  *             if isinstance(bgraph, int):
  *                 self.p_bgraph = <CppTBGraph*>(ptr)
  *             elif isinstance(bgraph, ctypes.c_void_p):             # <<<<<<<<<<<<<<
@@ -14805,7 +14798,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     if (__pyx_t_1) {
 
-      /* "megakernel/_cython/core.pyx":471
+      /* "python/xop/megakernel/_cython/core.pyx":471
  *                 self.p_bgraph = <CppTBGraph*>(ptr)
  *             elif isinstance(bgraph, ctypes.c_void_p):
  *                 self.p_bgraph = <CppTBGraph*>(ptr)             # <<<<<<<<<<<<<<
@@ -14814,7 +14807,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
  */
       __pyx_v_self->p_bgraph = ((megakernel::threadblock::TBGraph *)__pyx_v_ptr);
 
-      /* "megakernel/_cython/core.pyx":470
+      /* "python/xop/megakernel/_cython/core.pyx":470
  *             if isinstance(bgraph, int):
  *                 self.p_bgraph = <CppTBGraph*>(ptr)
  *             elif isinstance(bgraph, ctypes.c_void_p):             # <<<<<<<<<<<<<<
@@ -14824,7 +14817,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
       goto __pyx_L7;
     }
 
-    /* "megakernel/_cython/core.pyx":473
+    /* "python/xop/megakernel/_cython/core.pyx":473
  *                 self.p_bgraph = <CppTBGraph*>(ptr)
  *             else:
  *                 assert False, "bgraph must be an integer or ctypes.c_void_p, but got " + str(type(bgraph))             # <<<<<<<<<<<<<<
@@ -14853,7 +14846,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
   }
   __pyx_L3:;
 
-  /* "megakernel/_cython/core.pyx":450
+  /* "python/xop/megakernel/_cython/core.pyx":450
  *     cdef CppTBGraph *p_bgraph #Hold a CppTBGraph instance
  * 
  *     def __cinit__(self, tuple grid_dim = (), tuple block_dim = (), int thread_num = 128, bgraph = None):             # <<<<<<<<<<<<<<
@@ -14876,7 +14869,7 @@ static int __pyx_pf_10megakernel_4core_9CyTBGraph___cinit__(struct __pyx_obj_10m
   return __pyx_r;
 }
 
-/* "megakernel/_cython/core.pyx":475
+/* "python/xop/megakernel/_cython/core.pyx":475
  *                 assert False, "bgraph must be an integer or ctypes.c_void_p, but got " + str(type(bgraph))
  * 
  *     def new_input(self, DTensor dtensor, tuple input_map):             # <<<<<<<<<<<<<<
@@ -15023,7 +15016,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("new_input", 1);
 
-  /* "megakernel/_cython/core.pyx":476
+  /* "python/xop/megakernel/_cython/core.pyx":476
  * 
  *     def new_input(self, DTensor dtensor, tuple input_map):
  *         assert len(input_map) == 3, "input_map must be of length 3"             # <<<<<<<<<<<<<<
@@ -15047,7 +15040,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
   if ((1)); else __PYX_ERR(1, 476, __pyx_L1_error)
   #endif
 
-  /* "megakernel/_cython/core.pyx":478
+  /* "python/xop/megakernel/_cython/core.pyx":478
  *         assert len(input_map) == 3, "input_map must be of length 3"
  *         cdef int3 c_input_map
  *         c_input_map.x = input_map[0]             # <<<<<<<<<<<<<<
@@ -15064,7 +15057,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_v_c_input_map.x = __pyx_t_4;
 
-  /* "megakernel/_cython/core.pyx":479
+  /* "python/xop/megakernel/_cython/core.pyx":479
  *         cdef int3 c_input_map
  *         c_input_map.x = input_map[0]
  *         c_input_map.y = input_map[1]             # <<<<<<<<<<<<<<
@@ -15081,7 +15074,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_v_c_input_map.y = __pyx_t_4;
 
-  /* "megakernel/_cython/core.pyx":480
+  /* "python/xop/megakernel/_cython/core.pyx":480
  *         c_input_map.x = input_map[0]
  *         c_input_map.y = input_map[1]
  *         c_input_map.z = input_map[2]             # <<<<<<<<<<<<<<
@@ -15098,7 +15091,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_v_c_input_map.z = __pyx_t_4;
 
-  /* "megakernel/_cython/core.pyx":481
+  /* "python/xop/megakernel/_cython/core.pyx":481
  *         c_input_map.y = input_map[1]
  *         c_input_map.z = input_map[2]
  *         cdef CppDTensor* dtensor_cptr = NULL             # <<<<<<<<<<<<<<
@@ -15107,7 +15100,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
  */
   __pyx_v_dtensor_cptr = NULL;
 
-  /* "megakernel/_cython/core.pyx":482
+  /* "python/xop/megakernel/_cython/core.pyx":482
  *         c_input_map.z = input_map[2]
  *         cdef CppDTensor* dtensor_cptr = NULL
  *         if dtensor is not None:             # <<<<<<<<<<<<<<
@@ -15117,7 +15110,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
   __pyx_t_2 = (((PyObject *)__pyx_v_dtensor) != Py_None);
   if (__pyx_t_2) {
 
-    /* "megakernel/_cython/core.pyx":483
+    /* "python/xop/megakernel/_cython/core.pyx":483
  *         cdef CppDTensor* dtensor_cptr = NULL
  *         if dtensor is not None:
  *             dtensor_cptr = dtensor.c_ptr             # <<<<<<<<<<<<<<
@@ -15127,7 +15120,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
     __pyx_t_5 = __pyx_v_dtensor->c_ptr;
     __pyx_v_dtensor_cptr = __pyx_t_5;
 
-    /* "megakernel/_cython/core.pyx":482
+    /* "python/xop/megakernel/_cython/core.pyx":482
  *         c_input_map.z = input_map[2]
  *         cdef CppDTensor* dtensor_cptr = NULL
  *         if dtensor is not None:             # <<<<<<<<<<<<<<
@@ -15136,7 +15129,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
  */
   }
 
-  /* "megakernel/_cython/core.pyx":484
+  /* "python/xop/megakernel/_cython/core.pyx":484
  *         if dtensor is not None:
  *             dtensor_cptr = dtensor.c_ptr
  *         cdef CppDTensor* ptr = self.p_bgraph.new_input(dtensor_cptr, c_input_map)             # <<<<<<<<<<<<<<
@@ -15145,7 +15138,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
  */
   __pyx_v_ptr = __pyx_v_self->p_bgraph->new_input(__pyx_v_dtensor_cptr, __pyx_v_c_input_map);
 
-  /* "megakernel/_cython/core.pyx":485
+  /* "python/xop/megakernel/_cython/core.pyx":485
  *             dtensor_cptr = dtensor.c_ptr
  *         cdef CppDTensor* ptr = self.p_bgraph.new_input(dtensor_cptr, c_input_map)
  *         t = ctypes.cast(<unsigned long long>ptr, ctypes.c_void_p)             # <<<<<<<<<<<<<<
@@ -15191,7 +15184,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
   __pyx_v_t = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":486
+  /* "python/xop/megakernel/_cython/core.pyx":486
  *         cdef CppDTensor* ptr = self.p_bgraph.new_input(dtensor_cptr, c_input_map)
  *         t = ctypes.cast(<unsigned long long>ptr, ctypes.c_void_p)
  *         return DTensor(t)             # <<<<<<<<<<<<<<
@@ -15205,7 +15198,7 @@ static PyObject *__pyx_pf_10megakernel_4core_9CyTBGraph_2new_input(struct __pyx_
   __pyx_t_3 = 0;
   goto __pyx_L0;
 
-  /* "megakernel/_cython/core.pyx":475
+  /* "python/xop/megakernel/_cython/core.pyx":475
  *                 assert False, "bgraph must be an integer or ctypes.c_void_p, but got " + str(type(bgraph))
  * 
  *     def new_input(self, DTensor dtensor, tuple input_map):             # <<<<<<<<<<<<<<
@@ -16231,7 +16224,6 @@ static int __Pyx_CreateStringTabAndInitStrings(void) {
     {&__pyx_kp_u_isenabled, __pyx_k_isenabled, sizeof(__pyx_k_isenabled), 0, 1, 0, 0},
     {&__pyx_n_u_json_file, __pyx_k_json_file, sizeof(__pyx_k_json_file), 0, 1, 0, 1},
     {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
-    {&__pyx_kp_s_megakernel__cython_core_pyx, __pyx_k_megakernel__cython_core_pyx, sizeof(__pyx_k_megakernel__cython_core_pyx), 0, 0, 1, 0},
     {&__pyx_n_s_megakernel_core, __pyx_k_megakernel_core, sizeof(__pyx_k_megakernel_core), 0, 0, 1, 1},
     {&__pyx_n_s_metaclass, __pyx_k_metaclass, sizeof(__pyx_k_metaclass), 0, 0, 1, 1},
     {&__pyx_n_s_module, __pyx_k_module, sizeof(__pyx_k_module), 0, 0, 1, 1},
@@ -16250,6 +16242,7 @@ static int __Pyx_CreateStringTabAndInitStrings(void) {
     {&__pyx_n_s_print, __pyx_k_print, sizeof(__pyx_k_print), 0, 0, 1, 1},
     {&__pyx_n_s_ptr, __pyx_k_ptr, sizeof(__pyx_k_ptr), 0, 0, 1, 1},
     {&__pyx_n_s_py_byte_string, __pyx_k_py_byte_string, sizeof(__pyx_k_py_byte_string), 0, 0, 1, 1},
+    {&__pyx_kp_s_python_xop_megakernel__cython_co, __pyx_k_python_xop_megakernel__cython_co, sizeof(__pyx_k_python_xop_megakernel__cython_co), 0, 0, 1, 0},
     {&__pyx_n_s_pyx_state, __pyx_k_pyx_state, sizeof(__pyx_k_pyx_state), 0, 0, 1, 1},
     {&__pyx_n_s_pyx_vtable, __pyx_k_pyx_vtable, sizeof(__pyx_k_pyx_vtable), 0, 0, 1, 1},
     {&__pyx_n_s_qualname, __pyx_k_qualname, sizeof(__pyx_k_qualname), 0, 0, 1, 1},
@@ -16309,7 +16302,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "megakernel/_cython/core.pyx":336
+  /* "python/xop/megakernel/_cython/core.pyx":336
  *         def __get__(self):
  *             if self.c_ptr == NULL:
  *                 print("Error: tensor is None in num_dims property")             # <<<<<<<<<<<<<<
@@ -16341,7 +16334,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__6);
   __pyx_codeobj__7 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__6, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_stringsource, __pyx_n_s_setstate_cython, 3, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__7)) __PYX_ERR(0, 3, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":165
+  /* "python/xop/megakernel/_cython/core.pyx":165
  *     FP_TYPES = ['fp16', 'bf16', 'fp32', 'fp64']
  * 
  *     def __init__(self, name):             # <<<<<<<<<<<<<<
@@ -16351,126 +16344,126 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__8 = PyTuple_Pack(2, __pyx_n_s_self, __pyx_n_s_name); if (unlikely(!__pyx_tuple__8)) __PYX_ERR(1, 165, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__8);
   __Pyx_GIVEREF(__pyx_tuple__8);
-  __pyx_codeobj__9 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__8, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_init, 165, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__9)) __PYX_ERR(1, 165, __pyx_L1_error)
+  __pyx_codeobj__9 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__8, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_init, 165, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__9)) __PYX_ERR(1, 165, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":169
+  /* "python/xop/megakernel/_cython/core.pyx":169
  *         assert name in dtype.SINT_TYPES + dtype.UINT_TYPES + dtype.FP_TYPES, name
  * 
  *     def is_fp16(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'fp16'
  * 
  */
-  __pyx_codeobj__10 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_fp16, 169, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__10)) __PYX_ERR(1, 169, __pyx_L1_error)
+  __pyx_codeobj__10 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_fp16, 169, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__10)) __PYX_ERR(1, 169, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":172
+  /* "python/xop/megakernel/_cython/core.pyx":172
  *         return self.name == 'fp16'
  * 
  *     def is_bf16(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'bf16'
  * 
  */
-  __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_bf16, 172, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) __PYX_ERR(1, 172, __pyx_L1_error)
+  __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_bf16, 172, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) __PYX_ERR(1, 172, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":175
+  /* "python/xop/megakernel/_cython/core.pyx":175
  *         return self.name == 'bf16'
  * 
  *     def is_fp32(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'fp32'
  * 
  */
-  __pyx_codeobj__12 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_fp32, 175, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__12)) __PYX_ERR(1, 175, __pyx_L1_error)
+  __pyx_codeobj__12 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_fp32, 175, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__12)) __PYX_ERR(1, 175, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":178
+  /* "python/xop/megakernel/_cython/core.pyx":178
  *         return self.name == 'fp32'
  * 
  *     def is_fp64(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'fp64'
  * 
  */
-  __pyx_codeobj__13 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_fp64, 178, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__13)) __PYX_ERR(1, 178, __pyx_L1_error)
+  __pyx_codeobj__13 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_fp64, 178, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__13)) __PYX_ERR(1, 178, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":181
+  /* "python/xop/megakernel/_cython/core.pyx":181
  *         return self.name == 'fp64'
  * 
  *     def is_int1(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'int1'
  * 
  */
-  __pyx_codeobj__14 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_int1, 181, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__14)) __PYX_ERR(1, 181, __pyx_L1_error)
+  __pyx_codeobj__14 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_int1, 181, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__14)) __PYX_ERR(1, 181, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":184
+  /* "python/xop/megakernel/_cython/core.pyx":184
  *         return self.name == 'int1'
  * 
  *     def is_int8(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'int8'
  * 
  */
-  __pyx_codeobj__15 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_int8, 184, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__15)) __PYX_ERR(1, 184, __pyx_L1_error)
+  __pyx_codeobj__15 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_int8, 184, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__15)) __PYX_ERR(1, 184, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":187
+  /* "python/xop/megakernel/_cython/core.pyx":187
  *         return self.name == 'int8'
  * 
  *     def is_int16(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'int16'
  * 
  */
-  __pyx_codeobj__16 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_int16, 187, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__16)) __PYX_ERR(1, 187, __pyx_L1_error)
+  __pyx_codeobj__16 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_int16, 187, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__16)) __PYX_ERR(1, 187, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":190
+  /* "python/xop/megakernel/_cython/core.pyx":190
  *         return self.name == 'int16'
  * 
  *     def is_int32(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'int32'
  * 
  */
-  __pyx_codeobj__17 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_int32, 190, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__17)) __PYX_ERR(1, 190, __pyx_L1_error)
+  __pyx_codeobj__17 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_int32, 190, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__17)) __PYX_ERR(1, 190, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":193
+  /* "python/xop/megakernel/_cython/core.pyx":193
  *         return self.name == 'int32'
  * 
  *     def is_int64(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'int64'
  * 
  */
-  __pyx_codeobj__18 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_int64, 193, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__18)) __PYX_ERR(1, 193, __pyx_L1_error)
+  __pyx_codeobj__18 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_int64, 193, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__18)) __PYX_ERR(1, 193, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":196
+  /* "python/xop/megakernel/_cython/core.pyx":196
  *         return self.name == 'int64'
  * 
  *     def is_uint8(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'uint8'
  * 
  */
-  __pyx_codeobj__19 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_uint8, 196, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__19)) __PYX_ERR(1, 196, __pyx_L1_error)
+  __pyx_codeobj__19 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_uint8, 196, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__19)) __PYX_ERR(1, 196, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":199
+  /* "python/xop/megakernel/_cython/core.pyx":199
  *         return self.name == 'uint8'
  * 
  *     def is_uint16(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'uint16'
  * 
  */
-  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_uint16, 199, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) __PYX_ERR(1, 199, __pyx_L1_error)
+  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_uint16, 199, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) __PYX_ERR(1, 199, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":202
+  /* "python/xop/megakernel/_cython/core.pyx":202
  *         return self.name == 'uint16'
  * 
  *     def is_uint32(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'uint32'
  * 
  */
-  __pyx_codeobj__21 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_uint32, 202, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__21)) __PYX_ERR(1, 202, __pyx_L1_error)
+  __pyx_codeobj__21 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_uint32, 202, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__21)) __PYX_ERR(1, 202, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":205
+  /* "python/xop/megakernel/_cython/core.pyx":205
  *         return self.name == 'uint32'
  * 
  *     def is_uint64(self):             # <<<<<<<<<<<<<<
  *         return self.name == 'uint64'
  * 
  */
-  __pyx_codeobj__22 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_uint64, 205, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__22)) __PYX_ERR(1, 205, __pyx_L1_error)
+  __pyx_codeobj__22 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_uint64, 205, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__22)) __PYX_ERR(1, 205, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":208
+  /* "python/xop/megakernel/_cython/core.pyx":208
  *         return self.name == 'uint64'
  * 
  *     def __eq__(self, other: dtype):             # <<<<<<<<<<<<<<
@@ -16480,36 +16473,36 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__23 = PyTuple_Pack(2, __pyx_n_s_self, __pyx_n_s_other); if (unlikely(!__pyx_tuple__23)) __PYX_ERR(1, 208, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__23);
   __Pyx_GIVEREF(__pyx_tuple__23);
-  __pyx_codeobj__24 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__23, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_eq, 208, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__24)) __PYX_ERR(1, 208, __pyx_L1_error)
+  __pyx_codeobj__24 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__23, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_eq, 208, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__24)) __PYX_ERR(1, 208, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":213
+  /* "python/xop/megakernel/_cython/core.pyx":213
  *         return self.name == other.name
  * 
  *     def __ne__(self, other: dtype):             # <<<<<<<<<<<<<<
  *         return not self.__eq__(other)
  * 
  */
-  __pyx_codeobj__25 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__23, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_ne, 213, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__25)) __PYX_ERR(1, 213, __pyx_L1_error)
+  __pyx_codeobj__25 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__23, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_ne, 213, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__25)) __PYX_ERR(1, 213, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":216
+  /* "python/xop/megakernel/_cython/core.pyx":216
  *         return not self.__eq__(other)
  * 
  *     def __hash__(self):             # <<<<<<<<<<<<<<
  *         return hash((self.name, ))
  * 
  */
-  __pyx_codeobj__26 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_hash, 216, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__26)) __PYX_ERR(1, 216, __pyx_L1_error)
+  __pyx_codeobj__26 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_hash, 216, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__26)) __PYX_ERR(1, 216, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":219
+  /* "python/xop/megakernel/_cython/core.pyx":219
  *         return hash((self.name, ))
  * 
  *     def __str__(self):             # <<<<<<<<<<<<<<
  *         return self.name
  * 
  */
-  __pyx_codeobj__27 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_str, 219, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__27)) __PYX_ERR(1, 219, __pyx_L1_error)
+  __pyx_codeobj__27 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_str, 219, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__27)) __PYX_ERR(1, 219, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":222
+  /* "python/xop/megakernel/_cython/core.pyx":222
  *         return self.name
  * 
  *     def is_dtype(type_str):             # <<<<<<<<<<<<<<
@@ -16519,9 +16512,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__28 = PyTuple_Pack(1, __pyx_n_s_type_str); if (unlikely(!__pyx_tuple__28)) __PYX_ERR(1, 222, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__28);
   __Pyx_GIVEREF(__pyx_tuple__28);
-  __pyx_codeobj__29 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__28, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_is_dtype, 222, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__29)) __PYX_ERR(1, 222, __pyx_L1_error)
+  __pyx_codeobj__29 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__28, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_is_dtype, 222, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__29)) __PYX_ERR(1, 222, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":226
+  /* "python/xop/megakernel/_cython/core.pyx":226
  * 
  * # data types
  * int8 = dtype('int8')             # <<<<<<<<<<<<<<
@@ -16532,7 +16525,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__30);
   __Pyx_GIVEREF(__pyx_tuple__30);
 
-  /* "megakernel/_cython/core.pyx":227
+  /* "python/xop/megakernel/_cython/core.pyx":227
  * # data types
  * int8 = dtype('int8')
  * int16 = dtype('int16')             # <<<<<<<<<<<<<<
@@ -16543,7 +16536,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__31);
   __Pyx_GIVEREF(__pyx_tuple__31);
 
-  /* "megakernel/_cython/core.pyx":228
+  /* "python/xop/megakernel/_cython/core.pyx":228
  * int8 = dtype('int8')
  * int16 = dtype('int16')
  * int32 = dtype('int32')             # <<<<<<<<<<<<<<
@@ -16554,7 +16547,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__32);
   __Pyx_GIVEREF(__pyx_tuple__32);
 
-  /* "megakernel/_cython/core.pyx":229
+  /* "python/xop/megakernel/_cython/core.pyx":229
  * int16 = dtype('int16')
  * int32 = dtype('int32')
  * int64 = dtype('int64')             # <<<<<<<<<<<<<<
@@ -16565,7 +16558,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__33);
   __Pyx_GIVEREF(__pyx_tuple__33);
 
-  /* "megakernel/_cython/core.pyx":230
+  /* "python/xop/megakernel/_cython/core.pyx":230
  * int32 = dtype('int32')
  * int64 = dtype('int64')
  * uint8 = dtype('uint8')             # <<<<<<<<<<<<<<
@@ -16576,7 +16569,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__34);
   __Pyx_GIVEREF(__pyx_tuple__34);
 
-  /* "megakernel/_cython/core.pyx":231
+  /* "python/xop/megakernel/_cython/core.pyx":231
  * int64 = dtype('int64')
  * uint8 = dtype('uint8')
  * uint16 = dtype('uint16')             # <<<<<<<<<<<<<<
@@ -16587,7 +16580,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__35);
   __Pyx_GIVEREF(__pyx_tuple__35);
 
-  /* "megakernel/_cython/core.pyx":232
+  /* "python/xop/megakernel/_cython/core.pyx":232
  * uint8 = dtype('uint8')
  * uint16 = dtype('uint16')
  * uint32 = dtype('uint32')             # <<<<<<<<<<<<<<
@@ -16598,7 +16591,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__36);
   __Pyx_GIVEREF(__pyx_tuple__36);
 
-  /* "megakernel/_cython/core.pyx":233
+  /* "python/xop/megakernel/_cython/core.pyx":233
  * uint16 = dtype('uint16')
  * uint32 = dtype('uint32')
  * uint64 = dtype('uint64')             # <<<<<<<<<<<<<<
@@ -16609,7 +16602,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__37);
   __Pyx_GIVEREF(__pyx_tuple__37);
 
-  /* "megakernel/_cython/core.pyx":234
+  /* "python/xop/megakernel/_cython/core.pyx":234
  * uint32 = dtype('uint32')
  * uint64 = dtype('uint64')
  * float16 = dtype('fp16')             # <<<<<<<<<<<<<<
@@ -16620,7 +16613,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__38);
   __Pyx_GIVEREF(__pyx_tuple__38);
 
-  /* "megakernel/_cython/core.pyx":235
+  /* "python/xop/megakernel/_cython/core.pyx":235
  * uint64 = dtype('uint64')
  * float16 = dtype('fp16')
  * bfloat16 = dtype('bf16')             # <<<<<<<<<<<<<<
@@ -16631,7 +16624,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__39);
   __Pyx_GIVEREF(__pyx_tuple__39);
 
-  /* "megakernel/_cython/core.pyx":236
+  /* "python/xop/megakernel/_cython/core.pyx":236
  * float16 = dtype('fp16')
  * bfloat16 = dtype('bf16')
  * float32 = dtype('fp32')             # <<<<<<<<<<<<<<
@@ -16642,7 +16635,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__40);
   __Pyx_GIVEREF(__pyx_tuple__40);
 
-  /* "megakernel/_cython/core.pyx":237
+  /* "python/xop/megakernel/_cython/core.pyx":237
  * bfloat16 = dtype('bf16')
  * float32 = dtype('fp32')
  * float64 = dtype('fp64')             # <<<<<<<<<<<<<<
@@ -16653,7 +16646,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__41);
   __Pyx_GIVEREF(__pyx_tuple__41);
 
-  /* "megakernel/_cython/core.pyx":240
+  /* "python/xop/megakernel/_cython/core.pyx":240
  * 
  * 
  * def convert_dtype_to_ctype(type : dtype):             # <<<<<<<<<<<<<<
@@ -16663,27 +16656,27 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__42 = PyTuple_Pack(1, __pyx_n_s_type); if (unlikely(!__pyx_tuple__42)) __PYX_ERR(1, 240, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__42);
   __Pyx_GIVEREF(__pyx_tuple__42);
-  __pyx_codeobj__43 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__42, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_convert_dtype_to_ctype, 240, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__43)) __PYX_ERR(1, 240, __pyx_L1_error)
+  __pyx_codeobj__43 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__42, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_convert_dtype_to_ctype, 240, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__43)) __PYX_ERR(1, 240, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":262
+  /* "python/xop/megakernel/_cython/core.pyx":262
  *         raise RuntimeError(f"Unsupported dtype: {dtype}")
  * 
  * def convert_ctype_to_dtype(type):             # <<<<<<<<<<<<<<
  *     if type == DT_INT8:
  *         return int8
  */
-  __pyx_codeobj__44 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__42, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_convert_ctype_to_dtype, 262, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__44)) __PYX_ERR(1, 262, __pyx_L1_error)
+  __pyx_codeobj__44 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__42, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_convert_ctype_to_dtype, 262, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__44)) __PYX_ERR(1, 262, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":280
+  /* "python/xop/megakernel/_cython/core.pyx":280
  *         return None
  * 
  * def convert_torch_type_to_dtype(type):             # <<<<<<<<<<<<<<
  *     if type is torch.int8:
  *         return int8
  */
-  __pyx_codeobj__45 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__42, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_convert_torch_type_to_dtype, 280, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__45)) __PYX_ERR(1, 280, __pyx_L1_error)
+  __pyx_codeobj__45 = (PyObject*)__Pyx_PyCode_New(1, 0, 0, 1, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__42, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_convert_torch_type_to_dtype, 280, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__45)) __PYX_ERR(1, 280, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":351
+  /* "python/xop/megakernel/_cython/core.pyx":351
  *         self._set_tensor(tensor)
  * 
  *     def dim(self, int idx):             # <<<<<<<<<<<<<<
@@ -16693,7 +16686,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__46 = PyTuple_Pack(2, __pyx_n_s_self, __pyx_n_s_idx); if (unlikely(!__pyx_tuple__46)) __PYX_ERR(1, 351, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__46);
   __Pyx_GIVEREF(__pyx_tuple__46);
-  __pyx_codeobj__47 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__46, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_dim, 351, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__47)) __PYX_ERR(1, 351, __pyx_L1_error)
+  __pyx_codeobj__47 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__46, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_dim, 351, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__47)) __PYX_ERR(1, 351, __pyx_L1_error)
 
   /* "(tree fragment)":1
  * def __reduce_cython__(self):             # <<<<<<<<<<<<<<
@@ -16710,7 +16703,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  */
   __pyx_codeobj__49 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__6, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_stringsource, __pyx_n_s_setstate_cython, 3, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__49)) __PYX_ERR(0, 3, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":374
+  /* "python/xop/megakernel/_cython/core.pyx":374
  *             self.p_kgraph = <CppKNGraph*>(ptr)
  * 
  *     def new_input(self, tuple dims, tuple strides, dtype : dtype = float16):             # <<<<<<<<<<<<<<
@@ -16720,9 +16713,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__50 = PyTuple_Pack(10, __pyx_n_s_self, __pyx_n_s_dims, __pyx_n_s_strides, __pyx_n_s_dtype, __pyx_n_s_cdims, __pyx_n_s_cstrides, __pyx_n_s_i, __pyx_n_s_c_type, __pyx_n_s_ptr, __pyx_n_s_t); if (unlikely(!__pyx_tuple__50)) __PYX_ERR(1, 374, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__50);
   __Pyx_GIVEREF(__pyx_tuple__50);
-  __pyx_codeobj__51 = (PyObject*)__Pyx_PyCode_New(4, 0, 0, 10, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__50, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_new_input, 374, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__51)) __PYX_ERR(1, 374, __pyx_L1_error)
+  __pyx_codeobj__51 = (PyObject*)__Pyx_PyCode_New(4, 0, 0, 10, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__50, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_new_input, 374, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__51)) __PYX_ERR(1, 374, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":389
+  /* "python/xop/megakernel/_cython/core.pyx":389
  *         return DTensor(t)
  * 
  *     def customized(self, list inputs, CyTBGraph bgraph):             # <<<<<<<<<<<<<<
@@ -16732,9 +16725,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__52 = PyTuple_Pack(6, __pyx_n_s_self, __pyx_n_s_inputs, __pyx_n_s_bgraph, __pyx_n_s_cinputs, __pyx_n_s_t, __pyx_n_s_i); if (unlikely(!__pyx_tuple__52)) __PYX_ERR(1, 389, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__52);
   __Pyx_GIVEREF(__pyx_tuple__52);
-  __pyx_codeobj__53 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 6, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__52, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_customized, 389, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__53)) __PYX_ERR(1, 389, __pyx_L1_error)
+  __pyx_codeobj__53 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 6, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__52, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_customized, 389, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__53)) __PYX_ERR(1, 389, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":403
+  /* "python/xop/megakernel/_cython/core.pyx":403
  * 
  *     # Functions for ersistent kernels
  *     def attach_torch_tensor(self, DTensor tensor, torch_tensor, str name):             # <<<<<<<<<<<<<<
@@ -16744,9 +16737,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__54 = PyTuple_Pack(7, __pyx_n_s_self, __pyx_n_s_tensor, __pyx_n_s_torch_tensor, __pyx_n_s_name, __pyx_n_s_torch_data_ptr, __pyx_n_s_cname, __pyx_n_s_py_byte_string); if (unlikely(!__pyx_tuple__54)) __PYX_ERR(1, 403, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__54);
   __Pyx_GIVEREF(__pyx_tuple__54);
-  __pyx_codeobj__55 = (PyObject*)__Pyx_PyCode_New(4, 0, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__54, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_attach_torch_tensor, 403, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__55)) __PYX_ERR(1, 403, __pyx_L1_error)
+  __pyx_codeobj__55 = (PyObject*)__Pyx_PyCode_New(4, 0, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__54, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_attach_torch_tensor, 403, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__55)) __PYX_ERR(1, 403, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":412
+  /* "python/xop/megakernel/_cython/core.pyx":412
  *         self.p_kgraph.attach_torch_tensor(tensor.c_ptr, <void *>torch_data_ptr, cname)
  * 
  *     def attach_cuda_tensor(self, DTensor tensor, str name):             # <<<<<<<<<<<<<<
@@ -16756,18 +16749,18 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__56 = PyTuple_Pack(5, __pyx_n_s_self, __pyx_n_s_tensor, __pyx_n_s_name, __pyx_n_s_cname, __pyx_n_s_py_byte_string); if (unlikely(!__pyx_tuple__56)) __PYX_ERR(1, 412, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__56);
   __Pyx_GIVEREF(__pyx_tuple__56);
-  __pyx_codeobj__57 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__56, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_attach_cuda_tensor, 412, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__57)) __PYX_ERR(1, 412, __pyx_L1_error)
+  __pyx_codeobj__57 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__56, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_attach_cuda_tensor, 412, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__57)) __PYX_ERR(1, 412, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":419
+  /* "python/xop/megakernel/_cython/core.pyx":419
  *         self.p_kgraph.attach_cuda_tensor(tensor.c_ptr, cname)
  * 
  *     def attach_nvshmem_tensor(self, DTensor tensor, str name):             # <<<<<<<<<<<<<<
  *         cdef char* cname = NULL
  *         if name is not None:
  */
-  __pyx_codeobj__58 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__56, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_attach_nvshmem_tensor, 419, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__58)) __PYX_ERR(1, 419, __pyx_L1_error)
+  __pyx_codeobj__58 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__56, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_attach_nvshmem_tensor, 419, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__58)) __PYX_ERR(1, 419, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":426
+  /* "python/xop/megakernel/_cython/core.pyx":426
  *         self.p_kgraph.attach_nvshmem_tensor(tensor.c_ptr, cname)
  * 
  *     def register_task(self, str task_type, list[int] params):             # <<<<<<<<<<<<<<
@@ -16777,9 +16770,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__59 = PyTuple_Pack(7, __pyx_n_s_self, __pyx_n_s_task_type, __pyx_n_s_params, __pyx_n_s_cname, __pyx_n_s_py_byte_string, __pyx_n_s_cparams, __pyx_n_s_i); if (unlikely(!__pyx_tuple__59)) __PYX_ERR(1, 426, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__59);
   __Pyx_GIVEREF(__pyx_tuple__59);
-  __pyx_codeobj__60 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__59, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_register_task, 426, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__60)) __PYX_ERR(1, 426, __pyx_L1_error)
+  __pyx_codeobj__60 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__59, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_register_task, 426, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__60)) __PYX_ERR(1, 426, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":439
+  /* "python/xop/megakernel/_cython/core.pyx":439
  *         self.p_kgraph.register_task(cname, cparams)
  * 
  *     def generate_task_graph(self, int num_gpus, int my_gpu_id):             # <<<<<<<<<<<<<<
@@ -16789,7 +16782,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__61 = PyTuple_Pack(4, __pyx_n_s_self, __pyx_n_s_num_gpus, __pyx_n_s_my_gpu_id, __pyx_n_s_result); if (unlikely(!__pyx_tuple__61)) __PYX_ERR(1, 439, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__61);
   __Pyx_GIVEREF(__pyx_tuple__61);
-  __pyx_codeobj__62 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 4, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__61, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_generate_task_graph, 439, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__62)) __PYX_ERR(1, 439, __pyx_L1_error)
+  __pyx_codeobj__62 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 4, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__61, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_generate_task_graph, 439, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__62)) __PYX_ERR(1, 439, __pyx_L1_error)
 
   /* "(tree fragment)":1
  * def __reduce_cython__(self):             # <<<<<<<<<<<<<<
@@ -16806,7 +16799,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  */
   __pyx_codeobj__64 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__6, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_stringsource, __pyx_n_s_setstate_cython, 3, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__64)) __PYX_ERR(0, 3, __pyx_L1_error)
 
-  /* "megakernel/_cython/core.pyx":475
+  /* "python/xop/megakernel/_cython/core.pyx":475
  *                 assert False, "bgraph must be an integer or ctypes.c_void_p, but got " + str(type(bgraph))
  * 
  *     def new_input(self, DTensor dtensor, tuple input_map):             # <<<<<<<<<<<<<<
@@ -16816,7 +16809,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__65 = PyTuple_Pack(7, __pyx_n_s_self, __pyx_n_s_dtensor, __pyx_n_s_input_map, __pyx_n_s_c_input_map, __pyx_n_s_dtensor_cptr, __pyx_n_s_ptr, __pyx_n_s_t); if (unlikely(!__pyx_tuple__65)) __PYX_ERR(1, 475, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__65);
   __Pyx_GIVEREF(__pyx_tuple__65);
-  __pyx_codeobj__66 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__65, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_megakernel__cython_core_pyx, __pyx_n_s_new_input, 475, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__66)) __PYX_ERR(1, 475, __pyx_L1_error)
+  __pyx_codeobj__66 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__65, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_python_xop_megakernel__cython_co, __pyx_n_s_new_input, 475, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__66)) __PYX_ERR(1, 475, __pyx_L1_error)
 
   /* "(tree fragment)":1
  * def __reduce_cython__(self):             # <<<<<<<<<<<<<<
@@ -17340,7 +17333,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_patch_abc() < 0) __PYX_ERR(1, 1, __pyx_L1_error)
   #endif
 
-  /* "megakernel/_cython/core.pyx":17
+  /* "python/xop/megakernel/_cython/core.pyx":17
  * 
  * from cpython cimport array
  * import ctypes             # <<<<<<<<<<<<<<
@@ -17352,7 +17345,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_ctypes, __pyx_t_2) < 0) __PYX_ERR(1, 17, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":18
+  /* "python/xop/megakernel/_cython/core.pyx":18
  * from cpython cimport array
  * import ctypes
  * import array             # <<<<<<<<<<<<<<
@@ -17364,7 +17357,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_array, __pyx_t_2) < 0) __PYX_ERR(1, 18, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":19
+  /* "python/xop/megakernel/_cython/core.pyx":19
  * import ctypes
  * import array
  * import numpy as np             # <<<<<<<<<<<<<<
@@ -17376,7 +17369,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_2) < 0) __PYX_ERR(1, 19, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":20
+  /* "python/xop/megakernel/_cython/core.pyx":20
  * import array
  * import numpy as np
  * import torch             # <<<<<<<<<<<<<<
@@ -17409,7 +17402,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_setstate_cython, __pyx_t_2) < 0) __PYX_ERR(0, 3, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":160
+  /* "python/xop/megakernel/_cython/core.pyx":160
  * ################################################################
  * 
  * class dtype:             # <<<<<<<<<<<<<<
@@ -17419,7 +17412,7 @@ if (!__Pyx_RefNanny) {
   __pyx_t_2 = __Pyx_Py3MetaclassPrepare((PyObject *) NULL, __pyx_empty_tuple, __pyx_n_s_dtype, __pyx_n_s_dtype, (PyObject *) NULL, __pyx_n_s_megakernel_core, (PyObject *) NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 160, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
 
-  /* "megakernel/_cython/core.pyx":161
+  /* "python/xop/megakernel/_cython/core.pyx":161
  * 
  * class dtype:
  *     SINT_TYPES = ['int8', 'int16', 'int32', 'int64']             # <<<<<<<<<<<<<<
@@ -17443,7 +17436,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_SINT_TYPES, __pyx_t_3) < 0) __PYX_ERR(1, 161, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":162
+  /* "python/xop/megakernel/_cython/core.pyx":162
  * class dtype:
  *     SINT_TYPES = ['int8', 'int16', 'int32', 'int64']
  *     UINT_TYPES = ['uint8', 'uint16', 'uint32', 'uint64']             # <<<<<<<<<<<<<<
@@ -17467,7 +17460,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_UINT_TYPES, __pyx_t_3) < 0) __PYX_ERR(1, 162, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":163
+  /* "python/xop/megakernel/_cython/core.pyx":163
  *     SINT_TYPES = ['int8', 'int16', 'int32', 'int64']
  *     UINT_TYPES = ['uint8', 'uint16', 'uint32', 'uint64']
  *     FP_TYPES = ['fp16', 'bf16', 'fp32', 'fp64']             # <<<<<<<<<<<<<<
@@ -17491,7 +17484,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_FP_TYPES, __pyx_t_3) < 0) __PYX_ERR(1, 163, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":165
+  /* "python/xop/megakernel/_cython/core.pyx":165
  *     FP_TYPES = ['fp16', 'bf16', 'fp32', 'fp64']
  * 
  *     def __init__(self, name):             # <<<<<<<<<<<<<<
@@ -17503,7 +17496,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_init, __pyx_t_3) < 0) __PYX_ERR(1, 165, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":169
+  /* "python/xop/megakernel/_cython/core.pyx":169
  *         assert name in dtype.SINT_TYPES + dtype.UINT_TYPES + dtype.FP_TYPES, name
  * 
  *     def is_fp16(self):             # <<<<<<<<<<<<<<
@@ -17515,7 +17508,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_fp16, __pyx_t_3) < 0) __PYX_ERR(1, 169, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":172
+  /* "python/xop/megakernel/_cython/core.pyx":172
  *         return self.name == 'fp16'
  * 
  *     def is_bf16(self):             # <<<<<<<<<<<<<<
@@ -17527,7 +17520,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_bf16, __pyx_t_3) < 0) __PYX_ERR(1, 172, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":175
+  /* "python/xop/megakernel/_cython/core.pyx":175
  *         return self.name == 'bf16'
  * 
  *     def is_fp32(self):             # <<<<<<<<<<<<<<
@@ -17539,7 +17532,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_fp32, __pyx_t_3) < 0) __PYX_ERR(1, 175, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":178
+  /* "python/xop/megakernel/_cython/core.pyx":178
  *         return self.name == 'fp32'
  * 
  *     def is_fp64(self):             # <<<<<<<<<<<<<<
@@ -17551,7 +17544,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_fp64, __pyx_t_3) < 0) __PYX_ERR(1, 178, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":181
+  /* "python/xop/megakernel/_cython/core.pyx":181
  *         return self.name == 'fp64'
  * 
  *     def is_int1(self):             # <<<<<<<<<<<<<<
@@ -17563,7 +17556,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_int1, __pyx_t_3) < 0) __PYX_ERR(1, 181, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":184
+  /* "python/xop/megakernel/_cython/core.pyx":184
  *         return self.name == 'int1'
  * 
  *     def is_int8(self):             # <<<<<<<<<<<<<<
@@ -17575,7 +17568,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_int8, __pyx_t_3) < 0) __PYX_ERR(1, 184, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":187
+  /* "python/xop/megakernel/_cython/core.pyx":187
  *         return self.name == 'int8'
  * 
  *     def is_int16(self):             # <<<<<<<<<<<<<<
@@ -17587,7 +17580,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_int16, __pyx_t_3) < 0) __PYX_ERR(1, 187, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":190
+  /* "python/xop/megakernel/_cython/core.pyx":190
  *         return self.name == 'int16'
  * 
  *     def is_int32(self):             # <<<<<<<<<<<<<<
@@ -17599,7 +17592,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_int32, __pyx_t_3) < 0) __PYX_ERR(1, 190, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":193
+  /* "python/xop/megakernel/_cython/core.pyx":193
  *         return self.name == 'int32'
  * 
  *     def is_int64(self):             # <<<<<<<<<<<<<<
@@ -17611,7 +17604,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_int64, __pyx_t_3) < 0) __PYX_ERR(1, 193, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":196
+  /* "python/xop/megakernel/_cython/core.pyx":196
  *         return self.name == 'int64'
  * 
  *     def is_uint8(self):             # <<<<<<<<<<<<<<
@@ -17623,7 +17616,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_uint8, __pyx_t_3) < 0) __PYX_ERR(1, 196, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":199
+  /* "python/xop/megakernel/_cython/core.pyx":199
  *         return self.name == 'uint8'
  * 
  *     def is_uint16(self):             # <<<<<<<<<<<<<<
@@ -17635,7 +17628,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_uint16, __pyx_t_3) < 0) __PYX_ERR(1, 199, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":202
+  /* "python/xop/megakernel/_cython/core.pyx":202
  *         return self.name == 'uint16'
  * 
  *     def is_uint32(self):             # <<<<<<<<<<<<<<
@@ -17647,7 +17640,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_uint32, __pyx_t_3) < 0) __PYX_ERR(1, 202, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":205
+  /* "python/xop/megakernel/_cython/core.pyx":205
  *         return self.name == 'uint32'
  * 
  *     def is_uint64(self):             # <<<<<<<<<<<<<<
@@ -17659,7 +17652,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_uint64, __pyx_t_3) < 0) __PYX_ERR(1, 205, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":208
+  /* "python/xop/megakernel/_cython/core.pyx":208
  *         return self.name == 'uint64'
  * 
  *     def __eq__(self, other: dtype):             # <<<<<<<<<<<<<<
@@ -17676,7 +17669,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_eq, __pyx_t_4) < 0) __PYX_ERR(1, 208, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "megakernel/_cython/core.pyx":213
+  /* "python/xop/megakernel/_cython/core.pyx":213
  *         return self.name == other.name
  * 
  *     def __ne__(self, other: dtype):             # <<<<<<<<<<<<<<
@@ -17693,7 +17686,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_ne, __pyx_t_3) < 0) __PYX_ERR(1, 213, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":216
+  /* "python/xop/megakernel/_cython/core.pyx":216
  *         return not self.__eq__(other)
  * 
  *     def __hash__(self):             # <<<<<<<<<<<<<<
@@ -17705,7 +17698,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_hash, __pyx_t_3) < 0) __PYX_ERR(1, 216, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":219
+  /* "python/xop/megakernel/_cython/core.pyx":219
  *         return hash((self.name, ))
  * 
  *     def __str__(self):             # <<<<<<<<<<<<<<
@@ -17717,7 +17710,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_str, __pyx_t_3) < 0) __PYX_ERR(1, 219, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":222
+  /* "python/xop/megakernel/_cython/core.pyx":222
  *         return self.name
  * 
  *     def is_dtype(type_str):             # <<<<<<<<<<<<<<
@@ -17729,7 +17722,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_SetNameInClass(__pyx_t_2, __pyx_n_s_is_dtype, __pyx_t_3) < 0) __PYX_ERR(1, 222, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":160
+  /* "python/xop/megakernel/_cython/core.pyx":160
  * ################################################################
  * 
  * class dtype:             # <<<<<<<<<<<<<<
@@ -17742,7 +17735,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":226
+  /* "python/xop/megakernel/_cython/core.pyx":226
  * 
  * # data types
  * int8 = dtype('int8')             # <<<<<<<<<<<<<<
@@ -17757,7 +17750,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_int8, __pyx_t_3) < 0) __PYX_ERR(1, 226, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":227
+  /* "python/xop/megakernel/_cython/core.pyx":227
  * # data types
  * int8 = dtype('int8')
  * int16 = dtype('int16')             # <<<<<<<<<<<<<<
@@ -17772,7 +17765,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_int16, __pyx_t_2) < 0) __PYX_ERR(1, 227, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":228
+  /* "python/xop/megakernel/_cython/core.pyx":228
  * int8 = dtype('int8')
  * int16 = dtype('int16')
  * int32 = dtype('int32')             # <<<<<<<<<<<<<<
@@ -17787,7 +17780,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_int32, __pyx_t_3) < 0) __PYX_ERR(1, 228, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":229
+  /* "python/xop/megakernel/_cython/core.pyx":229
  * int16 = dtype('int16')
  * int32 = dtype('int32')
  * int64 = dtype('int64')             # <<<<<<<<<<<<<<
@@ -17802,7 +17795,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_int64, __pyx_t_2) < 0) __PYX_ERR(1, 229, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":230
+  /* "python/xop/megakernel/_cython/core.pyx":230
  * int32 = dtype('int32')
  * int64 = dtype('int64')
  * uint8 = dtype('uint8')             # <<<<<<<<<<<<<<
@@ -17817,7 +17810,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_uint8, __pyx_t_3) < 0) __PYX_ERR(1, 230, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":231
+  /* "python/xop/megakernel/_cython/core.pyx":231
  * int64 = dtype('int64')
  * uint8 = dtype('uint8')
  * uint16 = dtype('uint16')             # <<<<<<<<<<<<<<
@@ -17832,7 +17825,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_uint16, __pyx_t_2) < 0) __PYX_ERR(1, 231, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":232
+  /* "python/xop/megakernel/_cython/core.pyx":232
  * uint8 = dtype('uint8')
  * uint16 = dtype('uint16')
  * uint32 = dtype('uint32')             # <<<<<<<<<<<<<<
@@ -17847,7 +17840,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_uint32, __pyx_t_3) < 0) __PYX_ERR(1, 232, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":233
+  /* "python/xop/megakernel/_cython/core.pyx":233
  * uint16 = dtype('uint16')
  * uint32 = dtype('uint32')
  * uint64 = dtype('uint64')             # <<<<<<<<<<<<<<
@@ -17862,7 +17855,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_uint64, __pyx_t_2) < 0) __PYX_ERR(1, 233, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":234
+  /* "python/xop/megakernel/_cython/core.pyx":234
  * uint32 = dtype('uint32')
  * uint64 = dtype('uint64')
  * float16 = dtype('fp16')             # <<<<<<<<<<<<<<
@@ -17877,7 +17870,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_float16, __pyx_t_3) < 0) __PYX_ERR(1, 234, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":235
+  /* "python/xop/megakernel/_cython/core.pyx":235
  * uint64 = dtype('uint64')
  * float16 = dtype('fp16')
  * bfloat16 = dtype('bf16')             # <<<<<<<<<<<<<<
@@ -17892,7 +17885,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_bfloat16, __pyx_t_2) < 0) __PYX_ERR(1, 235, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":236
+  /* "python/xop/megakernel/_cython/core.pyx":236
  * float16 = dtype('fp16')
  * bfloat16 = dtype('bf16')
  * float32 = dtype('fp32')             # <<<<<<<<<<<<<<
@@ -17907,7 +17900,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_float32, __pyx_t_3) < 0) __PYX_ERR(1, 236, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":237
+  /* "python/xop/megakernel/_cython/core.pyx":237
  * bfloat16 = dtype('bf16')
  * float32 = dtype('fp32')
  * float64 = dtype('fp64')             # <<<<<<<<<<<<<<
@@ -17922,7 +17915,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_float64, __pyx_t_2) < 0) __PYX_ERR(1, 237, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "megakernel/_cython/core.pyx":240
+  /* "python/xop/megakernel/_cython/core.pyx":240
  * 
  * 
  * def convert_dtype_to_ctype(type : dtype):             # <<<<<<<<<<<<<<
@@ -17939,7 +17932,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_convert_dtype_to_ctype, __pyx_t_3) < 0) __PYX_ERR(1, 240, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":262
+  /* "python/xop/megakernel/_cython/core.pyx":262
  *         raise RuntimeError(f"Unsupported dtype: {dtype}")
  * 
  * def convert_ctype_to_dtype(type):             # <<<<<<<<<<<<<<
@@ -17951,7 +17944,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_convert_ctype_to_dtype, __pyx_t_3) < 0) __PYX_ERR(1, 262, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":280
+  /* "python/xop/megakernel/_cython/core.pyx":280
  *         return None
  * 
  * def convert_torch_type_to_dtype(type):             # <<<<<<<<<<<<<<
@@ -17963,7 +17956,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_convert_torch_type_to_dtype, __pyx_t_3) < 0) __PYX_ERR(1, 280, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":351
+  /* "python/xop/megakernel/_cython/core.pyx":351
  *         self._set_tensor(tensor)
  * 
  *     def dim(self, int idx):             # <<<<<<<<<<<<<<
@@ -17997,7 +17990,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_setstate_cython, __pyx_t_3) < 0) __PYX_ERR(0, 3, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "megakernel/_cython/core.pyx":374
+  /* "python/xop/megakernel/_cython/core.pyx":374
  *             self.p_kgraph = <CppKNGraph*>(ptr)
  * 
  *     def new_input(self, tuple dims, tuple strides, dtype : dtype = float16):             # <<<<<<<<<<<<<<
@@ -18029,7 +18022,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   PyType_Modified(__pyx_ptype_10megakernel_4core_CyKNGraph);
 
-  /* "megakernel/_cython/core.pyx":389
+  /* "python/xop/megakernel/_cython/core.pyx":389
  *         return DTensor(t)
  * 
  *     def customized(self, list inputs, CyTBGraph bgraph):             # <<<<<<<<<<<<<<
@@ -18042,7 +18035,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   PyType_Modified(__pyx_ptype_10megakernel_4core_CyKNGraph);
 
-  /* "megakernel/_cython/core.pyx":403
+  /* "python/xop/megakernel/_cython/core.pyx":403
  * 
  *     # Functions for ersistent kernels
  *     def attach_torch_tensor(self, DTensor tensor, torch_tensor, str name):             # <<<<<<<<<<<<<<
@@ -18055,7 +18048,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   PyType_Modified(__pyx_ptype_10megakernel_4core_CyKNGraph);
 
-  /* "megakernel/_cython/core.pyx":412
+  /* "python/xop/megakernel/_cython/core.pyx":412
  *         self.p_kgraph.attach_torch_tensor(tensor.c_ptr, <void *>torch_data_ptr, cname)
  * 
  *     def attach_cuda_tensor(self, DTensor tensor, str name):             # <<<<<<<<<<<<<<
@@ -18068,7 +18061,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   PyType_Modified(__pyx_ptype_10megakernel_4core_CyKNGraph);
 
-  /* "megakernel/_cython/core.pyx":419
+  /* "python/xop/megakernel/_cython/core.pyx":419
  *         self.p_kgraph.attach_cuda_tensor(tensor.c_ptr, cname)
  * 
  *     def attach_nvshmem_tensor(self, DTensor tensor, str name):             # <<<<<<<<<<<<<<
@@ -18081,7 +18074,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   PyType_Modified(__pyx_ptype_10megakernel_4core_CyKNGraph);
 
-  /* "megakernel/_cython/core.pyx":426
+  /* "python/xop/megakernel/_cython/core.pyx":426
  *         self.p_kgraph.attach_nvshmem_tensor(tensor.c_ptr, cname)
  * 
  *     def register_task(self, str task_type, list[int] params):             # <<<<<<<<<<<<<<
@@ -18094,7 +18087,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   PyType_Modified(__pyx_ptype_10megakernel_4core_CyKNGraph);
 
-  /* "megakernel/_cython/core.pyx":439
+  /* "python/xop/megakernel/_cython/core.pyx":439
  *         self.p_kgraph.register_task(cname, cparams)
  * 
  *     def generate_task_graph(self, int num_gpus, int my_gpu_id):             # <<<<<<<<<<<<<<
@@ -18128,7 +18121,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_setstate_cython, __pyx_t_4) < 0) __PYX_ERR(0, 3, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "megakernel/_cython/core.pyx":475
+  /* "python/xop/megakernel/_cython/core.pyx":475
  *                 assert False, "bgraph must be an integer or ctypes.c_void_p, but got " + str(type(bgraph))
  * 
  *     def new_input(self, DTensor dtensor, tuple input_map):             # <<<<<<<<<<<<<<
@@ -18162,7 +18155,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_setstate_cython, __pyx_t_4) < 0) __PYX_ERR(0, 3, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "megakernel/_cython/core.pyx":1
+  /* "python/xop/megakernel/_cython/core.pyx":1
  * # Copyright 2024 CMU             # <<<<<<<<<<<<<<
  * #
  * # Licensed under the Apache License, Version 2.0 (the "License");

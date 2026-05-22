@@ -1,5 +1,8 @@
 # Cutlass Operators
 
+# megakernel 编译
+python megakernel_setup.py build_ext --inplace
+
 ### Install from Source
 ```bash
 git clone 
