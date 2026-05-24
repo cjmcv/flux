@@ -39,7 +39,7 @@ def config_cython():
             ret.append(Extension(
                 "megakernel.%s" % fn[:-4],
                 ["%s/%s" % (cython_path, fn)],
-                include_dirs=[path.join(megakernel_path, "include/xop"),
+                include_dirs=[path.join(megakernel_path, "include"),
                               path.join(megakernel_path, "3rdparty", "json", "include"),
                               path.join(megakernel_path, "3rdparty", "cutlass", "include"),
                               "/usr/local/cuda/include"],

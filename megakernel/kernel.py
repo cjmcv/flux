@@ -22,7 +22,7 @@ def get_key_paths():
     
     # If MEGAKERNEL_ROOT is not set, use the root_dir as MEGAKERNEL_ROOT
     MEGAKERNEL_ROOT = os.environ.get("MEGAKERNEL_ROOT", root_dir)
-    INCLUDE_PATH = os.path.join(MEGAKERNEL_ROOT, "include/xop/")
+    INCLUDE_PATH = os.path.join(MEGAKERNEL_ROOT, "include/")
     DEPS_PATH = os.path.join(MEGAKERNEL_ROOT, "3rdparty")
 
     # print("MEGAKERNEL_ROOT", MEGAKERNEL_ROOT)

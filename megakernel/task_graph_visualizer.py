@@ -14,7 +14,7 @@ svg_colors = [color for color in mcolors.CSS4_COLORS.keys() if color not in dark
 # Parses the runtime_header.h to get the current task and event types
 def get_color_map(prefix: Literal["TASK", "EVENT"]) -> dict[int, tuple[str, str]]:
     # Use XOP_HOME
-    filename = os.path.join(os.environ["XOP_HOME"], "include/xop/megakernel/persistent_kernel/runtime_header.h")
+    filename = os.path.join(os.environ["XOP_HOME"], "include/megakernel/persistent_kernel/runtime_header.h")
     with open(filename, "r") as f:
         lines = f.readlines()
     result = {}
@@ -40,7 +40,7 @@ supported_data_types = {
 }
 
 def check_supported_data_types() -> None:
-    filename = os.path.join(os.environ["XOP_HOME"], "include/xop/megakernel/type.h")
+    filename = os.path.join(os.environ["XOP_HOME"], "include/megakernel/type.h")
     with open(filename, "r") as f:
         lines = f.readlines()
     lines_set = set([line.strip() for line in lines])
