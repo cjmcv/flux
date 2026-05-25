@@ -250,7 +250,7 @@ struct Sm90AuxStoreAllReduce {
       return frg_input;
     }
 
-    // 自己的tile存好就置位自己tile的标志，标志跨rank共享，以供其他rank得到该rank的对应tile数据就绪
+    // 鑷繁鐨則ile瀛樺ソ灏辩疆浣嶈嚜宸眛ile鐨勬爣蹇楋紝鏍囧織璺╮ank鍏变韩锛屼互渚涘叾浠杛ank寰楀埌璇ank鐨勫搴攖ile鏁版嵁灏辩华
     CUTLASS_DEVICE void
     end() {
       if (params_ptr->fuse_mode == 0) return;

@@ -123,7 +123,7 @@ def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable, enable_tor
         torch.cuda.synchronize()
         return PerfResult(name=name, output=output, gemm_time_ms=1 / 1 * 1000)
     
-    my_stream = torch.cuda.Stream()          # 也可传外部流
+    my_stream = torch.cuda.Stream()          # 涔熷彲浼犲閮ㄦ祦
     start_event = torch.cuda.Event(enable_timing=True)
     end_event   = torch.cuda.Event(enable_timing=True)
 

@@ -86,11 +86,11 @@ __global__ void disaggregated_allreduce(vllm::RankData* dp, int **barrier_ptrs, 
 
     if constexpr (THREADS == 128) {
       int lane_id = tx & 31;            // 0..31
-      int warp_id = tx >> 5;            // 0..3£¨Ò»¸ö block 4 ¸ö warp£©
+      int warp_id = tx >> 5;            // 0..3ï¼ˆä¸€ä¸ª block 4 ä¸ª warpï¼‰
 
       for (int row_in_tile = warp_id; row_in_tile < TILE_M; row_in_tile += 4) {
         int global_m = base_m + row_in_tile;
-        if (global_m >= m) continue; // ²»ÄÜÊ¹ÓÃreturn£¬ÒòÎª for (int k = bx; k < flagSize; k += gridDim.x) ¿ÉÄÜ»¹ĞèÒª´¦ÀíÏÂÒ»×é
+        if (global_m >= m) continue; // ä¸èƒ½ä½¿ç”¨returnï¼Œå› ä¸º for (int k = bx; k < flagSize; k += gridDim.x) å¯èƒ½è¿˜éœ€è¦å¤„ç†ä¸‹ä¸€ç»„
       
         int global_n = base_n + lane_id * ArrayLen;
         int total_offset = global_m * OUT_N + global_n;
@@ -195,7 +195,7 @@ public:
   // These tags also provide additional metadata that can be queried at compile time.
   // using DefaultOperation = cutlass::epilogue::fusion::LinearCombination<ElementD, ElementCompute, ElementC, ElementScalar, RoundStyle>;
 
-  // CollectiveEpilogueµÄClusterShapeÊÇ111£¬CollectiveMainloopµÄÊÇ211
+  // CollectiveEpilogueçš„ClusterShapeæ˜¯111ï¼ŒCollectiveMainloopçš„æ˜¯211
   using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
       ArchTag, cutlass::arch::OpClassTensorOp,
       TileShape, cute::Shape<cute::_1, cute::_1, cute::_1>, // ClusterShape,
@@ -268,7 +268,7 @@ public:
     n_ = rt_args->n;
     output_len_ = rt_args->m * rt_args->n;
     ar_args_.output = rt_args->ptr_D;
-    ar_args_.aux_local_size = output_len_ * sizeof(ElementD);  // todo: ²»ĞèÒªÕâÃ´´ó
+    ar_args_.aux_local_size = output_len_ * sizeof(ElementD);  // todo: ä¸éœ€è¦è¿™ä¹ˆå¤§
     ar_args_.aux_local_buffer = GlobalBuffer::instance().GetDeviceBuffer(kDevBufferPoolAux, ar_args_.aux_local_size);
     CUDA_CHECK(cudaMemsetAsync(ar_args_.aux_local_buffer, 0, ar_args_.aux_local_size, cu_stream));
     
@@ -348,8 +348,8 @@ private:
     cudaMemcpy(&host_rank_data_, ar_args_.rank_data, sizeof(vllm::RankData), cudaMemcpyDeviceToHost);
     for (int i=0; i<kMaxLocalWorldSize; i++) {
       rank_data_[i] = (ElementD *)host_rank_data_.ptrs[i];
-      // ar_args_.rank_signals.signalsÊÇhostÖ¸Õë£¬ar_args_.rank_signals.signals[i] ÊÇdeviceÖ¸Õë
-      barrier_ptrs_[i] = (int *)ar_args_.rank_signals.signals[i]; // ²»ĞèÒªÈÎºÎ×ª»»£¬Ö±½ÓÓÃ¼´¿É
+      // ar_args_.rank_signals.signalsæ˜¯hostæŒ‡é’ˆï¼Œar_args_.rank_signals.signals[i] æ˜¯deviceæŒ‡é’ˆ
+      barrier_ptrs_[i] = (int *)ar_args_.rank_signals.signals[i]; // ä¸éœ€è¦ä»»ä½•è½¬æ¢ï¼Œç›´æ¥ç”¨å³å¯
     }
     printf("is_device_pointer: %d, %d, %d, %d\n", is_device_pointer(barrier_ptrs_[0]), is_device_pointer(ar_args_.rank_data), is_device_pointer(rank_data_[0]), is_device_pointer(ar_args_.rank_signals.signals[0]));
 

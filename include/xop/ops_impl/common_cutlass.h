@@ -35,7 +35,7 @@ struct to_cuda_type<cutlass::half_t> {
     using type = half;                                  // specialization mapping
 };
 template<class T>
-using to_cuda_type_t = typename to_cuda_type<T>::type;  // ·½±ãÓÃ
+using to_cuda_type_t = typename to_cuda_type<T>::type;  // Â·Â½Â±Ã£Ã“Ãƒ
 
 ////////////////////////////////////////////
 

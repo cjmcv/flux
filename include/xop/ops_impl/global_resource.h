@@ -125,24 +125,24 @@ public:
   }
 };
 
-// ¶¨Òå¹¤³§º¯ÊıÀàĞÍ
+// å®šä¹‰å·¥å‚å‡½æ•°ç±»å‹
 using GemmFactory = std::function<GemmBase*()>;
 
-// µ¥ÀıÀàÀ´¹ÜÀí gemm_map
+// å•ä¾‹ç±»æ¥ç®¡ç† gemm_map
 class GemmConfigRegister {
 private:
   std::map<std::vector<int16_t>, GemmFactory> gemm_map;
   std::map<std::vector<int16_t>, GemmBase*> created_instances;
 
-  // Ë½ÓĞ¹¹Ôìº¯Êı£¬·ÀÖ¹Íâ²¿ÊµÀı»¯
+  // ç§æœ‰æ„é€ å‡½æ•°ï¼Œé˜²æ­¢å¤–éƒ¨å®ä¾‹åŒ–
   GemmConfigRegister() = default;
 
-  // ·ÀÖ¹¿½±´¹¹ÔìºÍ¸³Öµ²Ù×÷
+  // é˜²æ­¢æ‹·è´æ„é€ å’Œèµ‹å€¼æ“ä½œ
   GemmConfigRegister(const GemmConfigRegister&) = delete;
   GemmConfigRegister& operator=(const GemmConfigRegister&) = delete;
 
 public:
-  // »ñÈ¡µ¥ÀıÊµÀı
+  // è·å–å•ä¾‹å®ä¾‹
   static GemmConfigRegister& instance() {
       static GemmConfigRegister instance;
       return instance;
@@ -160,7 +160,7 @@ public:
     }
   }
 
-  // ×¢²áº¯Êı
+  // æ³¨å†Œå‡½æ•°
   void add(const std::vector<int16_t> &key, GemmFactory factory) {
     gemm_map[key] = factory;
   }
@@ -187,7 +187,7 @@ public:
     return nullptr;
   }
 
-  // »ñÈ¡ Gemm ÊµÀı£¬Èç¹ûÒÑ´æÔÚÔòÖ±½Ó·µ»Ø£¬²»´æÔÚÔò´´½¨
+  // è·å– Gemm å®ä¾‹ï¼Œå¦‚æœå·²å­˜åœ¨åˆ™ç›´æ¥è¿”å›ï¼Œä¸å­˜åœ¨åˆ™åˆ›å»º
   GemmBase* GetOp(const std::vector<int16_t> &key, bool is_tuning = false) {
     // printf("Looking for Gemm type {");
     // for (int i=0; i<key.size(); i++)
@@ -200,7 +200,7 @@ public:
     return CreateOp(key, is_tuning);
   }
 
-  // Îö¹¹Ê±ÊÍ·ÅËùÓĞ´´½¨µÄÊµÀı
+  // ææ„æ—¶é‡Šæ”¾æ‰€æœ‰åˆ›å»ºçš„å®ä¾‹
   ~GemmConfigRegister() {
     for (auto& pair : created_instances) {
       delete pair.second;

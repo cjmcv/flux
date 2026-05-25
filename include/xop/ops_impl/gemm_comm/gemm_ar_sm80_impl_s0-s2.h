@@ -363,7 +363,7 @@ private:
       &ar_args_.rank_data, &ar_args_.rank_signals, &ar_args_.self_signal);
 
 #else
-    // ”√”⁄ ‘—È≤‚ ‘
+    // √ì√É√ì√ö√ä√î√ë√©¬≤√¢√ä√î
     RtCommArguments *rt_args = (RtCommArguments*)(fusion_args);
     ar_args_.reg_buffer = reinterpret_cast<void*>(rt_args->reg_buffer);
     ar_args_.world_size = 2;

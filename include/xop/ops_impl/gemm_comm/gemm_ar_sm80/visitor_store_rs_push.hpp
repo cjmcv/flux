@@ -279,7 +279,7 @@ struct VisitorAuxStoreRs{
       }
       
 #ifdef ENABLE_ALLREDUCE_SCHEMA_S2
-      // Ã¿¸öblockIdx.xÎªµ¥Î»¼ÇÂ¼blockIdx.y·½ÏòµÄÌî³äÇé¿ö£¬µ±´ÎÊı´ïµ½ gridDim.y/128 * 8(step) µÄ´ÎÊıÊ±£¬ËµÃ÷blockIdx.y·½ÏòÒÑ¾­Ìî³äÍê±Ï¡£
+      // æ¯ä¸ªblockIdx.xä¸ºå•ä½è®°å½•blockIdx.yæ–¹å‘çš„å¡«å……æƒ…å†µï¼Œå½“æ¬¡æ•°è¾¾åˆ° gridDim.y/128 * 8(step) çš„æ¬¡æ•°æ—¶ï¼Œè¯´æ˜blockIdx.yæ–¹å‘å·²ç»å¡«å……å®Œæ¯•ã€‚
 #ifdef ENABLE_ALLREDUCE
       using T = int;
       T *flag = (T*)params_ptr->self_signal;
@@ -339,7 +339,7 @@ struct VisitorAuxStoreRs{
         Tensor m = make_tensor(make_gmem_ptr((Element*)base_ptr), problem_shape, params_ptr->dAux);                 // (M,N,L)
         return recast<VecType>(group_modes<3,6>(ThreadMap::partition(m, thread_idx, threadblock_tile_offset)));
       };
-      // todo: ´óÍ¬²½
+      // todo: å¤§åŒæ­¥
       CUTLASS_PRAGMA_UNROLL
       for (int step_idx=0; step_idx < 8; step_idx++) {
         auto coord_v = filter(tC_cAux(_,_,_,step_idx));

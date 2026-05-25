@@ -22,8 +22,8 @@
 
 //////////////////////////////////////////////
 // reference: g2s - include/cutlass/epilogue/fusion/sm90_visitor_load_tma_warpspecialized.hpp
-// fetch Ê¹ÓÃtma½«Êı¾İ´Ógmem°áÔËµ½smem
-// reduce ÔÚsmemÉÏ½øĞĞ¼ÆËã£¬ºó¸³Öµµ½gmem
+// fetch ä½¿ç”¨tmaå°†æ•°æ®ä»gmemæ¬è¿åˆ°smem
+// reduce åœ¨smemä¸Šè¿›è¡Œè®¡ç®—ï¼Œåèµ‹å€¼åˆ°gmem
 namespace xop {
 
 using namespace cute;
@@ -51,7 +51,7 @@ struct Sm90AllReduceDma {
   static constexpr CommKindEnum CommKind = CommKind_;
   static constexpr bool FuseReduction = FuseReduction_;
   static constexpr bool FuseAllGather = FuseAllGather_;
-  // CommKind == _AcrossNode{} Ê±£¬ĞèÒª FuseReduction == true
+  // CommKind == _AcrossNode{} æ—¶ï¼Œéœ€è¦ FuseReduction == true
   static_assert(not(!FuseReduction and CommKind == _AcrossNode{})); 
   static constexpr int kAlignment = 128 / sizeof_bits_v<Element>;
 
@@ -156,7 +156,7 @@ struct Sm90AllReduceDma {
     XOP_CHECK(args.barrier_ptrs != nullptr);
     XOP_CHECK(args.local_reduce_buffer != nullptr);
 
-    // Èç4¿¨£¬tile_M=128, M=1024, ÔòÃ¿¿¨¸ºÔğ 1024/(128*4) = 2¸öm·½ÏòµÄtile
+    // å¦‚4å¡ï¼Œtile_M=128, M=1024, åˆ™æ¯å¡è´Ÿè´£ 1024/(128*4) = 2ä¸ªmæ–¹å‘çš„tile
     params.tile_m_perrank = M / (tile_M * params.world_size);
     params.stride = args.stride;
 
@@ -208,32 +208,32 @@ struct Sm90AllReduceDma {
       return fetch_write_state;
     }
 
-    // mÊÇtileµÄm·½Ïò±àºÅ£¬Èç×Ü¹²ÓĞM=1024ĞĞ£¬tile_M=128£¬Ôò m È¡Öµ·¶Î§ÊÇ 0~7£¬ÔÚ4¿¨ÏÂtile_m_perrank=2¡£
-    // ËùÒÔm=0/1Ê±£¬src_rank=0£»m=2/3Ê±£¬src_rank=1£»m=4/5Ê±£¬src_rank=2£»m=6/7Ê±£¬src_rank=3£»
-    // local_src_rankÖĞµÄlocalÊÇÖ¸±¾½Úµã£¬ÎªÁËÓë¿ç»úÇø·Ö¡£
-    // local_rankÊÇµ±Ç°¿¨µÄrank£¬ÈçÎª2£¬Ôò£º
-    // local_src_rank=0£¬m=0/1, ºó°ë¶ÎÎª(2-0)*2=4, m_fetch Ö¸Ïò4/5
-    // local_src_rank=1£¬m=2/3£¬ºó°ë¶ÎÎª(2-1)*2=2, m_fetch Ö¸Ïò4/5
-    // local_src_rank=2£¬m=4/5£¬ºó°ë¶ÎÎª(2-2)*2=0, m_fetch Ö¸Ïò4/5
-    // local_src_rank=3£¬m=6/7£¬ºó°ë¶ÎÎª(2-3)*2=-2, m_fetch Ö¸Ïò4/5
-    // ËùÒÔ¶ÔÓÚ2ºÅ¿¨£¬¸ºÔğ´Ó0µ½3ºÅ¿¨µÄ4/5¿éµÄÊı¾İÊÕ¼¯¡£
-    // Í¬Àí£¬0ºÅ¿¨¸ºÔğ0/1£¬1ºÅ¿¨¸ºÔğ2/3£¬3ºÅ¿¨¸ºÔğ6/7.
+    // mæ˜¯tileçš„mæ–¹å‘ç¼–å·ï¼Œå¦‚æ€»å…±æœ‰M=1024è¡Œï¼Œtile_M=128ï¼Œåˆ™ m å–å€¼èŒƒå›´æ˜¯ 0~7ï¼Œåœ¨4å¡ä¸‹tile_m_perrank=2ã€‚
+    // æ‰€ä»¥m=0/1æ—¶ï¼Œsrc_rank=0ï¼›m=2/3æ—¶ï¼Œsrc_rank=1ï¼›m=4/5æ—¶ï¼Œsrc_rank=2ï¼›m=6/7æ—¶ï¼Œsrc_rank=3ï¼›
+    // local_src_rankä¸­çš„localæ˜¯æŒ‡æœ¬èŠ‚ç‚¹ï¼Œä¸ºäº†ä¸è·¨æœºåŒºåˆ†ã€‚
+    // local_rankæ˜¯å½“å‰å¡çš„rankï¼Œå¦‚ä¸º2ï¼Œåˆ™ï¼š
+    // local_src_rank=0ï¼Œm=0/1, ååŠæ®µä¸º(2-0)*2=4, m_fetch æŒ‡å‘4/5
+    // local_src_rank=1ï¼Œm=2/3ï¼ŒååŠæ®µä¸º(2-1)*2=2, m_fetch æŒ‡å‘4/5
+    // local_src_rank=2ï¼Œm=4/5ï¼ŒååŠæ®µä¸º(2-2)*2=0, m_fetch æŒ‡å‘4/5
+    // local_src_rank=3ï¼Œm=6/7ï¼ŒååŠæ®µä¸º(2-3)*2=-2, m_fetch æŒ‡å‘4/5
+    // æ‰€ä»¥å¯¹äº2å·å¡ï¼Œè´Ÿè´£ä»0åˆ°3å·å¡çš„4/5å—çš„æ•°æ®æ”¶é›†ã€‚
+    // åŒç†ï¼Œ0å·å¡è´Ÿè´£0/1ï¼Œ1å·å¡è´Ÿè´£2/3ï¼Œ3å·å¡è´Ÿè´£6/7.
     //
-    // µ±Ç°º¯Êı»áÓĞm´Ó0-7.
-    //   ÒÔlocal_rank=2ºÅ¿¨ÎªÀı£¬µ±m=0/1Ê±£¬´Ólocal_src_rank=0ÖĞÈ¡³öÆä4/5. 
-    //                          µ±m=2/3Ê±£¬´Ólocal_src_rank=1ÖĞÈ¡³öÆä4/5...
-    //   ÒÔlocal_rank=3ºÅ¿¨ÎªÀı£¬µ±m=0/1Ê±£¬´Ólocal_src_rank=0ÖĞÈ¡³öÆä6/7.
-    //                          µ±m=2/3Ê±£¬´Ólocal_src_rank=1ÖĞÈ¡³öÆä6/7...
-    //   ´Ógmem(Ô¶³Ìtma tensor)¿½±´µ½smem(µ±Ç°rank)£¬smemÊÓÍ¼Î¬¶ÈÊÇ(EPI_TILE_M,EPI_TILE_N,PIPE)£¬PIPE¼´stage£¬ÕâÀïÈ¡1¼´¿É¡£
-    //   gmem¶ÔÓ¦ÊÓÍ¼ÊÇ(EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)£¬ĞèÒª·Ö EPI_M*EPI_N ´Îcopy¡£
-    //   ÒòÎªsmemÖ»ÓĞÒ»·İ£¬Ã¿´Îcopyºó¶¼ĞèÒªÓÉfetch_pipeline.producer_commitÍ¨Öª¸øreduceÏß³Ì£¬reduceÍêÁËºó»áÓÉfetch_pipeline.producer_acquire»ñÏ¤£¬¿ªÊ¼ÏÂÒ»´Îcopy¡£
-    //   ÓëreduceµÄfetch_pipeline.consumer_wait / fetch_pipeline.consumer_release ¶ÔÓ¦¡£
+    // å½“å‰å‡½æ•°ä¼šæœ‰mä»0-7.
+    //   ä»¥local_rank=2å·å¡ä¸ºä¾‹ï¼Œå½“m=0/1æ—¶ï¼Œä»local_src_rank=0ä¸­å–å‡ºå…¶4/5. 
+    //                          å½“m=2/3æ—¶ï¼Œä»local_src_rank=1ä¸­å–å‡ºå…¶4/5...
+    //   ä»¥local_rank=3å·å¡ä¸ºä¾‹ï¼Œå½“m=0/1æ—¶ï¼Œä»local_src_rank=0ä¸­å–å‡ºå…¶6/7.
+    //                          å½“m=2/3æ—¶ï¼Œä»local_src_rank=1ä¸­å–å‡ºå…¶6/7...
+    //   ä»gmem(è¿œç¨‹tma tensor)æ‹·è´åˆ°smem(å½“å‰rank)ï¼Œsmemè§†å›¾ç»´åº¦æ˜¯(EPI_TILE_M,EPI_TILE_N,PIPE)ï¼ŒPIPEå³stageï¼Œè¿™é‡Œå–1å³å¯ã€‚
+    //   gmemå¯¹åº”è§†å›¾æ˜¯(EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)ï¼Œéœ€è¦åˆ† EPI_M*EPI_N æ¬¡copyã€‚
+    //   å› ä¸ºsmemåªæœ‰ä¸€ä»½ï¼Œæ¯æ¬¡copyåéƒ½éœ€è¦ç”±fetch_pipeline.producer_commité€šçŸ¥ç»™reduceçº¿ç¨‹ï¼Œreduceå®Œäº†åä¼šç”±fetch_pipeline.producer_acquireè·æ‚‰ï¼Œå¼€å§‹ä¸‹ä¸€æ¬¡copyã€‚
+    //   ä¸reduceçš„fetch_pipeline.consumer_wait / fetch_pipeline.consumer_release å¯¹åº”ã€‚
     // 
-    // Í¬²½µã£º
-    //    1) ´ó¿éÍ¬²½, Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 2, 1);
-    //     Óë sm90_visitor_store_tma_warpspecialized_ar.hpp ÖĞµÄ Barrier::wait_eq_reset(params_ptr->barrier_ptr, thread_idx, tile_idx * 2, 0, 1); ¶ÔÓ¦
-    //     ¼´Ô¶³ÌrankÍê³Éstore¶ÔÓ¦tileºó£¬¼´¿É¿ªÊ¼¶Ô¸ÃÔ¶³Ìrank×öfetch¡£
-    //    2) Ğ¡¿éÍ¬²½£¬»ùÓÚfetch_pipeline£¬producer_acquire ¶ÔÓ¦ consumer_wait Óë producer_commit ¶ÔÓ¦ consumer_release¡£
+    // åŒæ­¥ç‚¹ï¼š
+    //    1) å¤§å—åŒæ­¥, Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 2, 1);
+    //     ä¸ sm90_visitor_store_tma_warpspecialized_ar.hpp ä¸­çš„ Barrier::wait_eq_reset(params_ptr->barrier_ptr, thread_idx, tile_idx * 2, 0, 1); å¯¹åº”
+    //     å³è¿œç¨‹rankå®Œæˆstoreå¯¹åº”tileåï¼Œå³å¯å¼€å§‹å¯¹è¯¥è¿œç¨‹rankåšfetchã€‚
+    //    2) å°å—åŒæ­¥ï¼ŒåŸºäºfetch_pipelineï¼Œproducer_acquire å¯¹åº” consumer_wait ä¸ producer_commit å¯¹åº” consumer_releaseã€‚
 
     int thread_idx = cutlass::canonical_lane_idx();
     int src_rank = m / params_ptr->tile_m_perrank;
@@ -262,8 +262,8 @@ struct Sm90AllReduceDma {
 
     Barrier::wait_eq_reset(params_ptr->local_barrier_ptr[local_src_rank], thread_idx, fetch_tile_idx * 3, 1);
 
-    // todo: ¼ì²éÕâ¸öfetch_pipeline producerÊÇ·ñ»á¸úreduceµÄconsumer_wait½»´í½øĞĞ
-    //       ¼ì²éµ±²»×ö FuseReduction Ê±£¬size<2>(gFetch_epi)Óë reduceµÄ size<2>(gReduce_epi) ÊÇ·ñÒ»ÖÂ£¿
+    // todo: æ£€æŸ¥è¿™ä¸ªfetch_pipeline produceræ˜¯å¦ä¼šè·Ÿreduceçš„consumer_waitäº¤é”™è¿›è¡Œ
+    //       æ£€æŸ¥å½“ä¸åš FuseReduction æ—¶ï¼Œsize<2>(gFetch_epi)ä¸ reduceçš„ size<2>(gReduce_epi) æ˜¯å¦ä¸€è‡´ï¼Ÿ
     CUTLASS_PRAGMA_UNROLL
     for (int epi_n = 0; epi_n < size<3>(gFetch_epi); ++epi_n) {
       CUTLASS_PRAGMA_UNROLL
@@ -317,13 +317,13 @@ struct Sm90AllReduceDma {
     // the logical m coord of the reduction tile in the output buffer
     int m_reduce_in_output = m + (params_ptr->local_rank - local_dst_rank) * params_ptr->tile_m_perrank;
     
-    // ¼´fetchµÄÀı×Ó£º
-    // µ±Ç°º¯Êı»áÓĞm´Ó0-7.
-    //   ÒÔlocal_rank=2ºÅ¿¨ÎªÀı£¬µ±m=0/1Ê±£¬´Ólocal_src_rank=0ÖĞÈ¡³öÆä4/5. 
-    //                          µ±m=2/3Ê±£¬´Ólocal_src_rank=1ÖĞÈ¡³öÆä4/5...
-    //   ÒÔlocal_rank=3ºÅ¿¨ÎªÀı£¬µ±m=0/1Ê±£¬´Ólocal_src_rank=0ÖĞÈ¡³öÆä6/7.
-    //                          µ±m=2/3Ê±£¬´Ólocal_src_rank=1ÖĞÈ¡³öÆä6/7...
-    // ÄÇÃ´ÕâÀïµÄ Ô­m_reduce ·¶Î§¾ÍÊÇ0-7£¬4¿¨ => tile_m_perrank=2
+    // å³fetchçš„ä¾‹å­ï¼š
+    // å½“å‰å‡½æ•°ä¼šæœ‰mä»0-7.
+    //   ä»¥local_rank=2å·å¡ä¸ºä¾‹ï¼Œå½“m=0/1æ—¶ï¼Œä»local_src_rank=0ä¸­å–å‡ºå…¶4/5. 
+    //                          å½“m=2/3æ—¶ï¼Œä»local_src_rank=1ä¸­å–å‡ºå…¶4/5...
+    //   ä»¥local_rank=3å·å¡ä¸ºä¾‹ï¼Œå½“m=0/1æ—¶ï¼Œä»local_src_rank=0ä¸­å–å‡ºå…¶6/7.
+    //                          å½“m=2/3æ—¶ï¼Œä»local_src_rank=1ä¸­å–å‡ºå…¶6/7...
+    // é‚£ä¹ˆè¿™é‡Œçš„ åŸm_reduce èŒƒå›´å°±æ˜¯0-7ï¼Œ4å¡ => tile_m_perrank=2
 
     /////////////////// Reduce Tensors ////////////////////
     auto get_mReduce = [&]() {
@@ -344,10 +344,10 @@ struct Sm90AllReduceDma {
       }
     };
 
-    // ÎŞÂÛ×ö²»×öreduce£¬gReduceµÄ´óĞ¡¶¼ÊÇÒ»ÑùµÄ¡£ÕâÀïÒÔmÎªµ¥Ôª½øĞĞÅÉ·¢Êı¾İ£¬mÎª0-7, Ôò»áÓĞ8¸ötileµÄm½øĞĞÕâÀï¡£
-    // Èç¹û×öreduce£¬Ã¿¸öm»áÕë¶ÔÖ¸ÏòÉÏÃæÊÕËõºóµÄ·¶Î§(m_reduce % params_ptr->tile_m_perrank)£¬´ÓsmemÄÃÊı¾İ¹æÔ¼µ½ÕâÀï¡£
-    // Èç¹û²»×öreduce£¬Ã¿¸öm»áÖ±½ÓÖ¸ÏòÔ­±¾×Ô¼ºËùÊôµÄÄ¿µÄµØ£¬´ÓsmemÈ¡³öÊı¾İ¡£
-    // 0-7µÄmÀï¶ÔÓ¦µÄsmemµÄÄÚÈİÊÇ ´ÓÆäËûrankĞèÒª¹æÔ¼µÄÊı¾İ¡£ËùÒÔÈç¹û²»fused reduce£¬ÔòĞèÒª½«Ä¿µÄbufferÖĞ£¬½«×Ô¼ºµÄm=2/3£¬4/5£¬6/7, ¶¼¶îÍâ¹æÔ¼µ½×Ô¼ºµÄ0/1ÉÏ¡£
+    // æ— è®ºåšä¸åšreduceï¼ŒgReduceçš„å¤§å°éƒ½æ˜¯ä¸€æ ·çš„ã€‚è¿™é‡Œä»¥mä¸ºå•å…ƒè¿›è¡Œæ´¾å‘æ•°æ®ï¼Œmä¸º0-7, åˆ™ä¼šæœ‰8ä¸ªtileçš„mè¿›è¡Œè¿™é‡Œã€‚
+    // å¦‚æœåšreduceï¼Œæ¯ä¸ªmä¼šé’ˆå¯¹æŒ‡å‘ä¸Šé¢æ”¶ç¼©åçš„èŒƒå›´(m_reduce % params_ptr->tile_m_perrank)ï¼Œä»smemæ‹¿æ•°æ®è§„çº¦åˆ°è¿™é‡Œã€‚
+    // å¦‚æœä¸åšreduceï¼Œæ¯ä¸ªmä¼šç›´æ¥æŒ‡å‘åŸæœ¬è‡ªå·±æ‰€å±çš„ç›®çš„åœ°ï¼Œä»smemå–å‡ºæ•°æ®ã€‚
+    // 0-7çš„mé‡Œå¯¹åº”çš„smemçš„å†…å®¹æ˜¯ ä»å…¶ä»–rankéœ€è¦è§„çº¦çš„æ•°æ®ã€‚æ‰€ä»¥å¦‚æœä¸fused reduceï¼Œåˆ™éœ€è¦å°†ç›®çš„bufferä¸­ï¼Œå°†è‡ªå·±çš„m=2/3ï¼Œ4/5ï¼Œ6/7, éƒ½é¢å¤–è§„çº¦åˆ°è‡ªå·±çš„0/1ä¸Šã€‚
     auto mReduce = get_mReduce();  // (M_reduce,N,L)
     Tensor gReduce = local_tile(mReduce, take<0, 2>(TileShape{}), make_coord(m_reduce_in_output, n));  // (TILE_M,TILE_N)
     Tensor gReduce_epi = flat_divide(gReduce, EpilogueTile{});  // (EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)
@@ -384,9 +384,9 @@ struct Sm90AllReduceDma {
     if constexpr (FuseReduction) {
       if (not is_local_tile_reduce) {
         // if this tile is fetched from other rank, wait for the local rank to reduce first
-        // ÓëÏÂÃæµÄint reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);¶ÔÓ¦
-        // Èç¹ûµ±Ç°tileÈÎÎñÊÇ´ÓÆäËûrank»ñÈ¡Êı¾İ£¬ÄÇÃ´ĞèÒªµÈ´ıµ±Ç°rankµÄÊı¾İ¾ÍĞ÷£¬¼´ĞèÒªÓÃ¹ıÒ»´Îarrive_inc_get¡£
-        // ÒòÎªÏÂÃæµÄtgReduce_epiµÚÒ»´ÎÊÇÖ±½Ó´Ósmem¿½±´¹ıÈ¥µÄ(ÃâÈ¥ÇåÁã²Ù×÷£¿)£¬¶ÁÈ¡ÆäËûrankÔòÔÚtgReduce_epi½øĞĞÀÛ¼Ó¡£
+        // ä¸ä¸‹é¢çš„int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);å¯¹åº”
+        // å¦‚æœå½“å‰tileä»»åŠ¡æ˜¯ä»å…¶ä»–rankè·å–æ•°æ®ï¼Œé‚£ä¹ˆéœ€è¦ç­‰å¾…å½“å‰rankçš„æ•°æ®å°±ç»ªï¼Œå³éœ€è¦ç”¨è¿‡ä¸€æ¬¡arrive_inc_getã€‚
+        // å› ä¸ºä¸‹é¢çš„tgReduce_epiç¬¬ä¸€æ¬¡æ˜¯ç›´æ¥ä»smemæ‹·è´è¿‡å»çš„(å…å»æ¸…é›¶æ“ä½œï¼Ÿ)ï¼Œè¯»å–å…¶ä»–rankåˆ™åœ¨tgReduce_epiè¿›è¡Œç´¯åŠ ã€‚
         Barrier::wait_lt(lock_ptr, thread_idx, flag_idx, 1);
       }
     }
@@ -411,10 +411,10 @@ struct Sm90AllReduceDma {
             // write to reduce_buffer
             if constexpr (FuseReduction) {
               if (is_local_tile_reduce) {
-                // trReduceÊÇ×Ô¼ºµÄ£¬Ö±½Ó¿½±´
+                // trReduceæ˜¯è‡ªå·±çš„ï¼Œç›´æ¥æ‹·è´
                 copy(tiled_copy, trReduce, tgReduce_epi(_, copy_m, copy_n));
               } else {
-                // trReduceÊÇÆäËûrankµÄ£¬ĞèÒª¹æÔ¼
+                // trReduceæ˜¯å…¶ä»–rankçš„ï¼Œéœ€è¦è§„çº¦
                 using VecType = uint_byte_t<sizeof(trReduce)>;
                 cutlass::arch::local_red<VecType, sizeof(Element) * kAlignment, Element>(
                     recast<VecType>(trReduce)(_0{}),
@@ -422,7 +422,7 @@ struct Sm90AllReduceDma {
                     true);
               }
             } else {
-              // ²»×öreduce£¬¾ÍÖ±½Ó¿½±´¡£
+              // ä¸åšreduceï¼Œå°±ç›´æ¥æ‹·è´ã€‚
               copy(tiled_copy, trReduce, tgReduce_epi(_, copy_m, copy_n));
             }
           }
@@ -433,13 +433,13 @@ struct Sm90AllReduceDma {
       }
     }
 
-    // È·±£ËùÓĞrank¶¼µ½Î»£¬Ã¿µ½Î»Ò»¸öÔòarrive_inc_get+1£¬ÓÉwait_eq_reset¼¯Æë½áÊøreduce½×¶Î
-    // 99 ±íÊ¾reduce½áÊø£¬¿É½Ó×Å×öallgather¡£0ÊÇÖ±½Ó¸´Î»£¬²»ÔÙ×öºóĞø¼ÆËã¡£
+    // ç¡®ä¿æ‰€æœ‰rankéƒ½åˆ°ä½ï¼Œæ¯åˆ°ä½ä¸€ä¸ªåˆ™arrive_inc_get+1ï¼Œç”±wait_eq_reseté›†é½ç»“æŸreduceé˜¶æ®µ
+    // 99 è¡¨ç¤ºreduceç»“æŸï¼Œå¯æ¥ç€åšallgatherã€‚0æ˜¯ç›´æ¥å¤ä½ï¼Œä¸å†åšåç»­è®¡ç®—ã€‚
     constexpr int finish_reduce_tag = (FuseAllGather == true) ? 99 : 0;
     if constexpr (FuseReduction) {
       int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);
       if (reduce_count == params_ptr->local_world_size) {
-        // ½öÓĞÒ»×éÄÜµ½´ïÕâÀï£¬ÆäËû×é»ñÈ¡µÄreduce_countÎŞ·¨½øÈëµ½ÕâÀïifÀïÃæ
+        // ä»…æœ‰ä¸€ç»„èƒ½åˆ°è¾¾è¿™é‡Œï¼Œå…¶ä»–ç»„è·å–çš„reduce_countæ— æ³•è¿›å…¥åˆ°è¿™é‡Œifé‡Œé¢
 
         BarrierSys::wait_eq_reset(lock_ptr, thread_idx, flag_idx, params_ptr->local_world_size, finish_reduce_tag);
         if constexpr (CommKind == _AcrossNode{}) {
@@ -456,7 +456,7 @@ struct Sm90AllReduceDma {
 
     // // allgather
     if constexpr (FuseAllGather) { 
-      // ²»ÄÜÊ¹ÓÃtile¼¶±ğµÄ¿½±´£¬ÒòÎª½øÈëÕâÀïµÄÏß³ÌÊÇwarpÎªµ¥Î»µÄ£¬²¢Ã»ÓĞÍêÕûblockµÄËùÓĞÏß³Ì¡£ËùÒÔ¿½±´ÒªÑØÓÃÇ°ÃæµÄwarp¼¶±ğ¿½±´
+      // ä¸èƒ½ä½¿ç”¨tileçº§åˆ«çš„æ‹·è´ï¼Œå› ä¸ºè¿›å…¥è¿™é‡Œçš„çº¿ç¨‹æ˜¯warpä¸ºå•ä½çš„ï¼Œå¹¶æ²¡æœ‰å®Œæ•´blockçš„æ‰€æœ‰çº¿ç¨‹ã€‚æ‰€ä»¥æ‹·è´è¦æ²¿ç”¨å‰é¢çš„warpçº§åˆ«æ‹·è´
       // auto thr_layout = make_layout(make_shape(size<0>(TileShape{}), size<1>(TileShape{}) / kAlignment));
       // auto val_layout = make_layout(make_shape(_1{}, Int<kAlignment>{}), make_stride(_0{}, _1{}));
       // auto tiled_copy = make_tiled_copy(
@@ -481,7 +481,7 @@ struct Sm90AllReduceDma {
         // xop::print_tensor_shape("src_thr_shape", src_thr);
         // xop::print_tensor("src_thr", src_thr, false);
 
-        // ±íÊ¾ÓĞworld_size-1¸öÆäËûrankÍê³É¸ÃtileµÄ½ÓÊÕ¡£¼´¿ÉÖØÖÃ¡£
+        // è¡¨ç¤ºæœ‰world_size-1ä¸ªå…¶ä»–rankå®Œæˆè¯¥tileçš„æ¥æ”¶ã€‚å³å¯é‡ç½®ã€‚
         // printf("<%d,%d,%d> local wait_eq_reset.\n", params_ptr->local_rank, m, flag_idx);
         BarrierSys::wait_eq_reset(lock_ptr, thread_idx, flag_end_idx, params_ptr->local_world_size-1, 0);  
         if (thread_idx == 0)
@@ -489,7 +489,7 @@ struct Sm90AllReduceDma {
         // printf("<%d,%d,%d> finish local wait_eq_reset.\n", params_ptr->local_rank, m, flag_idx);
       }
       else {
-        // m´Ó0-7£¬local_rank=0 => m=0/1; 1=>2/3; 2=>4/5; 3=>6/7
+        // mä»0-7ï¼Œlocal_rank=0 => m=0/1; 1=>2/3; 2=>4/5; 3=>6/7
         int src_rank = m / params_ptr->tile_m_perrank;
         int *src_lock_ptr = params_ptr->local_barrier_ptr[src_rank];
 
@@ -504,7 +504,7 @@ struct Sm90AllReduceDma {
         Tensor tgSrc = thread_copy.partition_S(gSrc_epi);
         copy(tiled_copy, tgSrc, tgGather);
 
-        BarrierSys::arrive_inc_get(src_lock_ptr, thread_idx, flag_end_idx, 1); // ¸ø¶Ô·½rank±êÖ¾+1
+        BarrierSys::arrive_inc_get(src_lock_ptr, thread_idx, flag_end_idx, 1); // ç»™å¯¹æ–¹rankæ ‡å¿—+1
       } 
     }
     
@@ -535,26 +535,26 @@ struct Sm90AllReduceDma {
     // the logical m coord of the reduction tile in the output buffer
     int m_reduce_in_output = m + (params_ptr->local_rank - local_dst_rank) * params_ptr->tile_m_perrank;
     
-    // ¼´fetchµÄÀı×Ó£º
-    // µ±Ç°º¯Êı»áÓĞm´Ó0-7.
-    //   ÒÔlocal_rank=2ºÅ¿¨ÎªÀı£¬µ±m=0/1Ê±£¬´Ólocal_src_rank=0ÖĞÈ¡³öÆä4/5. 
-    //                          µ±m=2/3Ê±£¬´Ólocal_src_rank=1ÖĞÈ¡³öÆä4/5...
-    //   ÒÔlocal_rank=3ºÅ¿¨ÎªÀı£¬µ±m=0/1Ê±£¬´Ólocal_src_rank=0ÖĞÈ¡³öÆä6/7.
-    //                          µ±m=2/3Ê±£¬´Ólocal_src_rank=1ÖĞÈ¡³öÆä6/7...
-    // ÄÇÃ´ÕâÀïµÄ Ô­m_reduce ·¶Î§¾ÍÊÇ0-7£¬4¿¨ => tile_m_perrank=2
-    // Èç¹û FuseReduction£¬µ¥½ÚµãÏÂ£º
+    // å³fetchçš„ä¾‹å­ï¼š
+    // å½“å‰å‡½æ•°ä¼šæœ‰mä»0-7.
+    //   ä»¥local_rank=2å·å¡ä¸ºä¾‹ï¼Œå½“m=0/1æ—¶ï¼Œä»local_src_rank=0ä¸­å–å‡ºå…¶4/5. 
+    //                          å½“m=2/3æ—¶ï¼Œä»local_src_rank=1ä¸­å–å‡ºå…¶4/5...
+    //   ä»¥local_rank=3å·å¡ä¸ºä¾‹ï¼Œå½“m=0/1æ—¶ï¼Œä»local_src_rank=0ä¸­å–å‡ºå…¶6/7.
+    //                          å½“m=2/3æ—¶ï¼Œä»local_src_rank=1ä¸­å–å‡ºå…¶6/7...
+    // é‚£ä¹ˆè¿™é‡Œçš„ åŸm_reduce èŒƒå›´å°±æ˜¯0-7ï¼Œ4å¡ => tile_m_perrank=2
+    // å¦‚æœ FuseReductionï¼Œå•èŠ‚ç‚¹ä¸‹ï¼š
     //   m_reduce = 0/1 => 0/1 + 2 * 0 => 0/1
     //              2/3 => 0/1 + 2 * 0 => 0/1
     //              4/5 => 0/1 + 2 * 0 => 0/1
     //              6/7 => 0/1 + 2 * 0 => 0/1
-    //   ¾ùÖ¸ÏòÇ°0/1£¬Îª½á¹ûÌî³äÇøµÄ·¶Î§¡£
-    // Ë«½ÚµãÏÂ£¬ÈçË«½ÚµãË«¿¨(nnodes=2, node_idx=0)£º£¿£¿È·ÈÏ
+    //   å‡æŒ‡å‘å‰0/1ï¼Œä¸ºç»“æœå¡«å……åŒºçš„èŒƒå›´ã€‚
+    // åŒèŠ‚ç‚¹ä¸‹ï¼Œå¦‚åŒèŠ‚ç‚¹åŒå¡(nnodes=2, node_idx=0)ï¼šï¼Ÿï¼Ÿç¡®è®¤
     //   m_reduce = 0/1 (dst_rank=0, dst_node_idx=0) => 0/1 + 2 * 0 => 0/1
     //              2/3 (dst_rank=1, dst_node_idx=0) => 0/1 + 2 * 0 => 0/1
     //              4/5 (dst_rank=2, dst_node_idx=1) => 0/1 + 2 * (1*2+0) => 4/5
-    //                               Èç node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
+    //                               å¦‚ node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
     //              6/7 (dst_rank=3, dst_node_idx=1) => 0/1 + 2 * (1*2+0) => 4/5
-    //                               Èç node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
+    //                               å¦‚ node_idx=1   => 0/1 + 2 * (1*2+1) => 6/7
 
     // the actual m coord in reduce_buffer
     int m_reduce = get<0>(tile_coord);
@@ -582,10 +582,10 @@ struct Sm90AllReduceDma {
       }
     };
 
-    // ÎŞÂÛ×ö²»×öreduce£¬gReduceµÄ´óĞ¡¶¼ÊÇÒ»ÑùµÄ¡£ÕâÀïÒÔmÎªµ¥Ôª½øĞĞÅÉ·¢Êı¾İ£¬mÎª0-7, Ôò»áÓĞ8¸ötileµÄm½øĞĞÕâÀï¡£
-    // Èç¹û×öreduce£¬Ã¿¸öm»áÕë¶ÔÖ¸ÏòÉÏÃæÊÕËõºóµÄ·¶Î§(m_reduce % params_ptr->tile_m_perrank)£¬´ÓsmemÄÃÊı¾İ¹æÔ¼µ½ÕâÀï¡£
-    // Èç¹û²»×öreduce£¬Ã¿¸öm»áÖ±½ÓÖ¸ÏòÔ­±¾×Ô¼ºËùÊôµÄÄ¿µÄµØ£¬´ÓsmemÈ¡³öÊı¾İ¡£
-    // 0-7µÄmÀï¶ÔÓ¦µÄsmemµÄÄÚÈİÊÇ ´ÓÆäËûrankĞèÒª¹æÔ¼µÄÊı¾İ¡£ËùÒÔÈç¹û²»fused reduce£¬ÔòĞèÒª½«Ä¿µÄbufferÖĞ£¬½«×Ô¼ºµÄm=2/3£¬4/5£¬6/7, ¶¼¶îÍâ¹æÔ¼µ½×Ô¼ºµÄ0/1ÉÏ¡£
+    // æ— è®ºåšä¸åšreduceï¼ŒgReduceçš„å¤§å°éƒ½æ˜¯ä¸€æ ·çš„ã€‚è¿™é‡Œä»¥mä¸ºå•å…ƒè¿›è¡Œæ´¾å‘æ•°æ®ï¼Œmä¸º0-7, åˆ™ä¼šæœ‰8ä¸ªtileçš„mè¿›è¡Œè¿™é‡Œã€‚
+    // å¦‚æœåšreduceï¼Œæ¯ä¸ªmä¼šé’ˆå¯¹æŒ‡å‘ä¸Šé¢æ”¶ç¼©åçš„èŒƒå›´(m_reduce % params_ptr->tile_m_perrank)ï¼Œä»smemæ‹¿æ•°æ®è§„çº¦åˆ°è¿™é‡Œã€‚
+    // å¦‚æœä¸åšreduceï¼Œæ¯ä¸ªmä¼šç›´æ¥æŒ‡å‘åŸæœ¬è‡ªå·±æ‰€å±çš„ç›®çš„åœ°ï¼Œä»smemå–å‡ºæ•°æ®ã€‚
+    // 0-7çš„mé‡Œå¯¹åº”çš„smemçš„å†…å®¹æ˜¯ ä»å…¶ä»–rankéœ€è¦è§„çº¦çš„æ•°æ®ã€‚æ‰€ä»¥å¦‚æœä¸fused reduceï¼Œåˆ™éœ€è¦å°†ç›®çš„bufferä¸­ï¼Œå°†è‡ªå·±çš„m=2/3ï¼Œ4/5ï¼Œ6/7, éƒ½é¢å¤–è§„çº¦åˆ°è‡ªå·±çš„0/1ä¸Šã€‚
     auto mReduce = get_mReduce();  // (M_reduce,N,L)
     Tensor gReduce = local_tile(mReduce, take<0, 2>(TileShape{}), make_coord(m_reduce, n));  // (TILE_M,TILE_N)
     Tensor gReduce_epi = flat_divide(gReduce, EpilogueTile{});  // (EPI_TILE_M,EPI_TILE_N,EPI_M,EPI_N)
@@ -619,9 +619,9 @@ struct Sm90AllReduceDma {
     if constexpr (FuseReduction) {
       if (not is_local_tile_reduce) {
         // if this tile is fetched from other rank, wait for the local rank to reduce first
-        // ÓëÏÂÃæµÄint reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);¶ÔÓ¦
-        // Èç¹ûµ±Ç°tileÈÎÎñÊÇ´ÓÆäËûrank»ñÈ¡Êı¾İ£¬ÄÇÃ´ĞèÒªµÈ´ıµ±Ç°rankµÄÊı¾İ¾ÍĞ÷£¬¼´ĞèÒªÓÃ¹ıÒ»´Îarrive_inc_get¡£
-        // ÒòÎªÏÂÃæµÄtgReduce_epiµÚÒ»´ÎÊÇÖ±½Ó´Ósmem¿½±´¹ıÈ¥µÄ(ÃâÈ¥ÇåÁã²Ù×÷£¿)£¬¶ÁÈ¡ÆäËûrankÔòÔÚtgReduce_epi½øĞĞÀÛ¼Ó¡£
+        // ä¸ä¸‹é¢çš„int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);å¯¹åº”
+        // å¦‚æœå½“å‰tileä»»åŠ¡æ˜¯ä»å…¶ä»–rankè·å–æ•°æ®ï¼Œé‚£ä¹ˆéœ€è¦ç­‰å¾…å½“å‰rankçš„æ•°æ®å°±ç»ªï¼Œå³éœ€è¦ç”¨è¿‡ä¸€æ¬¡arrive_inc_getã€‚
+        // å› ä¸ºä¸‹é¢çš„tgReduce_epiç¬¬ä¸€æ¬¡æ˜¯ç›´æ¥ä»smemæ‹·è´è¿‡å»çš„(å…å»æ¸…é›¶æ“ä½œï¼Ÿ)ï¼Œè¯»å–å…¶ä»–rankåˆ™åœ¨tgReduce_epiè¿›è¡Œç´¯åŠ ã€‚
         Barrier::wait_lt(lock_ptr, thread_idx, flag_idx, 1);
       }
     }
@@ -646,10 +646,10 @@ struct Sm90AllReduceDma {
             // write to reduce_buffer
             if constexpr (FuseReduction) {
               if (is_local_tile_reduce) {
-                // trReduceÊÇ×Ô¼ºµÄ£¬Ö±½Ó¿½±´
+                // trReduceæ˜¯è‡ªå·±çš„ï¼Œç›´æ¥æ‹·è´
                 copy(tiled_copy, trReduce, tgReduce_epi(_, copy_m, copy_n));
               } else {
-                // trReduceÊÇÆäËûrankµÄ£¬ĞèÒª¹æÔ¼
+                // trReduceæ˜¯å…¶ä»–rankçš„ï¼Œéœ€è¦è§„çº¦
                 using VecType = uint_byte_t<sizeof(trReduce)>;
                 cutlass::arch::local_red<VecType, sizeof(Element) * kAlignment, Element>(
                     recast<VecType>(trReduce)(_0{}),
@@ -657,7 +657,7 @@ struct Sm90AllReduceDma {
                     true);
               }
             } else {
-              // ²»×öreduce£¬¾ÍÖ±½Ó¿½±´¡£
+              // ä¸åšreduceï¼Œå°±ç›´æ¥æ‹·è´ã€‚
               copy(tiled_copy, trReduce, tgReduce_epi(_, copy_m, copy_n));
             }
           }
@@ -668,7 +668,7 @@ struct Sm90AllReduceDma {
       }
     }
 
-    // È·±£ËùÓĞrank¶¼µ½Î»£¬Ã¿µ½Î»Ò»¸öÔòarrive_inc_get+1£¬ÓÉwait_eq_reset¼¯ÆëÍ³Ò»ÍË³ö
+    // ç¡®ä¿æ‰€æœ‰rankéƒ½åˆ°ä½ï¼Œæ¯åˆ°ä½ä¸€ä¸ªåˆ™arrive_inc_get+1ï¼Œç”±wait_eq_reseté›†é½ç»Ÿä¸€é€€å‡º
     if constexpr (FuseReduction) {
       int reduce_count = Barrier::arrive_inc_get(lock_ptr, thread_idx, flag_idx, 1);
       if (reduce_count == params_ptr->local_world_size) {

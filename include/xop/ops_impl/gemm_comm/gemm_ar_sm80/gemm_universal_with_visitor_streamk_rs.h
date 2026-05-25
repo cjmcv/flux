@@ -781,7 +781,7 @@ protected:
     /// The location of this tile (in threadblock-tile coordinates) in the output matrix
     GemmCoord tiled_coord = params.block_mapping.get_tile_offset(reduce_tile_idx);
 
-    // 标记进入reduce的tile
+    // 鏍囪杩涘叆reduce鐨則ile
     int *streamk_flag = (int*)params.aux_local_buffer;
     uint32_t tiled_n = (get<1>(params.problem_shape) + blockDim.x - 1) / blockDim.x;
     uint32_t tileIdx = tiled_coord.m() * tiled_n + tiled_coord.n();

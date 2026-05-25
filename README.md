@@ -12,6 +12,8 @@ source ./build.sh --env
 ./build.sh --arch 89 --jobs 6
 # For Hopper(sm90) GPU
 ./build.sh --arch 90 --jobs 6
+# For blackwell(sm120) GPU
+./build.sh --arch 120 --jobs 6
 
 # ./build.sh --arch 89 --jobs 1 2>&1 | tee full.log
 
@@ -60,3 +62,6 @@ python3 tools/tuning/tune_gemm_normal.py --schema=GemmNormal
 # Now you can test it.
 python3 tools/gemm/test_gemm_normal.py 12 12288 6144 --dtype=bfloat16
 ```
+
+
+git clone -b pn2 --recursive https://github.com/cjmcv/flux.git

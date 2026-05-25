@@ -100,7 +100,7 @@ struct TorchDefaultConfig {
     TORCH_CHECK(weight.dim() == 2, "weight dim is not 2");
     int32_t m = input.size(0);
     int32_t k = input.size(1);
-    int32_t n = output.size(1); // is_transpose_weight ? weight.size(1) : weight.size(0); // true是RRR，正常使用是false，对应linear层的RCR
+    int32_t n = output.size(1); // is_transpose_weight ? weight.size(1) : weight.size(0); // true鏄疪RR锛屾甯镐娇鐢ㄦ槸false锛屽搴攍inear灞傜殑RCR
 
     std::unique_ptr<RtArguments> rt_args;
     if (weight_scale.has_value()) {

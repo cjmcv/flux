@@ -45,7 +45,7 @@ public:
       bool transpose_weight)
       : input_dtype(input_dtype),
         output_dtype(output_dtype),
-        transpose_weight(transpose_weight) { // transpose_weight true¶ÔÓ¦µÄÊÇRRR£¬Õı³£µÄfalseÊÇRCR
+        transpose_weight(transpose_weight) { // transpose_weight trueå¯¹åº”çš„æ˜¯RRRï¼Œæ­£å¸¸çš„falseæ˜¯RCR
     // auto device_properties = torch::cuda::get_device_properties(0);
     arch_ = get_arch();
 
@@ -69,12 +69,12 @@ public:
     }
   }
 
-  // tuning£ºtensor½øÈë£¬ÏÈ¹¹½¨meta£¬ÒÀ´ÎÌí¼ÓĞòºÅ³äµ±key£¬È¡»ñÈ¡op£¬¼ÆËãĞÔÄÜ£¬²¢½øĞĞÅÅĞò£¬È¡top5, ±£ÁôÕû¸ömeta¡£»ñÈ¡²»µ½ĞÂopÊ±±íÊ¾½áÊø¡£
-  //         top1µÄmeta´Ócpp¶ËĞ´ÈëÎÄ¼ş£¬ĞÅÏ¢°üÀ¨shape+ĞòºÅ+meta¡£±£´æÊ±£¬metaĞÅÏ¢ĞèÒª°´python½Å±¾µÄÉú³É·½Ê½£¬×ªÎª×Ö·û´®¡£
-  // python½Å±¾¸ù¾İtuning½á¹ûÎÄ¼ş£¬ÔÙ´ÎÉú³Éop×¢²á±í+tuning×¢²á±í£¬
-  //       op×¢²á±í£º°´µÚÒ»´ÎÉú³ÉµÄÁ÷³ÌÔÙ×ßÒ»±é£¬Í¬Ê±¼ìË÷ĞòºÅ+metaµÄ×Ö·û´®, Æ¥ÅäÕßÁôÏÂ£¬²»Æ¥ÅäµÄ²»Éú³É¡£
-  //       tuning×¢²á±í£ºkeyÊÇshape+meta£¬valueÊÇĞòºÅ£¬testÊ±ÊäÈëtensor£¬¹¹½¨meta£¬½áºÏshape£¬»ñÈ¡ĞòºÅ¡£×é³ÉĞòºÅ+meta£¬³äµ±op×¢²á±íµÄkey£¬¼ìË÷ËÑË÷op¡£
-  // python1Éú³ÉËÑË÷¿Õ¼äop×¢²á±í£¬±àÒë£¬python2Ö´ĞĞtuning½Å±¾£¬Éú³Étuned±í£¬python1Éú³Étop1µÄop×¢²á±íÒÔ¼°tuning×¢²á±í¡£
+  // tuningï¼štensorè¿›å…¥ï¼Œå…ˆæ„å»ºmetaï¼Œä¾æ¬¡æ·»åŠ åºå·å……å½“keyï¼Œå–è·å–opï¼Œè®¡ç®—æ€§èƒ½ï¼Œå¹¶è¿›è¡Œæ’åºï¼Œå–top5, ä¿ç•™æ•´ä¸ªmetaã€‚è·å–ä¸åˆ°æ–°opæ—¶è¡¨ç¤ºç»“æŸã€‚
+  //         top1çš„metaä»cppç«¯å†™å…¥æ–‡ä»¶ï¼Œä¿¡æ¯åŒ…æ‹¬shape+åºå·+metaã€‚ä¿å­˜æ—¶ï¼Œmetaä¿¡æ¯éœ€è¦æŒ‰pythonè„šæœ¬çš„ç”Ÿæˆæ–¹å¼ï¼Œè½¬ä¸ºå­—ç¬¦ä¸²ã€‚
+  // pythonè„šæœ¬æ ¹æ®tuningç»“æœæ–‡ä»¶ï¼Œå†æ¬¡ç”Ÿæˆopæ³¨å†Œè¡¨+tuningæ³¨å†Œè¡¨ï¼Œ
+  //       opæ³¨å†Œè¡¨ï¼šæŒ‰ç¬¬ä¸€æ¬¡ç”Ÿæˆçš„æµç¨‹å†èµ°ä¸€éï¼ŒåŒæ—¶æ£€ç´¢åºå·+metaçš„å­—ç¬¦ä¸², åŒ¹é…è€…ç•™ä¸‹ï¼Œä¸åŒ¹é…çš„ä¸ç”Ÿæˆã€‚
+  //       tuningæ³¨å†Œè¡¨ï¼škeyæ˜¯shape+metaï¼Œvalueæ˜¯åºå·ï¼Œtestæ—¶è¾“å…¥tensorï¼Œæ„å»ºmetaï¼Œç»“åˆshapeï¼Œè·å–åºå·ã€‚ç»„æˆåºå·+metaï¼Œå……å½“opæ³¨å†Œè¡¨çš„keyï¼Œæ£€ç´¢æœç´¢opã€‚
+  // python1ç”Ÿæˆæœç´¢ç©ºé—´opæ³¨å†Œè¡¨ï¼Œç¼–è¯‘ï¼Œpython2æ‰§è¡Œtuningè„šæœ¬ï¼Œç”Ÿæˆtunedè¡¨ï¼Œpython1ç”Ÿæˆtop1çš„opæ³¨å†Œè¡¨ä»¥åŠtuningæ³¨å†Œè¡¨ã€‚
   torch::Tensor
   forward(
       torch::Tensor input,
@@ -166,7 +166,7 @@ public:
 
         RtArguments *base_args = rt_args.get();
         std::vector<int> split_m = Strategy::SplitChunkM(base_args->m, max_m);
-        // bias == out_features == N £¨K == in_features£©
+        // bias == out_features == N ï¼ˆK == in_featuresï¼‰
         // so bias needn't split.
         void *ptr_A = rt_args->ptr_A;
         void *ptr_D = rt_args->ptr_D;

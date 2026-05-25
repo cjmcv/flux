@@ -70,8 +70,8 @@ public:
 
   /// Runs the kernel using initialized state.
   Status run(cudaStream_t stream = nullptr) {
-    dim3 block = dim3(kThreadsPerRow, kThreadCount / kThreadsPerRow, 1); // (16, 8£¬ 1)
-    dim3 grid = dim3((params_.problem_size.row() + (block.y - 1)) / block.y, 1, params_.splitk_num); // (m//8, 1£¬ 1)
+    dim3 block = dim3(kThreadsPerRow, kThreadCount / kThreadsPerRow, 1); // (16, 8Â£Â¬ 1)
+    dim3 grid = dim3((params_.problem_size.row() + (block.y - 1)) / block.y, 1, params_.splitk_num); // (m//8, 1Â£Â¬ 1)
     
     int smem_size = int(sizeof(typename GemvKernel::SharedStorage));
     

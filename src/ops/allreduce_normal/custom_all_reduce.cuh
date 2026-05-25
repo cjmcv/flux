@@ -349,7 +349,7 @@ __global__ void __launch_bounds__(1024, 1)
   P* tmps[ngpus];
 
   // 01234567 -> rank3: 34567012, rank6: 67012345  original 2stage
-  // 01234567 -> rank3: 30127456, rank6: 67452301  3stage£¬spilt to 2 groups
+  // 01234567 -> rank3: 30127456, rank6: 67452301  3stageÂ£Â¬spilt to 2 groups
   // stage1: reduce scatter 4 + 4
   if (rank < 4) {
 #pragma unroll

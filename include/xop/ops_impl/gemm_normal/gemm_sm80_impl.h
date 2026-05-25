@@ -3,7 +3,7 @@
 #include "xop/ops_impl/common_cutlass.h"
 // #define ENABLE_EVT
 
-#ifdef ENABLE_EVT // ÙÓº÷¶õ?Í¿ÉÔ»ÈÍÑevtÍ­¶è?¡¤¼ûÍ×ºÆ?À°
+#ifdef ENABLE_EVT // æœç´¢ç©º?ä¸ä¸ä½¿ç”¨evtæœ‰åŒº?ï¼Œéœ€è¦å†?æ•´
 #include "cutlass/epilogue/threadblock/fusion/visitors.hpp"
 #include "cutlass/gemm/kernel/default_gemm_universal_with_visitor.h"
 #include "cutlass/gemm/device/gemm_universal_adapter.h"
@@ -221,11 +221,11 @@ private:
 
 ///////////////////////////////////////////////////////////////////////////
 // // template
-// template <class ElementA, class ElementB, class ElementC¡£¡£¡£>
+// template <class ElementA, class ElementB, class ElementCã€‚ã€‚ã€‚>
 // class GemmSm80Impl : public GemmBase  {
 
-//   using EpilogueOp = cutlass::epilogue::thread::LinearCombination<¡£¡£¡£>;
-//   using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<¡£¡£¡£>;
+//   using EpilogueOp = cutlass::epilogue::thread::LinearCombination<ã€‚ã€‚ã€‚>;
+//   using DeviceGemmBasic = cutlass::gemm::device::GemmUniversal<ã€‚ã€‚ã€‚>;
 
 // public:
 //   void initialize(RtArgumentsBase *args, void *stream = nullptr) {
@@ -233,7 +233,7 @@ private:
 //     gemm_dev_ = DeviceGemmBasic();
 //     // Using the arguments, query for extra workspace required for matrix multiplication computation
 //     ImplHelper<LayoutA, LayoutB, LayoutC> helper(rt_args->m, rt_args->n, rt_args->k);
-//     ¡£¡£¡£
+//     ã€‚ã€‚ã€‚
 //     auto arguments = args_from_options(rt_args);
 //     size_t workspace_size = DeviceGemmBasic::get_workspace_size(arguments);
 

@@ -63,7 +63,7 @@ bool _is_weak_contiguous(torch::Tensor& t) {
  */
 void all_reduce(fptr_t _fa, torch::Tensor& inp, torch::Tensor& out, fptr_t _reg_buffer, int64_t reg_buffer_sz_bytes) {
   auto fa = reinterpret_cast<vllm::CustomAllreduce*>(_fa);
-  const at::cuda::OptionalCUDAGuard device_guard(device_of(inp)); // ÇĞ»»µ½inpËùÔÚµÄÄ¿±êdevice
+  const at::cuda::OptionalCUDAGuard device_guard(device_of(inp)); // åˆ‡æ¢åˆ°inpæ‰€åœ¨çš„ç›®æ ‡device
   auto stream = c10::cuda::getCurrentCUDAStream().stream();
 
   TORCH_CHECK_EQ(inp.scalar_type(), out.scalar_type());
@@ -72,10 +72,10 @@ void all_reduce(fptr_t _fa, torch::Tensor& inp, torch::Tensor& out, fptr_t _reg_
   TORCH_CHECK(_is_weak_contiguous(inp));
   auto input_size = inp.numel() * inp.element_size();
   auto reg_buffer = reinterpret_cast<void*>(_reg_buffer);
-  // ÔÚcaptureÊ±£¬reg_bufferÎª0£¬ÊäÈëtensor»áÖ±½ÓÊäÈëµ½fa->allreduce£¬½ø¶ø½øÈëµ½graph_unreg_buffers_ºÍd_rank_data_base_¡£
-  // ÔÚcapture½áÊøºó£¬»á¾­¹ıpython/xop/ops/custom_all_reduce.py£ºcapture -> self.register_graph_buffers(), 
-  // Õë¶ÔcaptureÖĞÊÕ¼¯µ½µÄÊäÈëÊı¾İ£¬Ê¹ÓÃcuda ipc²¹³äÓëÖ®¶ÔÓ¦µÄÆäËûrankµÄipcÄÚ´æ
-  //£¨µ±Ç°rankµÄ»¹ÊÇÔ­À´µÄÆÕÍ¨±¾µØÄÚ´æ£¬µ«»áÓëÆäËûrankµÄ¶ÔÓ¦ipcÄÚ´æÒ»Í¬°ó¶¨ÔÚd_rank_data_base_£¬¿ÉÒÔÓÃÖ±½ÓË÷ÒıÕÒµ½ÆäËûrankµÄÄÚ´æ£© 
+  // åœ¨captureæ—¶ï¼Œreg_bufferä¸º0ï¼Œè¾“å…¥tensorä¼šç›´æ¥è¾“å…¥åˆ°fa->allreduceï¼Œè¿›è€Œè¿›å…¥åˆ°graph_unreg_buffers_å’Œd_rank_data_base_ã€‚
+  // åœ¨captureç»“æŸåï¼Œä¼šç»è¿‡python/xop/ops/custom_all_reduce.pyï¼šcapture -> self.register_graph_buffers(), 
+  // é’ˆå¯¹captureä¸­æ”¶é›†åˆ°çš„è¾“å…¥æ•°æ®ï¼Œä½¿ç”¨cuda ipcè¡¥å……ä¸ä¹‹å¯¹åº”çš„å…¶ä»–rankçš„ipcå†…å­˜
+  //ï¼ˆå½“å‰rankçš„è¿˜æ˜¯åŸæ¥çš„æ™®é€šæœ¬åœ°å†…å­˜ï¼Œä½†ä¼šä¸å…¶ä»–rankçš„å¯¹åº”ipcå†…å­˜ä¸€åŒç»‘å®šåœ¨d_rank_data_base_ï¼Œå¯ä»¥ç”¨ç›´æ¥ç´¢å¼•æ‰¾åˆ°å…¶ä»–rankçš„å†…å­˜ï¼‰ 
   if (reg_buffer) {
     TORCH_CHECK_LE(input_size, reg_buffer_sz_bytes);
     AT_CUDA_CHECK(cudaMemcpyAsync(reg_buffer, inp.data_ptr(), input_size, cudaMemcpyDeviceToDevice, stream));

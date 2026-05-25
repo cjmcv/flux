@@ -10,9 +10,9 @@
 #define XOP_TORCH_EXTENSION_NAME xop_pybind
 
 namespace xop {
-// <NT> torch::CustomClassHolder ÊÇ PyTorch Ìá¹©µÄ»ùÀà£¬ËüÄÜÈÃ×Ô¶¨ÒåÀàÔÚ Python ºÍ C++ Ö®¼äË³Àû½»»¥¡£
-// ÏÈ×Ô¶¨ÒåÀà£¬Í¨¹ı TorchClassWrapper Ä£°å½á¹¹Ìå¶ÔÆä½øĞĞ°ü×° ÈçTorchClassWrapper<MyCustomClass>£¬
-// È»ºóÀûÓÃ ThsOpsInitRegistry ½« TorchClassWrapper<MyCustomClass> ×¢²áµ½ PyTorch ¿â¡£
+// <NT> torch::CustomClassHolder æ˜¯ PyTorch æä¾›çš„åŸºç±»ï¼Œå®ƒèƒ½è®©è‡ªå®šä¹‰ç±»åœ¨ Python å’Œ C++ ä¹‹é—´é¡ºåˆ©äº¤äº’ã€‚
+// å…ˆè‡ªå®šä¹‰ç±»ï¼Œé€šè¿‡ TorchClassWrapper æ¨¡æ¿ç»“æ„ä½“å¯¹å…¶è¿›è¡ŒåŒ…è£… å¦‚TorchClassWrapper<MyCustomClass>ï¼Œ
+// ç„¶ååˆ©ç”¨ ThsOpsInitRegistry å°† TorchClassWrapper<MyCustomClass> æ³¨å†Œåˆ° PyTorch åº“ã€‚
 template <typename T>
 struct TorchClassWrapper : public torch::CustomClassHolder, T {
  public:

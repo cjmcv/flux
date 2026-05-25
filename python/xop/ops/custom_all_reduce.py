@@ -191,7 +191,7 @@ class CustomAllreduce:
         # Buffers memory are owned by this Python class and passed to C++.
         # Meta data composes of two parts: meta data for synchronization and a
         # temporary buffer for storing intermediate allreduce results.
-        # <NT> meta_sizeÊÇSignalµÄsize£¬
+        # <NT> meta_sizeæ˜¯Signalçš„sizeï¼Œ
         self.meta_ptrs = self.create_shared_buffer(
             xop.meta_size() + max_size, group=group
         )
@@ -222,19 +222,19 @@ class CustomAllreduce:
         Creates a shared buffer and returns a list of pointers
         representing the buffer on all processes in the group.
         """
-        # <NT> ÉêÇëÏÔ´æ£¬²¢Ê¹ÓÃcudaIpcGetMemHandle½«¸ÃÏÔ´æÉèÖÃÎª¶àGPU¹²Ïí£¬µÃµ½²Ù×÷Õâ¿é¹²ÏíÄÚ´æµÄ¾ä±úhandle
+        # <NT> ç”³è¯·æ˜¾å­˜ï¼Œå¹¶ä½¿ç”¨cudaIpcGetMemHandleå°†è¯¥æ˜¾å­˜è®¾ç½®ä¸ºå¤šGPUå…±äº«ï¼Œå¾—åˆ°æ“ä½œè¿™å—å…±äº«å†…å­˜çš„å¥æŸ„handle
         lib = CudaRTLibrary()
         pointer = lib.cudaMalloc(size_in_bytes)
         handle = lib.cudaIpcGetMemHandle(pointer)
         world_size = dist.get_world_size(group=group)
         rank = dist.get_rank(group=group)
         handles = [None] * world_size
-        # <NT> Ê¹ÓÃallgather½«¸÷¸ögpuÉÏµÄ¹²ÏíÄÚ´æ¶¼ÊÕ¼¯ÆğÀ´£¬Ê¹Ã¿¸ögpuÉÏ¶¼ÄÃµ½ËùÓĞgpuµÄ·ÖÅäµÄ¹²ÏíÄÚ´æ¾ä±ú¡£
+        # <NT> ä½¿ç”¨allgatherå°†å„ä¸ªgpuä¸Šçš„å…±äº«å†…å­˜éƒ½æ”¶é›†èµ·æ¥ï¼Œä½¿æ¯ä¸ªgpuä¸Šéƒ½æ‹¿åˆ°æ‰€æœ‰gpuçš„åˆ†é…çš„å…±äº«å†…å­˜å¥æŸ„ã€‚
         dist.all_gather_object(handles, handle, group=group)
 
-        # <NT> Èç¹ûÊÇµ±Ç°GPU×Ô¼ºµÄ£¬ÔòÖ±½ÓÊ¹ÓÃÆÕÍ¨cudaMalloc³öÀ´µÄÏÔ´æÖ¸Õëpointer.value£¬²»ĞèÒª¶îÍâ²Ù×÷.
-        #      µ«Èç¹û²»ÊÇµ±Ç°GPUµÄ£¬ÊÇ´ÓÆäËûGPU»ñÈ¡µ½µÄ¾ä±ú£¬ÔòĞèÒª¶îÍâµ÷ÓÃcudaIpcOpenMemHandle£¬
-        #    ËüÔÊĞíÒ»¸ö½ø³Ì´ò¿ªÁíÒ»¸ö½ø³Ìµ¼³öµÄÉè±¸ÄÚ´æ¾ä±ú£¬²¢ÔÚµ±Ç°½ø³ÌÖĞÊ¹ÓÃ¸ÃÄÚ´æ¡£
+        # <NT> å¦‚æœæ˜¯å½“å‰GPUè‡ªå·±çš„ï¼Œåˆ™ç›´æ¥ä½¿ç”¨æ™®é€šcudaMallocå‡ºæ¥çš„æ˜¾å­˜æŒ‡é’ˆpointer.valueï¼Œä¸éœ€è¦é¢å¤–æ“ä½œ.
+        #      ä½†å¦‚æœä¸æ˜¯å½“å‰GPUçš„ï¼Œæ˜¯ä»å…¶ä»–GPUè·å–åˆ°çš„å¥æŸ„ï¼Œåˆ™éœ€è¦é¢å¤–è°ƒç”¨cudaIpcOpenMemHandleï¼Œ
+        #    å®ƒå…è®¸ä¸€ä¸ªè¿›ç¨‹æ‰“å¼€å¦ä¸€ä¸ªè¿›ç¨‹å¯¼å‡ºçš„è®¾å¤‡å†…å­˜å¥æŸ„ï¼Œå¹¶åœ¨å½“å‰è¿›ç¨‹ä¸­ä½¿ç”¨è¯¥å†…å­˜ã€‚
         pointers: List[int] = []
         for i, h in enumerate(handles):
             if i == rank:        
@@ -377,7 +377,7 @@ class CustomAllreduce:
                 # allreduce is out-of-place.
                 return torch.empty_like(input)
         else:
-            # <NT> cuda graphµÄreplayÊÇÒÑ¾­±»²¶»ñµ½ÁË£¬ËùÒÔ²»»á×ßÕâÀï¡£±»²¶»ñµÄ½«»áÊÇÉÏÃæ registered=True µÄ
+            # <NT> cuda graphçš„replayæ˜¯å·²ç»è¢«æ•è·åˆ°äº†ï¼Œæ‰€ä»¥ä¸ä¼šèµ°è¿™é‡Œã€‚è¢«æ•è·çš„å°†ä¼šæ˜¯ä¸Šé¢ registered=True çš„
             return self.all_reduce(input, registered=False)
 
     ###########################################
@@ -400,7 +400,7 @@ class CustomAllreduce:
                 # allreduce is out-of-place.
                 return 
         else:
-            # <NT> cuda graphµÄreplayÊÇÒÑ¾­±»²¶»ñµ½ÁË£¬ËùÒÔ²»»á×ßÕâÀï¡£±»²¶»ñµÄ½«»áÊÇÉÏÃæ registered=True µÄ
+            # <NT> cuda graphçš„replayæ˜¯å·²ç»è¢«æ•è·åˆ°äº†ï¼Œæ‰€ä»¥ä¸ä¼šèµ°è¿™é‡Œã€‚è¢«æ•è·çš„å°†ä¼šæ˜¯ä¸Šé¢ registered=True çš„
             return self.all_reduce(input, out=output, registered=False)
     #############################################
     

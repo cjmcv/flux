@@ -40,7 +40,7 @@ public:
       bool transpose_weight)
       : input_dtype(input_dtype),
         output_dtype(output_dtype),
-        transpose_weight(transpose_weight) { // transpose_weight true对应的是RRR，正常的false是RCR
+        transpose_weight(transpose_weight) { // transpose_weight true瀵瑰簲鐨勬槸RRR锛屾甯哥殑false鏄疪CR
     // auto device_properties = torch::cuda::get_device_properties(0);
     arch_ = get_arch();
   } 

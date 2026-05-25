@@ -68,7 +68,7 @@ class CheckFail {
 /////////////////////////////////////////////////////
 // Enum classes
 /////////////////////////////////////////////////////
-// 算子不区分v2/v3
+// 绠楀瓙涓嶅尯鍒唙2/v3
 enum class UnifiedMetaEnum : int8_t {
   GemmNormal = 0, GemvSimt, GemmNormalSimt, GemmGrouped,    // gemm type
   GemmBlockScaleFp8, GemmGroupedBlockScaleFp8, 

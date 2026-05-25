@@ -242,21 +242,21 @@ struct VisitorAuxStoreRs{
     }
 
     __device__ void unpack_and_print(VecType v, bool guard) {
-        // 1. ÏÈ°Ñ 128 bit ÊÓÎª 4¡Á32 bit ÈİÆ÷
+        // 1. å…ˆæŠŠ 128 bit è§†ä¸º 4Ã—32 bit å®¹å™¨
         union {
             VecType   u128;
             uint32_t  u32[4];
         } tmp = {v};
 
-        // 2. Ã¿ 32 bit ÔÙ½âÊÍ³É 2¡Ábfloat16£¨¸ßÎ»/µÍÎ»¸÷ 16 bit£©
+        // 2. æ¯ 32 bit å†è§£é‡Šæˆ 2Ã—bfloat16ï¼ˆé«˜ä½/ä½ä½å„ 16 bitï¼‰
         __nv_bfloat16 bf[4];
         #pragma unroll
         for (int i = 0; i < 4; ++i) {
             uint32_t word = tmp.u32[i];
-            bf[i] = *reinterpret_cast<__nv_bfloat16*>(&word);   // Ö±½Ó°´Î»¿½
+            bf[i] = *reinterpret_cast<__nv_bfloat16*>(&word);   // ç›´æ¥æŒ‰ä½æ‹·
         }
 
-        // 3. ´òÓ¡£¨device printf Ğè %f£¬»á×Ô¶¯°Ñ bfloat16 ÌáÉı³É float£©
+        // 3. æ‰“å°ï¼ˆdevice printf éœ€ %fï¼Œä¼šè‡ªåŠ¨æŠŠ bfloat16 æå‡æˆ floatï¼‰
         printf("bf16: %f %f %f %f (%d)\n",
               __bfloat162float(bf[0]),
               __bfloat162float(bf[1]),
