@@ -3,7 +3,7 @@ import itertools
 import tilelang
 import tilelang.language as T
 
-from xop.ops.dsl.micro_base import BaseMicroKernel, HparamSelectMode
+from xop.ops.dsl.micro_base import BaseMicroKernel, HparamSelectMode, get_artifact, get_launch_info, get_dispatch_source
 from xop.ops.dsl.micro_config import get_arch, get_thread_num, get_target_str, is_megakernel_enabled, get_pass_configs
 
 ######
@@ -414,8 +414,8 @@ __device__ __forceinline__ void rope_kernel_<name_suffix>(const int bx, const in
   
   const <dtype>* __restrict__ Q = static_cast<const <dtype>*>(q);
   const <dtype>* __restrict__ K = static_cast<const <dtype>*>(k);
-  const <dtype>* __restrict__ cos = static_cast<const <dtype>*>(cos_ptr);
-  const <dtype>* __restrict__ sin = static_cast<const <dtype>*>(sin_ptr);
+  const <dtype>* __restrict__ cos_1 = static_cast<const <dtype>*>(cos_ptr);
+  const <dtype>* __restrict__ sin_1 = static_cast<const <dtype>*>(sin_ptr);
   <dtype>* __restrict__ Q_embed = static_cast<<dtype>*>(q_embed_ptr);
   <dtype>* __restrict__ K_embed = static_cast<<dtype>*>(k_embed_ptr);
   
@@ -442,7 +442,8 @@ __device__ __forceinline__ void rope_kernel_<name_suffix>(const int bx, const in
         source = source.replace("blockIdx.y", "by")
         source = source.replace("blockIdx.z", "bz")
         
-        grid_dim, block_dim, dynamic_smem_buf, use_cooperative_groups = kernel.get_launch_info()[0]
+        artifact = get_artifact(kernel)
+        grid_dim, block_dim, dynamic_smem_buf, use_cooperative_groups = get_launch_info(artifact)[0]
         self.layout = f"({grid_dim['blockIdx.x']}, {grid_dim['blockIdx.y']}, {grid_dim['blockIdx.z']}), ({1}, {1}, {1})"
         source = source.replace("<gridx_0>", str(grid_dim['blockIdx.x']))
         source = source.replace("<gridy_0>", str(grid_dim['blockIdx.y']))
@@ -455,6 +456,9 @@ __device__ __forceinline__ void rope_kernel_<name_suffix>(const int bx, const in
         extra_attr += f"\n// block_dim=({block_dim['threadIdx.x']}, {block_dim['threadIdx.y']}, {block_dim['threadIdx.z']})."
         source += extra_attr
         
+        dispatch_source = get_dispatch_source(kernel, artifact).replace('call', "create_"+self.strategy.name)
+        dispatch_source = dispatch_source.replace('LAUNCH_INFO', "LAUNCH_INFO_"+self.strategy.name)
+        source += "\n\n" + dispatch_source + "\n"
         return source
     
     def get_kernel(self, mode: HparamSelectMode):

@@ -57,10 +57,10 @@ __device__ __forceinline__ void gqa_decode_kernel(const int bx, const int by, co
           flashattn_kernel_1_8192_64_16_8_128<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
         }
         else if (step >= 64 && step < 128) {
-          flashattn_kernel_1_8192_128_16_8_128__0<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
+          flashattn_kernel_1_8192_128_16_8_128<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
         }
         else if (step >= 128 && step < 256) {
-          flashattn_kernel_1_8192_256_16_8_128__0<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
+          flashattn_kernel_1_8192_256_16_8_128<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
         }
         else if (step >= 256 && step < 512) {
           flashattn_kernel_1_8192_512_16_8_128__0<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
@@ -74,12 +74,12 @@ __device__ __forceinline__ void gqa_decode_kernel(const int bx, const int by, co
       }
       else if constexpr (SUB_KERNEL_ID == 1) {
         if (step >= 0 && step < 64) {}
-        else if (step >= 64 && step < 128) {
-          flashattn_kernel_1_8192_128_16_8_128__1<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
-        }
-        else if (step >= 128 && step < 256) {
-          flashattn_kernel_1_8192_256_16_8_128__1<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
-        }
+        // else if (step >= 64 && step < 128) {
+        //   flashattn_kernel_1_8192_128_16_8_128__1<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
+        // }
+        // else if (step >= 128 && step < 256) {
+        //   flashattn_kernel_1_8192_256_16_8_128__1<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
+        // }
         else if (step >= 256 && step < 512) {
           flashattn_kernel_1_8192_512_16_8_128__1<T, THREAD_NUM, SUB_KERNEL_ID, M, HEAD, GROUPS, DIM>(bx, by, bz, q, k, v, edge_ptr, mask_ptr, output_ptr, glse_ptr, output_partial_ptr); return;
         }

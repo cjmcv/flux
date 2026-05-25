@@ -2,7 +2,7 @@ import itertools
 
 import tilelang
 import tilelang.language as T
-from xop.ops.dsl.micro_base import BaseMicroKernel, HparamSelectMode, get_launch_info, get_dispatch_source
+from xop.ops.dsl.micro_base import BaseMicroKernel, HparamSelectMode, get_artifact, get_launch_info, get_dispatch_source
 from xop.ops.dsl.micro_config import get_arch, get_thread_num, get_target_str, is_megakernel_enabled, get_pass_configs
 
 #####################################################################################################
@@ -561,7 +561,9 @@ __device__ __forceinline__ void flashattn_kernel_<name_suffix>(const int bx, con
         source = source.replace("blockIdx.y", "by")
         source = source.replace("blockIdx.z", "bz")
         
-        grid_dim, block_dim, dynamic_smem_buf, use_cooperative_groups = get_launch_info(kernel)[0]
+        artifact = get_artifact(kernel)
+        infos = get_launch_info(artifact)
+        grid_dim, block_dim, dynamic_smem_buf, use_cooperative_groups = infos[0]
         self.layout = f"({grid_dim['blockIdx.x']}, {grid_dim['blockIdx.y']}, {grid_dim['blockIdx.z']}), ({BLOCK_N}, {BLOCK_H}, {num_split})"
         source = source.replace("<gridx_0>", str(grid_dim['blockIdx.x']))
         source = source.replace("<gridy_0>", str(grid_dim['blockIdx.y']))
@@ -584,7 +586,8 @@ __device__ __forceinline__ void flashattn_kernel_<name_suffix>(const int bx, con
         extra_attr += f"\n// block_dim=({block_dim['threadIdx.x']}, {block_dim['threadIdx.y']}, {block_dim['threadIdx.z']})."
         source += extra_attr
         
-        dispatch_source = get_dispatch_source(kernel).replace('call', "create_"+self.strategy.name)
+        dispatch_source = get_dispatch_source(kernel, artifact).replace('call', "create_"+self.strategy.name)
+        dispatch_source = dispatch_source.replace('LAUNCH_INFO', "LAUNCH_INFO_"+self.strategy.name)
         source += "\n\n" + dispatch_source + "\n"
         return source
     

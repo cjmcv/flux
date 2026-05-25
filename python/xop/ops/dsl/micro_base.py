@@ -375,7 +375,7 @@ class BaseMicroKernel:
             raise EnvironmentError("The environment variable DSL_HOME is not set.")
         # prop = torch.cuda.get_device_properties(0)
         # str(prop.major) + str(prop.minor)
-        self.base_path = self.dsl_home + "/gen/" + get_arch() + "/"
+        self.base_path = self.dsl_home + "/autogen/" + get_arch() + "/"
         target_dir = Path(self.base_path)
         target_dir.mkdir(parents=True, exist_ok=True)
 

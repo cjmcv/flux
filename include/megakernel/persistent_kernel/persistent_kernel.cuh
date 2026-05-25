@@ -15,8 +15,6 @@
 
 
 #include "profiler.h"
-// #include "tasks/common/copy_sm80.cuh"
-// #include "tasks/common/bfloat16.h"
 
 #include "mpk_atoms.cuh"
 #include "runtime_header.h"
@@ -81,7 +79,6 @@ using namespace kernel;
   } while (0)
 #endif
 
-// #define MPK_ENABLE_VERBOSE
 __device__ __forceinline__ void
     _execute_task(TaskDesc const *task_desc,
                   RuntimeConfig const &runtime_config, uint64_t* static_smem);

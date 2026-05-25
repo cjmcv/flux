@@ -71,14 +71,15 @@ class MicroAutoGen:
         
     def gen_qwen3_ops(self, layer_id: int, mode: HparamSelectMode):
         
-        dsl_home = os.getenv("DSL_HOME", default=None)
-        if dsl_home is None:
-            raise EnvironmentError("The environment variable DSL_HOME is not set.")
-        code_path = dsl_home + f"/src/megakernel/persistent_kernel/tasks/{get_arch()}/m{self.batch_size}/"
+        xop_home = os.getenv("XOP_HOME", default=None)
+        if xop_home is None:
+            raise EnvironmentError("The environment variable XOP_HOME is not set.")
+        code_path = xop_home + f"/include/megakernel/persistent_kernel/tasks/{get_arch()}/m{self.batch_size}/"
         code_dir = Path(code_path)
         code_dir.mkdir(parents=True, exist_ok=True)
         
-        config_path = dsl_home + f"/demo/common/autogen/{get_arch()}/"
+        dsl_home = os.getenv("DSL_HOME", default=None)
+        config_path = dsl_home + f"/autogen/{get_arch()}/"
         config_dir = Path(config_path)
         config_dir.mkdir(parents=True, exist_ok=True)
         

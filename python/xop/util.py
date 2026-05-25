@@ -55,7 +55,8 @@ def torch_profile(func):
         func(0)
     print(prof.key_averages().table(sort_by="cuda_time_total"))
     
-    prof.export_chrome_trace("trace.json") # chrome://tracing/     
+    prof.export_chrome_trace("trace.json") # chrome://tracing/
+    
 def assert_similar(x, y, eps=1e-2, name="tensor", assert_=False, print_=True):
     def print_red_warning(msg):
         print(f"\033[91m{msg}\033[0m")
@@ -167,6 +168,16 @@ def perf_gemm(warmup_iters: int, iters: int, name: str, fn: callable, enable_tor
     # total_time = end - start
     # return PerfResult(name=name, output=output, gemm_time_ms=total_time / iters * 1000)
 
+def profile(target_func: callable, torch_ref_func: callable):
+    check_allclose_ret(target_func, torch_ref_func, iters=5, print_mode=0)
+    
+    torch_profile(target_func)
+    torch_profile(torch_ref_func)
+    
+    perf_result_xop = perf_gemm(warmup_iters=100, iters=500, name="target", fn=target_func)
+    perf_result_torch = perf_gemm(warmup_iters=100, iters=500, name="torch", fn=torch_ref_func)
+    print(f"Latency: {perf_result_xop.gemm_time_ms:0.5}ms vs {perf_result_torch.gemm_time_ms:0.5}(torch) ms")
+    
 # scale = max(abs(BF16)) / 448
 # FP8 = clamp(round(BF16 / scale), -448, 448)
 # If using per-token quantization, the max is taken over the current token; 

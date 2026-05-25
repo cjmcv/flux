@@ -358,7 +358,7 @@ class MkLayers:
             self.qwen3_create_attn_layer(model, layer_id, is_long_kv, reuse_instance)
             self.qwen3_create_mlp_layer(model, layer_id, reuse_instance)
         meta, mk_attn_out, mk_mlp_out = self.fill_meta()
-        self.compile_load(meta_tensors=meta, is_no_compile=is_no_compile, output_dir=output_dir)  
+        self.compile_load(meta_tensors=meta, enable_prefetch=False, is_no_compile=is_no_compile, output_dir=output_dir)  
         
     def __call__(self, cur_pos, position_embeddings, hidden_states):
         self.update_step(cur_pos - 1, cos=position_embeddings[0], sin=position_embeddings[1])

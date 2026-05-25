@@ -1,0 +1,120 @@
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+namespace kernel {
+
+template <typename T,
+          int THREAD_NUM,
+          int TILE_DIM_X, 
+          int TILE_DIM_Y, 
+          int TILE_DIM_Z,
+          int M,
+          int N,
+          int I_STRIDE,
+          int O_STRIDE>
+__device__ __forceinline__ void silu_mul_kernel_32_9728(const int bx, const int by, const int bz,
+                                                   void const *input_ptr,
+                                                   void *output_ptr,
+                                                   int num_active_tokens) {
+  static_assert(THREAD_NUM==128);
+  static_assert(TILE_DIM_X==64); static_assert(TILE_DIM_Y==32); static_assert(TILE_DIM_Z==1);
+  static_assert(M==32); static_assert(N==9728);
+  if (bx >= 152 || by >= 1 || bz >= 1) { return; }
+  
+  const bfloat16_t* __restrict__ A = static_cast<const bfloat16_t*>(input_ptr);
+  bfloat16_t* __restrict__ C = static_cast<bfloat16_t*>(output_ptr);
+  
+  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
+  #pragma unroll
+  for (int i = 0; i < 2; ++i) {
+    *(uint4*)(((bfloat16_t*)buf_dyn_shmem) + ((i * 1024) + (((int)threadIdx.x) * 8))) = *(uint4*)(A + ((((i * 311296) + ((((int)threadIdx.x) >> 3) * 19456)) + (((int)bx) * 64)) + ((((int)threadIdx.x) & 7) * 8)));
+  }
+  #pragma unroll
+  for (int i_1 = 0; i_1 < 2; ++i_1) {
+    *(uint4*)(((bfloat16_t*)buf_dyn_shmem) + (((i_1 * 1024) + (((int)threadIdx.x) * 8)) + 2048)) = *(uint4*)(A + (((((i_1 * 311296) + ((((int)threadIdx.x) >> 3) * 19456)) + (((int)bx) * 64)) + ((((int)threadIdx.x) & 7) * 8)) + 9728));
+  }
+  __syncthreads();
+  #pragma unroll
+  for (int i_2 = 0; i_2 < 4; ++i_2) {
+    float4 __1;
+    uint2 v_ = *(uint2*)(((bfloat16_t*)buf_dyn_shmem) + ((i_2 * 512) + (((int)threadIdx.x) * 4)));
+    ((float2*)(&__1))[0] = __bfloat1622float2((reinterpret_cast<__nv_bfloat162*>(&v_))[0]);
+    ((float2*)(&__1))[1] = __bfloat1622float2((reinterpret_cast<__nv_bfloat162*>(&v_))[1]);
+    float4 xi = __1;
+    float broadcast_var = 0x1p+0f/*1.000000e+00*/;
+    float broadcast_var_1 = 0x1p+0f/*1.000000e+00*/;
+    float broadcast_var_2 = -0x1p+0f/*-1.000000e+00*/;
+    float4 __2;
+      float4 v__1 = make_float4(broadcast_var, broadcast_var, broadcast_var, broadcast_var);
+      float4 __3;
+        float4 v__2 = make_float4(broadcast_var_1, broadcast_var_1, broadcast_var_1, broadcast_var_1);
+        float4 __4;
+        float4 __5;
+          float4 v__3 = make_float4(broadcast_var_2, broadcast_var_2, broadcast_var_2, broadcast_var_2);
+          __5.x = (xi.x*v__3.x);
+          __5.y = (xi.y*v__3.y);
+          __5.z = (xi.z*v__3.z);
+          __5.w = (xi.w*v__3.w);
+        __4.x = expf(__5.x);
+        __4.y = expf(__5.y);
+        __4.z = expf(__5.z);
+        __4.w = expf(__5.w);
+        __3.x = (v__2.x+__4.x);
+        __3.y = (v__2.y+__4.y);
+        __3.z = (v__2.z+__4.z);
+        __3.w = (v__2.w+__4.w);
+      __2.x = (v__1.x/__3.x);
+      __2.y = (v__1.y/__3.y);
+      __2.z = (v__1.z/__3.z);
+      __2.w = (v__1.w/__3.w);
+    float4 sig = __2;
+    uint2 __6;
+    float4 __7;
+      float4 __8;
+        __8.x = (xi.x*sig.x);
+        __8.y = (xi.y*sig.y);
+        __8.z = (xi.z*sig.z);
+        __8.w = (xi.w*sig.w);
+      float4 __9;
+      uint2 v__4 = *(uint2*)(((bfloat16_t*)buf_dyn_shmem) + (((i_2 * 512) + (((int)threadIdx.x) * 4)) + 2048));
+      ((float2*)(&__9))[0] = __bfloat1622float2((reinterpret_cast<__nv_bfloat162*>(&v__4))[0]);
+      ((float2*)(&__9))[1] = __bfloat1622float2((reinterpret_cast<__nv_bfloat162*>(&v__4))[1]);
+      __7.x = (__8.x*__9.x);
+      __7.y = (__8.y*__9.y);
+      __7.z = (__8.z*__9.z);
+      __7.w = (__8.w*__9.w);
+    (reinterpret_cast<__nv_bfloat162*>(&__6))[0] = __float22bfloat162_rn(((float2*)(&__7))[0]);
+    (reinterpret_cast<__nv_bfloat162*>(&__6))[1] = __float22bfloat162_rn(((float2*)(&__7))[1]);
+    *(uint2*)(((bfloat16_t*)buf_dyn_shmem) + (((i_2 * 512) + (((int)threadIdx.x) * 4)) + 4096)) = __6;
+  }
+  __syncthreads();
+  #pragma unroll
+  for (int i_3 = 0; i_3 < 2; ++i_3) {
+    *(uint4*)(C + ((((i_3 * 155648) + ((((int)threadIdx.x) >> 3) * 9728)) + (((int)bx) * 64)) + ((((int)threadIdx.x) & 7) * 8))) = *(uint4*)(((bfloat16_t*)buf_dyn_shmem) + (((i_3 * 1024) + (((int)threadIdx.x) * 8)) + 4096));
+  }
+}
+
+
+} // kernel
+// Strategy: silu_mul_tl_32_9728
+// selected_hparams: [32, 64, 128].
+// smem: 12288 bytes.
+// use_cooperative_groups: 0.
+// layout: (152, 1, 1), (64, 32, 1)
+// block_dim=(128, 1, 1).
+
+
+extern "C" int create_silu_mul_tl_32_9728(bfloat16_t* __restrict__ A, bfloat16_t* __restrict__ C) {
+
+	return 0;
+}
+#define LAUNCH_INFO_silu_mul_tl_32_9728 dim3(152, 1, 1), dim3(128, 1, 1), 12288, stream
+
+// latency: 0.01071 ms vs [ref-0.02258 sim-1.0], idx: -1

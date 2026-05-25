@@ -1,5 +1,6 @@
 import os
 import torch
+import argparse
 # 
 os.environ["TL_DISABLE_WARP_SPECIALIZED"] = "1"
 
@@ -183,33 +184,39 @@ def test_code_gen():
     def target(iter):
         return fused_kernel(a, w1, w2)
     
-    profile(target, ref)
+    xutil.profile(target, ref)
     
     # kernel2 = kernel_load_B(M, N, 1, 1, 128)
     # print(kernel2.get_kernel_source())
             
-def profile(target_func: callable, torch_ref_func: callable):
-    xutil.check_allclose_ret(target_func, torch_ref_func, iters=5, print_mode=0)
+# def profile(target_func: callable, torch_ref_func: callable):
+#     xutil.check_allclose_ret(target_func, torch_ref_func, iters=5, print_mode=0)
     
-    xutil.torch_profile(target_func)
-    xutil.torch_profile(torch_ref_func)
+#     xutil.torch_profile(target_func)
+#     xutil.torch_profile(torch_ref_func)
     
-    perf_result_xop = xutil.perf_gemm(warmup_iters=100, iters=500, name="target", fn=target_func)
-    perf_result_torch = xutil.perf_gemm(warmup_iters=100, iters=500, name="torch", fn=torch_ref_func)
-    print(f"Latency: {perf_result_xop.gemm_time_ms:0.5}ms vs {perf_result_torch.gemm_time_ms:0.5}(torch) ms")
+#     perf_result_xop = xutil.perf_gemm(warmup_iters=100, iters=500, name="target", fn=target_func)
+#     perf_result_torch = xutil.perf_gemm(warmup_iters=100, iters=500, name="torch", fn=torch_ref_func)
+#     print(f"Latency: {perf_result_xop.gemm_time_ms:0.5}ms vs {perf_result_torch.gemm_time_ms:0.5}(torch) ms")
 
 def test_silu_mul():
     M, N = 32, 9728
     micro = MicroSiluMul(M,N, dtype=T.bfloat16, accum_dtype=T.float32)
     kernel, name, info  = micro.get_kernel(HparamSelectMode.HEURISTIC) # HEURISTIC, TUNING, TUNED
 
-    test_data = micro.gen_test_data(kernel.config)
-    
-    def target_func():
+    problem_cnt = 5
+    test_data_list = []
+    for _ in range(problem_cnt):
+        test_data = micro.gen_test_data(kernel.config)
+        test_data_list.append(test_data)
+    # test_data = micro.gen_test_data(kernel.config)
+    def target_func(iter):
+        test_data = test_data_list[iter % len(test_data_list)]
         return kernel(*test_data)
-    def torch_ref():
+    def torch_ref(iter):
+        test_data = test_data_list[iter % len(test_data_list)]
         return TorchRef.silu_and_mul(*test_data)
-    profile(target_func, torch_ref)
+    xutil.profile(target_func, torch_ref)
     
 def test_rms_norm():
     M = 1
@@ -217,14 +224,14 @@ def test_rms_norm():
     micro = MicroRmsNorm(M,N, dtype=T.bfloat16, accum_dtype=T.float32)
     kernel, fn, info = micro.get_kernel(HparamSelectMode.HEURISTIC) # HEURISTIC, TUNING, TUNED
     print(kernel.get_kernel_source())
-    print(kernel.get_dispatch_source())
+    # print(kernel.get_dispatch_source())
     
     test_data = micro.gen_test_data(kernel.config)
-    def target_func():
+    def target_func(iter):
         return kernel(*test_data)
-    def torch_ref():
+    def torch_ref(iter):
         return TorchRef.rms_norm(*test_data) 
-    profile(target_func, torch_ref)
+    xutil.profile(target_func, torch_ref)
     
 def test_merge_rms_norm():
     M = 16
@@ -234,7 +241,7 @@ def test_merge_rms_norm():
     kernel, fn, info = micro.get_kernel(HparamSelectMode.HEURISTIC) # HEURISTIC, TUNING, TUNED
     
     test_data = micro.gen_test_data(kernel.config)
-    def target_func():
+    def target_func(iter):
         return kernel(*test_data)
     
     a,b = test_data
@@ -242,11 +249,11 @@ def test_merge_rms_norm():
     a2 = a[M : M+M2, :]
     b1 = b[0 : 1, :]
     b2 = b[1 : 2, :]
-    def torch_ref():
+    def torch_ref(iter):
         c1 = TorchRef.rms_norm(a1, b1) 
         c2 = TorchRef.rms_norm(a2, b2) 
         return torch.cat([c1, c2], dim=0)
-    profile(target_func, torch_ref)
+    xutil.profile(target_func, torch_ref)
     
 def test_gemm():
     M = 1
@@ -276,7 +283,7 @@ def test_gemm():
     # def torch_ref(iter):
     #     return TorchRef.linear(*test_data)
     
-    profile(target_func, torch_ref)
+    xutil.profile(target_func, torch_ref)
 
 # def test_silu_mul_gemm():
 #     M = 32
@@ -296,7 +303,7 @@ def test_gemm():
 #     def torch_ref():
 #         a2 = TorchRef.silu_and_mul(a)
 #         return TorchRef.linear(a2, b)
-#     profile(target_func, torch_ref)
+#     xutil.profile(target_func, torch_ref)
     
 def test_gemm_add():
     M = 1
@@ -311,12 +318,12 @@ def test_gemm_add():
     test_data = micro.gen_test_data(kernel.config)
     a, b, r = test_data
 
-    def target_func():
+    def target_func(iter):
         return kernel(a, b, r)
-    def torch_ref():
+    def torch_ref(iter):
         return TorchRef.linear(a, b) + r
     
-    profile(target_func, torch_ref)
+    xutil.profile(target_func, torch_ref)
 
 def test_gqa_decode(num_heads, num_kv_heads, head_dim):
     batch = 1
@@ -355,34 +362,39 @@ def test_gqa_decode(num_heads, num_kv_heads, head_dim):
         return TorchRef.attention_sdpa(q, k_slice, v_slice, is_causal)
         # return TorchRef.attention(q, k, v, mask, glse, Output_partial)
         # return TorchRef.attention_split(q, k, v, mask, glse, Output_partial)
-    profile(target_func, torch_ref)
+    xutil.profile(target_func, torch_ref)
 
 def test_rope(num_heads, num_kv_heads, head_dim):
     batch = 1
     seqlen = 1
     
     micro = MicroRope(batch, seqlen, num_heads, num_kv_heads, head_dim, dtype=T.bfloat16, accum_dtype=T.float32)
-    kernel, name, info  = micro.get_kernel(HparamSelectMode.HEURISTIC) # HEURISTIC, TUNING, TUNED
+    kernel, name, info  = micro.get_kernel(HparamSelectMode.TUNING) # HEURISTIC, TUNING, TUNED
     # kernel.export_sources(kernel_path="demo/gen/single_micro.cu")
     
     test_data = micro.gen_test_data(kernel.config)
     q, k, cos, sin = test_data
     
-    def triton_ref():
+    def triton_ref(iter):
         q_emb, k_emb = TorchRef.apply_rotary_pos_emb_triton(q, k, cos, sin, unsqueeze_dim=2)
         return torch.cat((q_emb, k_emb), dim=-2)
 
-    def torch_ref():
+    def torch_ref(iter):
         q_emb, k_emb = TorchRef.apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=2)
         return torch.cat((q_emb, k_emb), dim=-2)
 
-    def target_func():
+    def target_func(iter):
         q_emb, k_emb = kernel(q, k, cos, sin)
         return torch.cat((q_emb, k_emb), dim=-2)
       
-    profile(target_func, triton_ref)
+    xutil.profile(target_func, triton_ref)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--gen", action="store_true", help="autogen")
+
+    args = parser.parse_args()
+    
     model_tag = "qwen3_06b" # "qwen3_4b"
     hidden_size, intermediate_size, num_heads, num_kv_heads, head_dim, num_hidden_layers \
         = Qwen3Info.get_basic_params(model_tag)  
@@ -390,7 +402,7 @@ if __name__ == "__main__":
     # test_silu_mul()
     # test_rms_norm()
     # test_merge_rms_norm()
-    test_gemm()
+    # test_gemm()
     ## test_silu_mul_gemm() # 逻辑有误，silu_mul被重复计算
     # test_gemm_add()
      
@@ -399,9 +411,10 @@ if __name__ == "__main__":
 
     # test_code_gen()
     
-    # gen = MicroAutoGen(model_tag, batch_size=1, hidden_size=hidden_size, intermediate_size=intermediate_size, 
-    #                    max_kv_seqlen=8192, num_heads=num_heads, num_kv_heads=num_kv_heads, head_dim=head_dim)
-    # gen.gen_qwen3_ops(layer_id=99, mode=HparamSelectMode.HEURISTIC) # HEURISTIC, TUNING, TUNED
+    if (args.gen is True): 
+        gen = MicroAutoGen(model_tag, batch_size=1, hidden_size=hidden_size, intermediate_size=intermediate_size, 
+                        max_kv_seqlen=8192, num_heads=num_heads, num_kv_heads=num_kv_heads, head_dim=head_dim)
+        gen.gen_qwen3_ops(layer_id=99, mode=HparamSelectMode.TUNED) # HEURISTIC, TUNING, TUNED
     # print(">> Finish gen_qwen3_ops.")
     # print("Test single_micro completed.")
     

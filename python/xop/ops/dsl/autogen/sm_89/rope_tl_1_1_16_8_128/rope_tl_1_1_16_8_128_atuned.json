@@ -1,0 +1,2 @@
+{"latency":0.01279,"latency_ref":0.03666,"similarity":1.0,"hparams":[0,1,1,1,128],"idx":0}
+{"latency":0.0128,"latency_ref":0.03579,"similarity":1.0,"hparams":[1,1,1,1,128],"idx":1}

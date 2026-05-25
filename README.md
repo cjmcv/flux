@@ -1,8 +1,5 @@
 # Cutlass Operators
 
-# megakernel 编译
-python megakernel_setup.py build_ext --inplace
-
 ### Install from Source
 ```bash
 git clone 
@@ -26,6 +23,20 @@ ncu-ui # Open file: my_profile.ncu-rep
 
 nsys profile --trace=cuda,nvtx --output=my_nsys python tools/test_model_integration.py
 nsight-sys # Open file: my_profile.ncu-rep
+```
+
+
+### megakernel
+
+```bash
+# 基础库编译
+python megakernel_setup.py build_ext --inplace
+# 生成kernel, 有HEURISTIC / TUNING / TUNED三种模式，具体看脚本
+python tools/test_dsl.py --gen
+# 直接测试，单算子无收益，融合以预取为主
+python tools/test_mega_single.py # 单算子
+python tools/test_mega_attn.py   # attn融合
+python tools/test_mega_mlp.py    # mlp融合
 ```
 
 #### Dependencies
