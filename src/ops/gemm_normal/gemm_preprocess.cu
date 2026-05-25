@@ -22,7 +22,7 @@
 
 /////////////////////////////
 #include "xop/xop.h"
-#if XOP_CUDA_ARCHS>=90
+#if XOP_CUDA_ARCHS==90
 #include "xop/ops_impl/gemm_normal/gemm_w4a16_sm90_impl.h"
 #endif
 //////////////////////////////
@@ -31,7 +31,7 @@ namespace xop {
 
 void gemm_w4a16_sm90_reorder_weight(torch::Tensor weight) {
   XOP_CHECK_INPUT(weight, c10::ScalarType::Char); // 2 x int4 => 1 x int8
-#if XOP_CUDA_ARCHS>=90
+#if XOP_CUDA_ARCHS==90
   int32_t n = weight.size(0);
   int32_t k = weight.size(1) * 2;
   int32_t l = 1;
