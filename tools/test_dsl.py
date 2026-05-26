@@ -204,9 +204,9 @@ def test_silu_mul():
     micro = MicroSiluMul(M,N, dtype=T.bfloat16, accum_dtype=T.float32)
     kernel, name, info  = micro.get_kernel(HparamSelectMode.HEURISTIC) # HEURISTIC, TUNING, TUNED
 
-    problem_cnt = 5
+    PROBLEM_COUNT = 5
     test_data_list = []
-    for _ in range(problem_cnt):
+    for _ in range(PROBLEM_COUNT):
         test_data = micro.gen_test_data(kernel.config)
         test_data_list.append(test_data)
     # test_data = micro.gen_test_data(kernel.config)

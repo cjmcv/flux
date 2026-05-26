@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+PROBLEM_COUNT = 5
 
 DTYPE_MAP = {
     "bfloat16": torch.bfloat16,
@@ -259,16 +260,17 @@ def perf_xop(
                     # print("weights_scale[problem_idx]:", weights_scale[problem_idx])
                     # print("output:", output)
                     return output
-                
-    # import tilelang.language as T
-    # from xop.ops.dsl.micro_base import HparamSelectMode
-    # from xop.ops.dsl.micro_linear import MicroLinearStrategy, MicroLinear            
-    # micro = MicroLinear(MicroLinearStrategy.GEMM, 1,6144,1024, dtype=T.bfloat16, accum_dtype=T.float32)
-    # kernel, name, info = micro.get_kernel(HparamSelectMode.TUNED) # HEURISTIC, TUNING, TUNED
-
-    # def target_func(iter_id):
-    #     problem_idx = iter_id % problem_cnt
-    #     return kernel(inputs[problem_idx], weights[problem_idx])
+            
+    if 1:
+        from tuning.tune_gemm_dsl import get_tuned_gemm
+        import tilelang.language as T
+        from xop.ops.dsl.micro_linear import MicroLinearStrategy, MicroLinear
+        k = inputs[0].size(1)
+        kernel = get_tuned_gemm(MicroLinearStrategy.GEMM, M=m, N=n, K=k, dtype=T.bfloat16, accum_dtype=T.float32)
+        def target_func(iter_id):
+            problem_idx = iter_id % problem_cnt
+            return kernel(inputs[problem_idx], weights[problem_idx])
+        fn = target_func
     
     return xutil.perf_gemm(warmup_iters, iters, "xop", fn, True)
 
@@ -299,8 +301,8 @@ def run(M, args, xop_perf, torch_perf):
     cache_size = 100 * 1024 * 1024 # 100MB 
     total_bytes = (M*K + K*N) * torch.finfo(dtype).bits // 8 # + M*N
 
-    problem_count = 5 # 1 + int((3 * cache_size) / total_bytes)
-    # print("problem_count", problem_count, cache_size, total_bytes)
+    PROBLEM_COUNT = 5 # 1 + int((3 * cache_size) / total_bytes)
+    # print("PROBLEM_COUNT", PROBLEM_COUNT, cache_size, total_bytes)
     #
     inputs = []
     weights = []
@@ -314,7 +316,7 @@ def run(M, args, xop_perf, torch_perf):
     if is_fp8:
         fp8_org_inputs = []
         fp8_org_weights = []
-        for i in range(problem_count):
+        for i in range(PROBLEM_COUNT):
             x = xutil.rand_tensor((M, K), dtype=output_dtype)
             y = xutil.rand_tensor((N, K), dtype=output_dtype)
             # x = torch.ones((M, K), device="cuda", dtype=output_dtype)
@@ -334,7 +336,7 @@ def run(M, args, xop_perf, torch_perf):
             inputs_scale.append(x_scale)
             weights_scale.append(y_scale.clone().contiguous())
     else:
-        for i in range(problem_count):
+        for i in range(PROBLEM_COUNT):
             # inputs.append(torch.ones((M, K), device="cuda", dtype=dtype))
             # weights.append(torch.ones((N, K), device="cuda", dtype=dtype))
             inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
@@ -362,7 +364,7 @@ def run(M, args, xop_perf, torch_perf):
         is_s8_dequant,
         args.warmup_iters,
         args.iters,
-        problem_count, 
+        PROBLEM_COUNT, 
         output_dtype,
         args.fast_accum,
         args.num_groups,
@@ -380,7 +382,7 @@ def run(M, args, xop_perf, torch_perf):
             is_s8_dequant,
             args.warmup_iters,
             args.iters,
-            problem_count,
+            PROBLEM_COUNT,
             output_dtype,
             args.num_groups,
         )

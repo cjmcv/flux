@@ -44,7 +44,7 @@ python tools/test_mega_mlp.py    # mlp融合
 #### Dependencies
 1. cutlass
 2. cublasLt
-3. tilelang=0.1.8
+3. tilelang==0.1.8   pip install tilelang==0.1.8 --index-url https://pypi.org/simple
 4. triton
 
 ## Quick Start

@@ -227,15 +227,15 @@ def run(world_size, rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
     cache_size = 100 * 1024 * 1024 # 100MB 
     total_bytes = (M*K + K*N) * torch.finfo(dtype).bits // 8 # + M*N
 
-    problem_count = 5 # 1 + int((3 * cache_size) / total_bytes)
-    # print("problem_count", problem_count, cache_size, total_bytes)
+    PROBLEM_COUNT = 5 # 1 + int((3 * cache_size) / total_bytes)
+    # print("PROBLEM_COUNT", PROBLEM_COUNT, cache_size, total_bytes)
     #
     inputs = []
     weights = []
     inputs_scale = []
     weights_scale = []
 
-    for i in range(problem_count):
+    for i in range(PROBLEM_COUNT):
         inputs.append(xutil.rand_tensor((M, K), dtype=dtype))
         weights.append(xutil.rand_tensor((N, K), dtype=dtype))
         # if (rank == 0):
@@ -261,7 +261,7 @@ def run(world_size, rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
         weights_scale,
         args.warmup_iters,
         args.iters,
-        problem_count, 
+        PROBLEM_COUNT, 
         output_dtype,
         args.fast_accum,
     )
@@ -273,7 +273,7 @@ def run(world_size, rank, M, args, xop_group, nccl_group, xop_perf, torch_perf):
         bias,
         args.warmup_iters,
         args.iters,
-        problem_count,
+        PROBLEM_COUNT,
         output_dtype,
     )
 

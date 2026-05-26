@@ -26,7 +26,7 @@ import tilelang
 import tilelang.language as T
 
 from xop.ops.dsl.pkt_util import TestUtil, TorchRef
-from xop.ops.dsl.micro_config import get_arch, get_target_str, is_megakernel_enabled, is_enable_profiling
+from xop.ops.dsl.micro_config import get_arch, get_target_str, is_enable_profiling, is_save_kernel_source
 import xop.util as xutil
 
 class HparamSelectMode(IntEnum):
@@ -378,6 +378,8 @@ class BaseMicroKernel:
         self.base_path = self.dsl_home + "/autogen/" + get_arch() + "/"
         target_dir = Path(self.base_path)
         target_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.layout = None
 
     def replace_header(self, text: str, src_target: str, num_split: int, dst_target: str) -> str:
         lines = text.splitlines(True)
@@ -463,10 +465,10 @@ class BaseMicroKernel:
     def _run_profile(self, kernel, strategy, hparams):
         warnup_iters = 500
         test_iters = 2000
-        problem_cnt = 10
+        PROBLEM_COUNT = 10
         
         test_data_list = []
-        for _ in range(problem_cnt):
+        for _ in range(PROBLEM_COUNT):
             test_data = strategy.gen_test_data(hparams)
             test_data_list.append(test_data)
         
@@ -556,13 +558,14 @@ class BaseMicroKernel:
         
         if (mode == HparamSelectMode.TUNING):
             latency_hparams_list = self.run_tuning(strategy, save_path)
-            # Save all tuned kernels.
-            for i in range(len(latency_hparams_list)):
-                latency, latency_ref, similarity, selected_hparams, idx = latency_hparams_list[i]
-                kernel = strategy.get_kernel(selected_hparams)
-                file_name = save_path+f"_top{i}.cuh"
-                with open(file_name, "w", encoding="utf-8") as f:
-                    f.write(get_source_func(kernel, selected_hparams) + f"\n// latency: {latency} ms vs [ref-{latency_ref} sim-{similarity}], idx: {idx}")
+            if(is_save_kernel_source()):
+                # Save all tuned kernels.
+                for i in range(len(latency_hparams_list)):
+                    latency, latency_ref, similarity, selected_hparams, idx = latency_hparams_list[i]
+                    kernel = strategy.get_kernel(selected_hparams)
+                    file_name = save_path+f"_top{i}.cuh"
+                    with open(file_name, "w", encoding="utf-8") as f:
+                        f.write(get_source_func(kernel, selected_hparams) + f"\n// latency: {latency} ms vs [ref-{latency_ref} sim-{similarity}], idx: {idx}")
             _, _, _, selected_hparams, selected_idx = latency_hparams_list[0]
         elif (mode == HparamSelectMode.TUNED):
             latency_hparams_list = self.read_tuned_hparams_from_json(save_path)
@@ -587,8 +590,9 @@ class BaseMicroKernel:
             latency, latency_ref, similarity = 0,0,0
         # kernel.export_sources(kernel_path=save_path+f"_src.cuh")
         msg_suffix = f"latency: {latency} ms vs [ref-{latency_ref} sim-{similarity}], idx: {selected_idx}"
-        with open(save_path+f".cuh", "w", encoding="utf-8") as f:
-            f.write(get_source_func(kernel, selected_hparams) + f"\n// " + msg_suffix)
+        if(is_save_kernel_source()):
+            with open(save_path+f".cuh", "w", encoding="utf-8") as f:
+                f.write(get_source_func(kernel, selected_hparams) + f"\n// " + msg_suffix)
         print(f"selected: {selected_hparams}, " + msg_suffix)
         # print("0:", kernel.prim_func.attrs)
         # print("1:", kernel.adapter.params)

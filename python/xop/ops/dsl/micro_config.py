@@ -9,6 +9,7 @@ import tilelang
 
 ENABLE_MEGAKERNEL = True
 ENABLE_PROFILING = True
+SAVE_KERNEL_SOURCE = False
 
 target_arch = torch.cuda.get_device_properties(0).major * 10 + torch.cuda.get_device_properties(0).minor
 if target_arch == 120:
@@ -61,3 +62,6 @@ def is_megakernel_enabled():
 def is_enable_profiling():
     """Check if megakernel mode is enabled"""
     return ENABLE_PROFILING
+
+def is_save_kernel_source():
+    return SAVE_KERNEL_SOURCE

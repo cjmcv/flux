@@ -76,7 +76,7 @@ struct TorchDefaultConfig {
     }
     else {
       meta[kMetaSchema] = (int16_t)UnifiedMetaEnum::GemmNormal;
-      if (arch == UnifiedMetaEnum::Sm89) {
+      if (arch == UnifiedMetaEnum::Sm89 || arch == UnifiedMetaEnum::Sm120) {
         meta[kMetaArch] = (int16_t)UnifiedMetaEnum::Sm80;       
       }
     }
