@@ -456,7 +456,7 @@ def parse_args():
 
     return parser.parse_args()
 
-# python3 tools/gemm/test_gemm_normal.py 1 6144 1024 --show_ms
+# python3 tools/gemm/test_gemm_normal.py 14 6144 1024 --show_ms
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --num_groups 4
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8 --dtype=float16 --output_dtype=float16
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8
