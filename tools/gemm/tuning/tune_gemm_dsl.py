@@ -48,6 +48,7 @@ def tune_gemm(M, N, K):
     
     xutil.profile(target_func, torch_ref)
 
+# python tools/gemm/tuning/tune_gemm_dsl.py
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--gen", action="store_true", help="autogen")

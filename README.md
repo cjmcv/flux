@@ -2,7 +2,7 @@
 
 ### Install from Source
 ```bash
-git clone 
+git clone --recursive
 
 # Set env path
 source ./build.sh --env

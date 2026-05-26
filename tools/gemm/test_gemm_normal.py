@@ -27,17 +27,17 @@ DTYPE_MAP = {
 }
 
 def init_seed(seed=0):
-    os.environ["NCCL_DEBUG"] = os.getenv("NCCL_DEBUG", "ERROR")
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
-    torch.use_deterministic_algorithms(True, warn_only=True)
-    torch.set_printoptions(precision=2)
-    torch.manual_seed(3 + seed)
-    torch.cuda.manual_seed_all(3 + seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cuda.matmul.allow_tf32 = False
-    torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = False
-    torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
+    # os.environ["NCCL_DEBUG"] = os.getenv("NCCL_DEBUG", "ERROR")
+    # os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
+    # torch.use_deterministic_algorithms(True, warn_only=True)
+    # torch.set_printoptions(precision=2)
+    # torch.manual_seed(3 + seed)
+    # torch.cuda.manual_seed_all(3 + seed)
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
+    # torch.backends.cuda.matmul.allow_tf32 = False
+    # torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = False
+    # torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
     np.random.seed(3 + seed)
     random.seed(3 + seed)
 
@@ -113,6 +113,18 @@ def perf_torch(
     else:
         fn = fn_normal
 
+    # if 1:
+    #     from tuning.tune_gemm_dsl import get_tuned_gemm
+    #     import tilelang.language as T
+    #     from xop.ops.dsl.micro_linear import MicroLinearStrategy, MicroLinear
+    #     n = weights[0].size(0)
+    #     k = inputs[0].size(1)
+    #     kernel = get_tuned_gemm(MicroLinearStrategy.GEMM, M=m, N=n, K=k, dtype=T.bfloat16, accum_dtype=T.float32)
+    #     def target_func(iter_id):
+    #         problem_idx = iter_id % problem_cnt
+    #         return kernel(inputs[problem_idx], weights[problem_idx])
+    #     fn = target_func
+    
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn, True)
 
 def perf_xop(
@@ -301,7 +313,7 @@ def run(M, args, xop_perf, torch_perf):
     cache_size = 100 * 1024 * 1024 # 100MB 
     total_bytes = (M*K + K*N) * torch.finfo(dtype).bits // 8 # + M*N
 
-    PROBLEM_COUNT = 5 # 1 + int((3 * cache_size) / total_bytes)
+    # PROBLEM_COUNT = 5 # 1 + int((3 * cache_size) / total_bytes)
     # print("PROBLEM_COUNT", PROBLEM_COUNT, cache_size, total_bytes)
     #
     inputs = []

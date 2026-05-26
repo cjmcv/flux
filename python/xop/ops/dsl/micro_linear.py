@@ -135,10 +135,18 @@ class _GemmStrategy:
         # BLOCK_N=[64] # 64, 128, 256
         # BLOCK_K=[32, 64, 128] # 
         # splitks=[1] #, 2, 4
-        BLOCK_M=[16, 32, 64, 256]
+
+        if self.M <= 16:
+            BLOCK_M=[16]
+        elif self.M <= 32:
+            BLOCK_M=[32]
+        elif self.M < 128:
+            BLOCK_M=[32, 64]
+        elif self.M >= 128:
+            BLOCK_M=[128]
         BLOCK_N=[64, 128, 256]
         BLOCK_K=[32, 64, 128]
-        splitks=[1, 2, 4] #
+        splitks=[1] #, 2, 4
         num_stages=[0, 1, 2, 3]#
         policies=[T.GemmWarpPolicy.Square, T.GemmWarpPolicy.FullRow]
         enable_rasterations=[True, False]
