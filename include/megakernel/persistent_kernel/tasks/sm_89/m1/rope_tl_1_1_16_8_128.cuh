@@ -90,4 +90,4 @@ extern "C" int create_rope_tl_1_1_16_8_128(bfloat16_t* __restrict__ Q, bfloat16_
 }
 #define LAUNCH_INFO_rope_tl_1_1_16_8_128 dim3(24, 1, 1), dim3(128, 1, 1), 768, stream
 
-// latency: 0.01307 ms vs [ref-0.04534 sim-1.0], idx: 0
+// latency: 0.01977 ms vs [ref-0.04877 sim-1.0], idx: -1

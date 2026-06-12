@@ -45,13 +45,13 @@ __device__ __forceinline__ void flashattn_kernel_1_8192_1024_16_8_128__0(const i
   float acc_o[64];
   float logsum[2];
   float scores_max[2];
-  float acc_s[16];
+  float acc_s[32];
   float scores_max_prev[2];
   float scores_scale[2];
   float scores_sum[2];
-  bfloat16_t acc_s_cast[16];
+  bfloat16_t acc_s_cast[32];
   bfloat16_t A_local[8];
-  bfloat16_t B_local[16];
+  bfloat16_t B_local[32];
   float scores_max_clear[2];
   bfloat16_t B_local_1[64];
   float scores_max_clear_1[2];
@@ -85,13 +85,13 @@ __device__ __forceinline__ void flashattn_kernel_1_8192_1024_16_8_128__0(const i
   }
   if (0 < condval_1) {
     #pragma unroll
-    for (int i_2 = 0; i_2 < 4; ++i_2) {
-      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 2048) + (i_2 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])), (&(K[(((((((int64_t)i_2) * (int64_t)8192) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8))])), (((((i_2 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8192) && (0 <= (((i_2 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
+    for (int i_2 = 0; i_2 < 8; ++i_2) {
+      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 4096) + (i_2 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])), (&(K[(((((((int64_t)i_2) * (int64_t)8192) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8))])), ((((((((int)threadIdx.x) >> 4) + (((int)bz) * (actual_kv_seqlen >> 1))) >> 3) + i_2) < 1024) && (0 <= (((i_2 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
     }
     tl::cp_async_commit();
     #pragma unroll
-    for (int i_3 = 0; i_3 < 4; ++i_3) {
-      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 2048) + (i_3 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 20480)])), (&(V[(((((((int64_t)i_3) * (int64_t)8192) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8))])), (((((i_3 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8192) && (0 <= (((i_3 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
+    for (int i_3 = 0; i_3 < 8; ++i_3) {
+      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 4096) + (i_3 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 16384)])), (&(V[(((((((int64_t)i_3) * (int64_t)8192) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8))])), ((((((((int)threadIdx.x) >> 4) + (((int)bz) * (actual_kv_seqlen >> 1))) >> 3) + i_3) < 1024) && (0 <= (((i_3 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
     }
     tl::cp_async_commit();
   }
@@ -101,137 +101,101 @@ __device__ __forceinline__ void flashattn_kernel_1_8192_1024_16_8_128__0(const i
   } else {
     condval_2 = (actual_kv_seqlen >> 1);
   }
-  if (32 < condval_2) {
+  for (int k = 0; k < (((condval_2 + 63) >> 6) - 1); ++k) {
     #pragma unroll
-    for (int i_4 = 0; i_4 < 4; ++i_4) {
-      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 2048) + (i_4 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 12288)])), (&(K[((((((((int64_t)i_4) * (int64_t)8192) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8)) + (int64_t)32768)])), (((((i_4 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8160) && (-32 <= (((i_4 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
-    }
-    tl::cp_async_commit();
-    #pragma unroll
-    for (int i_5 = 0; i_5 < 4; ++i_5) {
-      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 2048) + (i_5 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 24576)])), (&(V[((((((((int64_t)i_5) * (int64_t)8192) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8)) + (int64_t)32768)])), (((((i_5 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8160) && (-32 <= (((i_5 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
-    }
-    tl::cp_async_commit();
-  }
-  int condval_3;
-  if ((((int)bz) == 1)) {
-    condval_3 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-  } else {
-    condval_3 = (actual_kv_seqlen >> 1);
-  }
-  if (64 < condval_3) {
-    #pragma unroll
-    for (int i_6 = 0; i_6 < 4; ++i_6) {
-      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 2048) + (i_6 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 16384)])), (&(K[((((((((int64_t)i_6) * (int64_t)8192) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8)) + (int64_t)65536)])), (((((i_6 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8128) && (-64 <= (((i_6 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
-    }
-    tl::cp_async_commit();
-    #pragma unroll
-    for (int i_7 = 0; i_7 < 4; ++i_7) {
-      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 2048) + (i_7 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 28672)])), (&(V[((((((((int64_t)i_7) * (int64_t)8192) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8)) + (int64_t)65536)])), (((((i_7 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8128) && (-64 <= (((i_7 * 8) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
-    }
-    tl::cp_async_commit();
-  }
-  int condval_4;
-  if ((((int)bz) == 1)) {
-    condval_4 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-  } else {
-    condval_4 = (actual_kv_seqlen >> 1);
-  }
-  for (int k = 0; k < (((condval_4 + 31) >> 5) - 3); ++k) {
-    #pragma unroll
-    for (int i_8 = 0; i_8 < 4; ++i_8) {
+    for (int i_4 = 0; i_4 < 8; ++i_4) {
       float broadcast_var_4 = 0x0p+0f/*0.000000e+00*/;
-      *(float4*)(acc_s + (i_8 * 4)) = make_float4(broadcast_var_4, broadcast_var_4, broadcast_var_4, broadcast_var_4);
+      *(float4*)(acc_s + (i_4 * 4)) = make_float4(broadcast_var_4, broadcast_var_4, broadcast_var_4, broadcast_var_4);
     }
-    tl::cp_async_wait<2>();
+    tl::cp_async_wait<0>();
     __syncthreads();
     for (int ki = 0; ki < 8; ++ki) {
       tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((ki >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511))])) + 0, A_local + 0);
-      for (int i_9 = 0; i_9 < 2; ++i_9) {
-        tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((k % 3) * 4096) + ((ki >> 2) * 2048)) + (i_9 * 1024)) + (((((int)threadIdx.x) & 31) >> 4) * 512)) + ((((int)threadIdx.x) & 7) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])) + 0, B_local + (i_9 * 8));
+      for (int i_5 = 0; i_5 < 4; ++i_5) {
+        tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((ki >> 2) * 4096) + (i_5 * 1024)) + (((((int)threadIdx.x) & 31) >> 4) * 512)) + ((((int)threadIdx.x) & 7) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])) + 0, B_local + (i_5 * 8));
       }
-      for (int j = 0; j < 2; ++j) {
+      for (int j = 0; j < 4; ++j) {
         tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_s + (j * 8)), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + (j * 8)));
         tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_s + ((j * 8) + 4)), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + ((j * 8) + 4)));
       }
     }
     __syncthreads();
     #pragma unroll
-    for (int i_10 = 0; i_10 < 4; ++i_10) {
-      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((k % 3) * 4096) + (((((int)threadIdx.x) & 15) >> 3) * 2048)) + (i_10 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])), (&(K[(((((((((int64_t)k) * (int64_t)32768) + (((int64_t)i_10) * (int64_t)8192)) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8)) + (int64_t)98304)])), ((((((k * 32) + (i_10 * 8)) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8096) && (-96 <= ((((k * 32) + (i_10 * 8)) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
+    for (int i_6 = 0; i_6 < 8; ++i_6) {
+      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 4096) + (i_6 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])), (&(K[(((((((((int64_t)k) * (int64_t)65536) + (((int64_t)i_6) * (int64_t)8192)) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8)) + (int64_t)65536)])), ((((((k * 64) + (i_6 * 8)) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8128) && (-64 <= ((((k * 64) + (i_6 * 8)) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
     }
     tl::cp_async_commit();
     #pragma unroll
-    for (int i_11 = 0; i_11 < 16; ++i_11) {
-      int condval_6;
+    for (int i_7 = 0; i_7 < 32; ++i_7) {
+      int condval_4;
       if ((((int)bz) == 1)) {
-        condval_6 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
+        condval_4 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
       } else {
-        condval_6 = (actual_kv_seqlen >> 1);
+        condval_4 = (actual_kv_seqlen >> 1);
       }
-      float condval_5;
-      if ((((((k * 32) + ((i_11 >> 2) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + (i_11 & 1)) < condval_6)) {
-        condval_5 = acc_s[i_11];
+      float condval_3;
+      if ((((((k * 64) + ((i_7 >> 2) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + (i_7 & 1)) < condval_4)) {
+        condval_3 = acc_s[i_7];
       } else {
-        condval_5 = -CUDART_INF_F;
+        condval_3 = -CUDART_INF_F;
       }
-      acc_s[i_11] = condval_5;
+      acc_s[i_7] = condval_3;
     }
     *(float2*)(scores_max_prev + 0) = *(float2*)(scores_max + 0);
     float broadcast_var_5 = -CUDART_INF_F;
     *(float2*)(scores_max + 0) = make_float2(broadcast_var_5, broadcast_var_5);
     #pragma unroll
-    for (int i_12 = 0; i_12 < 2; ++i_12) {
-      scores_max_clear[i_12] = -CUDART_INF_F;
+    for (int i_8 = 0; i_8 < 2; ++i_8) {
+      scores_max_clear[i_8] = -CUDART_INF_F;
       #pragma unroll
-      for (int rv = 0; rv < 8; ++rv) {
-        scores_max_clear[i_12] = max(scores_max_clear[i_12], acc_s[((((rv & 3) * 4) + (i_12 * 2)) + (rv >> 2))]);
+      for (int rv = 0; rv < 16; ++rv) {
+        scores_max_clear[i_8] = max(scores_max_clear[i_8], acc_s[((((rv & 7) * 4) + (i_8 * 2)) + (rv >> 3))]);
       }
-      scores_max_clear[i_12] = tl::AllReduce<tl::MaxOp, 4, 1, 0>::run(scores_max_clear[i_12]);
-      scores_max[i_12] = max(scores_max[i_12], scores_max_clear[i_12]);
+      scores_max_clear[i_8] = tl::AllReduce<tl::MaxOp, 4, 1, 0>::run(scores_max_clear[i_8]);
+      scores_max[i_8] = max(scores_max[i_8], scores_max_clear[i_8]);
+    }
+    #pragma unroll
+    for (int i_9 = 0; i_9 < 2; ++i_9) {
+      scores_max[i_9] = max(scores_max[i_9], scores_max_prev[i_9]);
+    }
+    #pragma unroll
+    for (int i_10 = 0; i_10 < 2; ++i_10) {
+      scores_scale[i_10] = exp2f(((scores_max_prev[i_10] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[i_10] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
+    }
+    #pragma unroll
+    for (int i_11 = 0; i_11 < 32; ++i_11) {
+      acc_s[i_11] = exp2f(((acc_s[i_11] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[((i_11 & 3) >> 1)] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
+    }
+    #pragma unroll
+    for (int i_12 = 0; i_12 < 2; ++i_12) {
+      scores_sum[i_12] = 0x0p+0f/*0.000000e+00*/;
+      #pragma unroll
+      for (int rv_1 = 0; rv_1 < 16; ++rv_1) {
+        scores_sum[i_12] = (scores_sum[i_12] + acc_s[((((rv_1 & 7) * 4) + (i_12 * 2)) + (rv_1 >> 3))]);
+      }
+      scores_sum[i_12] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(scores_sum[i_12]);
     }
     #pragma unroll
     for (int i_13 = 0; i_13 < 2; ++i_13) {
-      scores_max[i_13] = max(scores_max[i_13], scores_max_prev[i_13]);
+      logsum[i_13] = ((logsum[i_13] * scores_scale[i_13]) + scores_sum[i_13]);
     }
     #pragma unroll
-    for (int i_14 = 0; i_14 < 2; ++i_14) {
-      scores_scale[i_14] = exp2f(((scores_max_prev[i_14] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[i_14] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
-    }
-    #pragma unroll
-    for (int i_15 = 0; i_15 < 16; ++i_15) {
-      acc_s[i_15] = exp2f(((acc_s[i_15] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[((i_15 & 3) >> 1)] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
-    }
-    #pragma unroll
-    for (int i_16 = 0; i_16 < 2; ++i_16) {
-      scores_sum[i_16] = 0x0p+0f/*0.000000e+00*/;
-      #pragma unroll
-      for (int rv_1 = 0; rv_1 < 8; ++rv_1) {
-        scores_sum[i_16] = (scores_sum[i_16] + acc_s[((((rv_1 & 3) * 4) + (i_16 * 2)) + (rv_1 >> 2))]);
-      }
-      scores_sum[i_16] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(scores_sum[i_16]);
-    }
-    #pragma unroll
-    for (int i_17 = 0; i_17 < 2; ++i_17) {
-      logsum[i_17] = ((logsum[i_17] * scores_scale[i_17]) + scores_sum[i_17]);
-    }
-    #pragma unroll
-    for (int i_18 = 0; i_18 < 4; ++i_18) {
+    for (int i_14 = 0; i_14 < 8; ++i_14) {
       uint2 __1;
-      float4 v_ = *(float4*)(acc_s + (i_18 * 4));
+      float4 v_ = *(float4*)(acc_s + (i_14 * 4));
       (reinterpret_cast<__nv_bfloat162*>(&__1))[0] = __float22bfloat162_rn(((float2*)(&v_))[0]);
       (reinterpret_cast<__nv_bfloat162*>(&__1))[1] = __float22bfloat162_rn(((float2*)(&v_))[1]);
-      *(uint2*)(acc_s_cast + (i_18 * 4)) = __1;
+      *(uint2*)(acc_s_cast + (i_14 * 4)) = __1;
     }
     #pragma unroll
-    for (int i_19 = 0; i_19 < 64; ++i_19) {
-      acc_o[i_19] = (acc_o[i_19] * scores_scale[((i_19 & 3) >> 1)]);
+    for (int i_15 = 0; i_15 < 64; ++i_15) {
+      acc_o[i_15] = (acc_o[i_15] * scores_scale[((i_15 & 3) >> 1)]);
     }
-    tl::cp_async_wait<2>();
+    tl::cp_async_wait<0>();
     __syncthreads();
-    for (int ki_1 = 0; ki_1 < 2; ++ki_1) {
-      for (int i_20 = 0; i_20 < 8; ++i_20) {
-        tl::ptx_ldmatrix_x4_trans((&(((bfloat16_t*)buf_dyn_shmem)[(((((((k % 3) * 4096) + ((i_20 >> 2) * 2048)) + (ki_1 * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_20 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_20 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511)) + 20480)])) + 0, B_local_1 + (i_20 * 8));
+    for (int ki_1 = 0; ki_1 < 4; ++ki_1) {
+      for (int i_16 = 0; i_16 < 8; ++i_16) {
+        tl::ptx_ldmatrix_x4_trans((&(((bfloat16_t*)buf_dyn_shmem)[((((((i_16 >> 2) * 4096) + (ki_1 * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_16 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_16 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511)) + 16384)])) + 0, B_local_1 + (i_16 * 8));
       }
       for (int j_1 = 0; j_1 < 8; ++j_1) {
         tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_o + (j_1 * 8)), reinterpret_cast<const unsigned*>(acc_s_cast + (ki_1 * 8)), reinterpret_cast<const unsigned*>(B_local_1 + (j_1 * 8)));
@@ -240,136 +204,112 @@ __device__ __forceinline__ void flashattn_kernel_1_8192_1024_16_8_128__0(const i
     }
     __syncthreads();
     #pragma unroll
-    for (int i_21 = 0; i_21 < 4; ++i_21) {
-      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((k % 3) * 4096) + (((((int)threadIdx.x) & 15) >> 3) * 2048)) + (i_21 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 20480)])), (&(V[(((((((((int64_t)k) * (int64_t)32768) + (((int64_t)i_21) * (int64_t)8192)) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8)) + (int64_t)98304)])), ((((((k * 32) + (i_21 * 8)) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8096) && (-96 <= ((((k * 32) + (i_21 * 8)) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
+    for (int i_17 = 0; i_17 < 8; ++i_17) {
+      tl::cp_async_gs_conditional<16>((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((int)threadIdx.x) & 15) >> 3) * 4096) + (i_17 * 512)) + ((((int)threadIdx.x) >> 4) * 64)) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 32)) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 16384)])), (&(V[(((((((((int64_t)k) * (int64_t)65536) + (((int64_t)i_17) * (int64_t)8192)) + ((((int64_t)((int)threadIdx.x)) >> (int64_t)4) * (int64_t)1024)) + ((((int64_t)((int)bz)) * (((int64_t)actual_kv_seqlen) >> (int64_t)1)) * (int64_t)1024)) + (((int64_t)((int)by)) * (int64_t)128)) + ((((int64_t)((int)threadIdx.x)) & (int64_t)15) * (int64_t)8)) + (int64_t)65536)])), ((((((k * 64) + (i_17 * 8)) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))) < 8128) && (-64 <= ((((k * 64) + (i_17 * 8)) + (((int)threadIdx.x) >> 4)) + (((int)bz) * (actual_kv_seqlen >> 1))))));
     }
     tl::cp_async_commit();
   }
-  int condval_7;
+  int condval_5;
   if ((((int)bz) == 1)) {
-    condval_7 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
+    condval_5 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
   } else {
-    condval_7 = (actual_kv_seqlen >> 1);
+    condval_5 = (actual_kv_seqlen >> 1);
   }
-  if (65 <= condval_7) {
+  if (1 <= condval_5) {
     #pragma unroll
-    for (int i_22 = 0; i_22 < 4; ++i_22) {
+    for (int i_18 = 0; i_18 < 8; ++i_18) {
       float broadcast_var_6 = 0x0p+0f/*0.000000e+00*/;
-      *(float4*)(acc_s + (i_22 * 4)) = make_float4(broadcast_var_6, broadcast_var_6, broadcast_var_6, broadcast_var_6);
+      *(float4*)(acc_s + (i_18 * 4)) = make_float4(broadcast_var_6, broadcast_var_6, broadcast_var_6, broadcast_var_6);
     }
-    tl::cp_async_wait<2>();
+    tl::cp_async_wait<0>();
     __syncthreads();
     for (int ki_2 = 0; ki_2 < 8; ++ki_2) {
       tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((ki_2 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511))])) + 0, A_local + 0);
-      for (int i_23 = 0; i_23 < 2; ++i_23) {
-        int condval_8;
-        if ((((int)bz) == 1)) {
-          condval_8 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_8 = (actual_kv_seqlen >> 1);
-        }
-        int condval_9;
-        if ((((int)bz) == 1)) {
-          condval_9 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_9 = (actual_kv_seqlen >> 1);
-        }
-        tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((((condval_9 + 31) % 96) >> 5) * 4096) + ((ki_2 >> 2) * 2048)) + (i_23 * 1024)) + (((((int)threadIdx.x) & 31) >> 4) * 512)) + ((((int)threadIdx.x) & 7) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])) + 0, B_local + (i_23 * 8));
+      for (int i_19 = 0; i_19 < 4; ++i_19) {
+        tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((ki_2 >> 2) * 4096) + (i_19 * 1024)) + (((((int)threadIdx.x) & 31) >> 4) * 512)) + ((((int)threadIdx.x) & 7) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki_2 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki_2 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])) + 0, B_local + (i_19 * 8));
       }
-      for (int j_2 = 0; j_2 < 2; ++j_2) {
+      for (int j_2 = 0; j_2 < 4; ++j_2) {
         tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_s + (j_2 * 8)), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + (j_2 * 8)));
         tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_s + ((j_2 * 8) + 4)), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + ((j_2 * 8) + 4)));
       }
     }
     #pragma unroll
-    for (int i_24 = 0; i_24 < 16; ++i_24) {
-      int condval_11;
+    for (int i_20 = 0; i_20 < 32; ++i_20) {
+      int condval_7;
       if ((((int)bz) == 1)) {
-        condval_11 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
+        condval_7 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
       } else {
-        condval_11 = (actual_kv_seqlen >> 1);
+        condval_7 = (actual_kv_seqlen >> 1);
       }
-      int condval_12;
+      int condval_8;
       if ((((int)bz) == 1)) {
-        condval_12 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
+        condval_8 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
       } else {
-        condval_12 = (actual_kv_seqlen >> 1);
+        condval_8 = (actual_kv_seqlen >> 1);
       }
-      float condval_10;
-      if ((((((((condval_11 + 31) >> 5) * 32) + ((i_24 >> 2) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + (i_24 & 1)) < (condval_12 + 96))) {
-        condval_10 = acc_s[i_24];
+      float condval_6;
+      if ((((((((condval_7 + 63) >> 6) * 64) + ((i_20 >> 2) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + (i_20 & 1)) < (condval_8 + 64))) {
+        condval_6 = acc_s[i_20];
       } else {
-        condval_10 = -CUDART_INF_F;
+        condval_6 = -CUDART_INF_F;
       }
-      acc_s[i_24] = condval_10;
+      acc_s[i_20] = condval_6;
     }
     *(float2*)(scores_max_prev + 0) = *(float2*)(scores_max + 0);
     float broadcast_var_7 = -CUDART_INF_F;
     *(float2*)(scores_max + 0) = make_float2(broadcast_var_7, broadcast_var_7);
     #pragma unroll
-    for (int i_25 = 0; i_25 < 2; ++i_25) {
-      scores_max_clear_1[i_25] = -CUDART_INF_F;
+    for (int i_21 = 0; i_21 < 2; ++i_21) {
+      scores_max_clear_1[i_21] = -CUDART_INF_F;
       #pragma unroll
-      for (int rv_2 = 0; rv_2 < 8; ++rv_2) {
-        scores_max_clear_1[i_25] = max(scores_max_clear_1[i_25], acc_s[((((rv_2 & 3) * 4) + (i_25 * 2)) + (rv_2 >> 2))]);
+      for (int rv_2 = 0; rv_2 < 16; ++rv_2) {
+        scores_max_clear_1[i_21] = max(scores_max_clear_1[i_21], acc_s[((((rv_2 & 7) * 4) + (i_21 * 2)) + (rv_2 >> 3))]);
       }
-      scores_max_clear_1[i_25] = tl::AllReduce<tl::MaxOp, 4, 1, 0>::run(scores_max_clear_1[i_25]);
-      scores_max[i_25] = max(scores_max[i_25], scores_max_clear_1[i_25]);
+      scores_max_clear_1[i_21] = tl::AllReduce<tl::MaxOp, 4, 1, 0>::run(scores_max_clear_1[i_21]);
+      scores_max[i_21] = max(scores_max[i_21], scores_max_clear_1[i_21]);
+    }
+    #pragma unroll
+    for (int i_22 = 0; i_22 < 2; ++i_22) {
+      scores_max[i_22] = max(scores_max[i_22], scores_max_prev[i_22]);
+    }
+    #pragma unroll
+    for (int i_23 = 0; i_23 < 2; ++i_23) {
+      scores_scale[i_23] = exp2f(((scores_max_prev[i_23] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[i_23] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
+    }
+    #pragma unroll
+    for (int i_24 = 0; i_24 < 32; ++i_24) {
+      acc_s[i_24] = exp2f(((acc_s[i_24] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[((i_24 & 3) >> 1)] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
+    }
+    #pragma unroll
+    for (int i_25 = 0; i_25 < 2; ++i_25) {
+      scores_sum[i_25] = 0x0p+0f/*0.000000e+00*/;
+      #pragma unroll
+      for (int rv_3 = 0; rv_3 < 16; ++rv_3) {
+        scores_sum[i_25] = (scores_sum[i_25] + acc_s[((((rv_3 & 7) * 4) + (i_25 * 2)) + (rv_3 >> 3))]);
+      }
+      scores_sum[i_25] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(scores_sum[i_25]);
     }
     #pragma unroll
     for (int i_26 = 0; i_26 < 2; ++i_26) {
-      scores_max[i_26] = max(scores_max[i_26], scores_max_prev[i_26]);
+      logsum[i_26] = ((logsum[i_26] * scores_scale[i_26]) + scores_sum[i_26]);
     }
     #pragma unroll
-    for (int i_27 = 0; i_27 < 2; ++i_27) {
-      scores_scale[i_27] = exp2f(((scores_max_prev[i_27] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[i_27] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
-    }
-    #pragma unroll
-    for (int i_28 = 0; i_28 < 16; ++i_28) {
-      acc_s[i_28] = exp2f(((acc_s[i_28] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[((i_28 & 3) >> 1)] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
-    }
-    #pragma unroll
-    for (int i_29 = 0; i_29 < 2; ++i_29) {
-      scores_sum[i_29] = 0x0p+0f/*0.000000e+00*/;
-      #pragma unroll
-      for (int rv_3 = 0; rv_3 < 8; ++rv_3) {
-        scores_sum[i_29] = (scores_sum[i_29] + acc_s[((((rv_3 & 3) * 4) + (i_29 * 2)) + (rv_3 >> 2))]);
-      }
-      scores_sum[i_29] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(scores_sum[i_29]);
-    }
-    #pragma unroll
-    for (int i_30 = 0; i_30 < 2; ++i_30) {
-      logsum[i_30] = ((logsum[i_30] * scores_scale[i_30]) + scores_sum[i_30]);
-    }
-    #pragma unroll
-    for (int i_31 = 0; i_31 < 4; ++i_31) {
+    for (int i_27 = 0; i_27 < 8; ++i_27) {
       uint2 __2;
-      float4 v__1 = *(float4*)(acc_s + (i_31 * 4));
+      float4 v__1 = *(float4*)(acc_s + (i_27 * 4));
       (reinterpret_cast<__nv_bfloat162*>(&__2))[0] = __float22bfloat162_rn(((float2*)(&v__1))[0]);
       (reinterpret_cast<__nv_bfloat162*>(&__2))[1] = __float22bfloat162_rn(((float2*)(&v__1))[1]);
-      *(uint2*)(acc_s_cast + (i_31 * 4)) = __2;
+      *(uint2*)(acc_s_cast + (i_27 * 4)) = __2;
     }
     #pragma unroll
-    for (int i_32 = 0; i_32 < 64; ++i_32) {
-      acc_o[i_32] = (acc_o[i_32] * scores_scale[((i_32 & 3) >> 1)]);
+    for (int i_28 = 0; i_28 < 64; ++i_28) {
+      acc_o[i_28] = (acc_o[i_28] * scores_scale[((i_28 & 3) >> 1)]);
     }
-    tl::cp_async_wait<2>();
+    tl::cp_async_wait<0>();
     __syncthreads();
-    for (int ki_3 = 0; ki_3 < 2; ++ki_3) {
-      for (int i_33 = 0; i_33 < 8; ++i_33) {
-        int condval_13;
-        if ((((int)bz) == 1)) {
-          condval_13 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_13 = (actual_kv_seqlen >> 1);
-        }
-        int condval_14;
-        if ((((int)bz) == 1)) {
-          condval_14 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_14 = (actual_kv_seqlen >> 1);
-        }
-        tl::ptx_ldmatrix_x4_trans((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((condval_14 + 31) % 96) >> 5) * 4096) + ((i_33 >> 2) * 2048)) + (ki_3 * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_33 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_33 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511)) + 20480)])) + 0, B_local_1 + (i_33 * 8));
+    for (int ki_3 = 0; ki_3 < 4; ++ki_3) {
+      for (int i_29 = 0; i_29 < 8; ++i_29) {
+        tl::ptx_ldmatrix_x4_trans((&(((bfloat16_t*)buf_dyn_shmem)[((((((i_29 >> 2) * 4096) + (ki_3 * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_29 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_29 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511)) + 16384)])) + 0, B_local_1 + (i_29 * 8));
       }
       for (int j_3 = 0; j_3 < 8; ++j_3) {
         tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_o + (j_3 * 8)), reinterpret_cast<const unsigned*>(acc_s_cast + (ki_3 * 8)), reinterpret_cast<const unsigned*>(B_local_1 + (j_3 * 8)));
@@ -377,295 +317,31 @@ __device__ __forceinline__ void flashattn_kernel_1_8192_1024_16_8_128__0(const i
       }
     }
   }
-  int condval_15;
-  if ((((int)bz) == 1)) {
-    condval_15 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-  } else {
-    condval_15 = (actual_kv_seqlen >> 1);
-  }
-  if (33 <= condval_15) {
-    #pragma unroll
-    for (int i_34 = 0; i_34 < 4; ++i_34) {
-      float broadcast_var_8 = 0x0p+0f/*0.000000e+00*/;
-      *(float4*)(acc_s + (i_34 * 4)) = make_float4(broadcast_var_8, broadcast_var_8, broadcast_var_8, broadcast_var_8);
-    }
-    tl::cp_async_wait<1>();
-    __syncthreads();
-    for (int ki_4 = 0; ki_4 < 8; ++ki_4) {
-      tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((ki_4 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki_4 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki_4 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511))])) + 0, A_local + 0);
-      for (int i_35 = 0; i_35 < 2; ++i_35) {
-        int condval_16;
-        if ((((int)bz) == 1)) {
-          condval_16 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_16 = (actual_kv_seqlen >> 1);
-        }
-        int condval_17;
-        if ((((int)bz) == 1)) {
-          condval_17 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_17 = (actual_kv_seqlen >> 1);
-        }
-        tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((((condval_17 + 31) >> 5) + 1) % 3) * 4096) + ((ki_4 >> 2) * 2048)) + (i_35 * 1024)) + (((((int)threadIdx.x) & 31) >> 4) * 512)) + ((((int)threadIdx.x) & 7) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki_4 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki_4 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])) + 0, B_local + (i_35 * 8));
-      }
-      for (int j_4 = 0; j_4 < 2; ++j_4) {
-        tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_s + (j_4 * 8)), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + (j_4 * 8)));
-        tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_s + ((j_4 * 8) + 4)), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + ((j_4 * 8) + 4)));
-      }
-    }
-    #pragma unroll
-    for (int i_36 = 0; i_36 < 16; ++i_36) {
-      int condval_19;
-      if ((((int)bz) == 1)) {
-        condval_19 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-      } else {
-        condval_19 = (actual_kv_seqlen >> 1);
-      }
-      int condval_20;
-      if ((((int)bz) == 1)) {
-        condval_20 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-      } else {
-        condval_20 = (actual_kv_seqlen >> 1);
-      }
-      float condval_18;
-      if ((((((((condval_19 + 31) >> 5) * 32) + ((i_36 >> 2) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + (i_36 & 1)) < (condval_20 + 64))) {
-        condval_18 = acc_s[i_36];
-      } else {
-        condval_18 = -CUDART_INF_F;
-      }
-      acc_s[i_36] = condval_18;
-    }
-    *(float2*)(scores_max_prev + 0) = *(float2*)(scores_max + 0);
-    float broadcast_var_9 = -CUDART_INF_F;
-    *(float2*)(scores_max + 0) = make_float2(broadcast_var_9, broadcast_var_9);
-    #pragma unroll
-    for (int i_37 = 0; i_37 < 2; ++i_37) {
-      scores_max_clear_1[i_37] = -CUDART_INF_F;
-      #pragma unroll
-      for (int rv_4 = 0; rv_4 < 8; ++rv_4) {
-        scores_max_clear_1[i_37] = max(scores_max_clear_1[i_37], acc_s[((((rv_4 & 3) * 4) + (i_37 * 2)) + (rv_4 >> 2))]);
-      }
-      scores_max_clear_1[i_37] = tl::AllReduce<tl::MaxOp, 4, 1, 0>::run(scores_max_clear_1[i_37]);
-      scores_max[i_37] = max(scores_max[i_37], scores_max_clear_1[i_37]);
-    }
-    #pragma unroll
-    for (int i_38 = 0; i_38 < 2; ++i_38) {
-      scores_max[i_38] = max(scores_max[i_38], scores_max_prev[i_38]);
-    }
-    #pragma unroll
-    for (int i_39 = 0; i_39 < 2; ++i_39) {
-      scores_scale[i_39] = exp2f(((scores_max_prev[i_39] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[i_39] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
-    }
-    #pragma unroll
-    for (int i_40 = 0; i_40 < 16; ++i_40) {
-      acc_s[i_40] = exp2f(((acc_s[i_40] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[((i_40 & 3) >> 1)] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
-    }
-    #pragma unroll
-    for (int i_41 = 0; i_41 < 2; ++i_41) {
-      scores_sum[i_41] = 0x0p+0f/*0.000000e+00*/;
-      #pragma unroll
-      for (int rv_5 = 0; rv_5 < 8; ++rv_5) {
-        scores_sum[i_41] = (scores_sum[i_41] + acc_s[((((rv_5 & 3) * 4) + (i_41 * 2)) + (rv_5 >> 2))]);
-      }
-      scores_sum[i_41] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(scores_sum[i_41]);
-    }
-    #pragma unroll
-    for (int i_42 = 0; i_42 < 2; ++i_42) {
-      logsum[i_42] = ((logsum[i_42] * scores_scale[i_42]) + scores_sum[i_42]);
-    }
-    #pragma unroll
-    for (int i_43 = 0; i_43 < 4; ++i_43) {
-      uint2 __3;
-      float4 v__2 = *(float4*)(acc_s + (i_43 * 4));
-      (reinterpret_cast<__nv_bfloat162*>(&__3))[0] = __float22bfloat162_rn(((float2*)(&v__2))[0]);
-      (reinterpret_cast<__nv_bfloat162*>(&__3))[1] = __float22bfloat162_rn(((float2*)(&v__2))[1]);
-      *(uint2*)(acc_s_cast + (i_43 * 4)) = __3;
-    }
-    #pragma unroll
-    for (int i_44 = 0; i_44 < 64; ++i_44) {
-      acc_o[i_44] = (acc_o[i_44] * scores_scale[((i_44 & 3) >> 1)]);
-    }
-    tl::cp_async_wait<1>();
-    __syncthreads();
-    for (int ki_5 = 0; ki_5 < 2; ++ki_5) {
-      for (int i_45 = 0; i_45 < 8; ++i_45) {
-        int condval_21;
-        if ((((int)bz) == 1)) {
-          condval_21 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_21 = (actual_kv_seqlen >> 1);
-        }
-        int condval_22;
-        if ((((int)bz) == 1)) {
-          condval_22 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_22 = (actual_kv_seqlen >> 1);
-        }
-        tl::ptx_ldmatrix_x4_trans((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((condval_22 + 31) >> 5) + 1) % 3) * 4096) + ((i_45 >> 2) * 2048)) + (ki_5 * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_45 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_45 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511)) + 20480)])) + 0, B_local_1 + (i_45 * 8));
-      }
-      for (int j_5 = 0; j_5 < 8; ++j_5) {
-        tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_o + (j_5 * 8)), reinterpret_cast<const unsigned*>(acc_s_cast + (ki_5 * 8)), reinterpret_cast<const unsigned*>(B_local_1 + (j_5 * 8)));
-        tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_o + ((j_5 * 8) + 4)), reinterpret_cast<const unsigned*>(acc_s_cast + (ki_5 * 8)), reinterpret_cast<const unsigned*>(B_local_1 + ((j_5 * 8) + 4)));
-      }
-    }
-  }
-  int condval_23;
-  if ((((int)bz) == 1)) {
-    condval_23 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-  } else {
-    condval_23 = (actual_kv_seqlen >> 1);
-  }
-  if (1 <= condval_23) {
-    #pragma unroll
-    for (int i_46 = 0; i_46 < 4; ++i_46) {
-      float broadcast_var_10 = 0x0p+0f/*0.000000e+00*/;
-      *(float4*)(acc_s + (i_46 * 4)) = make_float4(broadcast_var_10, broadcast_var_10, broadcast_var_10, broadcast_var_10);
-    }
-    tl::cp_async_wait<0>();
-    __syncthreads();
-    for (int ki_6 = 0; ki_6 < 8; ++ki_6) {
-      tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((ki_6 >> 2) * 4096) + ((((int)threadIdx.x) >> 5) * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki_6 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki_6 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511))])) + 0, A_local + 0);
-      for (int i_47 = 0; i_47 < 2; ++i_47) {
-        int condval_24;
-        if ((((int)bz) == 1)) {
-          condval_24 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_24 = (actual_kv_seqlen >> 1);
-        }
-        int condval_25;
-        if ((((int)bz) == 1)) {
-          condval_25 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_25 = (actual_kv_seqlen >> 1);
-        }
-        tl::ptx_ldmatrix_x4((&(((bfloat16_t*)buf_dyn_shmem)[(((((((((((((condval_25 + 31) >> 5) + 2) % 3) * 4096) + ((ki_6 >> 2) * 2048)) + (i_47 * 1024)) + (((((int)threadIdx.x) & 31) >> 4) * 512)) + ((((int)threadIdx.x) & 7) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + ((ki_6 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki_6 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 15) >> 3) + (((int)threadIdx.x) & 1)) & 1) * 8)) + 8192)])) + 0, B_local + (i_47 * 8));
-      }
-      for (int j_6 = 0; j_6 < 2; ++j_6) {
-        tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_s + (j_6 * 8)), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + (j_6 * 8)));
-        tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_s + ((j_6 * 8) + 4)), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + ((j_6 * 8) + 4)));
-      }
-    }
-    #pragma unroll
-    for (int i_48 = 0; i_48 < 16; ++i_48) {
-      int condval_27;
-      if ((((int)bz) == 1)) {
-        condval_27 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-      } else {
-        condval_27 = (actual_kv_seqlen >> 1);
-      }
-      int condval_28;
-      if ((((int)bz) == 1)) {
-        condval_28 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-      } else {
-        condval_28 = (actual_kv_seqlen >> 1);
-      }
-      float condval_26;
-      if ((((((((condval_27 + 31) >> 5) * 32) + ((i_48 >> 2) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + (i_48 & 1)) < (condval_28 + 32))) {
-        condval_26 = acc_s[i_48];
-      } else {
-        condval_26 = -CUDART_INF_F;
-      }
-      acc_s[i_48] = condval_26;
-    }
-    *(float2*)(scores_max_prev + 0) = *(float2*)(scores_max + 0);
-    float broadcast_var_11 = -CUDART_INF_F;
-    *(float2*)(scores_max + 0) = make_float2(broadcast_var_11, broadcast_var_11);
-    #pragma unroll
-    for (int i_49 = 0; i_49 < 2; ++i_49) {
-      scores_max_clear_1[i_49] = -CUDART_INF_F;
-      #pragma unroll
-      for (int rv_6 = 0; rv_6 < 8; ++rv_6) {
-        scores_max_clear_1[i_49] = max(scores_max_clear_1[i_49], acc_s[((((rv_6 & 3) * 4) + (i_49 * 2)) + (rv_6 >> 2))]);
-      }
-      scores_max_clear_1[i_49] = tl::AllReduce<tl::MaxOp, 4, 1, 0>::run(scores_max_clear_1[i_49]);
-      scores_max[i_49] = max(scores_max[i_49], scores_max_clear_1[i_49]);
-    }
-    #pragma unroll
-    for (int i_50 = 0; i_50 < 2; ++i_50) {
-      scores_max[i_50] = max(scores_max[i_50], scores_max_prev[i_50]);
-    }
-    #pragma unroll
-    for (int i_51 = 0; i_51 < 2; ++i_51) {
-      scores_scale[i_51] = exp2f(((scores_max_prev[i_51] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[i_51] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
-    }
-    #pragma unroll
-    for (int i_52 = 0; i_52 < 16; ++i_52) {
-      acc_s[i_52] = exp2f(((acc_s[i_52] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/) - (scores_max[((i_52 & 3) >> 1)] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/)));
-    }
-    #pragma unroll
-    for (int i_53 = 0; i_53 < 2; ++i_53) {
-      scores_sum[i_53] = 0x0p+0f/*0.000000e+00*/;
-      #pragma unroll
-      for (int rv_7 = 0; rv_7 < 8; ++rv_7) {
-        scores_sum[i_53] = (scores_sum[i_53] + acc_s[((((rv_7 & 3) * 4) + (i_53 * 2)) + (rv_7 >> 2))]);
-      }
-      scores_sum[i_53] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(scores_sum[i_53]);
-    }
-    #pragma unroll
-    for (int i_54 = 0; i_54 < 2; ++i_54) {
-      logsum[i_54] = ((logsum[i_54] * scores_scale[i_54]) + scores_sum[i_54]);
-    }
-    #pragma unroll
-    for (int i_55 = 0; i_55 < 4; ++i_55) {
-      uint2 __4;
-      float4 v__3 = *(float4*)(acc_s + (i_55 * 4));
-      (reinterpret_cast<__nv_bfloat162*>(&__4))[0] = __float22bfloat162_rn(((float2*)(&v__3))[0]);
-      (reinterpret_cast<__nv_bfloat162*>(&__4))[1] = __float22bfloat162_rn(((float2*)(&v__3))[1]);
-      *(uint2*)(acc_s_cast + (i_55 * 4)) = __4;
-    }
-    #pragma unroll
-    for (int i_56 = 0; i_56 < 64; ++i_56) {
-      acc_o[i_56] = (acc_o[i_56] * scores_scale[((i_56 & 3) >> 1)]);
-    }
-    tl::cp_async_wait<0>();
-    __syncthreads();
-    for (int ki_7 = 0; ki_7 < 2; ++ki_7) {
-      for (int i_57 = 0; i_57 < 8; ++i_57) {
-        int condval_29;
-        if ((((int)bz) == 1)) {
-          condval_29 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_29 = (actual_kv_seqlen >> 1);
-        }
-        int condval_30;
-        if ((((int)bz) == 1)) {
-          condval_30 = (actual_kv_seqlen - (((int)bz) * (actual_kv_seqlen >> 1)));
-        } else {
-          condval_30 = (actual_kv_seqlen >> 1);
-        }
-        tl::ptx_ldmatrix_x4_trans((&(((bfloat16_t*)buf_dyn_shmem)[((((((((((condval_30 + 31) >> 5) + 2) % 3) * 4096) + ((i_57 >> 2) * 2048)) + (ki_7 * 1024)) + (((((int)threadIdx.x) & 15) >> 3) * 512)) + ((((((((int)threadIdx.x) & 15) * 64) + (((((((int)threadIdx.x) & 7) >> 2) + ((i_57 & 3) >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_57 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8)) & 511)) + 20480)])) + 0, B_local_1 + (i_57 * 8));
-      }
-      for (int j_7 = 0; j_7 < 8; ++j_7) {
-        tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_o + (j_7 * 8)), reinterpret_cast<const unsigned*>(acc_s_cast + (ki_7 * 8)), reinterpret_cast<const unsigned*>(B_local_1 + (j_7 * 8)));
-        tl::mma_sync<tl::DataType::kBFloat16, tl::DataType::kBFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(acc_o + ((j_7 * 8) + 4)), reinterpret_cast<const unsigned*>(acc_s_cast + (ki_7 * 8)), reinterpret_cast<const unsigned*>(B_local_1 + ((j_7 * 8) + 4)));
-      }
-    }
+  #pragma unroll
+  for (int i_30 = 0; i_30 < 64; ++i_30) {
+    acc_o[i_30] = (acc_o[i_30] / logsum[((i_30 & 3) >> 1)]);
   }
   #pragma unroll
-  for (int i_58 = 0; i_58 < 64; ++i_58) {
-    acc_o[i_58] = (acc_o[i_58] / logsum[((i_58 & 3) >> 1)]);
-  }
-  #pragma unroll
-  for (int i_59 = 0; i_59 < 2; ++i_59) {
-    logsum[i_59] = (log2f(logsum[i_59]) + (scores_max[i_59] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/));
+  for (int i_31 = 0; i_31 < 2; ++i_31) {
+    logsum[i_31] = (log2f(logsum[i_31]) + (scores_max[i_31] * 0x1.0527dbd5cafffp-3f/*1.275174e-01*/));
   }
   if ((((int)threadIdx.x) % 4) == 0) {
     #pragma unroll
-    for (int i_60 = 0; i_60 < 2; ++i_60) {
-      if (((((((int)threadIdx.x) >> 5) * 8) + (i_60 * 4)) + ((((int)threadIdx.x) & 31) >> 3)) < 1) {
-        glse[((((((((int)threadIdx.x) >> 5) * 32) + (i_60 * 16)) + (((int)by) * 4)) + (((((int)threadIdx.x) & 31) >> 2) * 2)) + ((int)bz))] = ((bfloat16_t)logsum[i_60]);
+    for (int i_32 = 0; i_32 < 2; ++i_32) {
+      if (((((((int)threadIdx.x) >> 5) * 8) + (i_32 * 4)) + ((((int)threadIdx.x) & 31) >> 3)) < 1) {
+        glse[((((((((int)threadIdx.x) >> 5) * 32) + (i_32 * 16)) + (((int)by) * 4)) + (((((int)threadIdx.x) & 31) >> 2) * 2)) + ((int)bz))] = ((bfloat16_t)logsum[i_32]);
       }
     }
   }
   __syncthreads();
   #pragma unroll
-  for (int i_61 = 0; i_61 < 32; ++i_61) {
-    if (((((((int)threadIdx.x) >> 5) * 8) + ((i_61 & 1) * 4)) + ((((int)threadIdx.x) & 31) >> 3)) < 1) {
-      uint1 __5;
-      float2 v__4 = *(float2*)(acc_o + (i_61 * 2));
-      (reinterpret_cast<__nv_bfloat162*>(&__5))[0] = __float22bfloat162_rn(((float2*)(&v__4))[0]);
-      *(uint1*)(O_shared_local_cast + 0) = __5;
-      *(uint1*)(((bfloat16_t*)buf_dyn_shmem) + ((((((((int)threadIdx.x) >> 5) * 2048) + ((i_61 & 1) * 1024)) + (((((int)threadIdx.x) & 31) >> 2) * 128)) + ((i_61 >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(uint1*)(O_shared_local_cast + 0);
+  for (int i_33 = 0; i_33 < 32; ++i_33) {
+    if (((((((int)threadIdx.x) >> 5) * 8) + ((i_33 & 1) * 4)) + ((((int)threadIdx.x) & 31) >> 3)) < 1) {
+      uint1 __3;
+      float2 v__2 = *(float2*)(acc_o + (i_33 * 2));
+      (reinterpret_cast<__nv_bfloat162*>(&__3))[0] = __float22bfloat162_rn(((float2*)(&v__2))[0]);
+      *(uint1*)(O_shared_local_cast + 0) = __3;
+      *(uint1*)(((bfloat16_t*)buf_dyn_shmem) + ((((((((int)threadIdx.x) >> 5) * 2048) + ((i_33 & 1) * 1024)) + (((((int)threadIdx.x) & 31) >> 2) * 128)) + ((i_33 >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(uint1*)(O_shared_local_cast + 0);
     }
   }
   __syncthreads();
@@ -731,10 +407,10 @@ __device__ __forceinline__ void flashattn_kernel_1_8192_1024_16_8_128__1(const i
 
 } // kernel
 // Strategy: gqa_decode_tl_1_8192_1024_16_8_128
-// selected_hparams: [32, 64, 2, 3, 128].
+// selected_hparams: [64, 64, 2, 1, 128].
 // smem: 0 bytes.
 // use_cooperative_groups: 0.
-// layout: (1, 8, 2), (32, 64, 2), (16, 1, 1), (32, 64, 2)
+// layout: (1, 8, 2), (64, 64, 2), (16, 1, 1), (64, 64, 2)
 // block_dim=(128, 1, 1).
 
 
@@ -744,4 +420,4 @@ extern "C" int create_gqa_decode_tl_1_8192_1024_16_8_128(bfloat16_t* __restrict_
 }
 #define LAUNCH_INFO_gqa_decode_tl_1_8192_1024_16_8_128 dim3(16, 1, 1), dim3(128, 1, 1), 0, stream
 
-// latency: 0.03891 ms vs [ref-0.04236 sim-0.9991], idx: 8
+// latency: 0.04577 ms vs [ref-0.05874 sim-0.99979], idx: -1

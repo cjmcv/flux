@@ -1,5 +1,5 @@
 
-#include "gemm_normal.h"
+// #include "gemm_normal.h"
 #include "xop/ops_impl/global_resource.h"
 #include "xop/common_cuda.h"
 #include "xop/common_torch.h"

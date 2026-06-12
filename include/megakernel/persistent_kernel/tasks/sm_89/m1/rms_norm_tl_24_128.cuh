@@ -71,4 +71,4 @@ extern "C" int create_rms_norm_tl_24_128(bfloat16_t* __restrict__ A, bfloat16_t*
 }
 #define LAUNCH_INFO_rms_norm_tl_24_128 dim3(24, 1, 1), dim3(128, 1, 1), 512, stream
 
-// latency: 0.00998 ms vs [ref-0.13582 sim-0.99999], idx: 0
+// latency: 0.01385 ms vs [ref-0.14722 sim-0.99999], idx: -1

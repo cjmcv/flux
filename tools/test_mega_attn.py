@@ -271,15 +271,19 @@ if __name__ == "__main__":
     
     key_cache = torch.zeros(batch, max_kv_seqlen, num_kv_heads, head_dim, device="cuda", dtype=torch.bfloat16)  # [B, N=seqlen_kv,  H=groups, D=dim]
     value_cache = torch.zeros(batch, max_kv_seqlen, num_kv_heads, head_dim, device="cuda", dtype=torch.bfloat16)
-    def torch_ref_tmp():
-        return ref_run(step, key_cache, value_cache, x_torch, 
-                       w_layernorm_torch, w_qkv_proj_torch, w_q_norm_torch, w_k_norm_torch, w_cos_torch, w_sin_torch, w_o_proj_torch)
+    # def torch_ref_tmp():
+    #     return ref_run(step, key_cache, value_cache, x_torch, 
+    #                    w_layernorm_torch, w_qkv_proj_torch, w_q_norm_torch, w_k_norm_torch, w_cos_torch, w_sin_torch, w_o_proj_torch)
 
-    graph, ref_output = TorchRef.compile_capture(torch_ref_tmp, is_compile=True)
-    def torch_ref(iter):
-        graph.replay()
-        return ref_output
+    # graph, ref_output = TorchRef.compile_capture(torch_ref_tmp, is_compile=True)
+    # def torch_ref(iter):
+    #     graph.replay()
+    #     return ref_output
     
+    def torch_ref(iter):
+        return ref_run(step, key_cache, value_cache, x_torch, 
+        w_layernorm_torch, w_qkv_proj_torch, w_q_norm_torch, w_k_norm_torch, w_cos_torch, w_sin_torch, w_o_proj_torch)
+        
     for i in range(100):
         torch_ref(0)
         

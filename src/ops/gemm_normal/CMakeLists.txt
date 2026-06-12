@@ -25,8 +25,9 @@ message(STATUS "TUNING_CONFIGS: ${TUNING_CONFIGS}")
 
 set(CU_FILES
   ${TUNING_CONFIGS}
-  ${CMAKE_CURRENT_LIST_DIR}/gemm_preprocess.cu
-  ${CMAKE_CURRENT_LIST_DIR}/gemm_dsl_interface.cu
+  ${CMAKE_CURRENT_LIST_DIR}/common/gemm_preprocess.cu
+  # ${CMAKE_CURRENT_LIST_DIR}/common/fusedActivationQuant.cu
+  # ${CMAKE_CURRENT_LIST_DIR}/common/gemm_dsl_interface.cu
 )
 
 #########################

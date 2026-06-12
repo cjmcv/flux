@@ -127,6 +127,53 @@ def perf_torch(
     
     return xutil.perf_gemm(warmup_iters, iters, "torch", fn, True)
 
+def xop_quant(
+    inputs: list[torch.Tensor],
+    weights: list[torch.Tensor],
+    bias: Optional[torch.Tensor],
+    transpose_weight: bool,
+    problem_cnt: int,
+    output_dtype: torch.dtype,
+    fast_accum: bool,
+    num_groups: int,
+    quant_bits: int,
+):
+    if transpose_weight:
+        assert (0), "FP8/S8 GEMM does not support transpose weight (RRR layout)"
+
+    # output = torch.empty([m, n], dtype=output_dtype, device=inputs[0].device, requires_grad=False)
+    # tuned_hparam = gen_tuned_hparam(4096, Meta.Sm80)
+    # uupdate_tuned_hparam(tuned_hparam, 512, -1)
+    # tuned_hparam = gen_tuned_hparam(1024, -1)
+    tuned_hparam = None # [2, 4096]
+    op = xop.GemmQuant(
+        input_dtype=inputs[0].dtype,
+        output_dtype=output_dtype,
+        quant_bits=quant_bits,
+        num_groups=num_groups
+    )
+    weights_fp8 = []
+    weights_fp8_scale = []
+    for i in range(problem_cnt):
+        weight_fp8, weight_fp8_scale = op.weight_preprocess(weights[i], fast_accum)
+        weights_fp8.append(weight_fp8)
+        weights_fp8_scale.append(weight_fp8_scale)
+    
+    def fn(iter_id):
+        problem_idx = iter_id % problem_cnt
+        return op.forward(
+            inputs[problem_idx],
+            weights_fp8[problem_idx],
+            output=None,
+            bias=bias,
+            input_scale=None,
+            weight_scale=weights_fp8_scale[problem_idx],
+            output_scale=None,
+            tuning = tuned_hparam,
+            fast_accum=fast_accum,
+        )
+    return fn
+   
 def perf_xop(
     inputs: list[torch.Tensor],
     weights: list[torch.Tensor],
@@ -176,32 +223,9 @@ def perf_xop(
     # tuned_hparam = gen_tuned_hparam(1024, -1)
     tuned_hparam = None # [2, 4096]
     if (quant_bits != -1): #  and m > 256
-        op = xop.GemmQuant(
-            input_dtype=inputs[0].dtype,
-            output_dtype=output_dtype,
-            quant_bits=quant_bits,
-            num_groups=num_groups
-        )
-        weights_fp8 = []
-        weights_fp8_scale = []
-        for i in range(problem_cnt):
-            weight_fp8, weight_fp8_scale = op.weight_preprocess(weights[i], fast_accum)
-            weights_fp8.append(weight_fp8)
-            weights_fp8_scale.append(weight_fp8_scale)
-        
-        def fn(iter_id):
-            problem_idx = iter_id % problem_cnt
-            return op.forward(
-                inputs[problem_idx],
-                weights_fp8[problem_idx],
-                output=None,
-                bias=bias,
-                input_scale=None,
-                weight_scale=weights_fp8_scale[problem_idx],
-                output_scale=None,
-                tuning = tuned_hparam,
-                fast_accum=fast_accum,
-            )
+        fn = xop_quant(inputs, weights, bias,
+                       transpose_weight, problem_cnt, output_dtype,
+                       fast_accum, num_groups, quant_bits)
     else:   
         op = xop.GemmNormal(
             input_dtype=inputs[0].dtype,
@@ -273,16 +297,16 @@ def perf_xop(
                     # print("output:", output)
                     return output
             
-    if 1:
-        from tuning.tune_gemm_dsl import get_tuned_gemm
-        import tilelang.language as T
-        from xop.ops.dsl.micro_linear import MicroLinearStrategy, MicroLinear
-        k = inputs[0].size(1)
-        kernel = get_tuned_gemm(MicroLinearStrategy.GEMM, M=m, N=n, K=k, dtype=T.bfloat16, accum_dtype=T.float32)
-        def target_func(iter_id):
-            problem_idx = iter_id % problem_cnt
-            return kernel(inputs[problem_idx], weights[problem_idx])
-        fn = target_func
+    # if 1:
+    #     from tuning.tune_gemm_dsl import get_tuned_gemm
+    #     import tilelang.language as T
+    #     from xop.ops.dsl.micro_linear import MicroLinearStrategy, MicroLinear
+    #     k = inputs[0].size(1)
+    #     kernel = get_tuned_gemm(MicroLinearStrategy.GEMM, M=m, N=n, K=k, dtype=T.bfloat16, accum_dtype=T.float32)
+    #     def target_func(iter_id):
+    #         problem_idx = iter_id % problem_cnt
+    #         return kernel(inputs[problem_idx], weights[problem_idx])
+    #     fn = target_func
     
     return xutil.perf_gemm(warmup_iters, iters, "xop", fn, True)
 
@@ -326,6 +350,7 @@ def run(M, args, xop_perf, torch_perf):
         weights_scale.append(xutil.rand_tensor((1, N), dtype=torch.float32))
 
     if is_fp8:
+        # 针对单独测blockscale fp8 kernel的性能，纯离线完成数据转换。用--dtype=float8_e4m3fn使用
         fp8_org_inputs = []
         fp8_org_weights = []
         for i in range(PROBLEM_COUNT):
@@ -430,44 +455,6 @@ def run(M, args, xop_perf, torch_perf):
     # print(atol, rtol)
     xutil.torch_allclose(xop_output, torch_output, atol=atol, rtol=rtol)
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--show_ms", default=False, action="store_true", help="whether to print time or tflops."
-    )
-    parser.add_argument("M", type=int)
-    parser.add_argument("N", type=int)
-    parser.add_argument("K", type=int)
-    parser.add_argument("--num_groups", default=-1, type=int, help="whether to use GemmGrouped.")
-    parser.add_argument("--quant_bits", default=-1, type=int, help="whether to use GemmQuant.")
-    parser.add_argument("--smallest_m", default=1, type=int, help="The smallest m for testing") # for hopper fp8
-    parser.add_argument("--step", default=5, type=int, help="m step")
-    parser.add_argument("--warmup_iters", default=500, type=int, help="perf warmup iterations")
-    parser.add_argument("--iters", default=2000, type=int, help="perf iterations")
-    parser.add_argument(
-        "--dtype",
-        default="bfloat16", # float16, float8_e4m3fn
-        type=str,
-        choices=list(DTYPE_MAP.keys()),
-    )
-    parser.add_argument(
-        "--output_dtype",
-        default="bfloat16", # float16
-        type=str,
-        help="allowed data type:: bfloat16,float16,s32.",
-    )
-    parser.add_argument(
-        "--fast_accum", default=False, action="store_true", help="whether to use fp16 accum"
-    )
-    parser.add_argument(
-        "--has_bias", default=False, action="store_true", help="whether to add bias"
-    )
-    parser.add_argument(
-        "--transpose_weight", default=False, action="store_true", help="whether to transpose weight"
-    )
-
-    return parser.parse_args()
-
 # python3 tools/gemm/test_gemm_normal.py 14 6144 1024 --show_ms
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --num_groups 4
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --quant_bits=8 --dtype=float16 --output_dtype=float16
@@ -480,7 +467,23 @@ def parse_args():
 # python3 tools/gemm/test_gemm_normal.py 14 4096 4096 --dtype=float8_e4m3fn --output_dtype=float16 --fast_accum
 if __name__ == "__main__":
     init_seed()
-    args = parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--show_ms", default=False, action="store_true", help="whether to print time or tflops.")
+    parser.add_argument("M", type=int)
+    parser.add_argument("N", type=int)
+    parser.add_argument("K", type=int)
+    parser.add_argument("--num_groups", default=-1, type=int, help="whether to use GemmGrouped.")
+    parser.add_argument("--quant_bits", default=-1, type=int, help="whether to use GemmQuant.") # 动态量化
+    parser.add_argument("--smallest_m", default=1, type=int, help="The smallest m for testing") # for hopper fp8
+    parser.add_argument("--step", default=5, type=int, help="m step")
+    parser.add_argument("--warmup_iters", default=500, type=int, help="perf warmup iterations")
+    parser.add_argument("--iters", default=2000, type=int, help="perf iterations")
+    parser.add_argument("--fast_accum", default=False, action="store_true", help="whether to use fp16 accum")
+    parser.add_argument("--has_bias", default=False, action="store_true", help="whether to add bias" )
+    parser.add_argument("--transpose_weight", default=False, action="store_true", help="whether to transpose weight")
+    parser.add_argument("--dtype", default="bfloat16", type=str, choices=list(DTYPE_MAP.keys())) # float16, float8_e4m3fn
+    parser.add_argument("--output_dtype", default="bfloat16", type=str, help="allowed data type:: bfloat16,float16,s32.")
+    args = parser.parse_args()
 
     xop_perf = {'ms': [], 'tflops': []} 
     torch_perf = {'ms': [], 'tflops': []} 

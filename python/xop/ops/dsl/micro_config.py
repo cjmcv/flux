@@ -9,7 +9,7 @@ import tilelang
 
 ENABLE_MEGAKERNEL = True
 ENABLE_PROFILING = True
-SAVE_KERNEL_SOURCE = False
+SAVE_KERNEL_SOURCE = True
 
 target_arch = torch.cuda.get_device_properties(0).major * 10 + torch.cuda.get_device_properties(0).minor
 if target_arch == 120:

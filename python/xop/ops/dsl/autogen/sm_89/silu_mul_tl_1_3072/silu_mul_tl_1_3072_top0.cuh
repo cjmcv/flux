@@ -124,4 +124,4 @@ extern "C" int create_silu_mul_tl_1_3072(bfloat16_t* __restrict__ A, bfloat16_t*
 }
 #define LAUNCH_INFO_silu_mul_tl_1_3072 dim3(48, 1, 1), dim3(128, 1, 1), 6144, stream
 
-// latency: 0.0153 ms vs [ref-0.02627 sim-1.0], idx: 0
+// latency: 0.02239 ms vs [ref-0.04073 sim-1.0], idx: 0

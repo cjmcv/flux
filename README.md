@@ -2,7 +2,7 @@
 
 ### Install from Source
 ```bash
-git clone --recursive
+git clone --recursive 
 
 # Set env path
 source ./build.sh --env
@@ -32,8 +32,10 @@ nsight-sys # Open file: my_profile.ncu-rep
 
 ```bash
 # 基础库编译
+source ./build.sh --env
 python megakernel_setup.py build_ext --inplace
-# 生成kernel, 有HEURISTIC / TUNING / TUNED三种模式，具体看脚本
+# 生成kernel, 有HEURISTIC / TUNING / TUNED三种模式。
+# 仅验证功能，可直接用HEURISTIC, 具体看脚本
 python tools/test_dsl.py --gen
 # 直接测试，单算子无收益，融合以预取为主
 python tools/test_mega_single.py # 单算子
@@ -62,6 +64,3 @@ python3 tools/tuning/tune_gemm_normal.py --schema=GemmNormal
 # Now you can test it.
 python3 tools/gemm/test_gemm_normal.py 12 12288 6144 --dtype=bfloat16
 ```
-
-
-git clone -b pn2 --recursive https://github.com/cjmcv/flux.git

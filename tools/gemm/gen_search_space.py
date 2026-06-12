@@ -455,6 +455,51 @@ class GemmGroupedBolckScaleFp8Sm90Schema:
             res.append(hparam_str)
         return res
 
+class GemmBlockScaleFp8Sm120Schema:
+    impl = "GemmBlockScaleFp8Sm120Impl"
+    impl_header = "gemm_normal/gemm_blockscale_fp8_sm120_impl.h"
+    arch_limit = "XOP_CUDA_ARCHS==120"
+    
+    def get_meta_space(self, w):
+        data_type = [('E4M3', 'E4M3', 'BF16', 'FP32')] # a,b,cd,acc
+        layout = ['RCR'] # , 'RRR'
+        arch = ['Sm120']
+        res = make_meta_space(w, data_type, layout, arch)
+        return res
+
+    def get_hparam_space(self, w):
+        mainloop_schedules = ["MSTmaWarpSpecializedPingpongFP8BlockScaledAccum", "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum"]
+        epilogue_schedules = ["ESTmaWarpSpecialized", "ESTmaWarpSpecializedCooperative"]
+        tile_schedulers = ["TSPersistent", "TSStreamK"]
+        tile_shapes = [(128, 128, 128)]
+        cluster_shapes = [(1, 1, 1)] # sm120 仅支持(1, 1, 1)
+        raster_orders = ["Heuristic", "AlongM", "AlongN"] #
+        swizzles = [8] # 1,2,4,8
+
+        res = []
+        for tile_shape, cluster_shape, mainloop_schedule, epilogue_schedule, tile_scheduler, raster_order, swizzle in itertools.product(
+            tile_shapes, cluster_shapes, mainloop_schedules, epilogue_schedules, tile_schedulers, raster_orders, swizzles):
+            
+            # "Cooperative kernel requires Tile Size to be greater than or equal to 128 along the M-dimension."
+            if (mainloop_schedule == "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum" and tile_shape[0] < 128):
+                continue
+            # "Ping-pong kernel does not currently support stream-K scheduler" - cutlass 4.2
+            if (mainloop_schedule == "MSTmaWarpSpecializedPingpongFP8BlockScaledAccum" and 
+                (epilogue_schedule != "ESTmaWarpSpecialized" or tile_scheduler != "TSPersistent")):
+                continue
+            # TmaWarpSpecializedCooperative -> TmaWarpSpecializedCooperative
+            if (mainloop_schedule == "MSTmaWarpSpecializedCooperativeFP8BlockScaledAccum" and epilogue_schedule != "ESTmaWarpSpecializedCooperative"):
+                continue
+            
+            hparam_str = '{0},{1},{2},{3},{4},{5},{6}'.format(
+                w.cstw(tile_shape,3), w.cstw(cluster_shape,3), 
+                w.xop_to_cutlasstype(mainloop_schedule), 
+                w.xop_to_cutlasstype(epilogue_schedule), 
+                w.xop_to_cutlasstype(tile_scheduler), 
+                w.xop_to_cutlasstype(raster_order), str(swizzle))
+            res.append(hparam_str)
+        return res
+    
 #### GemmComm
 class GemmAllreduceSm80Schema:
     impl = "GemmAllreduceSm80Impl"
@@ -556,6 +601,7 @@ def str2schema(schema_name):
         "GemmBlockScaleFp8Sm90": GemmBlockScaleFp8Sm90Schema(),
         "GemmGroupedBlockScaleFp8Sm90": GemmGroupedBolckScaleFp8Sm90Schema(),
         #
+        "GemmBlockScaleFp8Sm120": GemmBlockScaleFp8Sm120Schema(),
         "GemmSm120": GemmSm120Schema(),
         # 
         "GemmAllreduceSm80": GemmAllreduceSm80Schema(),
@@ -599,7 +645,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.schema == "None"):
-        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmSm80 (GemmSm80/GemmSimtSm80/GemmBlockScaleFp8Sm89/GemmSm90/GemmW4A16Sm90/GemmBlockScaleFp8Sm90/GemmGroupedBlockScaleFp8Sm90/GemmSm120 // GemmAllreduceSm80/GemmAllreduceSm90)")
+        print("usage: python3 tools/gemm/gen_search_space.py --schema=GemmSm80 (GemmSm80/GemmSimtSm80/GemmBlockScaleFp8Sm89/GemmSm90/GemmW4A16Sm90/GemmBlockScaleFp8Sm90/GemmBlockScaleFp8Sm120/GemmGroupedBlockScaleFp8Sm90 // GemmAllreduceSm80/GemmAllreduceSm90)")
         exit()
     generator = SearchSpaceGenerator()
     generator.run(args.schema, args.output_path) 

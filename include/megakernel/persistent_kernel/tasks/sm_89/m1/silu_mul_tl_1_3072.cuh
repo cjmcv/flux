@@ -24,7 +24,7 @@ __device__ __forceinline__ void silu_mul_kernel_1_3072(const int bx, const int b
                                                    void *output_ptr,
                                                    int num_active_tokens) {
   static_assert(THREAD_NUM==128);
-  static_assert(TILE_DIM_X==64); static_assert(TILE_DIM_Y==16); static_assert(TILE_DIM_Z==1);
+  static_assert(TILE_DIM_X==64); static_assert(TILE_DIM_Y==32); static_assert(TILE_DIM_Z==1);
   static_assert(M==1); static_assert(N==3072);
   if (bx >= 48 || by >= 1 || bz >= 1) { return; }
   
@@ -32,27 +32,33 @@ __device__ __forceinline__ void silu_mul_kernel_1_3072(const int bx, const int b
   bfloat16_t* __restrict__ C = static_cast<bfloat16_t*>(output_ptr);
   
   extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
-  bfloat16_t broadcast_var = bfloat16_t(0x0p+0f/*0.000000e+00*/);
-  uint4 condval;
-  if ((((int)threadIdx.x) < 8)) {
-    condval = *(uint4*)(A + ((((int)bx) * 64) + (((int)threadIdx.x) * 8)));
-  } else {
-    condval = make_uint4(__pack_nv_bfloat162(broadcast_var, broadcast_var), __pack_nv_bfloat162(broadcast_var, broadcast_var), __pack_nv_bfloat162(broadcast_var, broadcast_var), __pack_nv_bfloat162(broadcast_var, broadcast_var));
-  }
-  *(uint4*)(((bfloat16_t*)buf_dyn_shmem) + (((int)threadIdx.x) * 8)) = condval;
-  bfloat16_t broadcast_var_1 = bfloat16_t(0x0p+0f/*0.000000e+00*/);
-  uint4 condval_1;
-  if ((((int)threadIdx.x) < 8)) {
-    condval_1 = *(uint4*)(A + (((((int)bx) * 64) + (((int)threadIdx.x) * 8)) + 3072));
-  } else {
-    condval_1 = make_uint4(__pack_nv_bfloat162(broadcast_var_1, broadcast_var_1), __pack_nv_bfloat162(broadcast_var_1, broadcast_var_1), __pack_nv_bfloat162(broadcast_var_1, broadcast_var_1), __pack_nv_bfloat162(broadcast_var_1, broadcast_var_1));
-  }
-  *(uint4*)(((bfloat16_t*)buf_dyn_shmem) + ((((int)threadIdx.x) * 8) + 1024)) = condval_1;
-  __syncthreads();
   #pragma unroll
   for (int i = 0; i < 2; ++i) {
+    bfloat16_t broadcast_var = bfloat16_t(0x0p+0f/*0.000000e+00*/);
+    uint4 condval;
+    if ((((i * 16) + (((int)threadIdx.x) >> 3)) < 1)) {
+      condval = *(uint4*)(A + ((((i * 98304) + ((((int)threadIdx.x) >> 3) * 6144)) + (((int)bx) * 64)) + ((((int)threadIdx.x) & 7) * 8)));
+    } else {
+      condval = make_uint4(__pack_nv_bfloat162(broadcast_var, broadcast_var), __pack_nv_bfloat162(broadcast_var, broadcast_var), __pack_nv_bfloat162(broadcast_var, broadcast_var), __pack_nv_bfloat162(broadcast_var, broadcast_var));
+    }
+    *(uint4*)(((bfloat16_t*)buf_dyn_shmem) + ((i * 1024) + (((int)threadIdx.x) * 8))) = condval;
+  }
+  #pragma unroll
+  for (int i_1 = 0; i_1 < 2; ++i_1) {
+    bfloat16_t broadcast_var_1 = bfloat16_t(0x0p+0f/*0.000000e+00*/);
+    uint4 condval_1;
+    if ((((i_1 * 16) + (((int)threadIdx.x) >> 3)) < 1)) {
+      condval_1 = *(uint4*)(A + (((((i_1 * 98304) + ((((int)threadIdx.x) >> 3) * 6144)) + (((int)bx) * 64)) + ((((int)threadIdx.x) & 7) * 8)) + 3072));
+    } else {
+      condval_1 = make_uint4(__pack_nv_bfloat162(broadcast_var_1, broadcast_var_1), __pack_nv_bfloat162(broadcast_var_1, broadcast_var_1), __pack_nv_bfloat162(broadcast_var_1, broadcast_var_1), __pack_nv_bfloat162(broadcast_var_1, broadcast_var_1));
+    }
+    *(uint4*)(((bfloat16_t*)buf_dyn_shmem) + (((i_1 * 1024) + (((int)threadIdx.x) * 8)) + 2048)) = condval_1;
+  }
+  __syncthreads();
+  #pragma unroll
+  for (int i_2 = 0; i_2 < 4; ++i_2) {
     float4 __1;
-    uint2 v_ = *(uint2*)(((bfloat16_t*)buf_dyn_shmem) + ((i * 512) + (((int)threadIdx.x) * 4)));
+    uint2 v_ = *(uint2*)(((bfloat16_t*)buf_dyn_shmem) + ((i_2 * 512) + (((int)threadIdx.x) * 4)));
     ((float2*)(&__1))[0] = __bfloat1622float2((reinterpret_cast<__nv_bfloat162*>(&v_))[0]);
     ((float2*)(&__1))[1] = __bfloat1622float2((reinterpret_cast<__nv_bfloat162*>(&v_))[1]);
     float4 xi = __1;
@@ -91,7 +97,7 @@ __device__ __forceinline__ void silu_mul_kernel_1_3072(const int bx, const int b
         __8.z = (xi.z*sig.z);
         __8.w = (xi.w*sig.w);
       float4 __9;
-      uint2 v__4 = *(uint2*)(((bfloat16_t*)buf_dyn_shmem) + (((i * 512) + (((int)threadIdx.x) * 4)) + 1024));
+      uint2 v__4 = *(uint2*)(((bfloat16_t*)buf_dyn_shmem) + (((i_2 * 512) + (((int)threadIdx.x) * 4)) + 2048));
       ((float2*)(&__9))[0] = __bfloat1622float2((reinterpret_cast<__nv_bfloat162*>(&v__4))[0]);
       ((float2*)(&__9))[1] = __bfloat1622float2((reinterpret_cast<__nv_bfloat162*>(&v__4))[1]);
       __7.x = (__8.x*__9.x);
@@ -100,21 +106,24 @@ __device__ __forceinline__ void silu_mul_kernel_1_3072(const int bx, const int b
       __7.w = (__8.w*__9.w);
     (reinterpret_cast<__nv_bfloat162*>(&__6))[0] = __float22bfloat162_rn(((float2*)(&__7))[0]);
     (reinterpret_cast<__nv_bfloat162*>(&__6))[1] = __float22bfloat162_rn(((float2*)(&__7))[1]);
-    *(uint2*)(((bfloat16_t*)buf_dyn_shmem) + (((i * 512) + (((int)threadIdx.x) * 4)) + 2048)) = __6;
+    *(uint2*)(((bfloat16_t*)buf_dyn_shmem) + (((i_2 * 512) + (((int)threadIdx.x) * 4)) + 4096)) = __6;
   }
   __syncthreads();
-  if (((int)threadIdx.x) < 8) {
-    *(uint4*)(C + ((((int)bx) * 64) + (((int)threadIdx.x) * 8))) = *(uint4*)(((bfloat16_t*)buf_dyn_shmem) + ((((int)threadIdx.x) * 8) + 2048));
+  #pragma unroll
+  for (int i_3 = 0; i_3 < 2; ++i_3) {
+    if (((i_3 * 16) + (((int)threadIdx.x) >> 3)) < 1) {
+      *(uint4*)(C + ((((i_3 * 49152) + ((((int)threadIdx.x) >> 3) * 3072)) + (((int)bx) * 64)) + ((((int)threadIdx.x) & 7) * 8))) = *(uint4*)(((bfloat16_t*)buf_dyn_shmem) + (((i_3 * 1024) + (((int)threadIdx.x) * 8)) + 4096));
+    }
   }
 }
 
 
 } // kernel
 // Strategy: silu_mul_tl_1_3072
-// selected_hparams: [16, 64, 128].
-// smem: 6144 bytes.
+// selected_hparams: [32, 64, 128].
+// smem: 12288 bytes.
 // use_cooperative_groups: 0.
-// layout: (48, 1, 1), (64, 16, 1)
+// layout: (48, 1, 1), (64, 32, 1)
 // block_dim=(128, 1, 1).
 
 
@@ -122,6 +131,6 @@ extern "C" int create_silu_mul_tl_1_3072(bfloat16_t* __restrict__ A, bfloat16_t*
 
 	return 0;
 }
-#define LAUNCH_INFO_silu_mul_tl_1_3072 dim3(48, 1, 1), dim3(128, 1, 1), 6144, stream
+#define LAUNCH_INFO_silu_mul_tl_1_3072 dim3(48, 1, 1), dim3(128, 1, 1), 12288, stream
 
-// latency: 0.01145 ms vs [ref-0.02138 sim-1.0], idx: 0
+// latency: 0.01149 ms vs [ref-0.02289 sim-1.0], idx: -1

@@ -1,1 +1,1 @@
-{"latency":0.0153,"latency_ref":0.02627,"similarity":1.0,"hparams":[16,64,128],"idx":0}
+{"latency":0.02239,"latency_ref":0.04073,"similarity":1.0,"hparams":[16,64,128],"idx":0}
